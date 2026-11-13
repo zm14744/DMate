@@ -5,6 +5,7 @@
 (function (root) {
     'use strict';
     const exact = {
+        "选项": "Options",
         // Mathematical symbol picker UI; the inserted glyphs remain content.
         "数学符号": "Math symbols",
         "数学符号键盘": "Math symbol keyboard",

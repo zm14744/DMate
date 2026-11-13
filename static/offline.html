@@ -44,7 +44,7 @@
 <link rel="stylesheet" href="/static/dmate-shared-overrides.css?v=17">
 <link rel="stylesheet" href="/static/button-themes.css">
 <link rel="stylesheet" href="/static/offline-knowledge-graph.css?v=17">
-<link rel="stylesheet" href="/static/offline.css?v=8">
+<link rel="stylesheet" href="/static/offline.css?v=18">
 <script defer src="/static/graph-editor-model.js"></script>
 <script defer src="/static/graph-editor-format.js"></script>
 <script defer src="/static/graph-editor-overlay.js"></script>
@@ -60,7 +60,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/vendor/marked-15.0.12/marked.umd.js"></script>
 <script defer src="/static/vendor/dompurify-3.2.6/purify.min.js"></script>
 <script defer src="/static/ui-tooltip.js"></script>
-<script defer src="/static/language-catalog.js"></script>
+<script defer src="/static/language-catalog.js?v=18"></script>
 <script defer src="/static/language-knowledge.js"></script>
 <script defer src="/static/language.js"></script>
 <script defer src="/static/offline-appearance.js?v=8"></script>
@@ -68,7 +68,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/knowledge-graph-labels.js?v=17"></script>
 <script defer src="/static/offline-knowledge-graph.js?v=17"></script>
 <script defer src="/static/offline-entry.js?v=17"></script>
-<script defer src="/static/offline.js?v=17"></script>
+<script defer src="/static/offline.js?v=18"></script>
 </head>
 <body class="offline-workspace">
 <script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"light";</script>
@@ -116,13 +116,13 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
     </nav>
 
     <div class="offline-sidebar-bottom">
-      <button id="offlineAppearanceBtn" class="offline-nav-item" type="button"><!-- BEGIN ONLINE APPEARANCE ICON -->
-<svg class="dmate-lucide-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z" /><circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /><circle cx="17.5" cy="10.5" r=".5" fill="currentColor" /><circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /><circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /></svg>
-<!-- END ONLINE APPEARANCE ICON --><span>外观</span></button>
       <button type="button" id="returnOnline" class="btn offline-return" aria-label="在线版">
         <svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
         <span>在线版</span>
       </button>
+      <button id="offlineAppearanceBtn" class="offline-nav-item" type="button"><!-- BEGIN ONLINE APPEARANCE ICON -->
+<svg class="dmate-lucide-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z" /><circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /><circle cx="17.5" cy="10.5" r=".5" fill="currentColor" /><circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /><circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /></svg>
+<!-- END ONLINE APPEARANCE ICON --><span>外观</span></button>
     </div>
   </aside>
 
@@ -192,7 +192,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
         <div class="offline-filters">
           <select id="questionCategory" aria-label="按章节筛选"><option value="">全部章节</option></select>
           <select id="questionDifficulty" aria-label="按难度筛选">
-            <option value="">全部难度</option><option value="基础">基础</option><option value="中等">中等</option><option value="进阶">进阶</option>
+            <option value="">全部难度</option><option value="简单">简单</option><option value="中等">中等</option><option value="困难">困难</option>
           </select>
         </div>
       </div>

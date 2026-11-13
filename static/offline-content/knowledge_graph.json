@@ -1,5 +1,5 @@
 {
-  "version": 47,
+  "version": 49,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1070,20 +1070,45 @@
       ],
       "videos": [
         {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "生成函数",
+          "source_id": "sawfin_bilibili",
+          "title": "Generating Functions",
           "sections": [
-            "第14讲：生成函数基础定义与运算",
-            "第15讲：生成函数经典计数案例"
+            "Discrete Math II - 8.4.1 Readiness for Generating Functions: Model with Generating Functions",
+            "Discrete Math II - 8.4.2 Readiness for Generating Functions: Power Series and Fundamental Identity",
+            "Discrete Math II - 8.4.3 Readiness for Generating Functions: The Finite Geometric Series",
+            "Discrete Math II - 8.4.4 Readiness for Generating Functions: Binomial and Extended Binomial Theorem",
+            "Discrete Math II - 8.4.5 Solve Counting Problems with Generating Functions",
+            "Discrete Math II - 8.4.6 The Explicit Form of a Generating Function",
+            "Discrete Math II - 8.4.7 Solve Recurrence Relations with Generating Function"
           ],
           "lessons": [
             {
-              "title": "第14讲：生成函数基础定义与运算",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=14"
+              "title": "Discrete Math II - 8.4.1 Readiness for Generating Functions: Model with Generating Functions",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=110"
             },
             {
-              "title": "第15讲：生成函数经典计数案例",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=15"
+              "title": "Discrete Math II - 8.4.2 Readiness for Generating Functions: Power Series and Fundamental Identity",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=111"
+            },
+            {
+              "title": "Discrete Math II - 8.4.3 Readiness for Generating Functions: The Finite Geometric Series",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=112"
+            },
+            {
+              "title": "Discrete Math II - 8.4.4 Readiness for Generating Functions: Binomial and Extended Binomial Theorem",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=113"
+            },
+            {
+              "title": "Discrete Math II - 8.4.5 Solve Counting Problems with Generating Functions",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=114"
+            },
+            {
+              "title": "Discrete Math II - 8.4.6 The Explicit Form of a Generating Function",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=115"
+            },
+            {
+              "title": "Discrete Math II - 8.4.7 Solve Recurrence Relations with Generating Function",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=116"
             }
           ]
         }
@@ -1119,20 +1144,25 @@
       ],
       "videos": [
         {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "线性递推与特征方程",
+          "source_id": "sawfin_bilibili",
+          "title": "Linear Homogeneous Recurrence Relations",
           "sections": [
-            "第12讲：线性递推求解方法",
-            "第13讲：递推序列的特征方程法"
+            "Discrete Math II - 8.2.1 Solving First-Order Linear Homogeneous Recurrence Relations",
+            "Discrete Math II - 8.2.2 Solving Second-Order Linear Homogeneous Recurrence",
+            "Discrete Math II - 8.2.3 General Case Linear Homogeneous Recurrence Relation"
           ],
           "lessons": [
             {
-              "title": "第12讲：线性递推求解方法",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=12"
+              "title": "Discrete Math II - 8.2.1 Solving First-Order Linear Homogeneous Recurrence Relations",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=106"
             },
             {
-              "title": "第13讲：递推序列的特征方程法",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=13"
+              "title": "Discrete Math II - 8.2.2 Solving Second-Order Linear Homogeneous Recurrence",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=107"
+            },
+            {
+              "title": "Discrete Math II - 8.2.3 General Case Linear Homogeneous Recurrence Relation",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=108"
             }
           ]
         }
@@ -1147,15 +1177,15 @@
       ],
       "videos": [
         {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "source_id": "sawfin_bilibili",
+          "title": "Non-Homogeneous Linear Recurrence Relations",
           "sections": [
-            "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+            "Discrete Math II - 8.2.4 Non-Homogeneous Linear Recurrence Relations"
           ],
           "lessons": [
             {
-              "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=15"
+              "title": "Discrete Math II - 8.2.4 Non-Homogeneous Linear Recurrence Relations",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=109"
             }
           ]
         }
@@ -1516,15 +1546,25 @@
       ],
       "videos": [
         {
-          "source_id": "hit_set_graph_2017",
-          "title": "平面图及欧拉公式",
+          "source_id": "dogeman_discrete",
+          "title": "平面图",
           "sections": [
-            "43平面图及欧拉公式"
+            "10.1.0.2 平面图的基本概念",
+            "10.2.0.3 欧拉公式与平面图的判断",
+            "10.3.0.3 对偶图和外平面图"
           ],
           "lessons": [
             {
-              "title": "43平面图及欧拉公式",
-              "url": "https://www.bilibili.com/video/BV1Eb41137gB/?p=43"
+              "title": "10.1.0.2 平面图的基本概念",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=39"
+            },
+            {
+              "title": "10.2.0.3 欧拉公式与平面图的判断",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=40"
+            },
+            {
+              "title": "10.3.0.3 对偶图和外平面图",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=41"
             }
           ]
         }
@@ -2258,11 +2298,25 @@
     {
       "id": "sawfin_bilibili",
       "name": "Bellevue University · Kimberly Brehm",
-      "course": "Discrete Math I",
+      "course": "Discrete Math I & II",
       "platform": "Bilibili",
       "publisher": "常青藤中英字幕课程",
-      "note": "Kimberly Brehm 的大学离散数学课程；B站页面标注中英字幕，上传者说明为唯一翻译发布账号。用于排列组合、二项式定理和递推建模。仅外链跳转，不下载或托管。",
-      "display_name": "Kimberly Brehm BU"
+      "note": "Kimberly Brehm 的两门大学离散数学课程（Discrete Math I、Discrete Math II），B站同一合集/视频列表。Discrete Math I 内部标号 p0–p79，共80讲，对应B站实际P1–P80；Discrete Math II 内部标号 p0–p53，共54讲，对应B站实际P81–P134。用于基础证明、数论、计数、排列组合、二项式定理、递推建模，以及第二课程中的强归纳、递推求解和生成函数等专题。当前DMate使用的Discrete Math I分P继续按原有已核实的P号；Discrete Math II的P106–P109按两段目录的连续分P偏移计算：内部p25–p28对应实际P106–P109。B站页面有中英字幕，上传者为常青藤中英字幕课程；页面标注未经作者授权，DMate仅提供原视频外链，不下载、托管或重新分发。",
+      "display_name": "Kimberly Brehm BU",
+      "discrete_math_ii_part_index": {
+        "first_course_internal_parts": "p0-p79",
+        "first_course_bilibili_parts": "P1-P80",
+        "second_course_internal_parts": "p0-p53",
+        "second_course_bilibili_parts": "P81-P134",
+        "mapping_rule": "Bilibili P = 81 + Discrete Math II internal part index",
+        "active_parts": [
+          106,
+          107,
+          108,
+          109
+        ],
+        "status": "part indices derived from the published 80-part first course followed by the 54-part second course; exact playback of each target part not independently checked by the search tool"
+      }
     },
     {
       "id": "chenggong_gta",
@@ -2322,22 +2376,22 @@
   "video_resource_policy": {
     "primary_per_node": "Exactly one curated Bilibili course per knowledge node, with multiple precise lessons only when necessary to cover that node.",
     "platform_policy": "Bilibili_only",
-    "course_continuity": "Choose source per node based on tight topic match, clear lecture content and natural adjacency; do not use graph edges as mandatory viewing order. Do not add unrelated advanced algorithms or duplicate supplementary teachers merely for prestige.",
+    "course_continuity": "Choose source per node based on tight topic match, clear lecture content and natural continuity; knowledge graph edges are associations, not mandatory study order. Keep a single best-fit course per node; use consecutive lessons from that course when they provide necessary depth.",
     "note": "Bilibili-only. Select lessons by direct relevance to each individual knowledge node; prefer natural continuity of course scope and difficulty within and across modules without prescribing a strict viewing order. Knowledge graph edges describe useful conceptual relationships, not mandatory steps or proof of mastering prerequisites. Do not show any study-order explanation notes in node detail panels.",
     "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs.",
     "audit_status": {
       "nodes_total": 68,
       "nodes_with_active_course": 68,
       "nodes_pending": "none",
-      "direct_episode_links": 136,
+      "direct_episode_links": 144,
       "nested_or_missing_episode_urls": 0,
       "youtube_links": 0,
       "cmu_2021_parts_verified": 35,
       "cmu_2021_total_duration": "31:26:24",
       "cmu_2021_mapped_nodes": 18,
-      "last_audit_scope": "One best-fit course per each of 68 existing DMate knowledge nodes; removed duplicate course alternatives and off-topic extras, replaced broad MIT basic-number-theory entries with precise BU lessons, preserved specialized MIT Euler/Fermat/RSA, CMU generating-function block and other topic-focused courses.",
-      "unique_episode_urls": 132,
-      "cross_node_reused_urls": 4,
+      "last_audit_scope": "One selected course per node after final search. Count-generating-functions now uses BU Discrete Math II P110-P116 for a complete series naturally following BU recurrence relations; CMU P14-P17 retained in source pool but not active because BU has tighter course continuity.",
+      "unique_episode_urls": 141,
+      "cross_node_reused_urls": 3,
       "sources_with_selected_nodes": 13
     },
     "excluded_source_ids": [
@@ -2844,7 +2898,62 @@
           ]
         }
       ],
-      "scope_limitation": "Evaluated public syllabi, indexed video part names and available lecture descriptions/transcripts. These edits do not certify the teaching quality of every minute of every video; the live Bilibili playback status was not exhaustively checked."
+      "scope_limitation": "Evaluated public syllabi, indexed video part names and available lecture descriptions/transcripts. These edits do not certify the teaching quality of every minute of every video; the live Bilibili playback status was not exhaustively checked.",
+      "last_final_review": {
+        "date": "2026-11-13",
+        "scope": "rechecked current selected videos against mainland Bilibili part lists and original course syllabi",
+        "changes": [
+          {
+            "node": "graph_planar",
+            "previous": "hit_set_graph_2017",
+            "selected": "dogeman_discrete",
+            "parts": [
+              39,
+              40,
+              41
+            ],
+            "reason": "three consecutive, directly titled lessons cover planar graph concepts, Euler formula and planarity tests, dual and outerplanar graphs; they lead naturally into the same course's graph-coloring P42-P44"
+          },
+          {
+            "node": "recurrence_homogeneous",
+            "previous": "CMU P12-P13",
+            "selected": "BU Discrete Math II P106-P108",
+            "parts": [
+              106,
+              107,
+              108
+            ],
+            "reason": "three precise lessons separately cover first-order, second-order and general linear homogeneous recurrences"
+          },
+          {
+            "node": "recurrence_nonhomogeneous",
+            "previous": "MIT Lecture 15",
+            "selected": "BU Discrete Math II P109",
+            "parts": [
+              109
+            ],
+            "reason": "the lesson title directly names non-homogeneous linear recurrence relations"
+          },
+          {
+            "node": "count_generating",
+            "previous": "CMU P14-P17",
+            "selected": "BU Discrete Math II P110-P116",
+            "parts": [
+              110,
+              111,
+              112,
+              113,
+              114,
+              115,
+              116
+            ],
+            "reason": "the BU sequence forms a complete progression from generating-function modeling and power series through counting applications, explicit forms and solving recurrences; it follows the same teacher's BU recurrence-solution sequence, making the cross-topic transition more coherent than switching back to CMU for the GF block"
+          }
+        ],
+        "new_candidate_discovery": "BU Discrete Math II also contains exact lessons on pigeonhole principle, permutations/combinations, binomial theorem, inclusion-exclusion, generating functions and graph theory; these were not bulk-added because current CMU/BUI selections already have strong direct matches and duplicate course links were intentionally minimized.",
+        "limitations": "BU Discrete Math II part indices are calculated from the displayed 80-part Discrete Math I sequence followed by 54 Discrete Math II parts; target P106-P109 have not been independently played back. All other active mappings are based on indexed part titles or user-supplied CMU screenshots, not complete minute-by-minute viewing.",
+        "note": "The BU Discrete Math II P81-P134 block is the continuation of the same Bilibili upload after Discrete Math I P1-P80. P106-P109 map to the explicit homogeneous/non-homogeneous recurrence lessons; P110-P116 map to the complete generating-functions sequence. These part numbers follow the combined 80+54-part list; live playback of each target P was not independently verified."
+      }
     }
   },
   "video_resource_candidates": [

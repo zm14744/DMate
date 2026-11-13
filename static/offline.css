@@ -61,7 +61,7 @@ body.offline-workspace .offline-main.center { position:relative; display:flex !i
 .detail-section p,.detail-section li { font-size:14px; line-height:1.85; white-space:pre-wrap; overflow-wrap:anywhere; }
 .detail-section p { margin:0; }
 .detail-section ul { margin:0; padding-left:20px; }
-.question-option { display:flex; align-items:baseline; gap:8px; width:100%; margin:7px 0; padding:11px 12px; border:1px solid var(--border-strong); border-radius:9px; background:var(--surface-2); color:var(--text-primary); text-align:left; font:inherit; font-size:14px; }
+.question-option { display:flex; align-items:baseline; gap:8px; width:100%; margin:7px 0; padding:11px 12px; border:1px solid var(--border-strong); border-radius:9px; background:var(--surface-2); color:var(--text-primary); text-align:left; font:inherit; font-size:14px; cursor:text; }
 .question-option-key { flex:none; }
 .question-option-text { min-width:0; }
 .question-option-text :first-child { margin-top:0; }
@@ -104,7 +104,6 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
   body.offline-workspace[data-appearance-theme] :is(#offlineDesktopSidebarToggle,#offlineDesktopSidebarOpen,#offlineNavToggle,#offlineAppearanceToggle):is(.offline-icon-button,.mobile-topbar-button) { border:0 !important; background:transparent !important; box-shadow:none !important; color:var(--text-primary) !important; }
   body.offline-workspace[data-appearance-theme] #offlineMain :is(.question-item,.concept-item) { background:transparent !important; border-color:transparent !important; box-shadow:none !important; color:var(--text-primary) !important; }
   body.offline-workspace[data-appearance-theme] #offlineMain :is(.question-item.active,.concept-item.active) { background:var(--dm-selected-bg,var(--surface-3)) !important; }
-  body.offline-workspace[data-appearance-theme] #offlineMain .question-option.selected { background:var(--dm-selected-bg,var(--surface-3)) !important; border-color:var(--dm-selected-ring) !important; }
 }
 @media(max-width:1100px) {
   body.offline-workspace .offline-layout { display:block !important; grid-template-columns:1fr; padding-top:calc(56px + env(safe-area-inset-top)); }

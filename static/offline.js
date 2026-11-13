@@ -6,10 +6,10 @@
   const state = {
     db: null, concepts: [], questions: [], graph: null,
     panel: "graph", selectedQuestion: null, selectedConcept: null,
-    selectedOption: [], revealed: false,
+    revealed: false,
     drawingController: null, backgroundUrl: "", graphCategory: "", questionCategory: "",
     questionDifficulty: "", conceptQuery: "", graphQuery: "", graphController: null,
-    questionResponses: new Map(), appearanceQueue: Promise.resolve()
+    appearanceQueue: Promise.resolve()
   };
   const panelMeta = {
     graph: ["知识图谱", "浏览离散数学知识点及其前置关系。"],
@@ -42,7 +42,7 @@
   }
   function action(text, className, handler, icon) {
     const node = button("", className, handler);
-    const mark = window.DMateOfflineIcons?.create(icon);
+    const mark = icon ? window.DMateOfflineIcons?.create(icon) : null;
     if (mark) node.append(mark);
     node.append(el("span", "dmate-ui-label", text));
     node.setAttribute("aria-label", text);
@@ -196,11 +196,17 @@
     for (const value of categories) select.add(new Option(value, value));
   }
 
+  function difficultyName(value) {
+    if (value === "基础") return "简单";
+    if (value === "进阶" || value === "提高") return "困难";
+    return value;
+  }
+
   function renderQuestions() {
     fillQuestionFilters();
     const filtered = state.questions.filter(q =>
       (!state.questionCategory || q.category === state.questionCategory) &&
-      (!state.questionDifficulty || q.difficulty === state.questionDifficulty)
+      (!state.questionDifficulty || difficultyName(q.difficulty) === state.questionDifficulty)
     );
     $("questionCount").textContent = filtered.length + " 道题目";
     const list = $("questionList");
@@ -209,7 +215,7 @@
       const item = button("", "question-item" + (state.selectedQuestion?.id === question.id ? " active" : ""), () => selectQuestion(question));
       item.dataset.questionId = question.id;
       item.setAttribute("aria-current", String(state.selectedQuestion?.id === question.id));
-      item.append(el("strong", "", question.title), el("small", "", question.category + " · " + question.difficulty + " · " + question.type));
+      item.append(el("strong", "", question.title), el("small", "", question.category + " · " + difficultyName(question.difficulty) + " · " + question.type));
       list.append(item);
     }
     if (state.selectedQuestion && filtered.some(q => q.id === state.selectedQuestion.id)) {
@@ -223,7 +229,6 @@
 
   function selectQuestion(question) {
     state.selectedQuestion = question;
-    state.selectedOption = [];
     state.revealed = false;
     document.querySelectorAll(".question-item").forEach(node => {
       const selected = node.dataset.questionId === question.id;
@@ -235,7 +240,7 @@
   function renderQuestionDetail(question) {
     const detail = $("questionDetail");
     detail.replaceChildren();
-    detail.append(el("div", "detail-kicker", question.category + " / " + question.difficulty + " / " + question.type));
+    detail.append(el("div", "detail-kicker", question.category + " / " + difficultyName(question.difficulty) + " / " + question.type));
     detail.append(el("h2", "detail-title", question.title));
     const concepts = el("div", "prereq-list question-concept-links");
     for (const id of question.knowledge_points || []) {
@@ -256,44 +261,24 @@
 
     if (Array.isArray(question.options) && question.options.length) {
       const options = el("div", "detail-section");
-      options.append(el("h3", "", question.type === "多项选择" ? "选择所有正确选项" : "选择一个答案"));
+      options.append(el("h3", "", "选项"));
+      const list = el("div", "question-options");
+      list.setAttribute("role", "list");
       for (const option of question.options) {
-        const node = button("",
-          "question-option" + (state.selectedOption.includes(option.key) ? " selected" : ""),
-          () => {
-            if (question.type === "多项选择") {
-              state.selectedOption = state.selectedOption.includes(option.key)
-                ? state.selectedOption.filter(x => x !== option.key) : [...state.selectedOption, option.key];
-            } else state.selectedOption = [option.key];
-            renderQuestionDetail(question);
-          });
+        const node = el("div", "question-option");
+        node.setAttribute("role", "listitem");
         node.append(el("span", "question-option-key", option.key + "."), rich("question-option-text", option.text));
-        node.setAttribute("aria-pressed", String(state.selectedOption.includes(option.key)));
-        options.append(node);
+        list.append(node);
       }
+      options.append(list);
       detail.append(options);
-    } else {
-      const response = el("div", "detail-section");
-      response.append(el("h3", "", "你的作答"));
-      const textarea = el("textarea", "");
-      textarea.id = "questionResponse";
-      textarea.value = state.questionResponses.get(question.id) || "";
-      textarea.setAttribute("aria-label", "你的作答");
-      textarea.addEventListener("input", () => state.questionResponses.set(question.id, textarea.value));
-      textarea.placeholder = question.type === "证明" ? "在这里写出完整证明过程…" : "在这里填写你的答案…";
-      response.append(textarea); detail.append(response);
     }
 
     const actions = el("div", "question-actions wrong-actions");
-    actions.append(action("记录本次练习", "secondary", async () => {
-      const response = $("questionResponse")?.value || "";
-      await put("practice", {id:uid(), questionId:question.id, response, selected:state.selectedOption, createdAt:stamp()});
-      toast("练习记录已保存在本机");
-    }, "save"));
     actions.append(action(state.revealed ? "收起参考答案" : "查看参考答案", "offline-primary", () => {
       state.revealed = !state.revealed;
       renderQuestionDetail(question);
-    }, "eye"));
+    }));
     detail.append(actions);
 
     if (state.revealed) {

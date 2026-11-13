@@ -38,6 +38,13 @@ async function ready(page) {
   'Removed wrong-book and notebook navigation, panels and editors are absent');
   assert.equal(await page.locator('#questionsPanel button').filter({ hasText: '加入错题本' }).count(), 0);
   assert.deepEqual(await page.locator('.offline-nav-item[data-panel]').evaluateAll(items => items.map(item => item.dataset.panel)), panels);
+  const entries = await page.evaluate(() => {
+    const online = document.getElementById('returnOnline'), appearance = document.getElementById('offlineAppearanceBtn');
+    return { order: Boolean(online.compareDocumentPosition(appearance) & Node.DOCUMENT_POSITION_FOLLOWING),
+      onlineBottom: online.getBoundingClientRect().bottom, appearanceTop: appearance.getBoundingClientRect().top };
+  });
+  assert.equal(entries.order, true, 'The online entry precedes appearance in sidebar reading order');
+  assert.ok(entries.onlineBottom <= entries.appearanceTop + 1, 'The online button is displayed above appearance');
   await page.locator('#graphPanel').waitFor({ state: 'visible' });
   assert.equal(await page.locator('.offline-nav-item.active').getAttribute('data-panel'), 'graph', 'The first module is the default');
   if (page.viewportSize().width <= 1100) assert.equal(await page.locator('#offlineMobileTitle').innerText(), '知识图谱');
@@ -278,27 +285,133 @@ async function appearanceControls(page, width, theme, reference) {
   await dialog.waitFor({ state: 'hidden' });
 }
 
+const displayDifficulty = value => ({ 基础: '简单', 简单: '简单', 中等: '中等', 进阶: '困难', 提高: '困难', 困难: '困难' }[value] || value);
+
+async function questionDifficulties(page, questions) {
+  const filter = page.locator('#questionDifficulty');
+  assert.deepEqual(await filter.locator('option').evaluateAll(options => options.map(option => [option.value, option.textContent])),
+    [['', '全部难度'], ['简单', '简单'], ['中等', '中等'], ['困难', '困难']], 'Difficulty choices use the three requested labels');
+  assert.ok(questions.every(question => ['简单', '中等', '困难'].includes(displayDifficulty(question.difficulty))),
+    'Every bundled difficulty has a known display/filter mapping');
+  for (const difficulty of ['简单', '中等', '困难', '']) {
+    await filter.selectOption(difficulty);
+    const expected = questions.filter(question => !difficulty || displayDifficulty(question.difficulty) === difficulty);
+    assert.deepEqual(await page.locator('#questionList .question-item').evaluateAll(items => items.map(item => item.dataset.questionId)),
+      expected.map(question => question.id), 'Difficulty filter includes the exact complete-pack IDs: ' + difficulty);
+    assert.equal(await page.locator('#questionCount').textContent(), expected.length + ' 道题目');
+    assert.deepEqual(await page.locator('#questionList .question-item small').allTextContents(),
+      expected.map(question => question.category + ' · ' + displayDifficulty(question.difficulty) + ' · ' + question.type),
+      'Question list uses normalized difficulty labels');
+    if (expected.length) {
+      const currentId = await page.locator('#questionList .question-item.active').getAttribute('data-question-id');
+      const current = expected.find(question => question.id === currentId);
+      assert.ok(current, 'The selected question belongs to the filtered result');
+      assert.equal(await page.locator('#questionDetail .detail-kicker').textContent(),
+        current.category + ' / ' + displayDifficulty(current.difficulty) + ' / ' + current.type);
+    }
+  }
+  // Chapter and difficulty filters must compose, including legacy pack labels.
+  const category = questions[0].category;
+  await page.locator('#questionCategory').selectOption(category);
+  for (const difficulty of ['简单', '中等', '困难']) {
+    await filter.selectOption(difficulty);
+    const expected = questions.filter(question => question.category === category && displayDifficulty(question.difficulty) === difficulty);
+    assert.equal(await page.locator('#questionList .question-item').count(), expected.length);
+    assert.equal(await page.locator('#questionCount').textContent(), expected.length + ' 道题目');
+  }
+  await page.locator('#questionCategory').selectOption('');
+  await filter.selectOption('');
+}
+
 async function practice(page) {
   await navigate(page, 'questions');
-  await page.locator('#questionList .question-item').filter({ hasText: '判断命题' }).click();
-  await page.locator('#questionDetail .question-option').first().click();
-  assert.equal(await page.locator('#questionDetail .question-option.selected').count(), 1);
-  await page.locator('#questionDetail').getByRole('button', { name: '记录本次练习', exact: true }).click();
-  await page.waitForFunction(() => document.getElementById('offlineToast').textContent.includes('练习记录'));
-  await page.locator('#questionDetail').getByRole('button', { name: '查看参考答案', exact: true }).click();
-  await page.locator('#questionDetail .answer-panel').waitFor();
-  assert.match(await page.locator('#questionDetail .answer-panel').textContent(), /参考答案/);
-  assert.equal(await page.locator('#questionDetail button').filter({ hasText: '加入错题本' }).count(), 0);
-  await page.locator('#questionList .question-item').filter({ hasText: '逻辑等价变形' }).click();
-  await page.locator('#questionResponse').fill('¬p∨q');
-  await page.locator('#questionDetail').getByRole('button', { name: '查看参考答案', exact: true }).click();
-  assert.equal(await page.locator('#questionResponse').inputValue(), '¬p∨q', 'Revealing answer preserves unfinished response');
-  assert.equal(await page.locator('#questionDetail button').filter({ hasText: '加入错题本' }).count(), 0);
-  await page.locator('#questionDetail').getByRole('button', { name: '记录本次练习', exact: true }).click();
-  await page.waitForFunction(() => document.getElementById('offlineToast').textContent.includes('练习记录'));
-  const rows = await readStore(page, 'practice');
-  assert.ok(rows.some(row => row.questionId === 'q01' && row.selected.includes('A')));
-  assert.ok(rows.some(row => row.questionId === 'q03' && row.response === '¬p∨q'));
+  const questions = await page.evaluate(async () => (await (await fetch('/static/offline-content/questions.zh-CN.json')).json()).questions);
+  await questionDifficulties(page, questions);
+  assert.deepEqual(await readStore(page, 'practice'), [], 'Browsing starts with a fresh empty practice store');
+  // Record complete source values passed to the real rich renderer, without
+  // replacing its Markdown, sanitization or MathJax behavior in this test.
+  await page.evaluate(() => {
+    const original = window.DMateAIAnswer.render;
+    window.__testQuestionSources = new WeakMap();
+    window.DMateAIAnswer.render = function (target, value, ...args) {
+      window.__testQuestionSources.set(target, String(value ?? ''));
+      return original.call(this, target, value, ...args);
+    };
+  });
+  const detail = page.locator('#questionDetail');
+  const select = async question => {
+    await page.locator('#questionList [data-question-id="' + question.id + '"]').click();
+    assert.equal(await detail.locator('.detail-title').innerText(), question.title);
+    assert.equal(await detail.locator('textarea,input,select,[contenteditable="true"],#questionResponse').count(), 0,
+      question.type + ': the question detail has no answer input');
+    assert.equal(await detail.getByRole('heading', { name: '你的作答', exact: true }).count(), 0);
+    assert.equal(await detail.getByRole('button', { name: /记录本次练习|保存记录|加入错题本/ }).count(), 0);
+    assert.deepEqual(await detail.locator('.question-actions button').allTextContents(), ['查看参考答案'],
+      'Only the reference-answer action remains');
+    assert.equal(await detail.locator('.question-option.selected,[aria-pressed],[aria-checked]').count(), 0,
+      question.type + ': there is no choice-selection state');
+    const actual = await detail.locator('.question-option').evaluateAll(nodes => nodes.map(node => ({
+      key: node.querySelector('.question-option-key').textContent,
+      source: window.__testQuestionSources.get(node.querySelector('.question-option-text')),
+      rendered: Boolean(node.querySelector('.question-option-text').textContent.trim()),
+      interactive: node.matches('button,a,input,[role="button"],[role="radio"],[role="checkbox"]')
+        || node.tabIndex >= 0 || Boolean(node.querySelector('button,a,input,select,textarea,[role="radio"],[role="checkbox"]'))
+    })));
+    assert.deepEqual(actual, (question.options || []).map(option => ({ key: option.key + '.', source: option.text,
+      rendered: true, interactive: false })), question.id + ': every option remains complete and read-only');
+    if (actual.length) {
+      await detail.locator('.question-option').first().click();
+      assert.equal(await detail.locator('.question-option.selected,[aria-pressed],[aria-checked]').count(), 0,
+        'Clicking a displayed option does not select it');
+    }
+  };
+  const types = ['单项选择', '多项选择', '填空', '计算', '简答', '证明'];
+  const representatives = types.map(type => {
+    const question = questions.find(item => item.type === type);
+    assert.ok(question, 'The complete pack contains ' + type);
+    return question;
+  });
+  for (const question of representatives) {
+    await select(question);
+    const reveal = detail.getByRole('button', { name: '查看参考答案', exact: true });
+    assert.equal(await reveal.locator('svg').count(), 0, 'The reference-answer toggle has no eye icon');
+    assert.equal(await detail.locator('.answer-panel').count(), 0);
+    await reveal.click();
+    const answer = detail.locator('.answer-panel');
+    await answer.waitFor();
+    assert.match(await answer.textContent(), /参考答案/);
+    assert.equal(await answer.locator('.wrong-answer-inner').first().evaluate(node => window.__testQuestionSources.get(node)),
+      question.answer_text || (question.answer || []).join('、'), 'The original reference answer remains available');
+    assert.equal(await answer.locator('.wrong-analysis-body').evaluate(node => window.__testQuestionSources.get(node)), question.explanation);
+    const collapse = detail.getByRole('button', { name: '收起参考答案', exact: true });
+    assert.equal(await collapse.locator('svg').count(), 0);
+    await collapse.click();
+    assert.equal(await detail.locator('.answer-panel').count(), 0, 'The reference answer can be collapsed');
+  }
+  // All choice questions, rather than just the first example, retain all four
+  // option bodies while losing their old selection/save behavior.
+  for (const question of questions.filter(item => item.options?.length)) await select(question);
+  assert.deepEqual(await readStore(page, 'practice'), [], 'Reading options/answers never creates practice records');
+  const legacy = [
+    { id: 'legacy-choice', questionId: 'q06', selected: ['B', 'D'], response: '', createdAt: '2025-03-01T00:00:00Z',
+      custom: { feedback: '原有记录保留', attempts: [1, 2] } },
+    { id: 'legacy-written', questionId: 'archived-question', selected: [], response: '原有证明：α²≤Γ₁',
+      createdAt: '2025-03-02T00:00:00Z', custom: { futureField: true } }
+  ];
+  await page.evaluate(rows => new Promise((resolve, reject) => {
+    const request = indexedDB.open('dmate-offline-workspace');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result, tx = db.transaction('practice', 'readwrite');
+      for (const row of rows) tx.objectStore('practice').put(row);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    };
+  }), legacy);
+  await select(representatives.at(-1));
+  await detail.getByRole('button', { name: '查看参考答案', exact: true }).click();
+  assert.deepEqual(await readStore(page, 'practice'), legacy, 'Existing practice content and metadata are untouched');
+  return legacy;
 }
 
 async function concepts(page) {
@@ -330,12 +443,8 @@ async function curriculum(page) {
   assert.ok(references.length >= 3 && references.every(source => source.commercial_use_permitted),
     'The commercial-use reference registry is readable without a network');
   await navigate(page, 'questions');
-  for (const difficulty of [...new Set(questions.map(question => question.difficulty))]) {
-    await page.locator('#questionDifficulty').selectOption(difficulty);
-    assert.equal(await page.locator('#questionList .question-item').count(),
-      questions.filter(question => question.difficulty === difficulty).length, 'Difficulty filter: ' + difficulty);
-  }
-  await page.locator('#questionDifficulty').selectOption('');
+  // Complete-pack difficulty labels, counts and IDs are exercised by practice()
+  // for every viewport/theme, independently of the concept-link round trips.
   const categories = new Set();
   for (const topic of graph) {
     if (categories.has(topic.category)) continue;
@@ -618,16 +727,17 @@ async function runCase(browser, width, theme) {
       await noOverflow(page, panel);
     }
     await appearanceControls(page, width, theme, reference);
-    await practice(page);
+    const preservedPractice = await practice(page);
     await concepts(page);
     if (theme === 'dark') await curriculum(page);
     await graph(page);
     await drawing(page, reference.drawing);
-    // A second fully offline navigation must restore practice records and the drawing.
+    // A second fully offline navigation preserves old records and the drawing.
     await page.reload({ waitUntil: 'networkidle' });
     await ready(page);
     assert.equal(await page.evaluate(() => document.documentElement.dataset.appearanceTheme), theme, 'Offline appearance persists');
-    assert.ok((await readStore(page, 'practice')).length >= 2);
+    assert.deepEqual(await readStore(page, 'practice'), preservedPractice,
+      'Offline reload preserves existing records without creating or rewriting practice data');
     await navigate(page, 'drawing');
     assert.equal(await page.locator('#offlineDrawingHost .ddw-name').inputValue(), '离线保存画板');
     assert.equal(await page.locator('#offlineDrawingHost .dge-overlay-node').count(), 2, 'Edited vertices survive offline refresh');
@@ -643,7 +753,7 @@ async function runCase(browser, width, theme) {
     assert.deepEqual(apiRequests, [], label + ': offline work must not call server APIs');
     assert.deepEqual(failures, [], label + ': required resources must be cached');
     assert.deepEqual(errors, [], label + ': no page errors');
-    console.log('PASS ' + label + ': four panels, removed legacy modules, shared appearance/icons, practice, curriculum, graph, drawing and offline reload');
+    console.log('PASS ' + label + ': four panels, shared appearance/icons, read-only questions, normalized difficulty, preserved legacy records, curriculum, graph, drawing and offline reload');
   } catch (error) {
     const workerStatus = await page.evaluate(async () => {
       const describe = worker => worker && ({ state: worker.state, scriptURL: worker.scriptURL });
