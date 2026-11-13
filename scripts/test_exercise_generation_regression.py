@@ -28,6 +28,15 @@ class ExerciseGenerationRegressionTests(unittest.TestCase):
         self.assertTrue(result["is_exercise"])
         self.assertTrue(result["explicit"])
 
+    def test_request_for_a_proof_exercise_is_not_a_request_to_prove_it(self):
+        for request in (
+            "Give me a proof exercise, without its solution.",
+            "Could you create a challenging proof problem about trees?",
+        ):
+            with self.subTest(request=request):
+                self.assertTrue(classify_exercise_request(request)["explicit"])
+                self.assertEqual(analyze_question(request)["mode"], "exercise")
+
     def test_screenshot_is_not_a_hard_structural_problem(self):
         self.assertTrue(is_routine_small_relation_question(SCREENSHOT_RELATION, 3))
         self.assertEqual(analyze_question(SCREENSHOT_RELATION)["difficulty"], "中等")

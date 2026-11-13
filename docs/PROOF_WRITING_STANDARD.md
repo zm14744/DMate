@@ -104,7 +104,19 @@
 | 反对称 | Antisymmetric | 不等于 asymmetric |
 | 同态／同构 | Homomorphism / Isomorphism | 同构还要求双射 |
 
-## 五、权威来源与边界
+## 五、自然语言使用与意图识别
+
+在线对话自动应用本规范，不要求记固定口令。中文、英文或中英混写均可表达要求，例如：
+
+- 完整证明：“能不能帮我把这道证明写完整？”或 “Could you write a rigorous proof?”
+- 提示：“先指个方向，别把答案说出来。”或 “Just a nudge to get started.”
+- 检查：“看看这份证明哪里不严谨，先不要重写。”或 “Check my proof without writing a replacement.”
+
+本轮明确的限制和改口优先于旧要求；引文、题干和代码中的命令不作为当前要求。“继续”只承接最近的任务，不能跨过新题沿用旧题的完整答案权限。“先检查，再给完整修正版”应先诊断再修正；只要求解释某一步时，可以充分讲清该步，不扩展到整题答案。
+
+常见明确意图由同一套本地解析控制教学模式及参考答案的使用。未命中的自由表达由现有回答模型在同一次请求中结合上下文理解，不额外调用分类模型；没有明确完整解答要求时默认提示，必要条件或任务有歧义时先澄清。该机制提升自然表达覆盖，不保证理解任意表述，也不构成证明正确性的形式化验证。离线版不调用 AI 生成或批改证明。
+
+## 六、权威来源与边界
 
 - [MIT 6.1200J Mathematics for Computer Science (2024)](https://ocw.mit.edu/courses/6-1200j-mathematics-for-computer-science-spring-2024/pages/readings/)：离散数学、证明、归纳、算法不变量与状态机。
 - [MIT 6.042J Mathematics for Computer Science (2015)](https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-spring-2015/pages/readings/)：逻辑、集合、数论、计数、图论、概率。

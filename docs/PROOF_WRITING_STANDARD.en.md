@@ -104,7 +104,19 @@ Both languages use the same domain IDs, method IDs, logical requirements and err
 | Antisymmetric | 反对称 | Not the same as asymmetric |
 | Homomorphism / Isomorphism | 同态／同构 | Isomorphism also requires bijectivity |
 
-## 5. Authoritative sources and boundaries
+## 5. Natural-language requests and intent
+
+The online conversation applies this standard automatically; no fixed command words are required. Requests can be Chinese, English or mixed, for example:
+
+- A complete proof: “能不能帮我把这道证明写完整？” or “Could you write a rigorous proof?”
+- A hint: “先指个方向，别把答案说出来。” or “Just a nudge to get started.”
+- A review: “看看这份证明哪里不严谨，先不要重写。” or “Check my proof without writing a replacement.”
+
+Current restrictions and corrections take precedence over earlier requests. Commands inside quotations, problem statements or code are not current instructions. “Continue” carries on the most recent task without transferring an old question's permission to disclose a complete answer to a new question. A request to review and then rewrite calls for diagnosis before the corrected proof. A request about one step may explain that step fully without revealing the entire solution.
+
+A shared local parser controls common explicit tutoring intentions and use of saved reference answers. Unrecognized free-form phrasing is interpreted in context by the existing answer model in the same request, with no additional classification-model call. Hints remain the default without a request for a complete solution; ambiguous tasks or missing essential assumptions call for clarification. This improves language coverage but does not guarantee understanding of every expression or formally verify a proof. The offline edition does not call AI to generate or review proofs.
+
+## 6. Authoritative sources and boundaries
 
 - [MIT 6.1200J Mathematics for Computer Science (2024)](https://ocw.mit.edu/courses/6-1200j-mathematics-for-computer-science-spring-2024/pages/readings/): discrete mathematics, proofs, induction, algorithm invariants and state machines.
 - [MIT 6.042J Mathematics for Computer Science (2015)](https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-spring-2015/pages/readings/): logic, sets, number theory, counting, graph theory and probability.

@@ -6,6 +6,7 @@ on:
     paths:
       - 'app.py'
       - 'teaching.py'
+      - 'tutoring_intent.py'
       - 'ai.py'
       - 'concept_notebook.py'
       - 'proof_writing.py'
@@ -13,6 +14,7 @@ on:
       - 'docs/PROOF_WRITING_STANDARD.md'
       - 'docs/PROOF_WRITING_STANDARD.en.md'
       - 'scripts/test_proof_writing.py'
+      - 'scripts/test_tutoring_*.py'
       - 'exercise_relation_check.py'
       - 'exercise_intent.py'
       - 'static/exercise-intent-rules.json'
@@ -34,8 +36,16 @@ jobs:
         with:
           python-version: '3.10'
       - name: Compile proof-writing integrations
-        run: python -m py_compile ai.py concept_notebook.py proof_writing.py proof_writing_extended.py
+        run: python -m py_compile app.py teaching.py tutoring_intent.py ai.py concept_notebook.py proof_writing.py proof_writing_extended.py
       - name: Run offline exercise regressions
         run: python -m unittest discover -s scripts -p 'test_exercise_generation_regression.py' -v
       - name: Run proof-writing policy regressions
         run: python -m unittest discover -s scripts -p 'test_proof_writing.py' -v
+      - name: Run natural-language tutoring regressions
+        run: python -m unittest discover -s scripts -p 'test_tutoring_intent.py' -v
+      - name: Run proof context regressions
+        run: python -m unittest discover -s scripts -p 'test_tutoring_context.py' -v
+      - name: Install chat route test dependencies
+        run: python -m pip install Flask==3.1.2 requests==2.32.5 Pillow==11.3.0
+      - name: Run chat intent regressions without external AI calls
+        run: python -m unittest discover -s scripts -p 'test_tutoring_chat.py' -v

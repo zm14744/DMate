@@ -68,6 +68,7 @@ from classification_semantic import classify_ambiguous_questions
 from exercise_intent import EXERCISE_INTENT_RULES, classify_exercise_request
 from exercise_relation_check import verify_relation_closure_count
 from teaching import (
+    _extract_explicit_review_question,
     analyze_messages,
     analyze_question,
     extract_current_request,
@@ -3985,20 +3986,21 @@ def _chat_response(on_delta=None, cancelled=None):
             "unsupported_effort": "max",
         })
 
-    solution_mode = bool(explicit_solution or (
-        (teaching or {}).get("mode") == "full_solution"
-        and not re.search(r"(?:不要|别|不用|无需|不需要).{0,5}(?:答案|解答)", current_instruction)
-        and not re.search(r"\b(?:no|without|don't|do not|never|hide|omit)\b.{0,30}\b(?:answers?|solutions?)\b", current_instruction, re.I)
-    ))
-    if solution_mode:
-        teaching = dict(teaching or {})
-        teaching["mode"] = "full_solution"
-        teaching["mode_label"] = "完整解析"
+    # One current-request decision controls tutoring. The separate output
+    # parser is for compound exercise-generation requests below; its broad
+    # answer/proof words must not override "check only", hints or quotations.
+    # Unresolved phrasing is interpreted by the existing answer-model call,
+    # without preloading a saved answer or adding a second classification call.
+    solution_mode = (teaching or {}).get("mode") == "full_solution"
+    current_user_content = next(
+        (item["content"] for item in reversed(cleaned) if item["role"] == "user"), ""
+    )
+    new_review_question = _extract_explicit_review_question(current_user_content)
 
     # 仅当本轮确实要求答案、客户端发送的题干与实际请求锚点一致时，
     # 才使用这道生成题之前保存的参考答案；不查其他账号或会话。
     solution_reference_answer = ""
-    if solution_mode and not client_requires_exercise and confirmed_context is None:
+    if solution_mode and not client_requires_exercise and confirmed_context is None and not new_review_question:
         ref = data.get("solution_reference")
         if isinstance(ref, dict):
             q = ref.get("question")
@@ -4014,13 +4016,11 @@ def _chat_response(on_delta=None, cancelled=None):
     # 推测难度。只接受已包含在本轮用户消息中的同一题目锚点。
     if not client_requires_exercise:
         question_context = data.get("question_context")
-        if isinstance(question_context, dict):
+        # An explicitly supplied new proof replaces an old pinned problem;
+        # neither its difficulty nor its carried reasoning preference applies.
+        if isinstance(question_context, dict) and not new_review_question:
             pinned_question = str(question_context.get("question") or "").strip()
             pinned_difficulty = str(question_context.get("difficulty") or "").strip()
-            current_user_content = next(
-                (item["content"] for item in reversed(cleaned)
-                 if item["role"] == "user"), ""
-            )
             if (10 <= len(pinned_question) <= MAX_CONFIRMED_MESSAGE_CHARS
                     and pinned_difficulty in ("简单", "中等", "困难")
                     and "【当前指向题目】" in current_user_content
@@ -4041,7 +4041,7 @@ def _chat_response(on_delta=None, cancelled=None):
         client_effort = str(data.get("reasoning_effort_override") or "").lower()
         # 客户端的续用偏好只在它携带了有效题目锚点时接受。
         has_pinned_question = bool(
-            isinstance(question_context, dict)
+            not new_review_question and isinstance(question_context, dict)
             and isinstance(question_context.get("question"), str)
             and "【当前指向题目】" in current_user_content
             and question_context["question"].strip() in current_user_content
