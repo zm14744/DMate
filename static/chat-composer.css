@@ -17,14 +17,26 @@ body[data-appearance-theme] .center.chat-empty > .input-wrap:not([hidden]) {
        for the keyboard; the center already follows its visible height. */
 }
 
-/* The active mode capsule and message field share the same depth per theme. */
+/* One surface supplies the active capsule and message field, including the
+   fill, shaded paint, edge and depth rather than only their outer shadow. */
+body[data-appearance-theme] {
+    --dmate-composer-bg:rgba(var(--surface-2-rgb),var(--panel-alpha,1));
+    --dmate-composer-image:none;
+    --dmate-composer-border:var(--border-strong,#cbd5e1);
+}
 body[data-appearance-theme="light"] {
+    --dmate-composer-border:rgba(148,163,184,.24);
     --dmate-composer-shadow:0 4px 16px rgba(15,23,42,.055),0 1px 3px rgba(15,23,42,.025);
 }
 body[data-appearance-theme="dark"] {
     --dmate-composer-shadow:0 5px 18px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.035);
 }
 body[data-appearance-theme="navy"] {
+    --dmate-composer-bg:transparent;
+    --dmate-composer-image:linear-gradient(180deg,
+        rgba(27,38,59,var(--panel-alpha,1)),
+        rgba(23,33,53,var(--panel-alpha,1)));
+    --dmate-composer-border:rgba(148,163,184,.12);
     --dmate-composer-shadow:0 5px 18px rgba(2,6,23,.20),inset 0 1px 0 rgba(226,232,240,.035);
 }
 
@@ -32,7 +44,6 @@ body[data-appearance-theme="navy"] {
 body[data-appearance-theme] .interaction-mode-switch {
     --dmate-mode-track-bg:var(--surface-1,#f1f5f9);
     --dmate-mode-track-border:transparent;
-    --dmate-mode-active-bg:var(--surface-3,#e2e8f0);
     position:relative; isolation:isolate; display:inline-grid;
     grid-template-columns:minmax(0,54fr) minmax(0,46fr);
     grid-template-rows:minmax(0,1fr); align-items:center; flex:none;
@@ -50,15 +61,12 @@ body[data-appearance-theme] .interaction-mode-switch[data-mode="question"] {
 body[data-appearance-theme="light"] .interaction-mode-switch {
     --dmate-mode-track-bg:rgba(237,241,246,var(--panel-alpha,1));
     --dmate-mode-track-border:rgba(148,163,184,.12);
-    --dmate-mode-active-bg:rgba(255,255,255,var(--panel-alpha,1));
 }
 body[data-appearance-theme="dark"] .interaction-mode-switch {
     --dmate-mode-track-bg:#1b1b1b;
-    --dmate-mode-active-bg:#212121;
 }
 body[data-appearance-theme="navy"] .interaction-mode-switch {
     --dmate-mode-track-bg:var(--surface-1,#0b1220);
-    --dmate-mode-active-bg:var(--surface-3,#1f2937);
 }
 body[data-appearance-theme] .interaction-mode-switch::after {
     content:""; position:absolute; z-index:0; inset:1px 0;
@@ -67,8 +75,10 @@ body[data-appearance-theme] .interaction-mode-switch::after {
 }
 body[data-appearance-theme] .interaction-mode-switch::before {
     content:""; position:absolute; z-index:1; top:0; bottom:0; left:0;
-    width:54%; border-radius:999px;
-    background:var(--dmate-mode-active-bg); pointer-events:none;
+    box-sizing:border-box; width:54%; border-radius:999px;
+    border:1px solid var(--dmate-composer-border);
+    background-color:var(--dmate-composer-bg);
+    background-image:var(--dmate-composer-image); pointer-events:none;
     box-shadow:var(--dmate-composer-shadow,none);
     transition:left .18s ease;
 }
@@ -123,18 +133,9 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input {
     display:flex !important; align-items:flex-end !important; gap:8px !important;
     box-sizing:border-box !important; width:min(100%,1440px) !important; min-width:0 !important;
     min-height:52px !important; height:auto !important; max-height:none !important;
-    margin:0 auto !important; padding:6px 10px !important; border:1px solid var(--border-strong,#cbd5e1) !important;
+    margin:0 auto !important; padding:6px 10px !important; border:1px solid var(--dmate-composer-border) !important;
     border-radius:28px !important; background:var(--surface-2,#f4f4f5) !important;
     box-shadow:var(--dmate-composer-shadow,none) !important;
-}
-/* Theme-specific composer outlines and depth. */
-body[data-appearance-theme="light"] .center > .input-wrap:not([hidden]) > .input,
-body[data-appearance-theme="light"] .center > .input-wrap:not([hidden]) > .input.composer-expanded {
-    border:1px solid rgba(148,163,184,.24) !important;
-}
-body[data-appearance-theme="navy"] .center > .input-wrap:not([hidden]) > .input,
-body[data-appearance-theme="navy"] .center > .input-wrap:not([hidden]) > .input.composer-expanded {
-    border:1px solid rgba(148,163,184,.12) !important;
 }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input.composer-expanded {
     border-radius:24px !important;

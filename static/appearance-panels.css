@@ -72,12 +72,11 @@ body[data-appearance-theme] {
         -webkit-backdrop-filter:none!important;
     }
 
-    /* A single translucent paint preserves the appearance opacity setting. */
-    body[data-appearance-theme="navy"] .center > .input-wrap:not([hidden]) > .input {
-        background-color:transparent!important;
-        background-image:linear-gradient(180deg,
-            rgba(27,38,59,var(--panel-alpha,1)),
-            rgba(23,33,53,var(--panel-alpha,1)))!important;
+    /* Keep this authoritative panel paint on the same surface as the active
+       mode capsule, including the navy gradient and appearance opacity. */
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input {
+        background-color:var(--dmate-composer-bg,rgba(var(--surface-2-rgb),var(--panel-alpha)))!important;
+        background-image:var(--dmate-composer-image,none)!important;
     }
 
     /* Idle conversations merge into the sidebar in every theme. The current
