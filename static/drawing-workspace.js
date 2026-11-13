@@ -87,22 +87,13 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    const anchor=trigger.getBoundingClientRect(),below=bottomEdge-anchor.bottom-gap,above=anchor.top-gap-topEdge;
    const upwards=below<120&&above>below,space=Math.max(40,upwards?above:below);
    content.style.maxHeight=space+'px';content.style.maxWidth=Math.max(40,rightEdge-leftEdge)+'px';
+   // A host can create a fixed containing block (for example will-change:
+   // transform on the offline main). Measure its origin instead of assuming
+   // that fixed left/top are viewport coordinates.
+   content.style.left='0px';content.style.right='auto';content.style.top='0px';
    const box=content.getBoundingClientRect(),left=Math.max(leftEdge,Math.min(alignLeft?anchor.left:anchor.right-box.width,rightEdge-box.width));
    const top=Math.max(topEdge,Math.min(upwards?anchor.top-gap-box.height:anchor.bottom+gap,bottomEdge-box.height));
-   content.style.left=left+'px';content.style.right='auto';content.style.top=top+'px';content.style.visibility='visible';
-  }
-  function syncCanvasClip(viewport=observedViewport){
-   if(!viewport?.clientWidth||!viewport.clientHeight)return;
-   // Clip only the scrollable content; the enclosing frame owns the outline.
-   // Even-odd paths retain native scrollbar gutters around the rounded canvas.
-   const w=viewport.offsetWidth,h=viewport.offsetHeight,l=viewport.clientLeft,t=viewport.clientTop;
-   const radius=parseFloat(win.getComputedStyle(viewport).borderTopLeftRadius)||0;
-   const r=l+viewport.clientWidth,b=t+viewport.clientHeight,k=Math.min(radius,viewport.clientWidth/2,viewport.clientHeight/2);
-   const outer='M-1 -1H'+(w+1)+'V'+(h+1)+'H-1Z';
-   const square='M'+l+' '+t+'H'+r+'V'+b+'H'+l+'Z';
-   const rounded='M'+(l+k)+' '+t+'H'+(r-k)+'A'+k+' '+k+' 0 0 1 '+r+' '+(t+k)+'V'+(b-k)+'A'+k+' '+k+' 0 0 1 '+(r-k)+' '+b+'H'+(l+k)+'A'+k+' '+k+' 0 0 1 '+l+' '+(b-k)+'V'+(t+k)+'A'+k+' '+k+' 0 0 1 '+(l+k)+' '+t+'Z';
-   const clip='path(evenodd, "'+outer+square+rounded+'")';
-   if(viewport.style.clipPath!==clip)viewport.style.clipPath=clip;
+   content.style.left=(left-box.left)+'px';content.style.top=(top-box.top)+'px';content.style.visibility='visible';
   }
   const documentScrolled=event=>{
    if(event.target===observedViewport||event.target?.closest?.('.ddw-side-panel,.dge-float-content,.dge-overlay-tools'))return;
@@ -117,10 +108,10 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
     observedViewport=viewport;
     if(viewport){
      if(!viewport.parentElement.classList.contains('ddw-canvas-frame')){const frame=el('div','ddw-canvas-frame');viewport.before(frame);frame.append(viewport);}
+     viewport.style.removeProperty('clip-path');
      resizeObserver?.observe(viewport);
     }
    }
-   syncCanvasClip(viewport);
    if(palette&&observedPalette!==palette){
     observedPalette=palette;const trigger=palette.querySelector(':scope > summary');
     trigger?.setAttribute('aria-label','绘图工具');trigger?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();toggleTools();});
@@ -141,20 +132,23 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    settingsButton.setAttribute('aria-expanded',String(Boolean(editorPanel('graphs')?.open)));
    informationButton.setAttribute('aria-expanded',String(Boolean(editorPanel('results')?.open)));
    shell.dataset.panelOpen=String(Boolean(panelMode||editorOpen||propertyOpen||toolsExpanded));
-   const origin=body.getBoundingClientRect(),viewBox=view?.getBoundingClientRect(),canvasBox=viewport?.getBoundingClientRect(),inset=18;
-   const controlsTop=Math.max(origin.top+inset,viewBox?viewBox.bottom+inset:origin.top+64);
-   const canvasStyle=viewport?win.getComputedStyle(viewport):null,borderLeft=parseFloat(canvasStyle?.borderLeftWidth)||0,borderRight=parseFloat(canvasStyle?.borderRightWidth)||0;
-   const leftSpace=viewport?viewport.clientLeft:borderLeft,rightSpace=viewport?Math.max(borderRight,viewport.offsetWidth-viewport.clientWidth-leftSpace):borderRight;
-   const canvasRight=canvasBox?canvasBox.right-rightSpace:origin.right,canvasLeft=canvasBox?canvasBox.left+leftSpace:origin.left;
-   rail.style.right=Math.max(inset,origin.right-canvasRight+inset)+'px';rail.style.top=(controlsTop-origin.top)+'px';
+   // The frame never pans. Own these positions through scoped CSS variables
+   // so the overlay's standalone inline palette placement cannot compete.
+   const origin=body.getBoundingClientRect(),frame=viewport?.parentElement;
+   const canvasBox=frame?.getBoundingClientRect()||origin,inset=18,controlsTop=canvasBox.top+inset;
+   body.style.setProperty('--ddw-controls-right',Math.max(inset,origin.right-canvasBox.right+inset)+'px');
    body.style.setProperty('--ddw-controls-top',(controlsTop-origin.top)+'px');
-   if(palette){const parent=palette.offsetParent?.getBoundingClientRect()||origin;palette.style.top=(controlsTop-parent.top)+'px';palette.style.left=(canvasLeft+inset-parent.left)+'px';}
+   if(palette){const parent=palette.offsetParent?.getBoundingClientRect()||origin;
+    body.style.setProperty('--ddw-tools-top',(controlsTop-parent.top)+'px');
+    body.style.setProperty('--ddw-tools-left',(canvasBox.left+inset-parent.left)+'px');}
    const toolBox=palette?.querySelector(':scope > summary')?.getBoundingClientRect();
-   if(toolBox&&rail.getBoundingClientRect().left<toolBox.right+12)rail.style.top=(toolBox.bottom-origin.top+12)+'px';
+   if(toolBox&&rail.getBoundingClientRect().left<toolBox.right+12)body.style.setProperty('--ddw-controls-top',(toolBox.bottom-origin.top+12)+'px');
    const top=Math.max(rail.getBoundingClientRect().bottom,toolBox?.bottom||0)-origin.top+8;
    body.style.setProperty('--ddw-panel-top',top+'px');
    const propertyOrigin=editorHost.querySelector('.dge-workspace')?.getBoundingClientRect()||origin;
    body.style.setProperty('--ddw-property-top',Math.max(0,origin.top+top-propertyOrigin.top)+'px');
+   const visibleBottom=(win.visualViewport?.offsetTop||0)+(win.visualViewport?.height||win.innerHeight);
+   body.style.setProperty('--ddw-property-bottom',Math.max(12,propertyOrigin.bottom-visibleBottom+8)+'px');
    body.style.setProperty('--ddw-panel-space',Math.max(90,origin.height-top-10)+'px');
    if(panelMode)positionPopover(panel,panelMode==='history'?historyButton:aiButton);
    for(const [key,trigger] of [['graphs',settingsButton],['results',informationButton]]){const item=editorPanel(key);if(item?.open)positionPopover(item.querySelector(':scope > .dge-float-content'),trigger);}

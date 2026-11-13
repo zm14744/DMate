@@ -63,6 +63,152 @@ async function panelPosition(page) {
   return state;
 }
 
+async function reachablePanelEnd(page, selector) {
+  const panel = page.locator(selector);
+  const overflow = await panel.evaluate(node => {
+    const overflow = node.scrollHeight > node.clientHeight + 1;
+    node.scrollTop = node.scrollHeight;
+    return { overflow, moved: node.scrollTop, scrollable: getComputedStyle(node).overflowY };
+  });
+  if (overflow.overflow) {
+    assert.ok(['auto', 'scroll'].includes(overflow.scrollable), 'Overflowing panel must have its own scroll');
+    assert.ok(overflow.moved > 0, 'Long panel must actually scroll to its end');
+  }
+  let last = panel.locator('button:enabled:visible,input:enabled:visible,select:enabled:visible,textarea:enabled:visible').last();
+  const actionable = await last.count() > 0;
+  if (!actionable) last = panel.locator('*:visible').last();
+  assert.ok(await last.count(), 'Panel has readable content');
+  const inside = await last.evaluate((node, actionable) => {
+    const rect = node.getBoundingClientRect(), parent = node.closest('.dge-selection-panel,.dge-float-content,.ddw-side-panel,.dge-overlay-tools').getBoundingClientRect();
+    return (!actionable || rect.top >= Math.max(0, parent.top - 1))
+      && rect.bottom >= parent.top - 1 && rect.bottom <= parent.bottom + 1
+      && rect.left >= parent.left - 1 && rect.right <= parent.right + 1
+      && rect.bottom <= innerHeight;
+  }, actionable);
+  assert.ok(inside, 'Last panel action remains inside the panel and visible viewport');
+  if (actionable) await last.click({ trial: true }); // Hit testing without deleting or invoking AI.
+}
+
+async function compactPanel(page, selector, mobile) {
+  const metrics = await page.locator(selector).evaluate(node => {
+    const rect = node.getBoundingClientRect(), style = getComputedStyle(node);
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height,
+      right: rect.right, bottom: rect.bottom, screenWidth: innerWidth, screenHeight: innerHeight,
+      padding: parseFloat(style.paddingTop), horizontalOverflow: node.scrollWidth - node.clientWidth };
+  });
+  assert.ok(metrics.x >= 7 && metrics.right <= metrics.screenWidth - 7, 'Popover fits the horizontal viewport: ' + JSON.stringify(metrics));
+  assert.ok(metrics.y >= 7 && metrics.bottom <= metrics.screenHeight - 7, 'Popover fits the vertical viewport: ' + JSON.stringify(metrics));
+  assert.ok(metrics.horizontalOverflow <= 1, 'Panel does not require horizontal scrolling');
+  if (mobile) {
+    assert.ok(metrics.width <= 320, 'Mobile panel stays compact instead of filling the screen: ' + JSON.stringify(metrics));
+    assert.ok(metrics.padding <= 10, 'Mobile panel has compact padding');
+  }
+  await reachablePanelEnd(page, selector);
+  return metrics;
+}
+
+async function canvasChrome(page) {
+  return page.evaluate(() => {
+    const viewport = document.querySelector('.dge-overlay-viewport'), frame = viewport.closest('.ddw-canvas-frame');
+    const style = getComputedStyle(viewport), bounds = viewport.getBoundingClientRect(), outer = frame.getBoundingClientRect();
+    const rect = node => {
+      const r = node.getBoundingClientRect(); return [r.x, r.y, r.width, r.height];
+    };
+    return { controls: [document.querySelector('.dge-view-controls'), document.querySelector('.dge-tool-palette>summary'),
+      ...document.querySelectorAll('.ddw-side-actions>button')].map(rect),
+      scroll: [viewport.scrollLeft, viewport.scrollTop],
+      gutter: [viewport.offsetWidth - viewport.clientWidth - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth),
+        viewport.offsetHeight - viewport.clientHeight - parseFloat(style.borderTopWidth) - parseFloat(style.borderBottomWidth)],
+      frameGap: [outer.right - bounds.right, outer.bottom - bounds.bottom],
+      frameOverflow: getComputedStyle(frame).overflow,
+      size: [viewport.clientWidth, viewport.clientHeight] };
+  });
+}
+
+async function viewportAndPopoverChecks(page, mobile, label, online = true) {
+  for (const language of ['en', 'zh-CN']) {
+    await page.evaluate(language => DMateI18n.setLanguage(language, false), language);
+    await settle(page);
+    const labels = await page.locator('.ddw-side-actions>button').evaluateAll(buttons => {
+      const frame = document.querySelector('.ddw-canvas-frame').getBoundingClientRect();
+      return buttons.map(button => {
+        const rect = button.getBoundingClientRect();
+        return { text: button.textContent, overflow: button.scrollWidth - button.clientWidth,
+          left: rect.left - frame.left, right: frame.right - rect.right };
+      });
+    });
+    for (const item of labels) {
+      assert.ok(item.overflow <= 1, label + '/' + language + ': button label must remain complete: ' + JSON.stringify(item));
+      assert.ok(item.left >= 0 && item.right >= 0, 'Button remains within the canvas frame');
+    }
+  }
+  const zoomIn = page.locator('[data-overlay-tool="zoom-in"]');
+  for (let i = 0; i < 20 && await zoomIn.isEnabled(); i++) await zoomIn.click();
+  assert.equal(await zoomIn.isEnabled(), false, 'Drawing zoom reaches its finite upper limit');
+  await settle(page);
+  await page.locator('.dge-overlay-viewport').evaluate(node => node.scrollTo(0, 0));
+  await settle(page);
+  const baseline = await canvasChrome(page);
+  assert.ok(baseline.size[0] > 120 && baseline.size[1] > 120, 'Canvas retains useful dimensions');
+  assert.ok(baseline.gutter.every(value => value <= 1), 'Canvas reserves no blank scrollbar strip: ' + JSON.stringify(baseline));
+  assert.ok(baseline.frameGap.every(value => value <= 2), 'Canvas fills the frame at right and bottom');
+  assert.ok(['hidden', 'clip'].includes(baseline.frameOverflow), 'Frame owns the rounded canvas clip');
+  // Sample every painted frame while genuine pointer input pans the canvas.
+  // A final-only comparison misses the overlay/workspace top-style race.
+  await page.evaluate(() => {
+    window.drawingChromeProbe = { samples: [], running: true };
+    const tick = () => {
+      const probe = window.drawingChromeProbe;
+      probe.samples.push([document.querySelector('.dge-view-controls'), document.querySelector('.dge-tool-palette>summary'),
+        ...document.querySelectorAll('.ddw-side-actions>button')].map(node => {
+        const r = node.getBoundingClientRect(); return [r.x, r.y, r.width, r.height];
+      }));
+      if (probe.running) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  const canvas = await page.locator('.dge-overlay-viewport').boundingBox();
+  const start = { x: canvas.x + canvas.width * .65, y: canvas.y + canvas.height * .65 };
+  await page.mouse.move(start.x, start.y); await page.mouse.down();
+  for (let step = 1; step <= 8; step++) {
+    await page.mouse.move(start.x - step * 9, start.y - step * 7);
+    await settle(page);
+  }
+  await page.mouse.up();
+  await page.mouse.wheel(180, 160); await settle(page);
+  const after = await canvasChrome(page);
+  const samples = await page.evaluate(() => {
+    window.drawingChromeProbe.running = false; return window.drawingChromeProbe.samples;
+  });
+  assert.ok(samples.length >= 8, 'Pan records multiple real animation frames');
+  assert.ok(after.scroll.some((value, i) => Math.abs(value - baseline.scroll[i]) > 20), 'The canvas really pans/scrolls');
+  for (const sample of samples) sample.forEach((rect, i) => rect.forEach((value, axis) => {
+    assert.ok(Math.abs(value - baseline.controls[i][axis]) <= 1,
+      label + ': toolbar/button jumped during pan: ' + JSON.stringify({ baseline: baseline.controls, sample }));
+  }));
+  if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/viewport-' + label + '-pan.png' });
+  await page.locator('[data-overlay-tool="zoom-fit"]').click(); await settle(page);
+  const popovers = [
+    ['tools', '.dge-tool-palette>summary', '.dge-tool-palette[open]>.dge-overlay-tools'],
+    ['settings', '.ddw-side-actions>button:first-child', '.dge-float-panel[data-panel-key="graphs"][open]>.dge-float-content'],
+    ['information', '.ddw-side-actions>button:nth-child(2)', '.dge-float-panel[data-panel-key="results"][open]>.dge-float-content'],
+    ['history', '.ddw-page-actions>button:nth-child(2)', '.ddw-side-panel:not([hidden])'],
+  ];
+  if (online) popovers.push(['ai', '.ddw-side-actions>button:last-child', '.ddw-side-panel:not([hidden])']);
+  const metrics = {};
+  for (const [name, trigger, panel] of popovers) {
+    await page.locator(trigger).click(); await page.locator(panel).waitFor(); await settle(page);
+    try { metrics[name] = await compactPanel(page, panel, mobile); }
+    catch (error) {
+      if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/viewport-' + label + '-' + name + '-failure.png' });
+      throw new Error(label + ' ' + name + ': ' + error.message, { cause: error });
+    }
+    if (['settings', 'information'].includes(name) && process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/viewport-' + label + '-' + name + '.png' });
+    await page.locator(trigger).click(); await settle(page);
+  }
+  console.log('PASS viewport ' + label + ': ' + samples.length + ' stable pan frames, no gutters; popovers ' + JSON.stringify(metrics));
+}
+
 async function history(page) {
   const button = page.locator('.ddw-page-actions').getByRole('button', { name: '历史绘图', exact: true });
   if (await button.getAttribute('aria-expanded') !== 'true') await button.click();
@@ -77,8 +223,10 @@ async function runCase(browser, width) {
   try {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
     await mount(page, true);
+    await viewportAndPopoverChecks(page, width === 390, 'online-' + width);
     await selectShape(page, 'vertex', width === 390);
     const vertex = await panelPosition(page);
+    await compactPanel(page, '.dge-selection-panel', width === 390);
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/drawing-' + width + '-vertex.png' });
     if (width === 390) {
       const oldStyle = await page.addStyleTag({ content: '.ddw-editor .dge-workspace .dge-selection-panel{top:var(--ddw-property-top,120px)!important;bottom:auto!important}' });
@@ -90,15 +238,9 @@ async function runCase(browser, width) {
     }
     await selectShape(page, 'edge', width === 390);
     const edge = await panelPosition(page);
-    if (width === 390) {
-      assert.ok(edge.scrollHeight > edge.clientHeight, 'Long edge properties must scroll within the small screen');
-      await page.locator('.dge-selection-panel').evaluate(panel => { panel.scrollTop = panel.scrollHeight; });
-      const inside = await page.locator('.dge-selection-panel').evaluate(panel => {
-        const rect = panel.getBoundingClientRect(), button = panel.querySelector('.dge-danger').getBoundingClientRect();
-        return button.top >= rect.top && button.bottom <= rect.bottom;
-      });
-      assert.ok(inside, 'Last edge action remains reachable inside the scrolling panel');
-    }
+    // A compact layout may fit naturally. If it overflows it must scroll;
+    // either way the final action must stay reachable, never clipped away.
+    await compactPanel(page, '.dge-selection-panel', width === 390);
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/drawing-' + width + '-edge.png' });
     assert.deepEqual(await (await history(page)).allTextContents(), names, 'History follows saved array order, not updatedAt');
     for (const index of [1, 0, 2]) {
@@ -282,11 +424,40 @@ async function runDefaultEmptyContract(browser) {
   } finally { await page.close(); }
 }
 
+async function runOfflineViewport(browser, width) {
+  const page = await browser.newPage({ viewport: { width, height: width === 390 ? 740 : 900 },
+    isMobile: width === 390, hasTouch: width === 390, serviceWorkers: 'block' });
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  let modelCalls = 0;
+  await page.route(/\/(?:chat|ocr|drawing\/[^?]+)(?:\?|$)/, route => { modelCalls++; return route.abort(); });
+  try {
+    await page.addInitScript(value => localStorage.setItem('dmate:offline:drawing-gallery:v1', JSON.stringify(value)), gallery);
+    await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
+    await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    if (width === 390) await page.locator('#offlineNavToggle').click();
+    await page.locator('#graphDrawingBtn').click();
+    await page.locator('#offlineDrawingHost .dge-overlay-viewport').waitFor();
+    await settle(page);
+    await viewportAndPopoverChecks(page, width === 390, 'offline-' + width, false);
+    for (const kind of ['vertex', 'edge']) {
+      if (kind === 'edge') await page.locator('.dge-selection-panel .dge-panel-close').click();
+      await selectShape(page, kind, width === 390);
+      const position = await panelPosition(page);
+      await compactPanel(page, '.dge-selection-panel', width === 390);
+      if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/drawing-offline-' + width + '-' + kind + '.png' });
+      console.log('PASS offline ' + width + ' ' + kind + ': ' + JSON.stringify(position) + '; last action reachable');
+    }
+    assert.equal(modelCalls, 0); assert.deepEqual(errors, []);
+  } finally { await page.close(); }
+}
+
 (async () => {
+  if (process.env.OFFLINE_SCREENSHOT_DIR) require('node:fs').mkdirSync(process.env.OFFLINE_SCREENSHOT_DIR, { recursive: true });
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
     for (const width of [390, 1440]) await runCase(browser, width);
+    for (const width of [390, 1440]) await runOfflineViewport(browser, width);
     await runGuestBlankLifecycle(browser);
     await runAccountGalleryLifecycle(browser);
     await runDefaultEmptyContract(browser);

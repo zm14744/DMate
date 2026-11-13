@@ -20,17 +20,19 @@
 .ddw-editor{flex:1;min-width:0;min-height:0;overflow:hidden}
 .ddw-editor.dmate-graph-editor{height:100%;display:flex;flex-direction:column}
 .ddw-editor>.dge-workspace{flex:1;min-height:0}
-.ddw-editor .dge-workspace .dge-selection-panel{top:auto;bottom:12px;max-height:max(0px,calc(100% - var(--ddw-property-top,120px) - 12px));min-height:0}
+.ddw-editor .dge-workspace .dge-selection-panel{top:auto;bottom:var(--ddw-property-bottom,12px);max-height:max(0px,calc(100% - var(--ddw-property-top,120px) - var(--ddw-property-bottom,12px)));min-height:0}
 .ddw-editor .dge-selection-panel .dge-field{flex:0 0 auto}
 .ddw-editor .dge-overlay-host{height:100%;min-height:0;border:0}
 .ddw-editor .dge-overlay{height:100%;min-height:0;max-height:none;display:flex;flex-direction:column;gap:8px}
 .ddw-editor .dge-view-controls{flex-shrink:0;border:1px solid var(--dge-border,#cbd5e1);border-radius:12px}
-/* Keep the outline outside the viewport's content clip and native scrollbars. */
+/* A single rounded frame clips the complete scrolling canvas. Native scroll
+   remains available for wheel/touch/pan without reserving white track gutters. */
 .ddw-canvas-frame{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden;border:1px solid var(--dge-border,#cbd5e1);border-radius:12px}
-.ddw-editor .dge-overlay-viewport{height:auto;flex:1;min-width:0;min-height:0;max-height:none;border:0;border-radius:11px;scrollbar-gutter:stable}
-.ddw-side-actions{position:absolute;z-index:16;right:18px;top:var(--ddw-controls-top,76px);display:flex;gap:6px;flex-direction:row;width:max-content;max-width:calc(100% - 112px)}
+.ddw-editor .dge-overlay-viewport{height:auto;flex:1;min-width:0;min-height:0;max-height:none;border:0;border-radius:11px;scrollbar-gutter:auto;scrollbar-width:none}
+.ddw-editor .dge-overlay-viewport::-webkit-scrollbar{display:none;width:0;height:0}
+.ddw-side-actions{position:absolute;z-index:16;right:var(--ddw-controls-right,18px);top:var(--ddw-controls-top,76px);display:flex;gap:6px;flex-direction:row;flex-wrap:wrap;justify-content:flex-end;width:max-content;max-width:calc(100% - 36px)}
 .ddw-side-actions[hidden]{display:none}
-.ddw-side-actions>button{min-width:0;padding:8px 10px;white-space:nowrap;font-size:13px;box-shadow:0 3px 12px #0000000f;background:var(--surface-1,#fff)}
+.ddw-side-actions>button{flex-shrink:0;min-width:0;padding:8px 10px;white-space:nowrap;font-size:13px;box-shadow:0 3px 12px #0000000f;background:var(--surface-1,#fff)}
 .ddw-editor .dge-floating-actions{right:10px;top:var(--ddw-panel-top,120px);display:block;width:min(380px,calc(100% - 20px));height:0;z-index:14}
 .ddw-editor .dge-floating-actions>.dge-float-panel{border:0;box-shadow:none;background:transparent}
 .ddw-editor .dge-floating-actions>.dge-float-panel>summary{display:none!important}
@@ -41,7 +43,7 @@
 .ddw-editor .dge-float-content{position:fixed;visibility:hidden;width:min(380px,calc(100vw - 16px));z-index:20}
 .ddw-side-panel{position:fixed;visibility:hidden;z-index:20;width:min(380px,calc(100vw - 16px))}
 .ddw-side-panel,.ddw-editor .dge-float-content,.ddw-editor .dge-tool-palette>.dge-overlay-tools{max-height:var(--ddw-panel-space,50dvh);overflow:auto;overscroll-behavior:contain;padding:12px;box-sizing:border-box;border:1px solid var(--border-strong,#cbd5e1);border-radius:12px;background:var(--surface-1,#fff);box-shadow:0 6px 22px #0002}
-.ddw-editor .dge-tool-palette{left:18px;top:var(--ddw-controls-top,76px);width:max-content;max-width:calc(100% - 20px);margin:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;z-index:15}
+.ddw-editor .dge-tool-palette{left:var(--ddw-tools-left,18px)!important;top:var(--ddw-tools-top,76px)!important;width:max-content;max-width:calc(100% - 20px);margin:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;z-index:15}
 .ddw-editor .dge-tool-palette>summary,.ddw-editor .dge-tool-palette[open]>summary{padding:8px 10px;margin:0;border:1px solid var(--border-strong,#cbd5e1);border-radius:9px;background:var(--surface-1,#fff);color:inherit;font-size:13px;font-weight:400;line-height:1.4;box-shadow:0 3px 12px #0000000f}
 .ddw-editor .dge-tool-palette>.dge-overlay-tools{position:fixed;visibility:hidden;width:160px;gap:8px;z-index:20}
 .ddw-editor .dge-tool-palette>summary[aria-disabled=true]{opacity:1;color:color-mix(in srgb,var(--text-primary,#172033) 55%,transparent);cursor:default}
@@ -75,10 +77,21 @@
 .dmate-drawing-workspace .ddw-export-close{width:20px;height:20px;min-width:20px;min-height:20px;padding:0;background:#ef4444;border:0;border-radius:50%}
 .ddw-export-image{display:block;max-width:100%;width:auto;height:auto;max-height:calc(100% - 120px);min-height:0;object-fit:contain;background:white;user-select:auto;-webkit-user-select:auto;-webkit-touch-callout:default}
 .ddw-export-download{display:inline-block;border-radius:9px;padding:10px 20px;background:var(--accent,#3b82f6);color:white;text-decoration:none;flex-shrink:0}
-@media(max-width:600px){.ddw-header{gap:6px}.ddw-name{width:100%;padding:7px 10px}.ddw-page-actions{width:100%;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.ddw-page-actions>button{font-size:12px;padding:8px 10px;white-space:nowrap}.ddw-side-actions{gap:4px;max-width:calc(100% - 96px)}.ddw-side-actions>button{font-size:12px;padding:7px 6px}.ddw-editor .dge-tool-palette>summary,.ddw-editor .dge-tool-palette[open]>summary{padding:7px 8px;font-size:12px}}
-@media(max-width:760px){
- .ddw-editor .dge-workspace .dge-selection-panel{right:12px;width:calc(100% - 24px);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;gap:12px}
+@media(max-width:600px){.ddw-header{gap:6px}.ddw-name{width:100%;padding:7px 10px}.ddw-page-actions{width:100%;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.ddw-page-actions>button{font-size:12px;padding:8px 10px;white-space:nowrap}.ddw-side-actions{gap:4px}.ddw-side-actions>button{font-size:12px;padding:7px 6px}.ddw-editor .dge-tool-palette>summary,.ddw-editor .dge-tool-palette[open]>summary{padding:7px 8px;font-size:12px}}
+@media(max-width:900px){
+ .ddw-side-panel,.ddw-editor .dge-float-content{width:min(300px,calc(100vw - 24px));padding:10px}
+ .ddw-panel-header,.ddw-editor-panel-header{gap:8px;margin-bottom:8px}
+ .ddw-editor .dge-float-panel .dge-toolbar{gap:8px}
+ .ddw-editor .dge-tool-palette>.dge-overlay-tools{width:156px;padding:8px;gap:6px}
+ .ddw-editor .dge-tool-palette .dge-overlay-tools button{min-height:36px}
+ .ddw-editor .dge-workspace .dge-selection-panel{right:12px;width:min(300px,calc(100% - 24px));padding:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;gap:8px}
  .ddw-editor .dge-selection-panel>*{grid-column:1/-1}
  .ddw-editor .dge-selection-panel>.dge-endpoint-field{grid-column:auto}
- .ddw-editor .dge-selection-panel select,.ddw-editor .dge-selection-panel input{min-height:42px;box-sizing:border-box}
+ .ddw-editor .dge-selection-panel .dge-field{gap:4px}
+ .ddw-editor :is(.dge-selection-panel,.dge-float-content) :is(input:not([type=checkbox]):not([type=radio]),select){font-size:16px;min-height:40px;padding:6px 8px;box-sizing:border-box}
+ .ddw-editor .dge-selection-panel .dge-danger{min-height:36px}
+ .ddw-ai-label{gap:6px;margin-bottom:8px}
+ .ddw-ai-requirement{font-size:16px;line-height:1.4;min-height:60px;max-height:160px;padding:7px 8px}
+ .ddw-history-list{gap:6px}
+ .ddw-history-item{gap:6px;padding:6px}
 }

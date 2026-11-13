@@ -152,12 +152,22 @@ function mount(host,o){
  // from OCR + visual edge evidence. Do not override this with toolbar labels.
  // Edge-level corrections in the advanced editor remain available.
  const visible=o.textOnly||o.scanOnly||o.drawingOnly?null:button('隐藏描绘','visibility',()=>{s.visible=!s.visible;draw();},viewControls);
- const MIN_ZOOM=.01,MAX_ZOOM=400;
+ // A drawing should remain usable at its smallest camera setting. Scanned
+ // source images can be arbitrarily tall, so retain their wider fit range.
+ const MIN_ZOOM=o.drawingOnly?25:.01,MAX_ZOOM=400;
+ const boundedZoom=x=>Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Math.round((Number.isFinite(x)?x:100)*100)/100));
+ const updateZoomControls=()=>{
+  value.textContent=s.zoom+'%';
+  for(const [control,atLimit]of [[zoomOut,s.zoom<=MIN_ZOOM],[zoomIn,s.zoom>=MAX_ZOOM]]){
+   control.disabled=Boolean(o.disabled?.()||atLimit);
+   control.setAttribute('aria-disabled',String(control.disabled));
+  }
+ };
  const zoom=x=>{
-   const previous=s.zoom||100;
+   const previous=Number.isFinite(s.zoom)&&s.zoom>0?s.zoom:100;
    const cx=scroll.scrollLeft+scroll.clientWidth/2,cy=scroll.scrollTop+scroll.clientHeight/2;
-   s.zoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Math.round(x*100)/100));
-   layoutWorld();value.textContent=s.zoom+'%';
+   s.zoom=boundedZoom(x);
+   layoutWorld();updateZoomControls();
    const ratio=s.zoom/previous;
    scroll.scrollLeft=cx*ratio-scroll.clientWidth/2;
    scroll.scrollTop=cy*ratio-scroll.clientHeight/2;
@@ -181,9 +191,11 @@ function mount(host,o){
    scroll.scrollLeft=(.5-world.left)*scale-viewportWidth/2;
    scroll.scrollTop=(.5-world.top)*scale*h/w-viewportHeight/2;
  };
- button('－','zoom-out',()=>{zoom(s.zoom/1.25);draw();},viewControls).setAttribute('aria-label','缩小原图');
+ const zoomOut=button('－','zoom-out',()=>{zoom(s.zoom/1.25);draw();},viewControls);
+ zoomOut.setAttribute('aria-label','缩小原图');
  const value=d.createElement('span');value.className='dge-overlay-zoom';viewControls.append(value);
- button('＋','zoom-in',()=>{zoom(s.zoom*1.25);draw();},viewControls).setAttribute('aria-label','放大原图');
+ const zoomIn=button('＋','zoom-in',()=>{zoom(s.zoom*1.25);draw();},viewControls);
+ zoomIn.setAttribute('aria-label','放大原图');
  button('适应','zoom-fit',()=>{fitImage();draw();},viewControls);
  // Hide the source photo independently from the drawing layer.
  // visibility:hidden preserves its dimensions and all source coordinates.
@@ -366,6 +378,7 @@ function mount(host,o){
  }
  const queueResizePreview=()=>{if(resizeFrame===null)resizeFrame=d.defaultView.requestAnimationFrame(paintResizePreview);};
  function draw(){
+  updateZoomControls();
   // A modal is mounted while hidden. Tool state must already be correct
   // before its first layout/image event, including on a cached-image reopen.
   if(visible)visible.textContent=s.visible?'隐藏描绘':'显示描绘';svg.classList.toggle('is-hidden',!s.visible);svg.dataset.mode=s.mode;
@@ -469,24 +482,29 @@ function mount(host,o){
     if(previous?.ink===ink)previous.points.push(to);else runs.push({ink,points:[from,to],offset:traversed});
     traversed+=Math.hypot(to[0]-from[0],to[1]-from[1]);
    }
+   // Dash lengths are screen pixels, just like the compensated line width.
+   // Unknown OCR directions keep their review hint; independent drawings
+   // must obey the explicitly chosen solid/dashed/dotted style instead.
+   const dash=!o.drawingOnly&&e.direction==='unknown'?[7,5]:e.style==='dashed'?[9,6]:e.style==='dotted'?[2,5]:null;
+   const paintDash=(path,offset)=>{
+    path.style.strokeDasharray=dash?dash.map(length=>length/scale).join(' '):'none';
+    path.style.strokeDashoffset=-offset+'px';
+   };
    for(const [index,run]of runs.entries()){
     const {ink}=run,segment=runs.length===1?line:pointsPath(run.points),halo=E(d,'path',{d:segment,class:'dge-overlay-contrast-halo'});
     halo.dataset.ink=oppositeInk(ink);halo.style.stroke=oppositeInk(ink);
     halo.style.strokeWidth=(chosen?6.2:4.8)/scale+'px';
-    if(e.style==='dashed')halo.setAttribute('stroke-dasharray','9 6');
-    if(e.style==='dotted')halo.setAttribute('stroke-dasharray','2 5');
+    paintDash(halo,run.offset);
     halos.push(halo);
     const att={d:segment,class:'dge-overlay-stroke'};
     if(e.direction==='forward'&&index===runs.length-1)
       att['marker-end']='url(#'+o.instance+'-arrow-'+(ink==='#ffffff'?'light':'dark')+')';
-    if(e.style==='dashed')att['stroke-dasharray']='9 6';
-    if(e.style==='dotted')att['stroke-dasharray']='2 5';
     const stroke=E(d,'path',att);
     stroke.dataset.ink=ink;stroke.style.stroke=ink;
     stroke.style.strokeWidth=(chosen?3.6:2.1)/scale+'px';
     // A uniform stretch is one joined path, rather than translucent little
     // segments whose overlapping caps leave seams and change arrow thickness.
-    halo.setAttribute('stroke-dashoffset',String(-run.offset));stroke.setAttribute('stroke-dashoffset',String(-run.offset));
+    paintDash(stroke,run.offset);
     strokes.push(stroke);
    }
    group.append(...halos,...strokes);
@@ -582,7 +600,7 @@ function mount(host,o){
    const scale=scroll.clientWidth*s.zoom/100/w,padding=28,
      factor=Math.min(Math.max(1,scroll.clientWidth-padding*2)/Math.max(1,bounds.width*scale),
        Math.max(1,scroll.clientHeight-padding*2)/Math.max(1,bounds.height*scale)),
-     next=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Math.round(s.zoom*factor*100)/100));
+     next=boundedZoom(s.zoom*factor);
    if(Math.abs(next-s.zoom)<.005)break;
    zoom(next);draw();
   }
