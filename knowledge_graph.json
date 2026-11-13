@@ -1,5 +1,5 @@
 {
-  "version": 48,
+  "version": 49,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1070,30 +1070,45 @@
       ],
       "videos": [
         {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "生成函数",
+          "source_id": "sawfin_bilibili",
+          "title": "Generating Functions",
           "sections": [
-            "第14讲：生成函数基础定义与运算",
-            "第15讲：生成函数经典计数案例",
-            "第16讲：生成函数进阶、组合级数",
-            "第17讲：更多生成函数技巧与变换"
+            "Discrete Math II - 8.4.1 Readiness for Generating Functions: Model with Generating Functions",
+            "Discrete Math II - 8.4.2 Readiness for Generating Functions: Power Series and Fundamental Identity",
+            "Discrete Math II - 8.4.3 Readiness for Generating Functions: The Finite Geometric Series",
+            "Discrete Math II - 8.4.4 Readiness for Generating Functions: Binomial and Extended Binomial Theorem",
+            "Discrete Math II - 8.4.5 Solve Counting Problems with Generating Functions",
+            "Discrete Math II - 8.4.6 The Explicit Form of a Generating Function",
+            "Discrete Math II - 8.4.7 Solve Recurrence Relations with Generating Function"
           ],
           "lessons": [
             {
-              "title": "第14讲：生成函数基础定义与运算",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=14"
+              "title": "Discrete Math II - 8.4.1 Readiness for Generating Functions: Model with Generating Functions",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=110"
             },
             {
-              "title": "第15讲：生成函数经典计数案例",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=15"
+              "title": "Discrete Math II - 8.4.2 Readiness for Generating Functions: Power Series and Fundamental Identity",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=111"
             },
             {
-              "title": "第16讲：生成函数进阶、组合级数",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=16"
+              "title": "Discrete Math II - 8.4.3 Readiness for Generating Functions: The Finite Geometric Series",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=112"
             },
             {
-              "title": "第17讲：更多生成函数技巧与变换",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=17"
+              "title": "Discrete Math II - 8.4.4 Readiness for Generating Functions: Binomial and Extended Binomial Theorem",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=113"
+            },
+            {
+              "title": "Discrete Math II - 8.4.5 Solve Counting Problems with Generating Functions",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=114"
+            },
+            {
+              "title": "Discrete Math II - 8.4.6 The Explicit Form of a Generating Function",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=115"
+            },
+            {
+              "title": "Discrete Math II - 8.4.7 Solve Recurrence Relations with Generating Function",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=116"
             }
           ]
         }
@@ -2368,15 +2383,15 @@
       "nodes_total": 68,
       "nodes_with_active_course": 68,
       "nodes_pending": "none",
-      "direct_episode_links": 141,
+      "direct_episode_links": 144,
       "nested_or_missing_episode_urls": 0,
       "youtube_links": 0,
       "cmu_2021_parts_verified": 35,
       "cmu_2021_total_duration": "31:26:24",
       "cmu_2021_mapped_nodes": 18,
-      "last_audit_scope": "Final evidence-based curation pass: Dogeman planar graph P39-P41 added as a coherent three-lesson sequence before Dogeman coloring P42-P44; CMU generating functions P14-P17 restored as a complete four-lesson block; BU Discrete Math II precise homogeneous/nonhomogeneous recurrence lessons P106-P109 selected. Remaining BU II alternatives retained as candidates rather than added redundantly.",
-      "unique_episode_urls": 138,
-      "cross_node_reused_urls": 4,
+      "last_audit_scope": "One selected course per node after final search. Count-generating-functions now uses BU Discrete Math II P110-P116 for a complete series naturally following BU recurrence relations; CMU P14-P17 retained in source pool but not active because BU has tighter course continuity.",
+      "unique_episode_urls": 141,
+      "cross_node_reused_urls": 3,
       "sources_with_selected_nodes": 13
     },
     "excluded_source_ids": [
@@ -2900,18 +2915,6 @@
             "reason": "three consecutive, directly titled lessons cover planar graph concepts, Euler formula and planarity tests, dual and outerplanar graphs; they lead naturally into the same course's graph-coloring P42-P44"
           },
           {
-            "node": "count_generating",
-            "previous": "CMU P14-P15",
-            "selected": "CMU P14-P17",
-            "parts": [
-              14,
-              15,
-              16,
-              17
-            ],
-            "reason": "the four consecutive lessons are all generating-function content; CMU's official syllabus explicitly schedules generating functions and more generating functions across consecutive weeks"
-          },
-          {
             "node": "recurrence_homogeneous",
             "previous": "CMU P12-P13",
             "selected": "BU Discrete Math II P106-P108",
@@ -2930,10 +2933,26 @@
               109
             ],
             "reason": "the lesson title directly names non-homogeneous linear recurrence relations"
+          },
+          {
+            "node": "count_generating",
+            "previous": "CMU P14-P17",
+            "selected": "BU Discrete Math II P110-P116",
+            "parts": [
+              110,
+              111,
+              112,
+              113,
+              114,
+              115,
+              116
+            ],
+            "reason": "the BU sequence forms a complete progression from generating-function modeling and power series through counting applications, explicit forms and solving recurrences; it follows the same teacher's BU recurrence-solution sequence, making the cross-topic transition more coherent than switching back to CMU for the GF block"
           }
         ],
         "new_candidate_discovery": "BU Discrete Math II also contains exact lessons on pigeonhole principle, permutations/combinations, binomial theorem, inclusion-exclusion, generating functions and graph theory; these were not bulk-added because current CMU/BUI selections already have strong direct matches and duplicate course links were intentionally minimized.",
-        "limitations": "BU Discrete Math II part indices are calculated from the displayed 80-part Discrete Math I sequence followed by 54 Discrete Math II parts; target P106-P109 have not been independently played back. All other active mappings are based on indexed part titles or user-supplied CMU screenshots, not complete minute-by-minute viewing."
+        "limitations": "BU Discrete Math II part indices are calculated from the displayed 80-part Discrete Math I sequence followed by 54 Discrete Math II parts; target P106-P109 have not been independently played back. All other active mappings are based on indexed part titles or user-supplied CMU screenshots, not complete minute-by-minute viewing.",
+        "note": "The BU Discrete Math II P81-P134 block is the continuation of the same Bilibili upload after Discrete Math I P1-P80. P106-P109 map to the explicit homogeneous/non-homogeneous recurrence lessons; P110-P116 map to the complete generating-functions sequence. These part numbers follow the combined 80+54-part list; live playback of each target P was not independently verified."
       }
     }
   },
