@@ -147,6 +147,11 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question
     resize:none !important; overflow-x:hidden !important; overflow-y:hidden; white-space:pre-wrap;
     overscroll-behavior:contain; scrollbar-width:thin;
 }
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input-lock-hint {
+    font:400 16px/24px var(--dmate-font-ui) !important;
+    letter-spacing:normal !important;
+}
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input-lock-hint,
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) textarea#text::placeholder {
     color:var(--text-subtle,#64748b) !important; -webkit-text-fill-color:var(--text-subtle,#64748b) !important; opacity:1;
 }
