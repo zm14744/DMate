@@ -17,6 +17,17 @@ body[data-appearance-theme] .center.chat-empty > .input-wrap:not([hidden]) {
        for the keyboard; the center already follows its visible height. */
 }
 
+/* The active mode capsule and message field share the same depth per theme. */
+body[data-appearance-theme="light"] {
+    --dmate-composer-shadow:0 4px 16px rgba(15,23,42,.055),0 1px 3px rgba(15,23,42,.025);
+}
+body[data-appearance-theme="dark"] {
+    --dmate-composer-shadow:0 5px 18px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.035);
+}
+body[data-appearance-theme="navy"] {
+    --dmate-composer-shadow:0 5px 18px rgba(2,6,23,.20),inset 0 1px 0 rgba(226,232,240,.035);
+}
+
 /* GPT-style segmented switch shared by the composer and grouped images. */
 body[data-appearance-theme] .interaction-mode-switch {
     --dmate-mode-track-bg:var(--surface-1,#f1f5f9);
@@ -37,12 +48,9 @@ body[data-appearance-theme] .interaction-mode-switch[data-mode="question"] {
 }
 /* A slightly shorter track leaves the active segment raised, as in the reference. */
 body[data-appearance-theme="light"] .interaction-mode-switch {
-    --dmate-mode-track-bg:rgba(231,236,242,var(--panel-alpha,1));
-    --dmate-mode-track-border:rgba(148,163,184,.16);
+    --dmate-mode-track-bg:rgba(237,241,246,var(--panel-alpha,1));
+    --dmate-mode-track-border:rgba(148,163,184,.12);
     --dmate-mode-active-bg:rgba(255,255,255,var(--panel-alpha,1));
-}
-body[data-appearance-theme="light"] .interaction-mode-switch::before {
-    box-shadow:0 1px 4px rgba(15,23,42,.10),0 0 0 1px rgba(15,23,42,.035);
 }
 body[data-appearance-theme="dark"] .interaction-mode-switch {
     --dmate-mode-track-bg:#1b1b1b;
@@ -61,6 +69,7 @@ body[data-appearance-theme] .interaction-mode-switch::before {
     content:""; position:absolute; z-index:1; top:0; bottom:0; left:0;
     width:54%; border-radius:999px;
     background:var(--dmate-mode-active-bg); pointer-events:none;
+    box-shadow:var(--dmate-composer-shadow,none);
     transition:left .18s ease;
 }
 body[data-appearance-theme] .interaction-mode-switch[data-mode="question"]::before { left:46%; }
@@ -116,20 +125,21 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input {
     min-height:52px !important; height:auto !important; max-height:none !important;
     margin:0 auto !important; padding:6px 10px !important; border:1px solid var(--border-strong,#cbd5e1) !important;
     border-radius:28px !important; background:var(--surface-2,#f4f4f5) !important;
-    box-shadow:none !important;
+    box-shadow:var(--dmate-composer-shadow,none) !important;
 }
 /* Theme-specific composer outlines and depth. */
 body[data-appearance-theme="light"] .center > .input-wrap:not([hidden]) > .input,
 body[data-appearance-theme="light"] .center > .input-wrap:not([hidden]) > .input.composer-expanded {
     border:1px solid rgba(148,163,184,.24) !important;
-    box-shadow:0 4px 16px rgba(15,23,42,.055),0 1px 3px rgba(15,23,42,.025) !important;
 }
 body[data-appearance-theme="navy"] .center > .input-wrap:not([hidden]) > .input,
 body[data-appearance-theme="navy"] .center > .input-wrap:not([hidden]) > .input.composer-expanded {
     border:1px solid rgba(148,163,184,.12) !important;
-    box-shadow:0 5px 18px rgba(2,6,23,.20),inset 0 1px 0 rgba(226,232,240,.035) !important;
 }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input.composer-expanded { border-radius:24px !important; }
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input.composer-expanded {
+    border-radius:24px !important;
+    box-shadow:var(--dmate-composer-shadow,none) !important;
+}
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > .manual-question-composer {
     order:1; position:relative; flex:1 1 0 !important; align-self:stretch !important;
     box-sizing:border-box; width:0 !important; min-width:0 !important;
