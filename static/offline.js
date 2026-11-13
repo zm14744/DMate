@@ -425,8 +425,8 @@
         storageKey: "dmate:offline:drawing-gallery:v1",
         persistent: true,
         sessionState: {},
+        features: {ai:false, upload:false},
         legacyDocument: {body_text:"",graphs:[{id:"G1",name:"我的图形",directed:false,weighted:false,vertices:[],edges:[]}]},
-        onUpload: async () => { throw new Error("离线模式不支持上传或在线识图"); },
         onChange: () => {}
       });
     } catch (error) {

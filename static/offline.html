@@ -128,12 +128,11 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
   <main id="offlineMain" class="center offline-main">
     <button id="offlineDesktopSidebarOpen" class="offline-icon-button" type="button" aria-label="展开学习工具" title="展开学习工具" aria-controls="offlineSidebar" aria-expanded="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
 
-    <section class="offline-panel" id="drawingPanel">
-      <div class="offline-intro">
-        <h2>独立绘图</h2>
-        <p>使用 DMate 现有图形编辑器。画板保存在当前设备，不调用在线识图或 AI 指导。</p>
+    <section class="offline-panel graph-editor-dialog" id="drawingPanel" aria-labelledby="offlineDrawingTitle">
+      <div class="graph-editor-dialog-head">
+        <h2 id="offlineDrawingTitle">绘图</h2>
       </div>
-      <div id="offlineDrawingHost" class="offline-drawing-host"></div>
+      <div id="offlineDrawingHost"></div>
     </section>
 
     <section class="offline-panel" id="graphPanel" hidden>

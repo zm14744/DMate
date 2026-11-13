@@ -41,9 +41,10 @@ body.offline-workspace .offline-main.center { position:relative; display:flex !i
 .offline-chip-row { display:flex; gap:7px; overflow:auto; padding:1px 0 16px; scrollbar-width:thin; }
 .offline-chip { flex:none; min-height:34px; padding:7px 11px; border:1px solid var(--border-strong); border-radius:9px; background:var(--surface-3); color:var(--text-secondary); font:inherit; font-size:13px; }
 .offline-chip.active { background:var(--dm-selected-bg,var(--surface-3)); color:var(--text-primary); }
-.offline-intro h2 { margin:0 0 7px; font-size:16px; font-weight:600; }
-.offline-intro p { margin:0 0 18px; color:var(--text-muted); font-size:13px; line-height:1.7; }
-.offline-drawing-host { min-height:440px; padding:12px; overflow:hidden; border:1px solid var(--border-strong); border-radius:14px; background:var(--surface-1); }
+/* The drawing component uses the online dialog's header and spacing; only
+   its outer positioning and available size adapt to the offline module. */
+#drawingPanel.graph-editor-dialog { position:relative; inset:auto; display:flex; flex-direction:column; width:calc(100% - 48px); max-width:1280px; height:auto; max-height:none; padding:18px; border-radius:16px; overflow:hidden; }
+#drawingPanel > #offlineDrawingHost { flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain; }
 .question-toolbar { align-items:flex-start; }
 .offline-filters { display:flex; gap:8px; flex-wrap:wrap; }
 .offline-filters select { min-width:135px; }
@@ -93,7 +94,6 @@ html[data-offline-sidebar="collapsed"] #offlineDesktopSidebarOpen { display:inli
 body.offline-workspace.has-custom-background .offline-main { background:transparent; }
 body.offline-workspace.has-custom-background .offline-sidebar { background:rgba(var(--surface-1-rgb),var(--shell-alpha)); }
 body.offline-workspace.has-custom-background .offline-panel { background:rgba(var(--surface-2-rgb),var(--panel-alpha)); }
-.dmate-drawing-workspace .ddw-side-actions>button:nth-child(3),.dmate-drawing-workspace .ddw-ai-button,.dmate-drawing-workspace .ddw-upload-button { display:none !important; }
 
 /* These actions share the online navigation's exception from raised buttons. */
 @layer dmate-button-themes {
@@ -131,8 +131,9 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
   .question-layout,.concept-layout { grid-template-columns:1fr; gap:14px; }
   .question-list,.concept-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); max-height:190px; }
   .question-detail,.concept-detail { min-height:280px; padding:16px; }
-  .offline-drawing-host { min-height:360px; padding:7px; }
+  #drawingPanel.graph-editor-dialog { width:calc(100% - 16px); margin:8px auto; }
 }
+@media(max-width:760px) { #drawingPanel.graph-editor-dialog { padding:12px; border-radius:0; } }
 @media(max-width:680px) {
   .offline-search { width:100%; min-width:0; }
   .offline-card-grid { grid-template-columns:1fr; }

@@ -131,8 +131,81 @@ async function onlineReference(page, theme) {
   await onlineOfflineEntry(page);
   const icons = {};
   for (const [panel, selector] of Object.entries(iconReferences)) icons[panel] = await geometry(page.locator(selector));
+  const drawing = await drawingReference(page);
   return { icons, appearanceIcon: await geometry(page.locator('#appearanceBtn svg')),
-    palette: await palette(page), close: await closeStyle(page.locator('#appearanceClose')) };
+    palette: await palette(page), close: await closeStyle(page.locator('#appearanceClose')), drawing };
+}
+
+// Compare the real component at equal content sizes: its online modal and the
+// offline embedded panel intentionally have different outer dimensions.
+async function drawingSnapshot(page, selector) {
+  await page.mouse.move(0, 0); // Compare the same resting state, rather than one recently clicked button's hover.
+  return page.locator(selector).evaluate(async host => {
+    const original = host.getAttribute('style');
+    const width = innerWidth < 760 ? 320 : 900;
+    host.style.setProperty('width', width + 'px', 'important');
+    host.style.setProperty('height', '600px', 'important');
+    host.style.setProperty('flex', 'none', 'important');
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await Promise.all(host.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
+    const origin = host.getBoundingClientRect();
+    const selectors = ['.dmate-drawing-workspace', '.ddw-header', '.ddw-name', '.ddw-page-actions',
+      ...[1, 2, 3].map(index => '.ddw-page-actions>button:nth-child(' + index + ')'),
+      '.ddw-body', '.ddw-editor', '.dge-topline', '[data-editor-undo]', '[data-editor-redo]',
+      '.dge-view-controls', '.ddw-canvas-frame', '.dge-overlay-viewport', '.ddw-side-actions',
+      '.ddw-side-actions>button:first-child', '.ddw-side-actions>button:nth-child(2)', '.dge-tool-palette>summary'];
+    const result = {};
+    for (const selector of selectors) {
+      const node = host.querySelector(selector);
+      if (!node) throw new Error('Missing drawing comparison node: ' + selector);
+      const style = getComputedStyle(node), rect = node.getBoundingClientRect();
+      result[selector] = { rect: [rect.x - origin.x, rect.y - origin.y, rect.width, rect.height],
+        style: Object.fromEntries(['display', 'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'color',
+          'backgroundColor', 'borderTopWidth', 'borderTopStyle', 'borderTopColor', 'borderRadius',
+          'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'gap', 'boxShadow'].map(key => [key, style[key]])) };
+    }
+    if (original === null) host.removeAttribute('style'); else host.setAttribute('style', original);
+    return result;
+  });
+}
+
+async function drawingShellStyle(page, selector) {
+  return page.locator(selector).evaluate(node => {
+    const capture = element => {
+      const style = getComputedStyle(element);
+      return Object.fromEntries(['backgroundColor', 'borderTopColor', 'borderTopWidth', 'borderTopStyle',
+        'borderRadius', 'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'color',
+        'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'].map(key => [key, style[key]]));
+    };
+    return { shell: capture(node), heading: capture(node.querySelector('.graph-editor-dialog-head')),
+      title: capture(node.querySelector('.graph-editor-dialog-head>h2')) };
+  });
+}
+
+async function drawingReference(page) {
+  await page.locator(page.viewportSize().width <= 1100 ? '#mobileToolsBtn' : '#desktopToolsBtn').click();
+  await page.locator('#graphDrawingBtn').click();
+  const dialog = page.locator('#graphEditorDialog');
+  await page.waitForFunction(() => document.getElementById('graphEditorDialog').open
+    && !document.getElementById('graphEditorDialog').dataset.positioning);
+  const workspace = dialog.locator('.dmate-drawing-workspace');
+  await workspace.waitFor();
+  assert.equal(await workspace.getByRole('button', { name: '上传', exact: true }).count(), 1, 'Online upload remains available');
+  await workspace.getByRole('button', { name: 'AI指导', exact: true }).click();
+  await workspace.locator('.ddw-ai-requirement').waitFor();
+  assert.equal(await workspace.locator('[data-drawing-guide],[data-math-diagram-generate]').count(), 2,
+    'Online guidance and mathematical generation remain available');
+  await workspace.getByRole('button', { name: 'AI指导', exact: true }).click();
+  // Remove only the two intentionally unavailable controls from this reference
+  // page, after proving the real online UI provides both capabilities.
+  await workspace.evaluate(node => {
+    node.querySelector('.ddw-upload-button').remove();
+    [...node.querySelectorAll('.ddw-side-actions>button')].find(button => button.textContent === 'AI指导').remove();
+  });
+  await workspace.getByRole('button', { name: '新建空白页', exact: true }).click();
+  const result = { inner: await drawingSnapshot(page, '#graphEditorMount'), outer: await drawingShellStyle(page, '#graphEditorDialog') };
+  await dialog.evaluate(node => node.close());
+  return result;
 }
 
 async function noOverflow(page, panel) {
@@ -319,12 +392,103 @@ async function graph(page) {
     'Every graph topic leads to its detailed concepts');
 }
 
-async function drawing(page) {
+async function drawing(page, reference) {
   await navigate(page, 'drawing');
   const workspace = page.locator('#offlineDrawingHost .dmate-drawing-workspace');
   await workspace.waitFor();
+  assert.equal(await page.locator('#offlineDrawingTitle').innerText(), '绘图');
+  assert.deepEqual(await drawingShellStyle(page, '#drawingPanel'), reference.outer,
+    'Online/offline drawing shell background, outline, typography, padding and heading match');
+  assert.equal(await page.locator('#drawingPanel .offline-intro').count(), 0, 'The old standalone drawing introduction is removed');
+  assert.equal(await workspace.getByRole('button', { name: /AI指导|上传|生成数学图/ }).count(), 0);
+  assert.equal(await workspace.locator('.ddw-ai-requirement,.ddw-ai-label,.ddw-ai-actions,.ddw-ai-answer,'
+    + '[data-drawing-guide],[data-math-diagram-generate],.ddw-upload-button,input[type="file"]').count(), 0,
+  'Unavailable AI/upload functionality has no controls or request form in the offline DOM');
+  const frame = await page.locator('#offlineDrawingHost').evaluate(node => {
+    const style = getComputedStyle(node);
+    return { parent: node.parentElement.id, border: parseFloat(style.borderTopWidth),
+      padding: ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'].map(key => parseFloat(style[key])),
+      canvasHeight: node.querySelector('.dge-overlay-viewport').clientHeight };
+  });
+  assert.equal(frame.parent, 'drawingPanel', 'The shared component mounts directly beneath the drawing header');
+  assert.equal(frame.border, 0, 'No extra inner card surrounds the shared drawing component');
+  assert.deepEqual(frame.padding, [0, 0, 0, 0]);
+  assert.ok(frame.canvasHeight > 200, 'The native embedded layout provides a usable canvas: ' + JSON.stringify(frame));
   await workspace.getByRole('button', { name: '新建空白页', exact: true }).click();
+  const actual = await drawingSnapshot(page, '#offlineDrawingHost');
+  for (const [selector, expected] of Object.entries(reference.inner)) {
+    assert.deepEqual(actual[selector].style, expected.style, 'Online/offline drawing styles: ' + selector);
+    actual[selector].rect.forEach((value, index) => assert.ok(Math.abs(value - expected.rect[index]) <= 1.5,
+      'Online/offline drawing relative geometry: ' + selector + ': ' + JSON.stringify({ actual: actual[selector].rect, expected: expected.rect })));
+  }
   await workspace.locator('.ddw-name').fill('离线保存画板');
+  const tool = async mode => {
+    const summary = workspace.locator('.dge-tool-palette>summary');
+    if (await summary.getAttribute('aria-expanded') !== 'true') await summary.click();
+    await workspace.locator('[data-overlay-tool="' + mode + '"]').click();
+    await summary.click();
+  };
+  const tap = async point => {
+    if (page.viewportSize().width < 760) await page.touchscreen.tap(point.x, point.y);
+    else await page.mouse.click(point.x, point.y);
+  };
+  await tool('vertex');
+  const canvas = await workspace.locator('.dge-overlay-viewport').boundingBox();
+  for (const [x, y] of [[.35, .55], [.7, .72]]) await tap({ x: canvas.x + canvas.width * x, y: canvas.y + canvas.height * y });
+  assert.equal(await workspace.locator('.dge-overlay-node').count(), 2, 'Real canvas gestures add vertices');
+  await tool('edge');
+  for (const index of [0, 1]) {
+    const point = await workspace.locator('.dge-overlay-node .dge-overlay-dot').nth(index).evaluate(node => {
+      const r = node.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    });
+    await tap(point);
+  }
+  assert.equal(await workspace.locator('.dge-overlay-edge').count(), 1, 'Real canvas gestures connect vertices');
+  await workspace.locator('[data-editor-undo]').click();
+  assert.equal(await workspace.locator('.dge-overlay-edge').count(), 0);
+  await workspace.locator('[data-editor-redo]').click();
+  assert.equal(await workspace.locator('.dge-overlay-edge').count(), 1);
+  await workspace.getByRole('button', { name: '清空', exact: true }).click();
+  assert.equal(await workspace.locator('.dge-overlay-node').count(), 0);
+  await workspace.locator('[data-editor-undo]').click();
+  assert.equal(await workspace.locator('.dge-overlay-node').count(), 2, 'Clear can be undone without losing the drawing');
+  await workspace.locator('[data-overlay-tool="zoom-in"]').click();
+  const zoomed = await workspace.locator('.dge-overlay-zoom').innerText();
+  await workspace.locator('[data-overlay-tool="zoom-fit"]').click();
+  assert.notEqual(await workspace.locator('.dge-overlay-zoom').innerText(), zoomed, 'Fit recalculates the view after zoom');
+  const downloading = page.waitForEvent('download');
+  await workspace.getByRole('button', { name: '导出图片', exact: true }).click();
+  if (page.viewportSize().width < 760) {
+    await workspace.locator('.ddw-export-preview').waitFor();
+    await page.waitForFunction(() => document.querySelector('.ddw-export-image')?.naturalWidth > 64);
+    await workspace.locator('.ddw-export-download').click();
+  }
+  const download = await downloading;
+  const stream = await download.createReadStream(), chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  const png = Buffer.concat(chunks);
+  assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.ok(png.readUInt32BE(16) > 64 && png.readUInt32BE(20) > 64, 'Offline PNG export renders a usable image');
+  if (page.viewportSize().width < 760) await workspace.locator('.ddw-export-close').click();
+  const history = workspace.getByRole('button', { name: '历史绘图', exact: true });
+  const historyNames = async () => {
+    if (await history.getAttribute('aria-expanded') !== 'true') await history.click();
+    return workspace.locator('.ddw-history-open').allTextContents();
+  };
+  assert.deepEqual(await historyNames(), ['离线保存画板']);
+  await history.click();
+  await workspace.getByRole('button', { name: '新建空白页', exact: true }).click();
+  await workspace.locator('.ddw-name').fill('待删除画板');
+  assert.deepEqual(await historyNames(), ['离线保存画板', '待删除画板']);
+  await workspace.locator('.ddw-history-open').getByText('离线保存画板', { exact: true }).click();
+  assert.equal(await workspace.locator('.dge-overlay-node').count(), 2);
+  assert.deepEqual(await historyNames(), ['离线保存画板', '待删除画板'], 'Selecting history does not change creation order');
+  await workspace.locator('.ddw-history-item').filter({ hasText: '待删除画板' })
+    .locator('.ddw-history-delete').click();
+  await page.locator('.dmate-delete-confirm-delete').click();
+  await page.waitForFunction(() => document.querySelectorAll('.ddw-history-open').length === 1);
+  assert.deepEqual(await historyNames(), ['离线保存画板']);
+  await history.click();
   await page.waitForFunction(() => (localStorage.getItem('dmate:offline:drawing-gallery:v1') || '').includes('离线保存画板'));
   assert.equal(await workspace.locator('.ddw-name').inputValue(), '离线保存画板');
 }
@@ -447,7 +611,7 @@ async function runCase(browser, width, theme) {
     await concepts(page);
     if (theme === 'dark') await curriculum(page);
     await graph(page);
-    await drawing(page);
+    await drawing(page, reference.drawing);
     // A second fully offline navigation must restore practice records and the drawing.
     await page.reload({ waitUntil: 'networkidle' });
     await ready(page);
@@ -455,6 +619,8 @@ async function runCase(browser, width, theme) {
     assert.ok((await readStore(page, 'practice')).length >= 2);
     await navigate(page, 'drawing');
     assert.equal(await page.locator('#offlineDrawingHost .ddw-name').inputValue(), '离线保存画板');
+    assert.equal(await page.locator('#offlineDrawingHost .dge-overlay-node').count(), 2, 'Edited vertices survive offline refresh');
+    assert.equal(await page.locator('#offlineDrawingHost .dge-overlay-edge').count(), 1, 'Edited edges survive offline refresh');
     for (const panel of panels) {
       await navigate(page, panel);
       await noOverflow(page, panel);
