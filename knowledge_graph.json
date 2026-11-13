@@ -1,5 +1,5 @@
 {
-  "version": 36,
+  "version": 37,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -839,15 +839,20 @@
       ],
       "videos": [
         {
-          "source_id": "crt_fraljimetry",
-          "title": "中国剩余定理（孙子定理）的证明〖一类存在唯一解的同余方程组〗",
+          "source_id": "pku_qiu_weisheng_math_thinking",
+          "title": "数学的思维方式与创新 · 11 中国剩余定理",
           "sections": [
-            "中国剩余定理（孙子定理）的证明〖一类存在唯一解的同余方程组〗"
+            "25-11.1-中国剩余定理（一）",
+            "26-11.2-中国剩余定理（二）"
           ],
           "lessons": [
             {
-              "title": "中国剩余定理（孙子定理）的证明〖一类存在唯一解的同余方程组〗",
-              "url": "https://www.bilibili.com/video/BV13b4y1Y7wh/"
+              "title": "25-11.1-中国剩余定理（一）",
+              "url": "https://www.bilibili.com/video/BV12Y411b7Yn/?p=29"
+            },
+            {
+              "title": "26-11.2-中国剩余定理（二）",
+              "url": "https://www.bilibili.com/video/BV12Y411b7Yn/?p=30"
             }
           ]
         }
@@ -2292,14 +2297,6 @@
       "note": "UP主原创讲解，章节按知识点、重要程度和难度组织。用于集合、关系、函数、部分图论专题及代数结构。"
     },
     {
-      "id": "crt_fraljimetry",
-      "name": "Fraljimetry 的数学工厂",
-      "course": "中国剩余定理（孙子定理）的证明",
-      "platform": "Bilibili",
-      "publisher": "Fraljimetry的数学工厂",
-      "note": "UP主原创的中国剩余定理证明视频，聚焦同余方程组存在唯一解；作为数论专题补充，仅提供原视频外链。"
-    },
-    {
       "id": "graph_animation_bili",
       "name": "动画讲解计算机知识",
       "course": "数据结构·图（动画讲解）",
@@ -2636,25 +2633,33 @@
       "platform": "Bilibili",
       "publisher": "脑袋要有光",
       "note": "爱荷华州立大学Steve Butler 2023秋季频谱图论，共29讲。按教师原课程目录：14 拉普拉斯矩阵导入、15 拉普拉斯矩阵性质、16 Matrix Tree Theorem，作为矩阵树定理节点连续学习资源。B站BV11kga6FEez是第三方中文AI配音＋中文字幕版本，翻译质量尚未逐句核验，本次无法独立确认B站页面播放及分P标题。仅原视频外链，不下载、托管或重新分发。教师课程目录：https://www.stevebutler.org/spectral2023"
+    },
+    {
+      "id": "pku_qiu_weisheng_math_thinking",
+      "name": "北京大学 · 丘维声",
+      "course": "数学的思维方式与创新（1080P高清修复版，全88集）",
+      "platform": "Bilibili",
+      "publisher": "",
+      "note": "由北京大学丘维声教授主讲，B站页面为第三方上传的1080P修复版（视频内容授权状态未核实），页面实际列有88个分P，开头有4集导论，故标题编号25《11.1 中国剩余定理（一）》和26《11.2 中国剩余定理（二）》在该上传版本中分别对应实际P29和P30。时长28:05和22:11；前置课程还讲模m同余关系、剩余类环及可逆元，适合在现有同余知识节点后衔接。保留原B站外链，不下载、托管或重新分发。大陆版：https://www.bilibili.com/video/BV12Y411b7Yn/"
     }
   ],
   "video_resource_policy": {
     "primary_per_node": "Keep one primary selected course per node; additional CMU lessons may be listed as supplementary when they add direct, non-duplicative coverage.",
     "platform_policy": "Bilibili_only",
     "course_continuity": "Keep adjacent topics within one course where possible; avoid redundant or abrupt switches.",
-    "note": "Bilibili-only. CMU Po-Shen Loh Spring 2021 course is confirmed from the mainland Bilibili screenshots as 35 parts totaling 31:26:24, uploaded by 无为斋主. The full 35-part list is stored in the source record. Direct part links use the mainland www.bilibili.com domain. CMU is primary for counting, binomial coefficients, recurrences and generating functions; later graph/tree/matching/planar lectures are supplementary where existing specialist courses remain primary. P22 Cayley formula is not the Matrix-Tree theorem. P26–P29 do not have matching existing nodes and are not forced into unrelated topics. The Matrix-Tree node remains assigned to Steve Butler P14–P16.",
+    "note": "Bilibili-only. CMU Po-Shen Loh Spring 2021 course is confirmed from the mainland Bilibili screenshots as 35 parts totaling 31:26:24, uploaded by 无为斋主. The full 35-part list is stored in the source record. Direct part links use the mainland www.bilibili.com domain. CMU is primary for counting, binomial coefficients, recurrences and generating functions; later graph/tree/matching/planar lectures are supplementary where existing specialist courses remain primary. P22 Cayley formula is not the Matrix-Tree theorem. P26–P29 do not have matching existing nodes and are not forced into unrelated topics. The Matrix-Tree node remains assigned to Steve Butler P14–P16. CRT node now uses Peking University professor Qiu Weisheng 1080p restored Bilibili video BV12Y411b7Yn, actual parts P29/P30. Display titles numbered 25/26 differ because the 88-part upload includes four intro videos. Avoid assigning P25/P26 for this upload.",
     "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs.",
     "audit_status": {
       "nodes_total": 68,
       "nodes_with_active_course": 68,
       "nodes_pending": "none",
-      "direct_episode_links": 157,
+      "direct_episode_links": 158,
       "nested_or_missing_episode_urls": 0,
       "youtube_links": 0,
       "cmu_2021_parts_verified": 35,
       "cmu_2021_total_duration": "31:26:24",
       "cmu_2021_mapped_nodes": 18,
-      "last_audit_scope": "all 35 mainland Bilibili CMU parts transcribed from the user's screenshots; total duration sum checked; direct P1-P35 links added where matched to DMate nodes; existing specialist courses retained as primary for supplementary graph topics"
+      "last_audit_scope": "Replaced number_inverse_crt with Qiu Weisheng 1080P Bilibili CRT P29/P30; crosschecked 88-part playlist with four introductory lessons and video titles 25/26, corrected previously misstated P numbers; other nodes unchanged"
     },
     "excluded_source_ids": [
       "scut_discrete_math",
@@ -2902,6 +2907,26 @@
       ],
       "previous_first_six_part_links_status": "verified_against_user_screenshots",
       "note": "The 35-part list and all durations were read from user-provided screenshots. Sum of the 35 displayed durations is exactly 31:26:24. For titles cropped by the screenshot viewport, only the visible text is stored; no completion has been invented."
+    },
+    "chinese_remainder_theorem": {
+      "node_id": "number_inverse_crt",
+      "source_id": "pku_qiu_weisheng_math_thinking",
+      "uploader": "第三方上传者（未核实名称）",
+      "bilibili_video_url": "https://www.bilibili.com/video/BV12Y411b7Yn/",
+      "lessons": [
+        {
+          "part": 29,
+          "title": "25-11.1-中国剩余定理（一）",
+          "duration": "28:05"
+        },
+        {
+          "part": 30,
+          "title": "26-11.2-中国剩余定理（二）",
+          "duration": "22:11"
+        }
+      ],
+      "reason_for_part_number_difference": "该88分P版本开头额外收录四集导论，标题课程编号与B站实际P号相差4",
+      "former_source_id": "crt_fraljimetry"
     }
   },
   "video_resource_candidates": [
