@@ -17579,9 +17579,6 @@ function normalizeKnowledgeGraphData(data) {
                 level: typeof node.level === "string"
                     ? node.level.trim()
                     : "",
-                note: typeof node.note === "string"
-                    ? node.note.trim()
-                    : "",
                 videos: Array.isArray(node.videos)
                     ? node.videos
                         .filter(video => video && typeof video === "object")
@@ -21113,14 +21110,6 @@ function renderKnowledgeGraphDetail() {
         nextNodes,
         "当前图中暂无后续"
     );
-
-    if (node.note) {
-        addDetailField(
-            "说明",
-            [node.note],
-            ""
-        );
-    }
 
     const videos = Array.isArray(node.videos) ? node.videos : [];
     if (videos.length) {
