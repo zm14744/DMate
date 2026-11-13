@@ -4,7 +4,7 @@
   const DB_NAME = "dmate-offline-workspace";
   const DB_VERSION = 2;
   const state = {
-    db: null, concepts: [], questions: [], graph: null,
+    db: null, concepts: [], questions: [], graph: null, translations: {concepts:{},questions:{}},
     panel: "graph", selectedQuestion: null, selectedConcept: null,
     revealed: false,
     drawingController: null, backgroundUrl: "", graphCategory: "", questionCategory: "",
@@ -13,10 +13,30 @@
   };
   const panelMeta = {
     graph: ["知识图谱", "浏览离散数学知识点及其前置关系。"],
-    concepts: ["概念库", "使用简体中文查看定义、解释、例题和易错点。"],
+    concepts: ["概念库", "查看定义、解释、例题和易错点，支持中英文切换。"],
     questions: ["练习库", "按章节和难度练习，查看参考答案与解析。"],
     drawing: ["绘图", "使用 DMate 图形编辑器，在本机创建和保存数学图形。"]
   };
+  const tr = (value, english) => window.DMateI18n?.t?.(value, english) ?? String(value ?? "");
+  const english = () => window.DMateI18n?.isEnglish?.() === true;
+  function localized(value, collection) {
+    return english() ? {...value, ...state.translations[collection]?.[value.id]} : value;
+  }
+  function contentText(tag, className, value) {
+    const node = el(tag, className, value);
+    node.setAttribute("data-i18n-content", "");
+    return node;
+  }
+  function studySource(value) {
+    return window.DMateMathMarkdown?.prepareStudyText?.(value) ?? String(value ?? "");
+  }
+  function studyLabel(tag, className, value) {
+    const node = contentText(tag, className, value), source = studySource(value);
+    if (source !== String(value ?? "") || /\$|\\\(|\\\[|`|\*\*/.test(source)) {
+      void window.DMateAIAnswer?.render(node, source, {typography:"inline"});
+    }
+    return node;
+  }
 
   function toast(message) {
     const node = $("offlineToast");
@@ -40,6 +60,11 @@
     });
     return node;
   }
+  function studyButton(text, className, handler) {
+    const node = button("", className, handler);
+    node.append(studyLabel("span", "", text));
+    return node;
+  }
   function action(text, className, handler, icon) {
     const node = button("", className, handler);
     const mark = icon ? window.DMateOfflineIcons?.create(icon) : null;
@@ -53,31 +78,20 @@
   function configureRenderer() {
     window.DMateAIAnswer?.configure({
       markdownToHtml(value) {
-        if (!window.marked?.parse || !window.DOMPurify?.sanitize) return escapeHtml(value).replace(/\n/g, "<br>");
-        // Use the online renderer's formula protection and final sanitization:
-        // Markdown must not consume LaTeX escapes or create unsafe attributes.
-        const segments = [];
-        let source = String(value ?? "");
-        const stash = math => {
-          const token = "\uE000DMATE_MATH_" + segments.length + "_END\uE001";
-          segments.push([token, math]);
-          return token;
-        };
-        source = source.replace(/\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|(?<!\\)\$(?!\$)(?:\\.|[^$\n])+\$/g, stash);
-        let html = window.marked.parse(source);
-        for (const [token, math] of segments) html = html.split(token).join(escapeHtml(math));
-        return window.DOMPurify.sanitize(html);
+        const formatter = window.DMateMathMarkdown;
+        if (!formatter) return escapeHtml(value).replace(/\n/g, "<br>");
+        return formatter.markdownToHtml(formatter.prepareAiDisplayText(value));
       },
       async renderMath(target) {
         await window.MathJax?.startup?.promise;
-        if (window.MathJax?.typesetPromise) await window.MathJax.typesetPromise([target]);
+        await window.DMateMathMarkdown?.renderMath?.(target);
       }
     });
   }
   function rich(className, value) {
     const node = el("div", className);
     node.setAttribute("data-i18n-content", "");
-    if (window.DMateAIAnswer?.render) void window.DMateAIAnswer.render(node, value);
+    if (window.DMateAIAnswer?.render) void window.DMateAIAnswer.render(node, studySource(value), {typography:"chat"});
     else node.textContent = String(value ?? "");
     return node;
   }
@@ -150,14 +164,23 @@
   }
 
   async function loadResources() {
-    const [concepts, questions, graph] = await Promise.all([
-      fetch("/static/offline-content/concepts.zh-CN.json", {cache:"no-store"}).then(r => { if(!r.ok) throw Error("概念库资源不可用"); return r.json(); }),
-      fetch("/static/offline-content/questions.zh-CN.json", {cache:"no-store"}).then(r => { if(!r.ok) throw Error("题库资源不可用"); return r.json(); }),
-      fetch("/static/offline-content/knowledge_graph.json", {cache:"no-store"}).then(r => { if(!r.ok) throw Error("知识图谱资源不可用"); return r.json(); })
+    const [concepts, questions, graph, translations] = await Promise.all([
+      fetch("/static/offline-content/concepts.zh-CN.json?v=22", {cache:"no-store"}).then(r => { if(!r.ok) throw Error("概念库资源不可用"); return r.json(); }),
+      fetch("/static/offline-content/questions.zh-CN.json?v=22", {cache:"no-store"}).then(r => { if(!r.ok) throw Error("题库资源不可用"); return r.json(); }),
+      fetch("/static/offline-content/knowledge_graph.json?v=22", {cache:"no-store"}).then(r => { if(!r.ok) throw Error("知识图谱资源不可用"); return r.json(); }),
+      fetch("/static/offline-content/translations.en.json?v=22", {cache:"no-store"}).then(r => { if(!r.ok) throw Error("英文学习内容资源不可用"); return r.json(); })
     ]);
     state.concepts = Array.isArray(concepts.concepts) ? concepts.concepts : [];
     state.questions = Array.isArray(questions.questions) ? questions.questions : [];
     state.graph = graph;
+    if (translations.schema_version !== 1 || translations.language !== "en"
+        || translations.source_pack_versions?.concepts !== concepts.pack_version
+        || translations.source_pack_versions?.questions !== questions.pack_version
+        || state.concepts.some(item => !translations.concepts?.[item.id])
+        || state.questions.some(item => !translations.questions?.[item.id])) {
+      throw Error(tr("中英文学习内容版本不一致，请联网更新离线资源。", "The Chinese and English study packs do not match. Reconnect to update offline resources."));
+    }
+    state.translations = translations;
   }
 
   function setNetworkStatus() {
@@ -193,7 +216,7 @@
     const select = $("questionCategory");
     if (select.options.length > 1) return;
     const categories = [...new Set(state.questions.map(q => q.category))].sort();
-    for (const value of categories) select.add(new Option(value, value));
+    for (const value of categories) select.add(new Option(tr(value), value));
   }
 
   function difficultyName(value) {
@@ -208,14 +231,16 @@
       (!state.questionCategory || q.category === state.questionCategory) &&
       (!state.questionDifficulty || difficultyName(q.difficulty) === state.questionDifficulty)
     );
-    $("questionCount").textContent = filtered.length + " 道题目";
+    $("questionCount").textContent = tr(filtered.length + " 道题目", filtered.length + (filtered.length === 1 ? " exercise" : " exercises"));
     const list = $("questionList");
     list.replaceChildren();
     for (const question of filtered) {
+      const display = localized(question, "questions");
       const item = button("", "question-item" + (state.selectedQuestion?.id === question.id ? " active" : ""), () => selectQuestion(question));
+      item.setAttribute("data-i18n-content", "");
       item.dataset.questionId = question.id;
       item.setAttribute("aria-current", String(state.selectedQuestion?.id === question.id));
-      item.append(el("strong", "", question.title), el("small", "", question.category + " · " + difficultyName(question.difficulty) + " · " + question.type));
+      item.append(studyLabel("strong", "", display.title), el("small", "", tr(question.category) + " · " + tr(difficultyName(question.difficulty)) + " · " + tr(question.type)));
       list.append(item);
     }
     if (state.selectedQuestion && filtered.some(q => q.id === state.selectedQuestion.id)) {
@@ -223,7 +248,7 @@
     } else if (filtered.length) selectQuestion(filtered[0]);
     else {
       state.selectedQuestion = null;
-      $("questionDetail").replaceChildren(el("div","offline-empty","没有符合条件的题目。"));
+      $("questionDetail").replaceChildren(el("div","offline-empty",tr("没有符合条件的题目。", "No matching exercises.")));
     }
   }
 
@@ -238,15 +263,16 @@
   }
 
   function renderQuestionDetail(question) {
-    const detail = $("questionDetail");
+    const detail = $("questionDetail"), display = localized(question, "questions");
+    detail.setAttribute("data-i18n-content", "");
     detail.replaceChildren();
-    detail.append(el("div", "detail-kicker", question.category + " / " + difficultyName(question.difficulty) + " / " + question.type));
-    detail.append(el("h2", "detail-title", question.title));
+    detail.append(el("div", "detail-kicker", tr(question.category) + " / " + tr(difficultyName(question.difficulty)) + " / " + tr(question.type)));
+    detail.append(studyLabel("h2", "detail-title", display.title));
     const concepts = el("div", "prereq-list question-concept-links");
     for (const id of question.knowledge_points || []) {
       const concept = state.concepts.find(item => item.id === id);
       if (concept) {
-        const link = button("知识点：" + concept.title, "", () => {
+        const link = studyButton(tr("知识点：", "Knowledge point: ") + localized(concept, "concepts").title, "", () => {
           $("conceptSearch").value = "";
           switchPanel("concepts"); fillConceptDetail(concept);
         });
@@ -255,16 +281,16 @@
     }
     if (concepts.children.length) detail.append(concepts);
     const statement = el("div", "detail-section wrong-question-section");
-    statement.append(el("h3", "", "题目"));
-    statement.append(rich("wrong-question", question.statement));
+    statement.append(el("h3", "", tr("题目", "Question")));
+    statement.append(rich("wrong-question", display.statement));
     detail.append(statement);
 
     if (Array.isArray(question.options) && question.options.length) {
       const options = el("div", "detail-section");
-      options.append(el("h3", "", "选项"));
+      options.append(el("h3", "", tr("选项", "Options")));
       const list = el("div", "question-options");
       list.setAttribute("role", "list");
-      for (const option of question.options) {
+      for (const option of display.options) {
         const node = el("div", "question-option");
         node.setAttribute("role", "listitem");
         node.append(el("span", "question-option-key", option.key + "."), rich("question-option-text", option.text));
@@ -275,7 +301,7 @@
     }
 
     const actions = el("div", "question-actions wrong-actions");
-    actions.append(action(state.revealed ? "收起参考答案" : "查看参考答案", "offline-primary", () => {
+    actions.append(action(state.revealed ? tr("收起参考答案", "Hide reference answer") : tr("查看参考答案", "View reference answer"), "offline-primary", () => {
       state.revealed = !state.revealed;
       renderQuestionDetail(question);
     }));
@@ -283,12 +309,12 @@
 
     if (state.revealed) {
       const answer = el("section", "answer-panel wrong-answer-details");
-      answer.append(el("h3", "", "参考答案"));
-      answer.append(rich("wrong-answer-inner", question.answer_text || (question.answer || []).join("、")));
-      answer.append(el("h3", "", "解析"));
-      answer.append(rich("wrong-analysis-body", question.explanation || "暂无解析。"));
+      answer.append(el("h3", "", tr("参考答案", "Reference answer")));
+      answer.append(rich("wrong-answer-inner", display.answer_text || (question.answer || []).join("、")));
+      answer.append(el("h3", "", tr("解析", "Explanation")));
+      answer.append(rich("wrong-analysis-body", display.explanation || tr("暂无解析。", "No explanation available.")));
       if (question.grading_criteria) {
-        answer.append(el("h3", "", "评分要点"), rich("wrong-feedback-body", question.grading_criteria));
+        answer.append(el("h3", "", tr("评分要点", "Marking criteria")), rich("wrong-feedback-body", display.grading_criteria));
       }
       detail.append(answer);
     }
@@ -296,19 +322,20 @@
 
   function fillConceptDetail(concept) {
     state.selectedConcept = concept;
-    const detail = $("conceptDetail");
+    const detail = $("conceptDetail"), display = localized(concept, "concepts");
+    detail.setAttribute("data-i18n-content", "");
     detail.replaceChildren();
-    detail.append(el("div", "detail-kicker", concept.category));
-    detail.append(el("h2", "detail-title", concept.title));
-    detail.append(rich("concept-summary", concept.summary));
+    detail.append(el("div", "detail-kicker", tr(concept.category)));
+    detail.append(studyLabel("h2", "detail-title", display.title));
+    detail.append(rich("concept-summary", display.summary));
     const topic = state.concepts.find(item => item.id === concept.graph_node_id);
     const children = (concept.related_concepts || []).map(id => state.concepts.find(item => item.id === id)).filter(Boolean);
     if (children.length || (topic && topic.id !== concept.id)) {
       const section = el("section", "detail-section concept-topic-links");
-      section.append(el("h3", "", children.length ? "细分概念" : "所属图谱知识点"));
+      section.append(el("h3", "", children.length ? tr("细分概念", "Detailed concepts") : tr("所属图谱知识点", "Knowledge-map topic")));
       const links = el("div", "prereq-list");
       for (const item of children.length ? children : [topic]) {
-        const link = button(item.title, "", () => fillConceptDetail(item));
+        const link = studyButton(localized(item, "concepts").title, "", () => fillConceptDetail(item));
         link.dataset.conceptId = item.id;
         links.append(link);
       }
@@ -320,30 +347,28 @@
     });
     const section = (title, content) => {
       const box = el("section", "detail-section");
-      box.append(el("h3", "", title));
+      box.append(el("h3", "", tr(title)));
       if (Array.isArray(content)) {
-        const ul = el("ul", "");
-        for (const item of content) { const li = el("li"); li.append(rich("concept-detail-text", item)); ul.append(li); }
-        box.append(ul);
-      } else box.append(rich("concept-detail-text", content || "暂无内容。"));
+        box.append(rich("concept-detail-text", content.map(item => "- " + String(item).replace(/\n/g, "\n  ")).join("\n")));
+      } else box.append(rich("concept-detail-text", content || tr("暂无内容。", "No content available.")));
       detail.append(box);
     };
-    section("基本定义", concept.definition);
-    section("理解与说明", concept.explanation);
-    section("数学符号", concept.notation || []);
-    section("典型例题", concept.example);
-    section("常见错误", concept.common_mistakes || []);
+    section("基本定义", display.definition);
+    section("理解与说明", display.explanation);
+    section("数学符号", display.notation || []);
+    section("典型例题", display.example);
+    section("常见错误", display.common_mistakes || []);
     const related = el("section", "detail-section");
-    related.append(el("h3", "", "关联知识点"));
+    related.append(el("h3", "", tr("关联知识点", "Related knowledge")));
     const prereqs = el("div", "prereq-list");
     for (const id of concept.prerequisites || []) {
       const item = state.concepts.find(c => c.id === id);
-      if (item) prereqs.append(button(item.title, "", () => fillConceptDetail(item)));
+      if (item) prereqs.append(studyButton(localized(item, "concepts").title, "", () => fillConceptDetail(item)));
     }
     for (const id of concept.related_questions || []) {
       const q = state.questions.find(x => x.id === id);
       if (q) {
-        const link = button("练习：" + q.title, "", () => {
+        const link = studyButton(tr("练习：", "Exercise: ") + localized(q, "questions").title, "", () => {
           state.questionCategory = ""; state.questionDifficulty = "";
           $("questionCategory").value = ""; $("questionDifficulty").value = "";
           switchPanel("questions"); selectQuestion(q);
@@ -351,27 +376,32 @@
         link.dataset.questionId = id; prereqs.append(link);
       }
     }
-    if (!prereqs.children.length) prereqs.append(el("span", "", "暂无已关联条目"));
+    if (!prereqs.children.length) prereqs.append(el("span", "", tr("暂无已关联条目", "No linked entries yet")));
     related.append(prereqs); detail.append(related);
   }
 
   function renderConcepts() {
     const query = $("conceptSearch").value.trim().toLocaleLowerCase();
-    const rows = state.concepts.filter(c => !query || [c.title,c.category,c.summary,c.definition].join(" ").toLocaleLowerCase().includes(query));
-    $("conceptCount").textContent = rows.length + " 个概念";
+    const rows = state.concepts.filter(c => {
+      const translated = state.translations.concepts[c.id] || {};
+      return !query || [c.title,c.category,c.summary,c.definition,translated.title,translated.summary,translated.definition,tr(c.category)].join(" ").toLocaleLowerCase().includes(query);
+    });
+    $("conceptCount").textContent = tr(rows.length + " 个概念", rows.length + (rows.length === 1 ? " concept" : " concepts"));
     const list = $("conceptList"); list.replaceChildren();
     for (const concept of rows) {
+      const display = localized(concept, "concepts");
       const item = button("", "concept-item" + (state.selectedConcept?.id === concept.id ? " active" : ""), () => {
         fillConceptDetail(concept);
       });
       item.dataset.conceptId = concept.id;
+      item.setAttribute("data-i18n-content", "");
       item.setAttribute("aria-current", String(state.selectedConcept?.id === concept.id));
-      item.append(el("strong", "", concept.title), el("small", "", concept.category));
+      item.append(studyLabel("strong", "", display.title), el("small", "", tr(concept.category)));
       list.append(item);
     }
     if (state.selectedConcept && rows.some(c => c.id === state.selectedConcept.id)) fillConceptDetail(state.selectedConcept);
     else if (rows.length) fillConceptDetail(rows[0]);
-    else $("conceptDetail").replaceChildren(el("div","offline-empty","没有找到匹配的概念。"));
+    else $("conceptDetail").replaceChildren(el("div","offline-empty",tr("没有找到匹配的概念。", "No matching concepts.")));
   }
 
   function renderGraph() {
@@ -443,6 +473,16 @@
   }
 
   function bind() {
+    window.DMateI18n?.register?.({
+      "基本定义":"Definition", "理解与说明":"Explanation", "典型例题":"Worked example", "常见错误":"Common mistakes",
+      "评分要点":"Marking criteria", "细分概念":"Detailed concepts", "所属图谱知识点":"Knowledge-map topic",
+      "关联知识点":"Related knowledge", "暂无已关联条目":"No linked entries yet", "数学符号":"Mathematical notation",
+      "单项选择":"Single choice", "多项选择":"Multiple choice", "填空":"Fill in the blank", "计算":"Calculation",
+      "简答":"Short answer", "证明":"Proof", "简单":"Easy", "中等":"Medium", "困难":"Hard",
+      "按章节筛选":"Filter by topic", "按难度筛选":"Filter by difficulty", "全部章节":"All topics", "全部难度":"All difficulties",
+      "题目、答案与解析":"Questions, answers and explanations", "定义、解释与例题":"Definitions, explanations and examples",
+      "搜索概念":"Search concepts", "没有符合条件的题目。":"No matching exercises.", "没有找到匹配的概念。":"No matching concepts."
+    });
     document.querySelectorAll(".offline-nav-item").forEach(item => item.addEventListener("click", () => switchPanel(item.dataset.panel)));
     $("questionCategory").addEventListener("change", event => { state.questionCategory=event.target.value; renderQuestions(); });
     $("questionDifficulty").addEventListener("change", event => { state.questionDifficulty=event.target.value; renderQuestions(); });
@@ -450,6 +490,14 @@
     $("returnOnline").addEventListener("click", returnOnline);
     window.addEventListener("online", setNetworkStatus);
     window.addEventListener("offline", setNetworkStatus);
+    window.addEventListener("dmate:languagechange", event => {
+      if (state.panel === "questions") renderQuestions();
+      if (state.panel === "concepts") renderConcepts();
+      if (event.detail?.persist !== false) {
+        void put("settings", {id:"language",value:event.detail.language,updatedAt:Date.now()})
+          .catch(() => toast(tr("语言偏好暂时无法保存", "The language preference could not be saved.")));
+      }
+    });
     window.addEventListener("offline:appearance-change", event => {
       state.appearanceQueue = state.appearanceQueue.then(() => saveAppearance(event.detail))
         .catch(error => { window.DMateOfflineAppearance?.fail(error); toast(error?.message || "外观保存失败"); });
@@ -461,10 +509,13 @@
       setNetworkStatus();
       state.db = await openDb();
       await applyOriginalAppearance();
+      const language = await transaction("settings", "readonly", os => os.get("language"));
+      if (language?.value === "en" || language?.value === "zh-CN") window.DMateI18n?.setLanguage?.(language.value, false);
       configureRenderer();
       await migrateCurrentAccountData();
       await loadResources();
       bind();
+      window.DMateI18n?.translate?.(document.body);
       await switchPanel("graph");
       document.documentElement.dataset.offlineReady = "true";
     } catch (error) {

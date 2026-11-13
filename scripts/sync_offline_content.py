@@ -13,6 +13,7 @@ from graphlib import TopologicalSorter
 import json
 from pathlib import Path
 import re
+from offline_translations import compile_translations
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -183,7 +184,7 @@ def coverage_markdown(graph, concepts, questions):
             if node["category"] == category:
                 lines.append(f'| {node["name"]} | {"；".join(groups[node["id"]])} | {exercises[node["id"]]} |')
     lines.extend(["", "## 质量与许可状态", "",
-                  "中文内容独立编写，不是第三方教材或习题的翻译、改编或摘录。参考来源的许可证与原创包的发行条款分别记录。"
+                  "中文内容独立编写，英文译文翻译DMate自有内容；未翻译、改编或摘录第三方教材及习题的受保护表达。参考来源的许可证与原创包的发行条款分别记录。"
                   "非商业许可题目、未核清许可的网络题和高校试卷未进入本包。", "",
                   "结构检查涵盖全部图谱大类、细分概念、前置关系、题目关联、答案字段、难度层次与来源章节；"
                   "有限计算题另外使用程序核对。内容尚未经过独立教师逐题终审，不能将自动检查表述为人工审定。", ""])
@@ -203,6 +204,7 @@ def main():
         for name, pack in zip(PACKS, (concepts, questions, packs[2])):
             targets[ROOT / "static/offline-content" / name] = encoded(pack)
         targets[ROOT / "static/offline-content/knowledge_graph.json"] = encoded(graph)
+        targets[ROOT / "static/offline-content/translations.en.json"] = encoded(compile_translations(ROOT, concepts, questions))
         targets[ROOT / "offline-content/PREVIEW.zh-CN.md"] = coverage_markdown(graph, concepts, questions)
         changed = [path for path, content in targets.items()
                    if not path.exists() or path.read_text(encoding="utf-8") != content]

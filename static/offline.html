@@ -37,18 +37,19 @@
 <link rel="stylesheet" href="/static/graph-editor.css?v=20">
 <link rel="stylesheet" href="/static/drawing-workspace.css?v=20">
 <link rel="stylesheet" href="/static/modal-chrome.css">
-<link rel="stylesheet" href="/static/ai-answer-renderer.css">
+<link rel="stylesheet" href="/static/ai-answer-renderer.css?v=22">
 <link rel="stylesheet" href="/static/red-circle-controls.css">
 <link rel="stylesheet" href="/static/ui-tooltip.css">
 <link rel="stylesheet" href="/static/appearance-panels.css">
 <link rel="stylesheet" href="/static/dmate-shared-overrides.css?v=17">
 <link rel="stylesheet" href="/static/button-themes.css?v=21">
 <link rel="stylesheet" href="/static/offline-knowledge-graph.css?v=17">
-<link rel="stylesheet" href="/static/offline.css?v=21">
+<link rel="stylesheet" href="/static/offline.css?v=22">
 <script defer src="/static/graph-editor-model.js"></script>
 <script defer src="/static/graph-editor-format.js"></script>
 <script defer src="/static/graph-editor-overlay.js?v=20"></script>
-<script defer src="/static/ai-answer-renderer.js"></script>
+<script defer src="/static/math-markdown.js?v=22"></script>
+<script defer src="/static/ai-answer-renderer.js?v=22"></script>
 <script defer src="/static/delete-confirm.js"></script>
 <script defer src="/static/drawing-export.js"></script>
 <script defer src="/static/graph-editor.js?v=20"></script>
@@ -62,13 +63,13 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/ui-tooltip.js"></script>
 <script defer src="/static/language-catalog.js?v=18"></script>
 <script defer src="/static/language-knowledge.js"></script>
-<script defer src="/static/language.js"></script>
+<script defer src="/static/language.js?v=22"></script>
 <script defer src="/static/offline-appearance.js?v=8"></script>
 <script defer src="/static/offline-shell.js?v=8"></script>
 <script defer src="/static/knowledge-graph-labels.js?v=17"></script>
 <script defer src="/static/offline-knowledge-graph.js?v=17"></script>
 <script defer src="/static/offline-entry.js?v=17"></script>
-<script defer src="/static/offline.js?v=20"></script>
+<script defer src="/static/offline.js?v=22"></script>
 </head>
 <body class="offline-workspace">
 <script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"light";</script>
@@ -188,7 +189,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 
     <section class="offline-panel" id="questionsPanel" hidden>
       <div class="offline-toolbar question-toolbar">
-        <div><strong id="questionCount">练习库</strong><span class="toolbar-muted">中文题目 · 答案与解析</span></div>
+        <div><strong id="questionCount">练习库</strong><span class="toolbar-muted">题目、答案与解析</span></div>
         <div class="offline-filters">
           <select id="questionCategory" aria-label="按章节筛选"><option value="">全部章节</option></select>
           <select id="questionDifficulty" aria-label="按难度筛选">
@@ -206,7 +207,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 
     <section class="offline-panel" id="conceptsPanel" hidden>
       <div class="offline-toolbar">
-        <div><strong id="conceptCount">概念库</strong><span class="toolbar-muted">简体中文知识条目</span></div>
+        <div><strong id="conceptCount">概念库</strong><span class="toolbar-muted">定义、解释与例题</span></div>
         <input type="search" id="conceptSearch" class="offline-search" placeholder="搜索概念" aria-label="搜索概念">
       </div>
       <div class="concept-layout">

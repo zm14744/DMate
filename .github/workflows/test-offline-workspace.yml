@@ -13,6 +13,9 @@ on:
       - 'scripts/sync_offline_styles.py'
       - 'scripts/sync_offline_shell.py'
       - 'scripts/sync_offline_content.py'
+      - 'scripts/offline_translations.py'
+      - 'scripts/test_offline_translations.py'
+      - 'scripts/test_offline_study_browser.cjs'
       - 'scripts/test_offline_content*.py'
       - 'scripts/test_favicon_consistency.py'
       - 'scripts/test_offline_workspace_browser.cjs'
@@ -40,6 +43,9 @@ on:
       - 'scripts/sync_offline_styles.py'
       - 'scripts/sync_offline_shell.py'
       - 'scripts/sync_offline_content.py'
+      - 'scripts/offline_translations.py'
+      - 'scripts/test_offline_translations.py'
+      - 'scripts/test_offline_study_browser.cjs'
       - 'scripts/test_offline_content*.py'
       - 'scripts/test_favicon_consistency.py'
       - 'scripts/test_offline_workspace_browser.cjs'
@@ -88,6 +94,9 @@ jobs:
           node --check static/offline-knowledge-graph.js
           node --check static/knowledge-graph-labels.js
           node --check static/script.js
+          node --check static/math-markdown.js
+          node --check static/ai-answer-renderer.js
+          node --check scripts/test_offline_study_browser.cjs
           node --check scripts/test_offline_workspace_browser.cjs
           node --check scripts/test_knowledge_graph_browser.cjs
           node --check scripts/test_offline_graph_browser.cjs
@@ -114,6 +123,7 @@ jobs:
           python scripts/sync_offline_content.py --check
           python scripts/test_offline_content.py
           python scripts/test_offline_content_math.py
+          python scripts/test_offline_translations.py
       - name: Verify service worker precache files exist
         run: |
           python - <<'PY'
@@ -160,6 +170,7 @@ jobs:
         run: |
           mkdir -p artifacts/offline-workspace
           node scripts/test_offline_workspace_browser.cjs
+          node scripts/test_offline_study_browser.cjs
           node scripts/test_offline_appearance_browser.cjs
           node scripts/test_offline_data_migration_browser.cjs
           node scripts/test_service_worker_cache_browser.cjs

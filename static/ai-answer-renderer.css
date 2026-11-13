@@ -8,3 +8,21 @@
 .wrong-answer-inner code{white-space:pre-wrap}
 .dmate-ai-answer.wrong-answer-inner.dmate-ai-answer-plain{white-space:pre-wrap}
 @media(max-width:760px){.wrong-answer-inner mjx-container:not([display="true"]){display:inline-block;max-width:100%;overflow-x:auto;overflow-y:hidden;vertical-align:middle;-webkit-overflow-scrolling:touch}}
+
+/* Study text uses the actual chat content hierarchy. Only the surrounding
+   bubble chrome is removed; the shared AI typography remains authoritative. */
+.dmate-ai-answer.dmate-chat-answer{box-sizing:border-box;min-width:0;max-width:none!important;width:100%;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;background-image:none!important;box-shadow:none!important;color:var(--text-primary,#1e293b);font-family:var(--dmate-font-ui);font-size:var(--font-base,16px);font-weight:400;line-height:1.6;white-space:normal;word-break:break-word;overflow-wrap:anywhere}
+body[data-appearance-theme] .dmate-ai-answer.dmate-chat-answer{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important}
+.dmate-chat-answer>.msg-content>.ai-content{font:inherit;color:inherit;white-space:normal;min-width:0}
+.dmate-chat-answer .ai-content p,.dmate-chat-answer .ai-content li{font-size:inherit;line-height:inherit;white-space:normal}
+.dmate-chat-answer .ai-content p{margin:10px 0}
+.dmate-chat-answer .ai-content :is(h1,h2,h3){font-size:revert;font-weight:revert;color:inherit;margin:12px 0 8px}
+.dmate-chat-answer .ai-content ul,.dmate-chat-answer .ai-content ol{margin:1em 0;padding-inline-start:40px}
+.dmate-chat-answer .ai-content table{display:table}
+.dmate-chat-answer .ai-content code{white-space:normal}
+.dmate-chat-answer .ai-content pre,.dmate-chat-answer .ai-content pre code{white-space:pre}
+.dmate-chat-answer.dmate-ai-answer-plain .ai-content{white-space:pre-wrap}
+.dmate-inline-answer{min-width:0;max-width:100%}
+.dmate-inline-answer mjx-container{max-width:100%}
+@media(max-width:1100px){.dmate-ai-answer.dmate-chat-answer{line-height:1.62}}
+html[data-ui-language="en"] .dmate-ai-answer.dmate-chat-answer{line-height:var(--dmate-reading-line,1.72);word-break:normal;overflow-wrap:break-word;hyphens:auto}

@@ -323,6 +323,36 @@ async function questionDifficulties(page, questions) {
   await filter.selectOption('');
 }
 
+async function studyOutput(locator, authored, typeset = true) {
+  const result = await locator.evaluate(async (node, { authored, typeset }) => {
+    const prepared = window.DMateMathMarkdown.prepareStudyText(authored);
+    const source = window.__testQuestionSources.get(node);
+    if (source === undefined) return { plain: node.textContent };
+    if (!typeset) return { source, prepared };
+    const ready = await window.__testQuestionRenders.get(node);
+    const expectedMath = window.DMateMathMarkdown.protectMathForMarkdown(prepared).mathSegments
+      .map(([, math]) => (math.startsWith('$$') ? math.slice(2, -2)
+        : math.startsWith('$') ? math.slice(1, -1) : math.slice(2, -2)).trim());
+    return { source, prepared, ready, state: node.dataset.dmateRenderState,
+      expectedMath, math: [...window.MathJax.startup.document.getMathItemsWithin([node])].map(item => item.math.trim()),
+      error: Boolean(node.querySelector('mjx-merror,[data-mjx-error],.MathJax_Error')),
+      fallback: node.classList.contains('dmate-ai-answer-plain'),
+      readable: Boolean(node.textContent.trim() || node.querySelector('mjx-container')) };
+  }, { authored, typeset });
+  if ('plain' in result) {
+    assert.equal(result.plain, authored, 'Plain study labels retain their complete original text');
+    return;
+  }
+  assert.equal(result.source, result.prepared, 'The complete authored JSON value reaches the shared study renderer');
+  if (!typeset) return;
+  assert.equal(result.ready, true, 'The real rich-render Promise completes successfully');
+  assert.equal(result.state, 'ready');
+  assert.equal(result.error, false, 'Study content has no MathJax errors');
+  assert.equal(result.fallback, false, 'Study content uses the real Markdown renderer');
+  assert.equal(result.readable, true);
+  assert.deepEqual(result.math, result.expectedMath, 'Actual MathJax expressions preserve the authored mathematics');
+}
+
 async function practice(page) {
   await navigate(page, 'questions');
   const questions = await page.evaluate(async () => (await (await fetch('/static/offline-content/questions.zh-CN.json')).json()).questions);
@@ -333,15 +363,18 @@ async function practice(page) {
   await page.evaluate(() => {
     const original = window.DMateAIAnswer.render;
     window.__testQuestionSources = new WeakMap();
+    window.__testQuestionRenders = new WeakMap();
     window.DMateAIAnswer.render = function (target, value, ...args) {
       window.__testQuestionSources.set(target, String(value ?? ''));
-      return original.call(this, target, value, ...args);
+      const pending = original.call(this, target, value, ...args);
+      window.__testQuestionRenders.set(target, pending);
+      return pending;
     };
   });
   const detail = page.locator('#questionDetail');
   const select = async question => {
     await page.locator('#questionList [data-question-id="' + question.id + '"]').click();
-    assert.equal(await detail.locator('.detail-title').innerText(), question.title);
+    await studyOutput(detail.locator('.detail-title'), question.title);
     assert.equal(await detail.locator('textarea,input,select,[contenteditable="true"],#questionResponse').count(), 0,
       question.type + ': the question detail has no answer input');
     assert.equal(await detail.getByRole('heading', { name: '你的作答', exact: true }).count(), 0);
@@ -357,8 +390,9 @@ async function practice(page) {
       interactive: node.matches('button,a,input,[role="button"],[role="radio"],[role="checkbox"]')
         || node.tabIndex >= 0 || Boolean(node.querySelector('button,a,input,select,textarea,[role="radio"],[role="checkbox"]'))
     })));
-    assert.deepEqual(actual, (question.options || []).map(option => ({ key: option.key + '.', source: option.text,
-      rendered: true, interactive: false })), question.id + ': every option remains complete and read-only');
+    const expected = await page.evaluate(options => options.map(option => ({ key: option.key + '.',
+      source: window.DMateMathMarkdown.prepareStudyText(option.text), rendered: true, interactive: false })), question.options || []);
+    assert.deepEqual(actual, expected, question.id + ': every option remains complete and read-only');
     if (actual.length) {
       await detail.locator('.question-option').first().click();
       assert.equal(await detail.locator('.question-option.selected,[aria-pressed],[aria-checked]').count(), 0,
@@ -373,6 +407,10 @@ async function practice(page) {
   });
   for (const question of representatives) {
     await select(question);
+    await studyOutput(detail.locator('.wrong-question'), question.statement);
+    for (const [index, option] of (question.options || []).entries()) {
+      await studyOutput(detail.locator('.question-option-text').nth(index), option.text);
+    }
     const reveal = detail.getByRole('button', { name: '查看参考答案', exact: true });
     assert.equal(await reveal.locator('svg').count(), 0, 'The reference-answer toggle has no eye icon');
     assert.equal(await detail.locator('.answer-panel').count(), 0);
@@ -380,9 +418,8 @@ async function practice(page) {
     const answer = detail.locator('.answer-panel');
     await answer.waitFor();
     assert.match(await answer.textContent(), /参考答案/);
-    assert.equal(await answer.locator('.wrong-answer-inner').first().evaluate(node => window.__testQuestionSources.get(node)),
-      question.answer_text || (question.answer || []).join('、'), 'The original reference answer remains available');
-    assert.equal(await answer.locator('.wrong-analysis-body').evaluate(node => window.__testQuestionSources.get(node)), question.explanation);
+    await studyOutput(answer.locator('.wrong-answer-inner').first(), question.answer_text || (question.answer || []).join('、'));
+    await studyOutput(answer.locator('.wrong-analysis-body'), question.explanation);
     const collapse = detail.getByRole('button', { name: '收起参考答案', exact: true });
     assert.equal(await collapse.locator('svg').count(), 0);
     await collapse.click();
@@ -456,18 +493,18 @@ async function curriculum(page) {
       overview.related_concepts.length);
     const child = concepts.find(item => item.id === overview.related_concepts[0]);
     await page.locator('#conceptDetail .concept-topic-links [data-concept-id="' + child.id + '"]').click();
-    assert.equal(await page.locator('#conceptDetail .detail-title').innerText(), child.title);
+    await studyOutput(page.locator('#conceptDetail .detail-title'), child.title);
     await page.locator('#conceptDetail [data-question-id="' + child.related_questions[0] + '"]').click();
     await page.locator('#questionsPanel').waitFor({ state: 'visible' });
     const question = questions.find(item => item.id === child.related_questions[0]);
-    assert.equal(await page.locator('#questionDetail .detail-title').innerText(), question.title);
+    await studyOutput(page.locator('#questionDetail .detail-title'), question.title);
     await page.locator('#questionDetail').getByRole('button', {name:'查看参考答案', exact:true}).click();
     assert.ok((await page.locator('#questionDetail .answer-panel').innerText()).includes('评分要点'));
     await page.locator('#questionDetail .question-concept-links [data-concept-id="' + child.id + '"]').click();
     await page.locator('#conceptsPanel').waitFor({ state: 'visible' });
-    assert.equal(await page.locator('#conceptDetail .detail-title').innerText(), child.title);
+    await studyOutput(page.locator('#conceptDetail .detail-title'), child.title);
     await page.locator('#conceptDetail .concept-topic-links [data-concept-id="' + topic.id + '"]').click();
-    assert.equal(await page.locator('#conceptDetail .detail-title').innerText(), topic.name);
+    await studyOutput(page.locator('#conceptDetail .detail-title'), topic.name);
   }
 }
 

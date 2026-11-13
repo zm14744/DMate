@@ -140,7 +140,7 @@
         refreshLanguageControls();
         translate(document.body);
         // In-place switching preserves drafts, streams, focus and cloud work.
-        if (previous !== current) root.dispatchEvent(new CustomEvent('dmate:languagechange', {detail: {language: current, previous}}));
+        if (previous !== current) root.dispatchEvent(new CustomEvent('dmate:languagechange', {detail: {language: current, previous, persist: persist !== false}}));
         translate(document.body);
         try {
             if (root.DMateLanguage?.postMessage) root.DMateLanguage.postMessage(JSON.stringify({language: current}));
