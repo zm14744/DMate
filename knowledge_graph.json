@@ -1,5 +1,5 @@
 {
-  "version": 45,
+  "version": 46,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1417,17 +1417,12 @@
           "title": "图的矩阵表示",
           "sections": [
             "5.1.1 邻接矩阵",
-            "5.2.1 邻接表",
             "5.3.1 关联矩阵"
           ],
           "lessons": [
             {
               "title": "5.1.1 邻接矩阵",
               "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=27"
-            },
-            {
-              "title": "5.2.1 邻接表",
-              "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=28"
             },
             {
               "title": "5.3.1 关联矩阵",
@@ -2726,13 +2721,13 @@
       "nodes_total": 68,
       "nodes_with_active_course": 68,
       "nodes_pending": "none",
-      "direct_episode_links": 169,
+      "direct_episode_links": 168,
       "nested_or_missing_episode_urls": 0,
       "youtube_links": 0,
       "cmu_2021_parts_verified": 35,
       "cmu_2021_total_duration": "31:26:24",
       "cmu_2021_mapped_nodes": 18,
-      "last_audit_scope": "Complete pedagogical-sequence pass: added dogeman binary operations and semigroup preludes; northeast logic P12–P19 prelude and lesson-order guidance (P13 before P14; P17 between P16 and P18); added foundational-to-advanced viewing guidance for recurrence, graph algorithms, binomial, pigeonhole and lattice."
+      "last_audit_scope": "Video-content match focus rather than prerequisite-line ordering: removed 19 prescriptive node notes; retained graph associations and all 68 nodes; excluded non-matrix adjacency-list lesson from the matrix-representation node; sources elsewhere unchanged."
     },
     "excluded_source_ids": [
       "scut_discrete_math",
