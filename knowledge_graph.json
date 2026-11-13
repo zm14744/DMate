@@ -1,5 +1,5 @@
 {
-  "version": 40,
+  "version": 41,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -2287,7 +2287,7 @@
       "platform": "Bilibili",
       "publisher": "",
       "note": "东北大学离散数学课程，仅收录女教师讲授的P1–P19；P20《集合的基本概念》及之后均排除。B站页面标注原始课程来源为辽宁省本科教学网；B站上传者及授权状态未核实，仅提供原视频外链，不下载或托管。",
-      "display_name": "胡明涵 东北大学"
+      "display_name": "胡明涵"
     },
     {
       "id": "dogeman_discrete",
@@ -2643,7 +2643,7 @@
       "platform": "Bilibili",
       "publisher": "脑袋要有光",
       "note": "爱荷华州立大学Steve Butler 2023秋季频谱图论，共29讲。按教师原课程目录：14 拉普拉斯矩阵导入、15 拉普拉斯矩阵性质、16 Matrix Tree Theorem，作为矩阵树定理节点连续学习资源。B站BV11kga6FEez是第三方中文AI配音＋中文字幕版本，翻译质量尚未逐句核验，本次无法独立确认B站页面播放及分P标题。仅原视频外链，不下载、托管或重新分发。教师课程目录：https://www.stevebutler.org/spectral2023",
-      "display_name": "Steve Butler 爱荷华州立大学"
+      "display_name": "Steve Butler ISU"
     },
     {
       "id": "pku_qiu_weisheng_math_thinking",
@@ -2943,7 +2943,12 @@
     "display_name_policy": {
       "format": "instructor SPACE institution",
       "exception": "MIT remains MIT without instructor",
-      "note": "For university courses with identified instructor, display a teacher name followed by a single space and the institution label. These are course-level labels, not claims that every part is narrated by one person. The NEU uploader names multiple teaching-team members; 胡明涵 is the listed original MOOC course lead, not verified as sole lecturer of the selected P1–P19. Original publisher/uploader metadata retained; non-university creators use their original names."
+      "note": "Video labels use the teacher name followed by a space and the institution label where requested. Exceptions: MIT remains MIT; the selected Northeast University female lecturer is displayed as 胡明涵 only; Iowa State University is abbreviated ISU in Steve Butler ISU. Original video source and uploader metadata are retained.",
+      "exceptions": [
+        "MIT",
+        "胡明涵",
+        "Steve Butler ISU"
+      ]
     }
   },
   "video_resource_candidates": [
