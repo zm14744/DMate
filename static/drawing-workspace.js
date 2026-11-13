@@ -17,6 +17,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   let pages=[],activeId='',editor=null,timer=null,destroyed=false,persistError='',aiAbort=null,aiEpoch=0,exportBusy=false,panelMode='',uploadBusy=false;
   let savedRaw='',restoredGallery=false,exportPreview=null,exportPreviewUrl='',chromeFrame=0,observedView=null,observedViewport=null,observedPalette=null,toolsExpanded=false,deletePending=null;
   let noticeFrame=0,noticeCurrent='',noticeQueue=[],persistNoticeShown='';
+  let galleryMetadata={};
   const el=(tag,className,text)=>{const n=doc.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;};
   const button=(text,fn,className)=>{const b=el('button',className,text);b.type='button';b.addEventListener('click',event=>{event.stopPropagation();if(!destroyed)void fn();});return b;};
   const sendIcon=()=>{const svg=doc.createElementNS('http://www.w3.org/2000/svg','svg'),path=doc.createElementNS(svg.namespaceURI,'path');
@@ -178,7 +179,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   function collect(){const p=active();if(!p)return;p.document=clone(currentDocument());p.name=caption(name.value);p.updatedAt=Date.now();}
   function persist(notify=true){
    clearTimeout(timer);timer=null;if(destroyed)return false;
-   const payload=JSON.stringify({version:2,activeId,pages});
+   const payload=JSON.stringify({...galleryMetadata,version:2,activeId,pages});
    // Keep the complete gallery in this owner's page memory even when storage
    // is full. Closing the drawing dialog must not discard that newer draft.
    sessionState.gallery=payload;
@@ -342,8 +343,10 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    const raw=draft||(persistent?win.localStorage.getItem(key):sessionState.gallery),value=raw?JSON.parse(raw):null;
    if((value?.version===1||value?.version===2)&&Array.isArray(value.pages)){
     restoredGallery=true;
+    galleryMetadata={...value};
+    for(const field of ['version','activeId','pages'])delete galleryMetadata[field];
     pages=value.pages.filter(p=>p&&typeof p.id==='string'&&goodDocument(p.document)).slice(0,50).map(p=>({...p,name:caption(p.name),requirement:String(p.requirement||'').slice(0,2000),updatedAt:Number(p.updatedAt)||0}));
-    const ids=new Set();pages=pages.filter(p=>{if(ids.has(p.id))return false;ids.add(p.id);return true;});activeId=pages.some(p=>p.id===value.activeId)?value.activeId:pages[0]?.id||'';savedRaw=JSON.stringify({version:value.version,activeId,pages});
+    const ids=new Set();pages=pages.filter(p=>{if(ids.has(p.id))return false;ids.add(p.id);return true;});activeId=pages.some(p=>p.id===value.activeId)?value.activeId:pages[0]?.id||'';savedRaw=JSON.stringify({...galleryMetadata,version:value.version,activeId,pages});
    }
   }catch(_){persistError='历史绘图暂时无法读取，当前绘图仍可编辑和导出。';}
   if(!restoredGallery){

@@ -7,37 +7,28 @@
       if (!snapshot) {
         const root = document.documentElement;
         const username = root.dataset.accountAuthenticated === "1" ? root.dataset.accountUsername : "";
-        if (!username) return;
-        const learning = JSON.parse(localStorage.getItem("discrete_math_ai_learning_v1") || "null");
-        if (!learning || typeof learning !== "object") return;
-        const deletedWrong = learning.deletedWrongQuestionIds || {};
-        const deletedNotes = learning.conceptNotebook?.deleted || {};
-        const galleryKey = "dmate:graph-gallery:v1::" + encodeURIComponent("account:" + username);
-        const drawingKey = "dmate:graph-drawing:v1";
-        let drawings = localStorage.getItem(galleryKey) || "";
-        if (!drawings && localStorage.getItem(drawingKey + ":owner") === "account:" + username) {
-          const legacy = localStorage.getItem(drawingKey);
-          if (legacy) {
-            try {
-              const document = JSON.parse(legacy);
-              drawings = JSON.stringify({version:1,pages:[{id:"legacy-local",name:document.graphs?.[0]?.name || "我的绘图",document,updatedAt:Date.now()}]});
-            } catch (_) {}
+        let drawings = "";
+        if (username) {
+          const galleryKey = "dmate:graph-gallery:v1::" + encodeURIComponent("account:" + username);
+          const drawingKey = "dmate:graph-drawing:v1";
+          drawings = localStorage.getItem(galleryKey) || "";
+          if (!drawings && localStorage.getItem(drawingKey + ":owner") === "account:" + username) {
+            const legacy = localStorage.getItem(drawingKey);
+            if (legacy) {
+              try {
+                const document = JSON.parse(legacy);
+                drawings = JSON.stringify({version:1,pages:[{id:"legacy-local",name:document.graphs?.[0]?.name || "我的绘图",document,updatedAt:Date.now()}]});
+              } catch (_) {}
+            }
           }
         }
-        snapshot = {
-          username,
-          wrongQuestions: (learning.wrongQuestions || []).filter(row => row && !deletedWrong[String(row.id)]),
-          notes: (learning.conceptNotebook?.notes || []).filter(row => row && !(Number(deletedNotes[String(row.id)]) >= Number(row.updatedAt || 0))),
-          drawings
-        };
+        snapshot = { username, drawings };
       }
       const pages = Array.isArray(snapshot.drawings) ? snapshot.drawings : [];
       const drawings = typeof snapshot.drawings === "string" ? snapshot.drawings
         : JSON.stringify({version:2,activeId:pages[0]?.id || "",pages});
       sessionStorage.setItem("dmate_offline_migration_v1", JSON.stringify({
         username: snapshot.username || "",
-        wrongQuestions: Array.isArray(snapshot.wrongQuestions) ? snapshot.wrongQuestions : [],
-        notes: Array.isArray(snapshot.notes) ? snapshot.notes : [],
         drawings
       }));
     } catch (error) {

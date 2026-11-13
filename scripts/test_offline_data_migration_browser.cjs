@@ -1,245 +1,253 @@
-/* Start Flask first. Verify local migrations, queued notebook edits, storage
- * failures and deletion metadata in isolated browser contexts. */
+/* Start Flask first. The four-module workspace imports only drawing data;
+ * removed notebook/wrong-book stores and journals must remain untouched.
+ */
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const baseURL = process.env.BASE_URL || process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const executablePath = process.env.CHROMIUM || process.env.CHROMIUM_EXECUTABLE_PATH;
-const journalKey = 'dmate:offline:notebook-journal:v1';
-const iso = value => new Date(value).toISOString();
-const note = (id, updatedAt, content, extra = {}) => ({ id, title:id, content, updatedAt:iso(updatedAt), ...extra });
+const dbName = 'dmate-offline-workspace', journalKey = 'dmate:offline:notebook-journal:v1';
+const galleryKey = 'dmate:offline:drawing-gallery:v1', migrationKey = 'dmate_offline_migration_v1';
+const documentFor = label => ({ body_text: 'Body ' + label, graphs: [{ id:'G1', name:label,
+  directed:false, weighted:false, vertices:[{ id:'v1', label, x:.3, y:.4 }], edges:[] }] });
+const drawing = (id, name, label, updatedAt) => ({ id, name, document:documentFor(label),
+  createdAt:1, updatedAt, requirement:'Retained request', custom:{ marker:id } });
 const ready = page => page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+const removed = '#wrongBookBtn,#conceptNotebookBtn,#mistakesPanel,#notesPanel,#recordDialog,#recordForm';
 
-async function openNotes(page) {
-  const button = page.locator('.offline-nav-item[data-panel="notes"]');
-  if (!await button.isVisible()) await page.locator('#offlineDesktopSidebarOpen').click();
-  await button.click();
-}
-
-async function prepare(page, seed) {
-  await page.goto(baseURL + '/offline');
-  await ready(page);
-  await page.evaluate(async ({ seed, journalKey }) => {
-    const db = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('dmate-offline-workspace', 2);
-      request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
-    });
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(['notes', 'settings', 'mistakes'], 'readwrite');
-      for (const row of seed.notes || []) tx.objectStore('notes').put(row);
-      for (const row of seed.mistakes || []) tx.objectStore('mistakes').put(row);
-      tx.objectStore('settings').put({ ...seed.deletionMetadata, id:'notebook-deletions', deleted:seed.deleted || {} });
-      tx.oncomplete = resolve; tx.onerror = tx.onabort = () => reject(tx.error);
-    });
-    db.close();
-    if (seed.journal) localStorage.setItem(journalKey, JSON.stringify(seed.journal));
-    sessionStorage.setItem('dmate_offline_migration_v1', JSON.stringify(seed.incoming));
-  }, { seed, journalKey });
-  await page.reload();
-  await ready(page);
-}
-
-async function read(page) {
-  return page.evaluate(() => new Promise((resolve, reject) => {
-    const request = indexedDB.open('dmate-offline-workspace', 2);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      const db = request.result, tx = db.transaction(['notes', 'settings', 'mistakes']);
-      const notes = tx.objectStore('notes').getAll(), mistakes = tx.objectStore('mistakes').getAll();
-      const deletions = tx.objectStore('settings').get('notebook-deletions');
-      tx.oncomplete = () => {
-        db.close();
-        resolve({ notes:notes.result, mistakes:mistakes.result,
-          deleted:deletions.result.deleted, deletionMetadata:deletions.result });
-      };
-      tx.onerror = tx.onabort = () => { db.close(); reject(tx.error); };
-    };
-  }));
-}
-
-async function waitForNote(page, id, expected) {
-  await page.waitForFunction(({ id, expected }) => new Promise((resolve, reject) => {
-    const request = indexedDB.open('dmate-offline-workspace', 2);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      const db = request.result;
-      const tx = db.transaction('notes', 'readonly');
-      const row = tx.objectStore('notes').get(id);
-      tx.oncomplete = () => {
-        db.close();
-        resolve(expected === null ? !row.result : row.result
-          && Object.entries(expected).every(([key, value]) => row.result[key] === value));
-      };
-      tx.onerror = tx.onabort = () => { db.close(); reject(tx.error); };
-    };
-  }), { id, expected });
-}
-
-async function verifyNotebookWrites(browser) {
-  const context = await browser.newContext({
-    viewport: { width:1440, height:900 }, serviceWorkers:'block'
-  });
+async function bootstrap(context) {
+  await context.route('**/__offline-data-test', route => route.fulfill({ contentType:'text/html', body:'<!doctype html><title>Local fixture</title>' }));
   const page = await context.newPage();
-  const pageErrors = [], apiRequests = [];
-  page.on('pageerror', error => pageErrors.push(error.message));
+  await page.goto(baseURL + '/__offline-data-test');
+  return page;
+}
+
+async function seed(page, fixture) {
+  await page.evaluate(async ({ fixture, dbName, journalKey, galleryKey, migrationKey }) => {
+    if (fixture.legacy) {
+      const db = await new Promise((resolve, reject) => {
+        const request = indexedDB.open(dbName, 2);
+        request.onupgradeneeded = () => {
+          for (const name of ['notes','mistakes','practice','settings']) request.result.createObjectStore(name, { keyPath:'id' });
+        };
+        request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+      });
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(['notes','mistakes','practice','settings'], 'readwrite');
+        for (const name of ['notes','mistakes','practice','settings']) for (const row of fixture.legacy[name]) tx.objectStore(name).put(row);
+        tx.oncomplete = resolve; tx.onerror = tx.onabort = () => reject(tx.error);
+      });
+      db.close();
+    }
+    localStorage.setItem(journalKey, fixture.journal);
+    if (fixture.gallery) localStorage.setItem(galleryKey, JSON.stringify(fixture.gallery));
+    sessionStorage.setItem(migrationKey, JSON.stringify(fixture.incoming));
+  }, { fixture, dbName, journalKey, galleryKey, migrationKey });
+}
+
+async function guardRemovedData(context) {
+  await context.addInitScript(({ journalKey }) => {
+    if (location.pathname !== '/offline') return;
+    const native = window.removedDataNative = { getItem:Storage.prototype.getItem,
+      setItem:Storage.prototype.setItem, removeItem:Storage.prototype.removeItem,
+      transaction:IDBDatabase.prototype.transaction, get:IDBObjectStore.prototype.get };
+    window.removedDataAccesses = [];
+    const forbidden = value => { window.removedDataAccesses.push(value); throw new Error('Removed data accessed: ' + value); };
+    for (const method of ['getItem','setItem','removeItem']) {
+      Storage.prototype[method] = function(key, ...args) {
+        if (key === journalKey) return forbidden('journal.' + method);
+        return native[method].call(this, key, ...args);
+      };
+    }
+    IDBDatabase.prototype.transaction = function(stores, ...args) {
+      const names = typeof stores === 'string' ? [stores] : [...stores];
+      if (names.some(name => ['notes','mistakes'].includes(name))) return forbidden('stores:' + names.join(','));
+      return native.transaction.call(this, stores, ...args);
+    };
+    IDBObjectStore.prototype.get = function(key) {
+      if (this.name === 'settings' && key === 'notebook-deletions') return forbidden('notebook-deletions');
+      return native.get.call(this, key);
+    };
+  }, { journalKey });
+}
+
+async function readState(page) {
+  return page.evaluate(({ dbName, journalKey, galleryKey }) => new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName, 2);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = async () => {
+      const db = request.result, native = window.removedDataNative;
+      const result = { version:db.version, stores:[...db.objectStoreNames], records:{} };
+      for (const name of result.stores) {
+        result.records[name] = await new Promise((done, fail) => {
+          // Inspection bypasses only the test's access guard, never application code.
+          const tx = native.transaction.call(db, name, 'readonly'), get = tx.objectStore(name).getAll();
+          tx.oncomplete = () => done(get.result); tx.onerror = tx.onabort = () => fail(tx.error);
+        });
+      }
+      db.close();
+      result.journal = native.getItem.call(localStorage, journalKey);
+      result.gallery = JSON.parse(localStorage.getItem(galleryKey) || 'null');
+      result.accesses = [...window.removedDataAccesses];
+      resolve(result);
+    };
+  }), { dbName, journalKey, galleryKey });
+}
+
+async function verifyOfflineMigration(browser, legacy) {
+  const context = await browser.newContext({ viewport:{ width:1440, height:900 }, serviceWorkers:'block' });
+  const page = await bootstrap(context), errors = [], apiRequests = [];
+  page.on('pageerror', error => errors.push(error.message));
   page.on('request', request => {
     const url = new URL(request.url());
-    if (url.origin === new URL(baseURL).origin
-        && ['fetch', 'xhr'].includes(request.resourceType())
+    if (['fetch','xhr'].includes(request.resourceType()) && url.origin === new URL(baseURL).origin
         && !url.pathname.startsWith('/static/')) apiRequests.push(url.pathname);
   });
-  const selectNote = id => page.locator('.dcn-note[data-note-id="' + id + '"] .dcn-note-open').click();
+  const records = { notes:[{ id:'keep-note', title:'Original note', content:'Untouched', custom:{ keep:true } }],
+    mistakes:[{ id:'keep-mistake', statement:'Original question', answer:'Original answer', custom:'retain' }],
+    practice:[{ id:'keep-practice', questionId:'q01', selected:['A'], custom:'keep' }],
+    settings:[{ id:'notebook-deletions', deleted:{ deleted:12345 }, custom:{ retain:true } }] };
+  const local = { version:2, activeId:'local-active', custom:{ gallery:'retain' },
+    pages:[drawing('shared','Shared local','local shared',1000), drawing('local-active','Local active','local active',2000)] };
+  const incomingGallery = { version:2, activeId:'incoming-only', custom:{ gallery:'must not replace local' },
+    pages:[drawing('shared','Conflicting newer incoming','must not overwrite',999999), drawing('incoming-only','Incoming only','incoming',3000)] };
+  const incoming = { username:'fixture-user', drawings:JSON.stringify(incomingGallery),
+    notes:[{ id:'keep-note', title:'must ignore', content:'must ignore', updatedAt:999999 }],
+    wrongQuestions:[{ id:'keep-mistake', question:'must ignore', updatedAt:999999 }] };
+  const journal = legacy ? JSON.stringify({ version:1, rows:[{ id:'keep-note', title:'journal must ignore', content:'never replay' }],
+    snapshot:{ notes:[], deleted:{ 'keep-note':999999 } } }) : '{malformed legacy journal';
   try {
-    await prepare(page, {
-      notes: [
-        note('queue-a', 2000, 'alpha original', {
-          title:'甲原', createdAt:'retain-created-a', custom:{ marker:'a' }
-        }),
-        note('queue-b', 1000, 'beta original', {
-          title:'乙原', createdAt:'retain-created-b', custom:{ marker:'b' }
-        })
-      ],
-      deleted: { 'older-deletion':1 },
-      deletionMetadata: { custom:{ retained:true } },
-      incoming: {}
-    });
-    await openNotes(page);
-    await selectNote('queue-a');
-
-    // Dispatch several inputs in one task, before any IndexedDB write can
-    // complete. An older snapshot must not clear or overwrite the newest one.
-    await page.evaluate(() => {
-      const title = document.querySelector('#noteList .dcn-title');
-      const body = document.querySelector('#noteList .dcn-original');
-      for (const value of ['甲-1', '甲-final']) {
-        title.value = value;
-        title.dispatchEvent(new Event('input', { bubbles:true }));
+    await seed(page, { legacy:legacy ? records : null, gallery:legacy ? local : null, journal, incoming });
+    await guardRemovedData(context);
+    await page.goto(baseURL + '/offline'); await ready(page);
+    assert.equal(await page.locator(removed).count(), 0);
+    assert.equal(await page.locator('.offline-nav-item.active').getAttribute('data-panel'), 'drawing');
+    let value = await readState(page);
+    assert.deepEqual(value.accesses, [], 'The app neither reads nor writes removed stores/journals');
+    assert.equal(value.journal, journal, 'Legacy journal bytes remain untouched');
+    assert.equal(value.version, 2);
+    assert.deepEqual(value.stores, legacy ? ['mistakes','notes','practice','settings'] : ['practice','settings']);
+    if (legacy) {
+      assert.deepEqual(value.records.notes, records.notes);
+      assert.deepEqual(value.records.mistakes, records.mistakes);
+      assert.deepEqual(value.records.practice, records.practice);
+      assert.deepEqual(value.records.settings.find(row => row.id === 'notebook-deletions'), records.settings[0]);
+      assert.deepEqual(value.gallery.custom, local.custom, 'Unknown gallery metadata survives migration and immediate default mount');
+      assert.equal(value.gallery.activeId, 'local-active');
+      assert.deepEqual(value.gallery.pages.map(row => row.id), ['shared','local-active','incoming-only']);
+      assert.equal(value.gallery.pages[0].name, 'Shared local', 'Local content wins even when incoming timestamps are newer');
+      for (const original of local.pages) {
+        const row = value.gallery.pages.find(item => item.id === original.id);
+        assert.deepEqual(row.custom, original.custom);
+        assert.equal(row.document.body_text, original.document.body_text);
+        assert.equal(row.document.graphs[0].vertices[0].label, original.document.graphs[0].vertices[0].label);
       }
-      body.value = 'alpha newest';
-      body.dispatchEvent(new Event('input', { bubbles:true }));
-    });
-    await selectNote('queue-b');
-    await page.locator('#noteList .dcn-original').fill('beta newest');
-    await waitForNote(page, 'queue-a', { title:'甲-final', content:'alpha newest' });
-    await waitForNote(page, 'queue-b', { content:'beta newest' });
-
-    const persisted = (await read(page)).notes;
-    for (const [id, marker, createdAt] of [
-      ['queue-a', 'a', 'retain-created-a'], ['queue-b', 'b', 'retain-created-b']
-    ]) {
-      const row = persisted.find(item => item.id === id);
-      assert.deepEqual(row.custom, { marker });
-      assert.equal(row.createdAt, createdAt);
-      assert.equal(new Date(row.updatedAt).toISOString(), row.updatedAt, 'Notebook timestamps remain ISO strings');
+      assert.deepEqual(value.gallery.pages[2].custom, incomingGallery.pages[1].custom);
+      assert.equal(await page.locator('#offlineDrawingHost .ddw-name').inputValue(), 'Local active');
+      await page.locator('#offlineDrawingHost .ddw-name').fill('Local active edited');
+      await page.waitForFunction(key => JSON.parse(localStorage.getItem(key)).pages.some(row => row.id === 'local-active' && row.name === 'Local active edited'), galleryKey);
+    } else {
+      assert.deepEqual(value.gallery.pages.map(row => row.id), ['shared','incoming-only']);
+      assert.equal(value.gallery.activeId, incomingGallery.activeId);
+      assert.deepEqual(value.gallery.custom, incomingGallery.custom);
     }
-    await page.locator('#noteList .dcn-search').fill('甲-final');
-    assert.equal(await page.locator('.dcn-note').count(), 1);
-    assert.equal((await read(page)).notes.length, 2, 'Searching must not remove stored notes');
-    await page.locator('#noteList .dcn-search').fill('');
-    await selectNote('queue-a');
-
-    // Fail only this note's writes. Other reads and the rest of the workspace
-    // remain usable, while the current page must retain the failed draft.
-    await page.evaluate(() => {
-      window.noteDataTestOriginalPut = IDBObjectStore.prototype.put;
-      IDBObjectStore.prototype.put = function (value, ...args) {
-        if (this.name === 'notes' && value.id === 'queue-a') {
-          throw new DOMException('Simulated notebook storage failure', 'QuotaExceededError');
-        }
-        return window.noteDataTestOriginalPut.call(this, value, ...args);
-      };
-    });
-    await page.locator('#noteList .dcn-original').fill('alpha pending retry');
-    await page.locator('#noteList .dcn-saved').filter({ hasText:'保存失败' }).waitFor();
-    await selectNote('queue-b');
-    await selectNote('queue-a');
-    assert.equal(await page.locator('#noteList .dcn-original').inputValue(), 'alpha pending retry');
-    assert.equal((await read(page)).notes.find(row => row.id === 'queue-a').content, 'alpha newest');
-
-    await page.locator('#addNote').click();
-    await page.waitForFunction(() => document.getElementById('offlineToast').textContent.includes('尚未保存'));
-    assert.equal((await read(page)).notes.length, 2, 'A failed draft must prevent creating a misleading blank note');
-    assert.equal(await page.locator('#noteList .dcn-original').inputValue(), 'alpha pending retry');
-    assert.equal(await page.locator('.dcn-note.is-current').getAttribute('data-note-id'), 'queue-a');
-
-    await page.evaluate(() => { IDBObjectStore.prototype.put = window.noteDataTestOriginalPut; });
-    await page.locator('.offline-nav-item[data-panel="mistakes"]').click();
-    await openNotes(page);
-    await waitForNote(page, 'queue-a', { content:'alpha pending retry' });
-
-    await page.locator('.dcn-note[data-note-id="queue-b"] .dcn-note-delete').click();
-    await page.locator('.dmate-delete-confirm[open] .dmate-delete-confirm-delete').click();
-    await waitForNote(page, 'queue-b', null);
-    await page.locator('.dcn-note[data-note-id="queue-b"]').waitFor({ state:'detached' });
-    const afterDelete = await read(page);
-    assert.equal(afterDelete.notes.length, 1);
-    assert.equal(afterDelete.notes[0].id, 'queue-a');
-    assert.ok(afterDelete.deleted['queue-b'] > Date.parse(persisted.find(row => row.id === 'queue-b').updatedAt));
-    assert.equal(afterDelete.deleted['older-deletion'], 1);
-    assert.deepEqual(afterDelete.deletionMetadata.custom, { retained:true });
-    assert.equal(await page.locator('#noteList .dcn-original').inputValue(), 'alpha pending retry');
-    assert.equal(await page.locator('.dcn-note.is-current').getAttribute('data-note-id'), 'queue-a');
-    assert.equal(await page.locator('#notesPanel .dcn-ai,#notesPanel .dcn-question,#notesPanel .dcn-ai-actions').count(), 0,
-      'The offline notebook omits the complete supplemental-request and AI section');
-    for (const name of ['AI 解释', '分析关联']) {
-      assert.equal(await page.locator('#noteList').getByRole('button', { name, exact:true }).count(), 0);
+    // Re-import the same page IDs and use a corrupt journal on the next load.
+    await page.evaluate(({ incoming, migrationKey, journalKey }) => {
+      sessionStorage.setItem(migrationKey, JSON.stringify(incoming));
+      window.removedDataNative.setItem.call(localStorage, journalKey, '{broken journal after reload');
+    }, { incoming, migrationKey, journalKey });
+    await page.reload(); await ready(page);
+    value = await readState(page);
+    assert.deepEqual(value.accesses, []);
+    assert.equal(value.journal, '{broken journal after reload');
+    assert.deepEqual(value.gallery.pages.map(row => row.id), legacy ? ['shared','local-active','incoming-only'] : ['shared','incoming-only']);
+    if (legacy) {
+      assert.deepEqual(value.records.notes, records.notes);
+      assert.deepEqual(value.records.mistakes, records.mistakes);
+      assert.deepEqual(value.records.settings.find(row => row.id === 'notebook-deletions'), records.settings[0]);
+      assert.deepEqual(value.gallery.custom, local.custom);
+      assert.equal(value.gallery.activeId, 'local-active');
+      assert.equal(await page.locator('#offlineDrawingHost .ddw-name').inputValue(), 'Local active edited');
     }
-    assert.deepEqual(apiRequests, [], 'Offline notebook actions must not call AI or other server APIs');
-    assert.deepEqual(pageErrors, []);
-    console.log('Notebook saves retain rapid edits and metadata, preserve failed drafts for retry, and record deletions without API calls.');
+    assert.deepEqual(errors, []); assert.deepEqual(apiRequests, []);
+    console.log('PASS ' + (legacy ? 'legacy v2' : 'fresh v2') + ': four-module init, ignored legacy payload/journals, drawing union/local precedence/metadata and refresh');
+  } finally { await context.close(); }
+}
+
+async function verifyBridge(browser) {
+  const context = await browser.newContext({ serviceWorkers:'block' }), page = await context.newPage();
+  try {
+    await page.goto(baseURL + '/', { waitUntil:'networkidle' });
+    const value = await page.evaluate(async document => {
+      if (accountState.authenticated) throw new Error('Snapshot fixture requires the anonymous test context');
+      standaloneDrawingOwner = 'guest'; standaloneDrawingSessionState = {}; standaloneDrawing = document;
+      const first = await DMateOfflineBridge.snapshot(), second = await DMateOfflineBridge.snapshot();
+      const schema = await new Promise((resolve, reject) => {
+        const request = indexedDB.open('dmate-offline-workspace',2);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => { const db=request.result; resolve([...db.objectStoreNames]); db.close(); };
+      });
+      return { first, second, schema };
+    }, documentFor('Legacy original'));
+    assert.deepEqual(Object.keys(value.first).sort(), ['drawings','username']);
+    assert.equal(value.first.username, '');
+    assert.equal(value.first.drawings.length, 1);
+    assert.equal(value.first.drawings[0].id, 'legacy-local');
+    assert.deepEqual(value.first.drawings[0].document, documentFor('Legacy original'));
+    assert.equal(value.second.drawings[0].id, 'legacy-local', 'Repeated legacy snapshots have a stable import identity');
+    assert.deepEqual(value.schema, ['practice','settings']);
+    console.log('PASS real online bridge: drawing-only snapshot, stable legacy ID and minimal v2 stores');
+  } finally { await context.close(); }
+}
+
+async function verifyEntry(browser, kind) {
+  const context = await browser.newContext({ serviceWorkers:'block' });
+  const username = 'entry-user', pages = [drawing('entry-page','Entry page','entry',1)];
+  const source = { version:2, activeId:'entry-page', custom:{ retained:true }, pages };
+  await context.route('**/__offline-entry-test', route => route.fulfill({ contentType:'text/html', body:
+    '<!doctype html><html data-account-authenticated="' + (kind === 'guest' ? '0' : '1') + '" data-account-username="entry-user"><body>'
+    + '<button id="offlineWorkspaceBtn"><span class="dmate-ui-label">离线版</span></button><script src="/static/offline-entry.js"></script></body></html>' }));
+  await context.route('**/offline', route => route.fulfill({ contentType:'text/html', body:'<!doctype html><title>Captured handoff</title>' }));
+  await context.addInitScript(({ kind, username, source, pages, document }) => {
+    if (location.pathname !== '/__offline-entry-test') return;
+    localStorage.setItem('dmate:graph-drawing:v1:owner', 'account:' + username);
+    localStorage.setItem('dmate:graph-drawing:v1', JSON.stringify(document));
+    if (kind !== 'legacy') localStorage.setItem('dmate:graph-gallery:v1::' + encodeURIComponent('account:' + username), JSON.stringify(source));
+    const get = Storage.prototype.getItem;
+    Storage.prototype.getItem = function(key) {
+      if (key === 'discrete_math_ai_learning_v1' || key === 'dmate:offline:notebook-journal:v1') throw new Error('Entry read removed learning data');
+      return get.call(this,key);
+    };
+    if (kind === 'bridge') window.DMateOfflineBridge = { snapshot:async () => {
+      const value = { username, drawings:pages };
+      for (const key of ['notes','wrongQuestions']) Object.defineProperty(value,key,{ get(){ throw new Error('Entry read ' + key); } });
+      return value;
+    } };
+  }, { kind, username, source, pages, document:documentFor('Entry legacy') });
+  const page = await context.newPage();
+  try {
+    await page.goto(baseURL + '/__offline-entry-test');
+    await page.locator('#offlineWorkspaceBtn').click(); await page.waitForURL(baseURL + '/offline');
+    const payload = await page.evaluate(key => JSON.parse(sessionStorage.getItem(key)), migrationKey);
+    assert.deepEqual(Object.keys(payload).sort(), ['drawings','username']);
+    assert.equal(payload.username, kind === 'guest' ? '' : username);
+    if (kind === 'guest') assert.equal(payload.drawings, '', 'Stale account markers cannot import another account gallery');
+    else if (kind === 'gallery') assert.deepEqual(JSON.parse(payload.drawings), source);
+    else {
+      const gallery = JSON.parse(payload.drawings);
+      assert.equal(gallery.pages.length,1);
+      assert.equal(gallery.pages[0].id, kind === 'legacy' ? 'legacy-local' : 'entry-page');
+      assert.deepEqual(gallery.pages[0].document, kind === 'legacy' ? documentFor('Entry legacy') : pages[0].document);
+    }
+    console.log('PASS entry ' + kind + ': username/drawings only, no removed learning data access');
   } finally { await context.close(); }
 }
 
 (async () => {
   const browser = await chromium.launch({ headless:true, ...(executablePath ? { executablePath } : {}) });
   try {
-    const context = await browser.newContext({ serviceWorkers:'block' }), page = await context.newPage();
-    const extra = { createdAt:'original-created-at', custom:{ retained:true } };
-    await prepare(page, {
-      notes:[note('local-newer', 5000, 'latest offline edit', extra), note('incoming-newer', 1000, 'old local', extra)],
-      mistakes:[{ id:'mistake-newer', title:'local', statement:'latest offline question', status:'resolved', updatedAt:iso(5000), custom:'keep' }],
-      deleted:{ 'deleted-note':4000, 'restored-note':2000 },
-      incoming:{ notes:[
-        { id:'local-newer', title:'old online', content:'stale online edit', updatedAt:1000 },
-        { id:'incoming-newer', title:'incoming-newer', content:'new online edit', updatedAt:5000 },
-        { id:'new-note', title:'new-note', content:'newly imported', updatedAt:3000 },
-        { id:'deleted-note', title:'deleted-note', content:'must stay deleted', updatedAt:3000 },
-        { id:'restored-note', title:'restored-note', content:'newer than deletion', updatedAt:5000 }
-      ], wrongQuestions:[{ id:'mistake-newer', question:'stale online question', updatedAt:1000 }] }
-    });
-    const first = await read(page), byId = new Map(first.notes.map(row => [row.id, row]));
-    assert.equal(byId.get('local-newer').content, 'latest offline edit');
-    assert.equal(byId.get('incoming-newer').content, 'new online edit');
-    for (const id of ['local-newer', 'incoming-newer']) {
-      assert.equal(byId.get(id).createdAt, extra.createdAt); assert.deepEqual(byId.get(id).custom, extra.custom);
-    }
-    assert.equal(byId.get('new-note').content, 'newly imported');
-    assert.equal(byId.has('deleted-note'), false, 'an old import must not resurrect a deleted note');
-    assert.equal(byId.get('restored-note').content, 'newer than deletion');
-    assert.equal(first.deleted['deleted-note'], 4000);
-    assert.equal(first.mistakes[0].statement, 'latest offline question');
-    assert.equal(first.mistakes[0].status, 'resolved'); assert.equal(first.mistakes[0].custom, 'keep');
-    await openNotes(page);
-    await page.locator('.dcn-note-open').filter({ hasText:'new-note' }).waitFor();
-    assert.equal(await page.locator('.dcn-note-open').filter({ hasText:'deleted-note' }).count(), 0);
-    await context.close();
-
-    const recoveryContext = await browser.newContext({ serviceWorkers:'block' }), recoveryPage = await recoveryContext.newPage();
-    const pending = note('pending-note', 6000, 'durable journal edit', extra);
-    await prepare(recoveryPage, {
-      notes:[note('pending-note', 1000, 'outdated database edit', extra)],
-      journal:{ version:1, rows:[pending], snapshot:{ notes:[{ ...pending, updatedAt:6000 }], deleted:{} } },
-      incoming:{ notes:[{ id:'pending-note', title:'old online', content:'stale incoming', updatedAt:2000 },
-        { id:'import-with-journal', title:'import-with-journal', content:'imported alongside recovery', updatedAt:3000 }] }
-    });
-    const recovered = (await read(recoveryPage)).notes.find(row => row.id === 'pending-note');
-    assert.equal(recovered.content, 'durable journal edit'); assert.deepEqual(recovered.custom, extra.custom);
-    assert.equal(recovered.createdAt, extra.createdAt);
-    assert.equal(await recoveryPage.evaluate(key => localStorage.getItem(key), journalKey), null);
-    await openNotes(recoveryPage);
-    await recoveryPage.locator('.dcn-note-open').filter({ hasText:'import-with-journal' }).waitFor();
-    await recoveryContext.close();
-    console.log('Offline migration preserves newer edits, metadata, tombstones and journal recovery.');
-    await verifyNotebookWrites(browser);
+    for (const legacy of [false,true]) await verifyOfflineMigration(browser,legacy);
+    await verifyBridge(browser);
+    for (const kind of ['bridge','gallery','legacy','guest']) await verifyEntry(browser,kind);
   } finally { await browser.close(); }
-})().catch(error => { console.error(error); process.exitCode = 1; });
+})().catch(error => { console.error(error); process.exitCode=1; });

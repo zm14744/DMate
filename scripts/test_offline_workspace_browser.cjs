@@ -5,9 +5,8 @@
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
-const panels = ['mistakes', 'notes', 'drawing', 'graph', 'questions', 'concepts'];
-const iconReferences = { mistakes: '#wrongBookBtn svg', notes: '#conceptNotebookBtn svg',
-  drawing: '#graphDrawingBtn svg', graph: '#knowledgeGraphBtn svg' };
+const panels = ['drawing', 'graph', 'questions', 'concepts'];
+const iconReferences = { drawing: '#graphDrawingBtn svg', graph: '#knowledgeGraphBtn svg' };
 
 async function navigate(page, panel) {
   const item = page.locator('.offline-nav-item[data-panel="' + panel + '"]');
@@ -31,6 +30,21 @@ async function ready(page) {
     'The removed header, save-state label, and network status are absent from the DOM');
   assert.equal(await page.locator('#exportLocalData').count(), 0, 'The local-data export entry is removed');
   assert.equal(await page.locator('#offlineSidebar button').filter({ hasText: /^导出本地数据$/ }).count(), 0);
+  assert.equal(await page.locator('.offline-nav-item[data-panel="mistakes"],.offline-nav-item[data-panel="notes"],'
+    + '#wrongBookBtn,#conceptNotebookBtn,#mistakesPanel,#notesPanel,#wrongBookModal,#conceptNotebookDialog,'
+    + '#recordDialog,#recordForm,#recordTitle,#recordContent,#cancelRecord,#addMistake,#addNote,#noteList,#mistakeList').count(), 0,
+  'Removed wrong-book and notebook navigation, panels and editors are absent');
+  assert.equal(await page.locator('#questionsPanel button').filter({ hasText: '加入错题本' }).count(), 0);
+  assert.deepEqual(await page.locator('.offline-nav-item[data-panel]').evaluateAll(items => items.map(item => item.dataset.panel)), panels);
+  await page.locator('#drawingPanel').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('.offline-nav-item.active').getAttribute('data-panel'), 'drawing', 'Drawing is the default module');
+  if (page.viewportSize().width <= 1100) assert.equal(await page.locator('#offlineMobileTitle').innerText(), '绘图');
+  const schema = await page.evaluate(() => new Promise((resolve, reject) => {
+    const request = indexedDB.open('dmate-offline-workspace', 2);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => { const db = request.result; resolve({ version: db.version, stores: [...db.objectStoreNames] }); db.close(); };
+  }));
+  assert.deepEqual(schema, { version: 2, stores: ['practice', 'settings'] }, 'Fresh databases contain only active data stores');
 }
 
 async function readStore(page, name) {
@@ -45,22 +59,6 @@ async function readStore(page, name) {
       tx.onerror = () => { db.close(); reject(tx.error); };
     };
   }), name);
-}
-
-async function waitRecord(page, store, title, content) {
-  await page.waitForFunction(async ({ store, title, content }) => {
-    const rows = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('dmate-offline-workspace');
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const db = request.result, tx = db.transaction(store, 'readonly');
-        const get = tx.objectStore(store).getAll();
-        tx.oncomplete = () => { db.close(); resolve(get.result); };
-        tx.onerror = () => { db.close(); reject(tx.error); };
-      };
-    });
-    return rows.some(row => row.title === title && (!content || (row.content || row.statement || '').includes(content)));
-  }, { store, title, content });
 }
 
 async function geometry(locator) {
@@ -134,7 +132,7 @@ async function onlineReference(page, theme) {
   const icons = {};
   for (const [panel, selector] of Object.entries(iconReferences)) icons[panel] = await geometry(page.locator(selector));
   return { icons, appearanceIcon: await geometry(page.locator('#appearanceBtn svg')),
-    palette: await palette(page), close: await closeStyle(page.locator('#wrongBookClose')) };
+    palette: await palette(page), close: await closeStyle(page.locator('#appearanceClose')) };
 }
 
 async function noOverflow(page, panel) {
@@ -159,15 +157,15 @@ async function sidebarControls(page, width) {
   }
   if (await opener.getAttribute('aria-expanded') !== 'true') await opener.click();
   assert.equal(await opener.isVisible(), false, 'Expanded sidebar has no floating opener');
-  const panelTop = await page.locator('#mistakesPanel').evaluate(node => node.getBoundingClientRect().top);
+  const panelTop = await page.locator('#drawingPanel').evaluate(node => node.getBoundingClientRect().top);
   await page.locator('#offlineDesktopSidebarToggle').click();
   await opener.waitFor({ state: 'visible' });
   assert.equal(await opener.getAttribute('aria-expanded'), 'false');
   assert.equal(await page.locator('#offlineSidebar').evaluate(node => node.inert), true);
   const floating = await opener.evaluate(node => ({ inMain: Boolean(node.closest('#offlineMain')), position: getComputedStyle(node).position }));
   assert.ok(floating.inMain && ['absolute', 'fixed'].includes(floating.position), 'Collapsed opener floats in the main area');
-  await noOverflow(page, 'mistakes');
-  assert.ok(Math.abs(await page.locator('#mistakesPanel').evaluate(node => node.getBoundingClientRect().top) - panelTop) <= 2,
+  await noOverflow(page, 'drawing');
+  assert.ok(Math.abs(await page.locator('#drawingPanel').evaluate(node => node.getBoundingClientRect().top) - panelTop) <= 2,
     'Collapsing navigation does not add a top content row');
   await opener.click();
   await opener.waitFor({ state: 'hidden' });
@@ -201,218 +199,6 @@ async function appearanceControls(page, width, theme, reference) {
   await dialog.waitFor({ state: 'hidden' });
 }
 
-async function confirmDeletion(page, trigger, commit) {
-  await trigger.click();
-  const dialog = page.locator('.dmate-delete-confirm[open]');
-  await dialog.waitFor({ state: 'visible' });
-  await dialog.locator(commit ? '.dmate-delete-confirm-delete' : '.dmate-delete-confirm-close').click();
-  await dialog.waitFor({ state: 'detached' });
-}
-
-async function notebookSnapshot(page, selector) {
-  await page.mouse.move(0, 0);
-  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-  await page.locator(selector).evaluate(async node => {
-    await Promise.all(node.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
-  });
-  return page.locator(selector).evaluate(content => {
-    const origin = content.getBoundingClientRect();
-    const selectors = [':scope', '.dcn-sidebar', '.dcn-sidebar > .dcn-primary', '.dcn-search-wrap', '.dcn-search',
-      '.dcn-search-clear', '.dcn-selection', '.dcn-list', '.dcn-list-empty', '.dcn-note', '.dcn-note-select',
-      '.dcn-note input[type=checkbox]', '.dcn-note-open', '.dcn-note-delete', '.dcn-main', '.dcn-editor',
-      '.dcn-editor > label:first-child', '.dcn-title', '.dcn-editor > label:nth-child(2)', '.dcn-original',
-      '.dcn-saved'];
-    const properties = ['display', 'boxSizing', 'position', 'gridTemplateColumns', 'gridTemplateRows',
-      'flexDirection', 'flexWrap', 'alignItems', 'justifyContent', 'gap', 'rowGap', 'columnGap',
-      'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
-      'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'textAlign', 'whiteSpace', 'color', 'backgroundColor',
-      'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth', 'borderTopStyle',
-      'borderTopColor', 'borderRadius', 'boxShadow', 'minHeight', 'appearance', 'opacity'];
-    const elements = {};
-    for (const key of selectors) {
-      const node = key === ':scope' ? content : content.querySelector(key);
-      const rect = node?.getBoundingClientRect(), style = node && getComputedStyle(node);
-      const visible = Boolean(node && node.getClientRects().length && rect.width > 0 && rect.height > 0
-        && style.display !== 'none' && style.visibility !== 'hidden');
-      if (!visible) { elements[key] = { visible: false }; continue; }
-      elements[key] = { visible: true, geometry: { x: rect.x - origin.x, y: rect.y - origin.y, width: rect.width, height: rect.height },
-        style: Object.fromEntries(properties.map(property => [property, style[property]])) };
-      if (node.matches('input,textarea')) elements[key].value = node.value;
-      if (node.matches('input[type=checkbox]')) elements[key].checked = node.checked;
-    }
-    // Keep the real online AI area intact, excluding only its text from this
-    // editor/list comparison. Its parent geometry is still measured above.
-    const text = [], walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
-    let node;
-    while ((node = walker.nextNode())) {
-      const parent = node.parentElement;
-      if (parent.closest('.dcn-ai') || !parent.getClientRects().length) continue;
-      const style = getComputedStyle(parent);
-      if (style.display !== 'none' && style.visibility !== 'hidden') text.push(node.textContent);
-    }
-    return { text: text.join(' ').replace(/\s+/g, ' ').trim(), elements };
-  });
-}
-
-async function compareNotebook(page, online, label, phase) {
-  assert.equal(await page.locator('#notesPanel .dcn-ai,#notesPanel .dcn-question,#notesPanel .dcn-ai-actions').count(), 0,
-    label + '/' + phase + ': the complete offline AI section is absent from the DOM');
-  const size = await page.locator('#noteList').evaluate(node => {
-    const rect = node.getBoundingClientRect(), panel = node.parentElement, box = panel.getBoundingClientRect(), style = getComputedStyle(panel);
-    return { width: rect.width, height: rect.height, gaps: [
-      rect.left - box.left - parseFloat(style.borderLeftWidth) - parseFloat(style.paddingLeft),
-      box.right - rect.right - parseFloat(style.borderRightWidth) - parseFloat(style.paddingRight),
-      rect.top - box.top - parseFloat(style.borderTopWidth) - parseFloat(style.paddingTop),
-      box.bottom - rect.bottom - parseFloat(style.borderBottomWidth) - parseFloat(style.paddingBottom)] };
-  });
-  assert.ok(size.gaps.every(gap => Math.abs(gap) <= 2), label + '/' + phase + ': notebook content fills its embedded container: ' + JSON.stringify(size));
-  // Match the content container, keeping the online component's actual CSS and
-  // viewport breakpoints. Modal framing and embedded page placement differ.
-  await online.evaluate(({ width, height }) => {
-    const dialog = document.getElementById('conceptNotebookDialog'), content = dialog.querySelector('.dcn-content');
-    const style = getComputedStyle(dialog), heading = dialog.querySelector('.dcn-heading').getBoundingClientRect();
-    const horizontal = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)
-      + parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth);
-    const vertical = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
-      + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth) + heading.height + parseFloat(style.rowGap);
-    Object.assign(dialog.style, { width: width + horizontal + 'px', height: height + vertical + 'px',
-      maxWidth: 'none', maxHeight: 'none', minHeight: '0' });
-    Object.assign(content.style, { width: width + 'px', height: height + 'px', flex: 'none' });
-  }, size);
-  const expected = await notebookSnapshot(online, '#conceptNotebookDialog .dcn-content');
-  const actual = await notebookSnapshot(page, '#noteList');
-  assert.equal(actual.text, expected.text, label + '/' + phase + ': notebook text and visible structure match online');
-  for (const [selector, reference] of Object.entries(expected.elements)) {
-    const current = actual.elements[selector], message = label + '/' + phase + ': ' + selector;
-    assert.equal(current.visible, reference.visible, message + ' visibility');
-    if (!reference.visible) continue;
-    assert.deepEqual(current.style, reference.style, message + ' computed style');
-    assert.equal(current.value, reference.value, message + ' value');
-    assert.equal(current.checked, reference.checked, message + ' checkbox');
-    for (const key of ['x', 'y', 'width', 'height']) {
-      assert.ok(Math.abs(current.geometry[key] - reference.geometry[key]) <= 2,
-        message + ' ' + key + ': offline=' + current.geometry[key] + ', online=' + reference.geometry[key]);
-    }
-  }
-  if (process.env.OFFLINE_SCREENSHOT_DIR) {
-    const suffix = label.replace('/', '-') + '-' + phase + '.png';
-    await online.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/notebook-online-' + suffix });
-    await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/notebook-offline-' + suffix });
-  }
-}
-
-async function notebookParity(browser, page, width, theme, label) {
-  await navigate(page, 'notes');
-  await page.locator('#addNote').waitFor();
-  assert.equal(await page.locator('#notesPanel > .offline-toolbar,#notesPanel > .dcn-heading,#noteCount').count(), 0,
-    'The embedded notebook has no replacement heading or toolbar');
-  assert.deepEqual(await readStore(page, 'notes'), [], 'Notebook comparison begins with the real empty state');
-  const context = await browser.newContext({ viewport: page.viewportSize(), isMobile: width < 1101,
-    hasTouch: width < 1101, serviceWorkers: 'block' });
-  const online = await context.newPage(), errors = [];
-  online.on('pageerror', error => errors.push(error.message));
-  try {
-    await online.goto(baseURL + '/', { waitUntil: 'networkidle' });
-    await online.evaluate(mode => { appearanceSettings = { ...APPEARANCE_DEFAULTS, mode }; applyAppearanceSettings({ save: false }); }, theme);
-    const toggle = online.locator(width <= 1100 ? '#mobileToolsBtn' : '#desktopToolsBtn');
-    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
-    await online.locator('#conceptNotebookBtn').click();
-    await online.locator('#conceptNotebookDialog[open]').waitFor();
-    await compareNotebook(page, online, label, 'empty');
-    await page.locator('#addNote').click();
-    await page.waitForFunction(() => Boolean(document.querySelector('#noteList .dcn-note.is-current')));
-    await online.locator('#conceptNotebookDialog .dcn-sidebar > .dcn-primary').click();
-    await compareNotebook(page, online, label, 'new');
-    const title = '笔记布局示例', content = '集合与关系：先说明对象，再核对定义中的全部条件。';
-    await page.locator('#noteList .dcn-title').fill(title);
-    await online.locator('#conceptNotebookDialog .dcn-title').fill(title);
-    await page.locator('#noteList .dcn-original').fill(content);
-    await online.locator('#conceptNotebookDialog .dcn-original').fill(content);
-    await waitRecord(page, 'notes', title, content);
-    await page.locator('#noteList .dcn-note input[type=checkbox]').check();
-    await online.locator('#conceptNotebookDialog .dcn-note input[type=checkbox]').check();
-    assert.equal(await online.locator('#conceptNotebookDialog .dcn-ai-actions > button').first().isEnabled(), true);
-    await compareNotebook(page, online, label, 'populated');
-    const row = (await readStore(page, 'notes')).find(note => note.title === title);
-    const fixture = page.locator('#noteList .dcn-note[data-note-id="' + row.id + '"]');
-    await confirmDeletion(page, fixture.locator('.dcn-note-delete'), true);
-    await fixture.waitFor({ state: 'detached' });
-    assert.deepEqual(await readStore(page, 'notes'), [], 'Parity fixture is removed before CRUD regression');
-    assert.deepEqual(errors, [], label + ': online notebook reference has no page errors');
-  } finally { await context.close(); }
-}
-
-async function notesCRUD(page, label) {
-  await navigate(page, 'notes');
-  const addNote = async () => {
-    const previousIds = await page.locator('#noteList .dcn-note').evaluateAll(nodes => nodes.map(node => node.dataset.noteId));
-    await page.locator('#addNote').click();
-    await page.waitForFunction(ids => {
-      const selected = document.querySelector('#noteList .dcn-note.is-current');
-      return selected?.dataset.noteId && !ids.includes(selected.dataset.noteId);
-    }, previousIds);
-    assert.equal(await page.locator('#noteList .dcn-title').inputValue(), '', 'New note editor is ready before typing');
-  };
-  await addNote();
-  const title = '本地笔记 ' + label;
-  await page.locator('#noteList .dcn-title').fill(title);
-  await page.locator('#noteList .dcn-original').fill('归纳法：先验证初始情形，再证明递推步骤。');
-  await waitRecord(page, 'notes', title, '初始情形');
-  await page.locator('#noteList .dcn-original').fill('归纳法修订：先验证初始情形，再由 P(n) 推出 P(n+1)。');
-  await waitRecord(page, 'notes', title, '修订');
-  const survivorId = (await readStore(page, 'notes')).find(row => row.title === title).id;
-  const survivor = page.locator('#noteList .dcn-note[data-note-id="' + survivorId + '"]');
-  await confirmDeletion(page, survivor.locator('.dcn-note-delete'), false);
-  assert.equal((await readStore(page, 'notes')).filter(row => row.title === title).length, 1, 'Cancel preserves note');
-  await addNote();
-  await page.locator('#noteList .dcn-title').fill('待删除笔记');
-  await page.locator('#noteList .dcn-original').fill('只用于验证本机删除。');
-  await waitRecord(page, 'notes', '待删除笔记');
-  const temporaryId = (await readStore(page, 'notes')).find(row => row.title === '待删除笔记').id;
-  const temporary = page.locator('#noteList .dcn-note[data-note-id="' + temporaryId + '"]');
-  await confirmDeletion(page, temporary.locator('.dcn-note-delete'), true);
-  await temporary.waitFor({ state: 'detached' });
-  assert.equal((await readStore(page, 'notes')).length, 1);
-  return title;
-}
-
-async function saveMistake(page, title, content) {
-  await page.locator('#recordTitle').fill(title);
-  await page.locator('#recordContent').fill(content);
-  await page.locator('#recordForm button[type="submit"]').click();
-  await page.locator('#recordDialog').waitFor({ state: 'hidden' });
-  await waitRecord(page, 'mistakes', title, content);
-}
-
-async function mistakeCard(page, title) {
-  const row = (await readStore(page, 'mistakes')).find(item => item.title === title);
-  assert.ok(row, 'Saved mistake exists: ' + title);
-  return page.locator('#mistakeList .wrong-card[data-record-id="' + row.id + '"]');
-}
-
-async function mistakesCRUD(page, label, reference) {
-  await navigate(page, 'mistakes');
-  await page.locator('#addMistake').click();
-  assert.deepEqual(await closeStyle(page.locator('#cancelRecord')), reference.close, 'Record dialog close dot matches online');
-  const title = '本地错题 ' + label;
-  const formula = '**勾股关系**：\\(a^2+b^2=c^2\\)。';
-  await saveMistake(page, title, formula);
-  const item = await mistakeCard(page, title);
-  await item.locator('[data-action="edit-mistake"]').click();
-  await saveMistake(page, title, formula + ' 已核对条件。');
-  await item.locator('.wrong-question strong').waitFor();
-  await item.locator('.wrong-question mjx-container svg').waitFor();
-  await confirmDeletion(page, item.locator('[data-action="delete-mistake"]'), false);
-  assert.equal((await readStore(page, 'mistakes')).length, 1, 'Cancel preserves mistake');
-  await page.locator('#addMistake').click();
-  await saveMistake(page, '待删除错题', '验证删除记录。');
-  const temporary = await mistakeCard(page, '待删除错题');
-  await confirmDeletion(page, temporary.locator('[data-action="delete-mistake"]'), true);
-  await temporary.waitFor({ state: 'detached' });
-  assert.equal((await readStore(page, 'mistakes')).length, 1);
-  return title;
-}
-
 async function practice(page) {
   await navigate(page, 'questions');
   await page.locator('#questionList .question-item').filter({ hasText: '判断命题' }).click();
@@ -423,13 +209,12 @@ async function practice(page) {
   await page.locator('#questionDetail').getByRole('button', { name: '查看参考答案', exact: true }).click();
   await page.locator('#questionDetail .answer-panel').waitFor();
   assert.match(await page.locator('#questionDetail .answer-panel').textContent(), /参考答案/);
-  await page.locator('#questionDetail').getByRole('button', { name: '加入错题本', exact: true }).click();
-  await page.waitForFunction(() => document.getElementById('offlineToast').textContent.includes('错题'));
-  assert.ok((await readStore(page, 'mistakes')).some(row => row.questionId === 'q01' && row.answer.includes('C')));
+  assert.equal(await page.locator('#questionDetail button').filter({ hasText: '加入错题本' }).count(), 0);
   await page.locator('#questionList .question-item').filter({ hasText: '逻辑等价变形' }).click();
   await page.locator('#questionResponse').fill('¬p∨q');
   await page.locator('#questionDetail').getByRole('button', { name: '查看参考答案', exact: true }).click();
   assert.equal(await page.locator('#questionResponse').inputValue(), '¬p∨q', 'Revealing answer preserves unfinished response');
+  assert.equal(await page.locator('#questionDetail button').filter({ hasText: '加入错题本' }).count(), 0);
   await page.locator('#questionDetail').getByRole('button', { name: '记录本次练习', exact: true }).click();
   await page.waitForFunction(() => document.getElementById('offlineToast').textContent.includes('练习记录'));
   const rows = await readStore(page, 'practice');
@@ -616,7 +401,7 @@ async function runCase(browser, width, theme) {
     page.on('requestfailed', request => failures.push(request.url() + ': ' + request.failure()?.errorText));
     page.on('request', request => {
       const url = new URL(request.url());
-      if (!['http:', 'https:'].includes(url.protocol)) return; // local Blob backup downloads do not call a server
+      if (!['http:', 'https:'].includes(url.protocol)) return; // local Blob URLs do not call a server
       const path = url.pathname;
       if (!path.startsWith('/static/') && !['/offline', '/offline-service-worker.js', '/favicon.ico'].includes(path)) apiRequests.push(path);
     });
@@ -636,7 +421,7 @@ async function runCase(browser, width, theme) {
       return { viewBox: icon.getAttribute('viewBox'), width: style.width, height: style.height,
         strokeWidth: style.strokeWidth, fill: style.fill };
     }));
-    assert.equal(iconStyles.length, 6);
+    assert.equal(iconStyles.length, panels.length);
     for (const style of iconStyles) assert.deepEqual(style,
       { viewBox: '0 0 24 24', width: '20px', height: '20px', strokeWidth: '1.8px', fill: 'none' },
       label + ': all navigation icons use the shared Lucide geometry');
@@ -658,25 +443,15 @@ async function runCase(browser, width, theme) {
       await noOverflow(page, panel);
     }
     await appearanceControls(page, width, theme, reference);
-    await notebookParity(browser, page, width, theme, label);
-    const noteTitle = await notesCRUD(page, label);
-    const mistakeTitle = await mistakesCRUD(page, label, reference);
     await practice(page);
     await concepts(page);
     if (theme === 'dark') await curriculum(page);
     await graph(page);
     await drawing(page);
-    // A second fully offline navigation must restore records and the drawing.
+    // A second fully offline navigation must restore practice records and the drawing.
     await page.reload({ waitUntil: 'networkidle' });
     await ready(page);
     assert.equal(await page.evaluate(() => document.documentElement.dataset.appearanceTheme), theme, 'Offline appearance persists');
-    await navigate(page, 'notes');
-    assert.equal((await readStore(page, 'notes'))[0].title, noteTitle);
-    await page.locator('#noteList .dcn-note-open').filter({ hasText: noteTitle }).click();
-    assert.match(await page.locator('#noteList .dcn-original').inputValue(), /修订/);
-    await navigate(page, 'mistakes');
-    assert.ok((await readStore(page, 'mistakes')).some(row => row.title === mistakeTitle));
-    await (await mistakeCard(page, mistakeTitle)).locator('mjx-container svg').waitFor();
     assert.ok((await readStore(page, 'practice')).length >= 2);
     await navigate(page, 'drawing');
     assert.equal(await page.locator('#offlineDrawingHost .ddw-name').inputValue(), '离线保存画板');
@@ -687,11 +462,11 @@ async function runCase(browser, width, theme) {
         await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/' + width + '-' + theme + '-' + panel + '.png' });
       }
     }
-    assert.deepEqual(nativeDialogs, [], label + ': deletion uses the shared in-app confirmation');
+    assert.deepEqual(nativeDialogs, [], label + ': actions do not open native browser dialogs');
     assert.deepEqual(apiRequests, [], label + ': offline work must not call server APIs');
     assert.deepEqual(failures, [], label + ': required resources must be cached');
     assert.deepEqual(errors, [], label + ': no page errors');
-    console.log('PASS ' + label + ': six panels, shared appearance/icons, CRUD, practice, math, graph, drawing and offline reload');
+    console.log('PASS ' + label + ': four panels, removed legacy modules, shared appearance/icons, practice, curriculum, graph, drawing and offline reload');
   } catch (error) {
     const workerStatus = await page.evaluate(async () => {
       const describe = worker => worker && ({ state: worker.state, scriptURL: worker.scriptURL });
@@ -718,6 +493,8 @@ async function runCase(browser, width, theme) {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
-    for (const width of [1440, 390]) for (const theme of ['light', 'dark', 'navy']) await runCase(browser, width, theme);
+    const themes = (process.env.DMATE_TEST_THEMES || 'light,dark,navy').split(',');
+    assert.ok(themes.length && themes.every(theme => ['light', 'dark', 'navy'].includes(theme)), 'Supported theme selection');
+    for (const width of [1440, 390]) for (const theme of themes) await runCase(browser, width, theme);
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

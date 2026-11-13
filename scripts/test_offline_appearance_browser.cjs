@@ -40,7 +40,7 @@ async function appearance(page) {
       '--bubble-alpha','--font-scale','--background-mask-alpha','--background-blur','--background-size','--accent']) {
       result[key] = document.documentElement.style.getPropertyValue(key);
     }
-    // The offline workspace retains its six-panel layout. Only shared wallpaper
+    // The offline workspace retains its four-panel layout. Only shared wallpaper
     // layers and appearance settings must match the online application.
     for (const [name,selector] of [['background','#appearanceBackgroundLayer'],['mask','.appearance-mask-layer']]) {
       const node = document.querySelector(selector);

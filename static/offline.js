@@ -3,20 +3,15 @@
   const $ = id => document.getElementById(id);
   const DB_NAME = "dmate-offline-workspace";
   const DB_VERSION = 2;
-  const NOTE_JOURNAL_KEY = "dmate:offline:notebook-journal:v1";
   const state = {
     db: null, concepts: [], questions: [], graph: null,
-    panel: "mistakes", selectedQuestion: null, selectedConcept: null,
-    selectedOption: [], revealed: false, recordKind: "note", editingId: null,
+    panel: "drawing", selectedQuestion: null, selectedConcept: null,
+    selectedOption: [], revealed: false,
     drawingController: null, backgroundUrl: "", graphCategory: "", questionCategory: "",
     questionDifficulty: "", conceptQuery: "", graphQuery: "", graphController: null,
-    selectedNoteId: null, noteQuery: "", noteRows: [], noteSaveQueue: Promise.resolve(),
-    noteSelectedIds: new Set(), noteDrafts: new Map(), noteSaveStatus: new Map(), noteDeletePending: null,
     questionResponses: new Map(), appearanceQueue: Promise.resolve()
   };
   const panelMeta = {
-    mistakes: ["错题本", "在本机查看、整理和复习已保存的错题。"],
-    notes: ["笔记本", "把自己的理解、推导和学习记录保存在本机。"],
     drawing: ["绘图", "使用 DMate 图形编辑器，在本机创建和保存数学图形。"],
     graph: ["知识图谱", "浏览离散数学知识点及其前置关系。"],
     questions: ["题库", "按章节和难度练习，查看参考答案与解析。"],
@@ -86,25 +81,12 @@
     else node.textContent = String(value ?? "");
     return node;
   }
-  function answerDetails(title, value, className = "wrong-answer-details") {
-    const details = el("details", className);
-    details.append(el("summary", className === "wrong-analysis-details" ? "wrong-analysis-summary" : "wrong-answer-summary", title));
-    details.append(rich(className === "wrong-analysis-details" ? "wrong-analysis-body" : "wrong-answer-inner", value));
-    details.addEventListener("toggle", () => {
-      if (details.open) void window.DMateAIAnswer?.render(details.lastElementChild, value);
-    });
-    return details;
-  }
-  async function confirmDelete(owner, title, content) {
-    if (!window.DMateDeleteConfirm?.request) { toast("删除确认组件尚未加载，请刷新后重试"); return false; }
-    return window.DMateDeleteConfirm.request(owner, {title, body:"删除后无法恢复。", content, confirmText:"删除"});
-  }
   function openDb() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = () => {
         const db = request.result;
-        for (const store of ["mistakes", "notes", "practice", "settings"]) {
+        for (const store of ["practice", "settings"]) {
           if (!db.objectStoreNames.contains(store)) {
             const objectStore = db.createObjectStore(store, { keyPath: "id" });
             objectStore.createIndex("updatedAt", "updatedAt");
@@ -127,9 +109,7 @@
       tx.onabort = () => reject(tx.error || new Error("本地保存已取消"));
     });
   }
-  const all = store => transaction(store, "readonly", os => os.getAll());
   const put = (store, value) => transaction(store, "readwrite", os => os.put(value));
-  const remove = (store, id) => transaction(store, "readwrite", os => os.delete(id));
   async function applyOriginalAppearance() {
     let saved = null;
     try { saved = await transaction("settings", "readonly", os => os.get("appearance")); } catch (_) {}
@@ -143,87 +123,11 @@
   const stamp = () => new Date().toISOString();
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : "local-" + Date.now() + "-" + Math.random().toString(36).slice(2));
 
-  async function restoreNotebookDraft() {
-    // This journal was written by the temporary notebook UI. Replay it into
-    // the original notes store so changing the interface cannot lose edits.
-    const raw = localStorage.getItem(NOTE_JOURNAL_KEY);
-    if (!raw) return;
-    const pending = JSON.parse(raw);
-    if (pending?.version !== 1 || !Array.isArray(pending.rows) || !Array.isArray(pending.snapshot?.notes)) {
-      throw new Error("本机笔记草稿无法读取，已保留原数据，请保留此页面后重试。");
-    }
-    const time = value => {
-      const numeric = Number(value);
-      return Number.isFinite(numeric) ? Math.max(0,numeric) : Date.parse(value) || 0;
-    };
-    const [rows, metadata] = await Promise.all([all("notes"), transaction("settings", "readonly", store => store.get("notebook-deletions"))]);
-    const byId = new Map(rows.map(row => [row.id,row])), deleted = {...(metadata?.deleted || {})};
-    for (const [id, at] of Object.entries(pending.snapshot.deleted || {})) deleted[id] = Math.max(time(deleted[id]), time(at));
-    for (const draft of pending.rows) {
-      if (!draft || typeof draft.id !== "string" || typeof draft.title !== "string" || typeof draft.content !== "string") continue;
-      const previous = byId.get(draft.id);
-      if (!previous || time(draft.updatedAt) >= time(previous.updatedAt)) {
-        byId.set(draft.id, {...(previous || {}), ...draft, updatedAt:new Date(time(draft.updatedAt) || Date.now()).toISOString()});
-      }
-    }
-    await new Promise((resolve,reject) => {
-      const tx = state.db.transaction(["notes","settings"], "readwrite"), notes = tx.objectStore("notes");
-      for (const [id,row] of byId) {
-        if (Object.hasOwn(deleted,id) && time(deleted[id]) >= time(row.updatedAt)) notes.delete(id);
-        else notes.put(row);
-      }
-      for (const id of Object.keys(deleted)) if (!byId.has(id)) notes.delete(id);
-      tx.objectStore("settings").put({...(metadata || {}), id:"notebook-deletions", deleted, updatedAt:stamp()});
-      tx.oncomplete = resolve;
-      tx.onerror = tx.onabort = () => reject(tx.error || new Error("笔记草稿尚未恢复，原稿已保留，请重试。"));
-    });
-    if (localStorage.getItem(NOTE_JOURNAL_KEY) === raw) localStorage.removeItem(NOTE_JOURNAL_KEY);
-  }
-
   async function migrateCurrentAccountData() {
     let payload;
     try { payload = JSON.parse(sessionStorage.getItem("dmate_offline_migration_v1") || "null"); }
     catch (_) { payload = null; }
     if (!payload || typeof payload !== "object") return;
-    const timestamp = value => {
-      const numeric = Number(value);
-      return Number.isFinite(numeric) ? Math.max(0, numeric) : Date.parse(value) || 0;
-    };
-    const toIso = value => new Date(timestamp(value) || Date.now()).toISOString();
-    // Recover edits acknowledged by the temporary shared notebook before
-    // comparing incoming account snapshots with this device's current data.
-    await restoreNotebookDraft();
-    const mistakes = new Map((await all("mistakes")).map(row => [row.id, row]));
-    for (const item of Array.isArray(payload.wrongQuestions) ? payload.wrongQuestions : []) {
-      if (!item || typeof item.question !== "string" || !item.question.trim()) continue;
-      const id = String(item.id || uid()), existing = mistakes.get(id);
-      if (existing && timestamp(item.updatedAt) <= timestamp(existing.updatedAt)) continue;
-      const reference = item.referenceAnswer;
-      const answer = item.answer || (typeof reference === "string" ? reference
-        : reference && typeof reference === "object" ? (reference.text || reference.answer || JSON.stringify(reference)) : "");
-      const row = {
-        ...(existing || {}), id,
-        title: String(item.category || item.question).slice(0, 72) || "错题",
-        statement: item.question,
-        answer: String(answer || ""),
-        explanation: String(item.analysis || item.solution || ""),
-        knowledgePoints: Array.isArray(item.knowledgePoints) ? item.knowledgePoints : [],
-        status: item.corrected ? "resolved" : "pending",
-        updatedAt: toIso(item.updatedAt)
-      };
-      await put("mistakes", row); mistakes.set(id, row);
-    }
-    const notes = new Map((await all("notes")).map(row => [row.id, row]));
-    const metadata = await transaction("settings", "readonly", os => os.get("notebook-deletions"));
-    const deleted = metadata?.deleted || {};
-    for (const note of Array.isArray(payload.notes) ? payload.notes : []) {
-      if (!note || typeof note.title !== "string" || typeof note.content !== "string") continue;
-      const id = String(note.id || uid()), existing = notes.get(id), incomingAt = timestamp(note.updatedAt);
-      if (Object.hasOwn(deleted, id) && incomingAt <= timestamp(deleted[id])) continue;
-      if (existing && incomingAt <= timestamp(existing.updatedAt)) continue;
-      const row = {...(existing || {}), id, title:note.title, content:note.content, updatedAt:toIso(note.updatedAt)};
-      await put("notes", row); notes.set(id, row);
-    }
     if (typeof payload.drawings === "string" && payload.drawings) {
       try {
         const key = "dmate:offline:drawing-gallery:v1", current = localStorage.getItem(key);
@@ -242,7 +146,7 @@
       } catch (error) { toast("本机绘图库已保留，部分在线绘图未能导入：" + (error?.message || "")); }
     }
     sessionStorage.removeItem("dmate_offline_migration_v1");
-    toast("已导入当前账号的错题、笔记和绘图到本机离线区");
+    toast("已导入当前账号的绘图到本机离线区");
   }
 
   async function loadResources() {
@@ -274,283 +178,11 @@
       const node = $(key + "Panel");
       if (node) node.hidden = key !== name;
     }
-    let rendering;
-    if (name === "mistakes") rendering = renderMistakes();
-    if (name === "notes") rendering = renderNotes();
     if (name === "drawing") mountDrawing();
     if (name === "graph") renderGraph();
     if (name === "questions") renderQuestions();
     if (name === "concepts") renderConcepts();
     window.dispatchEvent(new CustomEvent("dmate:offlinepanelchange", {detail:{panel:name,title:panelMeta[name][0]}}));
-    return rendering;
-  }
-
-  async function renderMistakes() {
-    const rows = (await all("mistakes")).sort((a,b) => b.updatedAt.localeCompare(a.updatedAt));
-    $("mistakeCount").textContent = rows.length + " 道错题";
-    const list = $("mistakeList");
-    list.classList.add("wrong-book-list");
-    list.replaceChildren();
-    if (!rows.length) {
-      list.append(el("div", "wrong-empty offline-empty", "无"));
-      return;
-    }
-    for (const row of rows) {
-      const card = el("article", "wrong-card");
-      card.dataset.recordId = row.id;
-      const top = el("div", "wrong-card-top");
-      top.append(el("span", "wrong-status" + (row.status === "resolved" ? " corrected" : ""), row.status === "resolved" ? "已完成订正" : "待订正"),
-        el("span", "wrong-date", new Date(row.updatedAt).toLocaleString()));
-      card.append(top, rich("wrong-question", row.statement || row.content || ""));
-      const knowledgeLabels = [...new Set((row.knowledgePoints || []).map(point =>
-        state.graph?.nodes?.find(node => node.id === point)?.name
-        || state.concepts.find(concept => concept.id === point)?.title
-        || (typeof point === "string" && /[\u3400-\u9fff]/.test(point) ? point : "")
-      ).filter(Boolean))];
-      if (knowledgeLabels.length) {
-        const meta = el("div", "wrong-meta"), line = el("div", "wrong-meta-row");
-        line.append(el("span", "wrong-meta-label", "整题涉及"), el("span", "wrong-meta-value", knowledgeLabels.join("、")));
-        meta.append(line); card.append(meta);
-      }
-      card.append(answerDetails("查看答案", row.answer || "这条记录没有保存参考答案。"));
-      if (row.explanation) card.append(answerDetails("查看解析", row.explanation, "wrong-analysis-details"));
-      const actions = el("div", "wrong-actions record-actions");
-      if (row.status !== "resolved") actions.append(action("完成订正", "", async () => {
-        await put("mistakes", {...row, status:"resolved", updatedAt:stamp()}); renderMistakes();
-      }, "check"));
-      const edit = action("编辑/笔记", "secondary", () => openRecord("mistakes", row), "edit");
-      edit.dataset.action = "edit-mistake";
-      const deletion = action("移出错题本", "secondary danger", async () => {
-        if (await confirmDelete($("mistakesPanel"), "移出这道错题？", row.statement || row.title)) {
-          await remove("mistakes", row.id); await renderMistakes();
-        }
-      }, "trash");
-      deletion.dataset.action = "delete-mistake";
-      actions.append(edit, deletion); card.append(actions); list.append(card);
-    }
-  }
-
-  function noteTime(value) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? Math.max(0, numeric) : Date.parse(value) || 0;
-  }
-
-  function setNoteSaveStatus(id, message) {
-    state.noteSaveStatus.set(id, message);
-    const saved = $("noteList").querySelector(".dcn-saved");
-    if (saved?.dataset.noteId === id) saved.textContent = message;
-  }
-
-  function queueNoteSave(row) {
-    const snapshot = {...row};
-    state.noteDrafts.set(row.id, snapshot);
-    setNoteSaveStatus(row.id, "正在保存…");
-    state.noteSaveQueue = state.noteSaveQueue.then(async () => {
-      try {
-        await put("notes", snapshot);
-        if (state.noteDrafts.get(row.id) === snapshot) {
-          state.noteDrafts.delete(row.id);
-          setNoteSaveStatus(row.id, "");
-        }
-        return true;
-      } catch (error) {
-        if (state.noteDrafts.get(row.id) === snapshot) {
-          setNoteSaveStatus(row.id, "保存失败，请保留当前页面后重试。");
-          toast(error?.message || "笔记保存失败");
-        }
-        return false;
-      }
-    });
-    return state.noteSaveQueue;
-  }
-
-  async function flushNoteDrafts() {
-    await state.noteSaveQueue;
-    for (const row of [...state.noteDrafts.values()]) queueNoteSave(row);
-    await state.noteSaveQueue;
-    return state.noteDrafts.size === 0;
-  }
-
-  async function deleteNote(row) {
-    await new Promise((resolve, reject) => {
-      const tx = state.db.transaction(["notes", "settings"], "readwrite");
-      const settings = tx.objectStore("settings");
-      const request = settings.get("notebook-deletions");
-      request.onsuccess = () => {
-        const previous = request.result || {};
-        const deleted = {...(previous.deleted || {})};
-        deleted[row.id] = Math.max(Date.now(), noteTime(row.updatedAt) + 1, noteTime(deleted[row.id]));
-        settings.put({...previous, id:"notebook-deletions", deleted, updatedAt:stamp()});
-      };
-      tx.objectStore("notes").delete(row.id);
-      tx.oncomplete = resolve;
-      tx.onerror = tx.onabort = () => reject(tx.error || new Error("概念尚未删除，请重试。"));
-    });
-    state.noteDrafts.delete(row.id);
-    state.noteSaveStatus.delete(row.id);
-    state.noteSelectedIds.delete(row.id);
-  }
-
-  async function renderNotes() {
-    await flushNoteDrafts();
-    const byId = new Map((await all("notes")).map(row => [row.id, row]));
-    // A failed write stays visible and retryable when changing panels. Read the
-    // drafts after IndexedDB finishes so newer input also wins this merge.
-    for (const [id, row] of state.noteDrafts) byId.set(id, {...row});
-    const rows = [...byId.values()].sort((a,b) => b.updatedAt.localeCompare(a.updatedAt));
-    state.noteRows = rows;
-    if (!rows.some(row => row.id === state.selectedNoteId)) state.selectedNoteId = rows[0]?.id || null;
-    state.noteSelectedIds = new Set([...state.noteSelectedIds].filter(id => byId.has(id)));
-    const host = $("noteList");
-    host.replaceChildren();
-    const sidebar = el("aside", "dcn-sidebar"), main = el("section", "dcn-main");
-    sidebar.setAttribute("aria-label", "概念笔记列表");
-    const create = button("新建概念", "dcn-primary", createNote);
-    create.id = "addNote";
-    const search = el("input", "dcn-search");
-    search.type = "search"; search.placeholder = "搜索"; search.setAttribute("aria-label", "搜索"); search.value = state.noteQuery;
-    const searchWrap = el("div", "dcn-search-wrap");
-    const searchClear = button("", "dcn-search-clear", () => {
-      search.value = ""; state.noteQuery = ""; renderList(); search.focus({preventScroll:true});
-    });
-    searchClear.title = "清空搜索"; searchClear.setAttribute("aria-label", "清空搜索");
-    searchWrap.append(search, searchClear);
-    const list = el("div", "dcn-list"), selection = el("div", "dcn-selection"), count = el("span");
-    selection.append(count);
-    const editor = el("section", "dcn-editor");
-    const nameLabel = el("label", "", "概念名称"), name = el("input", "dcn-title");
-    name.maxLength = 160; name.setAttribute("aria-label", "概念名称"); nameLabel.append(name);
-    const bodyLabel = el("label", "", "我的概念笔记"), body = el("textarea", "dcn-original");
-    body.rows = 9; body.setAttribute("aria-label", "我的概念笔记"); bodyLabel.append(body);
-    const saved = el("span", "dcn-saved"); saved.setAttribute("role", "status");
-    editor.append(nameLabel, bodyLabel, saved);
-    main.append(editor);
-    function renderActions() {
-      const empty = state.noteRows.length === 0;
-      $("notesPanel").classList.toggle("is-empty", empty);
-      selection.hidden = empty; main.hidden = empty;
-      count.textContent = "已选 " + state.noteSelectedIds.size + " 条";
-      for (const deletion of host.querySelectorAll(".dcn-note-delete")) deletion.disabled = Boolean(state.noteDeletePending);
-    }
-    function renderList() {
-      list.replaceChildren();
-      searchClear.hidden = !search.value;
-      const query = state.noteQuery.trim().toLocaleLowerCase();
-      const visible = state.noteRows.filter(row => !query || (row.title + "\n" + row.content).toLocaleLowerCase().includes(query));
-      if (!visible.length) list.append(el("p", "dcn-list-empty", rows.length ? "没有匹配的概念。" : "无"));
-      const names = new Map();
-      for (const row of state.noteRows) {
-        const title = row.title.trim() || "未命名概念";
-        names.set(title, (names.get(title) || 0) + 1);
-      }
-      for (const row of visible) {
-        const title = row.title.trim() || "未命名概念";
-        const item = el("div", "dcn-note" + (row.id === state.selectedNoteId ? " is-current" : ""));
-        item.dataset.noteId = row.id;
-        const hit = el("label", "dcn-note-select"), check = el("input");
-        check.type = "checkbox"; check.checked = state.noteSelectedIds.has(row.id);
-        check.setAttribute("aria-label", "选择概念：" + title); hit.append(check);
-        check.addEventListener("change", () => {
-          if (check.checked) state.noteSelectedIds.add(row.id); else state.noteSelectedIds.delete(row.id);
-          renderActions();
-        });
-        const open = button(title, "dcn-note-open", () => {
-          state.selectedNoteId = row.id; renderList(); renderEditor(); renderActions();
-        });
-        if (row.title.trim()) open.setAttribute("data-i18n-content", "");
-        open.setAttribute("aria-current", String(row.id === state.selectedNoteId));
-        const deletion = button("", "dcn-note-delete", async event => {
-          event.stopPropagation();
-          if (state.noteDeletePending) return;
-          state.noteDeletePending = row.id; renderActions();
-          try {
-            if (!await confirmDelete($("notesPanel"), "删除这个概念？", title)) return;
-            if (!await flushNoteDrafts()) { toast("笔记尚未保存，请保留当前页面后重试。"); return; }
-            await deleteNote(state.noteRows.find(note => note.id === row.id) || row); await renderNotes();
-          } finally {
-            state.noteDeletePending = null; renderActions();
-          }
-        });
-        deletion.title = "删除" + title;
-        deletion.setAttribute("aria-label", "删除概念：" + title + (names.get(title) > 1 ? "（" + row.id + "）" : ""));
-        item.append(hit, open, deletion); list.append(item);
-      }
-    }
-    function renderEditor() {
-      const row = state.noteRows.find(note => note.id === state.selectedNoteId);
-      editor.hidden = !row;
-      name.value = row?.title || ""; body.value = row?.content || "";
-      body.maxLength = Math.max(12000, row?.content.length || 0);
-      saved.dataset.noteId = row?.id || "";
-      saved.textContent = row ? state.noteSaveStatus.get(row.id) || "" : "";
-    }
-    const edit = () => {
-      const row = state.noteRows.find(note => note.id === state.selectedNoteId);
-      if (!row) return;
-      row.title = name.value; row.content = body.value;
-      row.updatedAt = new Date(Math.max(Date.now(), noteTime(row.updatedAt) + 1)).toISOString();
-      queueNoteSave(row); renderList();
-    };
-    name.addEventListener("input", edit); body.addEventListener("input", edit);
-    search.addEventListener("input", () => { state.noteQuery = search.value; renderList(); });
-    sidebar.append(create, searchWrap, selection, list); host.append(sidebar, main);
-    renderList(); renderEditor(); renderActions();
-  }
-
-  async function createNote() {
-    if (!await flushNoteDrafts()) { toast("笔记尚未保存，请保留当前页面后重试。"); return; }
-    const row = {id:uid(), title:"", content:"", updatedAt:stamp()};
-    await put("notes", row); state.selectedNoteId = row.id; state.noteQuery = "";
-    await renderNotes(); $("noteList").querySelector(".dcn-title")?.focus({preventScroll:true});
-  }
-
-  function openRecord(kind, row = null) {
-    state.recordKind = kind;
-    state.editingId = row?.id || null;
-    $("recordDialogTitle").textContent = row ? (kind === "notes" ? "编辑笔记" : "编辑错题") : (kind === "notes" ? "新建笔记" : "添加错题");
-    $("recordTitle").value = row?.title || "";
-    $("recordContent").value = row?.content || row?.statement || "";
-    const titleLabel = $("recordTitle").closest("label");
-    const contentLabel = $("recordContent").closest("label");
-    if (titleLabel?.firstChild?.nodeType === Node.TEXT_NODE) titleLabel.firstChild.textContent = "题目名称";
-    if (contentLabel?.firstChild?.nodeType === Node.TEXT_NODE) contentLabel.firstChild.textContent = "题目内容";
-    $("recordTitle").setAttribute("aria-label", "题目名称");
-    $("recordContent").setAttribute("aria-label", "题目内容");
-    $("recordDialog").showModal();
-    $("recordTitle").focus();
-  }
-
-  async function saveRecord(event) {
-    event.preventDefault();
-    const title = $("recordTitle").value.trim();
-    const content = $("recordContent").value.trim();
-    if (!title || !content) return toast("标题和内容不能为空");
-    const store = state.recordKind;
-    const old = state.editingId ? (await all(store)).find(row => row.id === state.editingId) : null;
-    const row = {
-      ...(old || {}), id: state.editingId || uid(), title,
-      updatedAt: stamp(), status: old?.status || "pending"
-    };
-    if (store === "notes") row.content = content;
-    else row.statement = content;
-    await put(store, row);
-    $("recordDialog").close();
-    if (store === "notes") renderNotes(); else renderMistakes();
-    toast("已保存在本机");
-  }
-
-  async function addQuestionMistake(question) {
-    const rows = await all("mistakes");
-    const existing = rows.find(row => row.questionId === question.id);
-    const record = {
-      id: existing?.id || uid(), questionId: question.id, title: question.title,
-      statement: question.statement, answer: question.answer_text || (question.answer || []).join("、"),
-      explanation: question.explanation, knowledgePoints: question.knowledge_points || [],
-      status: "pending", updatedAt: stamp()
-    };
-    await put("mistakes", record);
-    toast(existing ? "已更新错题记录" : "已加入错题本");
-    if (state.panel === "mistakes") renderMistakes();
   }
 
   function fillQuestionFilters() {
@@ -658,7 +290,6 @@
       state.revealed = !state.revealed;
       renderQuestionDetail(question);
     }, "eye"));
-    actions.append(action("加入错题本", "secondary", () => addQuestionMistake(question), "book-open"));
     detail.append(actions);
 
     if (state.revealed) {
@@ -829,10 +460,6 @@
 
   function bind() {
     document.querySelectorAll(".offline-nav-item").forEach(item => item.addEventListener("click", () => switchPanel(item.dataset.panel)));
-    $("addMistake").addEventListener("click", () => openRecord("mistakes"));
-    $("recordForm").addEventListener("submit", event => saveRecord(event).catch(error => toast(error?.message || "本地保存失败")));
-    $("cancelRecord").addEventListener("click", () => $("recordDialog").close());
-    $("cancelRecordSecondary")?.addEventListener("click", () => $("recordDialog").close());
     $("questionCategory").addEventListener("change", event => { state.questionCategory=event.target.value; renderQuestions(); });
     $("questionDifficulty").addEventListener("change", event => { state.questionDifficulty=event.target.value; renderQuestions(); });
     $("conceptSearch").addEventListener("input", renderConcepts);
@@ -850,13 +477,12 @@
     try {
       setNetworkStatus();
       state.db = await openDb();
-      await restoreNotebookDraft();
       await applyOriginalAppearance();
       configureRenderer();
       await migrateCurrentAccountData();
       await loadResources();
       bind();
-      await switchPanel("mistakes");
+      await switchPanel("drawing");
       document.documentElement.dataset.offlineReady = "true";
     } catch (error) {
       toast(error?.message || "离线工作区初始化失败");

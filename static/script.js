@@ -22922,14 +22922,10 @@ document.addEventListener(
 );
 
 
-// 离线工作区只读取当前页面已经通过账号验证、或当前游客会话中的学习数据。
+// 离线工作区只导出当前页面已验证账号、或当前游客会话的绘图库。
 // 不从 localStorage 的旧账号标记推断身份，也不上传这份快照。
 window.DMateOfflineBridge = Object.freeze({
     async snapshot() {
-        const wrongQuestions = Array.isArray(learningState?.wrongQuestions)
-            ? JSON.parse(JSON.stringify(learningState.wrongQuestions)) : [];
-        const notes = Array.isArray(learningState?.conceptNotebook?.notes)
-            ? JSON.parse(JSON.stringify(learningState.conceptNotebook.notes)) : [];
         let drawings = [];
         try {
             drawings = typeof collectLearningReviewDrawings === "function"
@@ -22948,7 +22944,7 @@ window.DMateOfflineBridge = Object.freeze({
                 const request = indexedDB.open("dmate-offline-workspace", 2);
                 request.onupgradeneeded = () => {
                     const db = request.result;
-                    for (const store of ["mistakes", "notes", "practice", "settings"]) {
+                    for (const store of ["practice", "settings"]) {
                         if (!db.objectStoreNames.contains(store)) db.createObjectStore(store, {keyPath:"id"});
                     }
                 };
@@ -22969,12 +22965,17 @@ window.DMateOfflineBridge = Object.freeze({
             console.warn("DMate 原有外观未能复制到离线工作区：", error);
         }
 
+        const copiedDrawings = Array.isArray(drawings) ? JSON.parse(JSON.stringify(drawings)) : [];
+        const legacyPage = copiedDrawings.length === 1 ? copiedDrawings[0] : null;
+        const legacyDocument = legacyPage?.document;
+        if (legacyPage && !legacyPage.id
+            && Array.isArray(legacyDocument?.graphs) && legacyDocument.graphs.length > 0
+            && legacyDocument.graphs.every(graph => graph && Array.isArray(graph.vertices) && Array.isArray(graph.edges))) {
+            legacyPage.id = "legacy-local";
+        }
         return {
-            authenticated: Boolean(accountState.authenticated && accountState.username),
             username: accountState.authenticated ? accountState.username : "",
-            wrongQuestions,
-            notes,
-            drawings: Array.isArray(drawings) ? JSON.parse(JSON.stringify(drawings)) : []
+            drawings: copiedDrawings
         };
     }
 });
