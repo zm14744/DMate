@@ -17604,7 +17604,7 @@ function normalizeKnowledgeGraphData(data) {
                                             : ""
                                     }))
                                     .filter(lesson => lesson.title && (
-                                        /^https:\/\/www\.bilibili\.com\/video\/BV[a-zA-Z0-9]+\/\?p=\d+$/.test(lesson.url)
+                                        /^https:\/\/www\.bilibili\.com\/video\/BV[a-zA-Z0-9]+\/(?:\?p=[1-9]\d*)?$/.test(lesson.url)
                                         || /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11}$/.test(lesson.url)
                                     ))
                                 : [],
