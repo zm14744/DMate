@@ -1,5 +1,5 @@
 {
-  "version": 32,
+  "version": 33,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1492,20 +1492,20 @@
       ],
       "videos": [
         {
-          "source_id": "scut_discrete_math",
-          "title": "平面图",
+          "source_id": "hit_set_graph_2017",
+          "title": "平面图及欧拉公式",
           "sections": [
-            "6.6.1 平面图",
-            "6.6.2 对偶图与图的着色"
+            "43平面图及欧拉公式",
+            "44非平面哈密顿图 库氏定理 顶点着色1"
           ],
           "lessons": [
             {
-              "title": "6.6.1 平面图",
-              "url": "https://www.bilibili.com/video/BV1YQ4y1Z7uE/?p=44"
+              "title": "43平面图及欧拉公式",
+              "url": "https://www.bilibili.com/video/BV1Eb41137gB/?p=43"
             },
             {
-              "title": "6.6.2 对偶图与图的着色",
-              "url": "https://www.bilibili.com/video/BV1YQ4y1Z7uE/?p=45"
+              "title": "44非平面哈密顿图 库氏定理 顶点着色1",
+              "url": "https://www.bilibili.com/video/BV1Eb41137gB/?p=44"
             }
           ]
         }
@@ -1750,26 +1750,7 @@
         "生成树"
       ],
       "level": "拓展",
-      "videos": [
-        {
-          "source_id": "ardila_enumerative_combinatorics",
-          "title": "矩阵树定理",
-          "sections": [
-            "Lecture 15 . Enumerative Combinatorics (Federico Ardila) — Trees",
-            "Lecture 16 . Enumerative Combinatorics (Federico Ardila) — Matrix-Tree Theorem"
-          ],
-          "lessons": [
-            {
-              "title": "Lecture 15 . Enumerative Combinatorics (Federico Ardila) — Trees",
-              "url": "https://www.bilibili.com/video/BV1Lt411K7bB/?p=15"
-            },
-            {
-              "title": "Lecture 16 . Enumerative Combinatorics (Federico Ardila) — Matrix-Tree Theorem",
-              "url": "https://www.bilibili.com/video/BV1Lt411K7bB/?p=16"
-            }
-          ]
-        }
-      ]
+      "videos": []
     },
     {
       "id": "algebra_system",
@@ -2001,37 +1982,36 @@
       "note": "哈尔滨工业大学图论课程，B站共72个分P，原课程入口为中国大学MOOC HIT-1003781003。用于图的基本概念、子图、顶点度、正则图、图同构，以及邻接矩阵、邻接表和关联矩阵。仅提供原视频外链，不下载或托管。"
     },
     {
-      "id": "scut_discrete_math",
-      "name": "华南理工大学 · 陈琼、马千里、陈伟能",
-      "course": "离散数学（中国大学MOOC）",
+      "id": "hit_set_graph_2017",
+      "name": "哈尔滨工业大学 · 集合论与图论（2017）",
+      "course": "哈工大-离散数学之集合论与图论2017（全48集）",
       "platform": "Bilibili",
-      "publisher": "荟呀荟学习",
-      "note": "华南理工大学离散数学公开课。学校中国大学MOOC课程页列出的授课教师为陈琼、马千里、陈伟能；B站合集为第三方上传，页面标注个人学习研究用途，授权状态未核实。此处仅用于平面图、对偶图和着色专题，提供原视频外链，不下载或托管。"
-    },
-    {
-      "id": "ardila_enumerative_combinatorics",
-      "name": "San Francisco State University / Universidad de los Andes · Federico Ardila",
-      "course": "Enumerative Combinatorics（2013）",
-      "platform": "Bilibili",
-      "publisher": "pippozzz",
-      "note": "Federico Ardila在San Francisco State University与Universidad de los Andes联合开设的组合学课程。Lecture 15讲树与生成树，Lecture 16讲生成树计数、图的关联矩阵、拉普拉斯矩阵及Kirchhoff矩阵树定理的证明。英文原声；未核实中文字幕。B站第三方上传，仅提供原视频外链，不下载或托管。"
+      "publisher": "数学 计算机 游戏",
+      "note": "B站合集BV1Eb41137gB，共48个分P。平面图节点采用P43《43平面图及欧拉公式》与P44《44非平面哈密顿图 库氏定理 顶点着色1》，在已选哈工大图论基础之后展开平面图及非平面图判定。上传授权未核实，产品仅提供原B站链接。"
     }
   ],
   "video_resource_policy": {
-    "primary_per_node": "one selected Bilibili course per node; related consecutive lesson links may belong to that one course",
+    "primary_per_node": "one selected Bilibili course per node; multiple adjacent lessons from that source may be listed",
     "platform_policy": "Bilibili_only",
-    "course_continuity": "Keep adjacent topics within one course series wherever the syllabus supports it; use specialist videos only for genuinely specialist topics.",
-    "note": "Bilibili-only. The rejected Chongqing University Liu Ran, pFLYan, and Zhejiang University of Technology sources are removed from active mappings and source records. Graph foundations, isomorphism, and matrix representations use the Harbin Institute of Technology graph theory course; planar graphs use the South China University of Technology discrete mathematics course; core graph theory algorithms continue to use Nanjing University Professor Cheng Gong's GTA course. The Matrix-Tree theorem uses Federico Ardila's Enumerative Combinatorics Lecture 16 on Bilibili, preceded by Lecture 15 on trees. The Ardila lecture is English original and no Chinese subtitles have been verified. Do not fabricate video links.",
+    "course_continuity": "Keep adjacent topics within one course where possible; avoid redundant or abrupt switches.",
+    "note": "Bilibili only. The rejected South China University of Technology video and Federico Ardila lectures have been removed. The Harbin Institute of Technology graph-theory foundation remains; planar graph uses the HIT 2017 set-theory and graph-theory lectures P43–P44. The Matrix-Tree theorem requires a new confirmed Bilibili-specific lecture, excluding Federico Ardila, Steve Butler, and previously rejected UCLA/Socratica sources. Do not fill with an unrelated spanning-tree, matrix or Kirchhoff circuit law video. Keep the node pending rather than fabricate an unverified lesson.",
     "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs.",
     "audit_status": {
       "nodes_total": 68,
-      "nodes_with_active_course": 68,
-      "nodes_pending": "none",
-      "direct_episode_links": 130,
+      "nodes_with_active_course": 67,
+      "nodes_pending": "tree_matrix_tree",
+      "direct_episode_links": 128,
       "nested_or_missing_episode_urls": 0,
       "youtube_links": 0,
-      "last_audit_scope": "removed Zhejiang University of Technology; replaced graph foundations, isomorphism, matrices, planar graphs; added a verified Bilibili Matrix-Tree theorem lecture and its tree prerequisite"
-    }
+      "last_audit_scope": "removed rejected SCUT and Federico Ardila; replaced planar with HIT 2017 P43/P44; left Matrix-Tree node pending instead of assigning previously rejected or unrelated lectures"
+    },
+    "excluded_source_ids": [
+      "scut_discrete_math",
+      "ardila_enumerative_combinatorics",
+      "zjut_discrete_xiaohua",
+      "pflyan_graph",
+      "cqu_discrete_liu"
+    ]
   },
   "video_resource_candidates": [
     {
