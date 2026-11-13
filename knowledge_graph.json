@@ -2825,7 +2825,7 @@
         "graph_planar": "Planar graphs and Euler's formula without dragging in the mixed nonplanar/Hamiltonian/coloring P44 and duplicate CMU lecture.",
         "graph_bipartite": "南大二部图理论P14的独立BV尚未确认；暂不显示链接。",
         "graph_topological": "Animation specifically illustrates topological sorting rather than a broader partial-order lecture.",
-        "graph_matching": "仅保留南大5.1.2.3花算法的独立BV1YfE8n；匹配理论、匈牙利算法和完美匹配的独立BV尚未确认。",
+        "graph_matching": "仅保留南大5.1.2.3花算法的独立BV1YfE8n（实际完整BV为BV14vZ1YfE8n）；匹配理论、匈牙利算法和完美匹配的独立BV尚未确认。",
         "tree_basic": "Dedicated introductory tree lectures, not CMU's mixed tree-and-spanning-tree lecture.",
         "tree_spanning": "Direct spanning-tree lecture; CMU P22 teaches Cayley counting, which is a different objective.",
         "count_pigeonhole": "P6 teaches the core pigeonhole principle; P7 is advanced Diophantine approximation.",
