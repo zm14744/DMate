@@ -462,6 +462,8 @@ body[data-appearance-theme] :is(
     #knowledgeGraphBtn,
     #graphDrawingBtn,
     #learningReviewBtn,
+    .offline-nav-item,
+    .offline-return,
     #accountBtn:not(.is-authenticated):not(.is-syncing),
     #voiceInputBtn:not([data-voice-state="recording"]):not([data-voice-state="finishing"])
 ) > svg {
@@ -485,6 +487,8 @@ body[data-appearance-theme] :is(
     #knowledgeGraphBtn,
     #graphDrawingBtn,
     #learningReviewBtn,
+    .offline-nav-item,
+    .offline-return,
     #accountBtn:not(.is-authenticated):not(.is-syncing),
     #voiceInputBtn:not([data-voice-state="recording"]):not([data-voice-state="finishing"])
 ):is(:focus-visible,:active,[aria-expanded="true"]) > svg {
@@ -509,6 +513,8 @@ body[data-appearance-theme] :is(
         #knowledgeGraphBtn,
         #graphDrawingBtn,
         #learningReviewBtn,
+        .offline-nav-item,
+        .offline-return,
         #accountBtn:not(.is-authenticated):not(.is-syncing),
         #voiceInputBtn:not([data-voice-state="recording"]):not([data-voice-state="finishing"])
     ):hover > svg {
