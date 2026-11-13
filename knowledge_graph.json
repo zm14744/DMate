@@ -1,5 +1,5 @@
 {
-  "version": 49,
+  "version": 50,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1344,7 +1344,7 @@
           "lessons": [
             {
               "title": "2.1.1-连通和DFS-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=6"
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/"
             },
             {
               "title": "2.1.2-连通和DFS-算法",
@@ -1403,7 +1403,7 @@
           "lessons": [
             {
               "title": "6.1.1-赋权图和距离-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=27"
+              "url": "https://www.bilibili.com/video/BV1MU5yzbETy/"
             }
           ]
         }
@@ -1490,7 +1490,7 @@
             },
             {
               "title": "6.1.1-赋权图和距离-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=27"
+              "url": "https://www.bilibili.com/video/BV1MU5yzbETy/"
             },
             {
               "title": "6.1.2-赋权图和距离-算法",
@@ -2389,10 +2389,27 @@
       "cmu_2021_parts_verified": 35,
       "cmu_2021_total_duration": "31:26:24",
       "cmu_2021_mapped_nodes": 18,
-      "last_audit_scope": "One selected course per node after final search. Count-generating-functions now uses BU Discrete Math II P110-P116 for a complete series naturally following BU recurrence relations; CMU P14-P17 retained in source pool but not active because BU has tighter course continuity.",
+      "last_audit_scope": "Nanjing GTA: replaced the exact 2.1.1 connectivity-theory and 6.1.1 weighted-graph-theory lesson URLs with their independently verified single-video BVs. Other Nanjing lesson mappings remain unchanged pending individual BV confirmation. BU mappings remain unchanged pending verification of the separate Discrete Math II Bilibili video entry.",
       "unique_episode_urls": 141,
       "cross_node_reused_urls": 3,
-      "sources_with_selected_nodes": 13
+      "sources_with_selected_nodes": 13,
+      "nanjing_verified_direct_episode_links": 2,
+      "nanjing_pending_episode_titles": [
+        "2.1.2-连通和DFS-算法",
+        "2.2.1-割点和割边-理论",
+        "2.2.2-割点和割边-算法",
+        "2.3.1-距离和BFS-理论",
+        "2.3.2-距离和BFS-算法",
+        "3.2.1-二分图-理论",
+        "3.3.1-欧拉图-理论",
+        "3.3.2-欧拉图-算法",
+        "3.4-哈密尔顿图",
+        "5.1.1-匹配和最大匹配-理论",
+        "5.1.2.1-匹配和最大匹配-匈牙利算法",
+        "5.2-完美匹配",
+        "7.3.1-有向图的连通-理论",
+        "7.4-有向图的距离"
+      ]
     },
     "excluded_source_ids": [
       "scut_discrete_math",
@@ -2900,59 +2917,32 @@
       ],
       "scope_limitation": "Evaluated public syllabi, indexed video part names and available lecture descriptions/transcripts. These edits do not certify the teaching quality of every minute of every video; the live Bilibili playback status was not exhaustively checked.",
       "last_final_review": {
-        "date": "2026-11-13",
-        "scope": "rechecked current selected videos against mainland Bilibili part lists and original course syllabi",
+        "date": "2026-11-14",
+        "scope": "verified direct Bilibili episode links for the existing Nanjing course selections without changing course or node selections",
         "changes": [
           {
-            "node": "graph_planar",
-            "previous": "hit_set_graph_2017",
-            "selected": "dogeman_discrete",
-            "parts": [
-              39,
-              40,
-              41
-            ],
-            "reason": "three consecutive, directly titled lessons cover planar graph concepts, Euler formula and planarity tests, dual and outerplanar graphs; they lead naturally into the same course's graph-coloring P42-P44"
+            "node": "graph_connectivity",
+            "lesson": "2.1.1-连通和DFS-理论",
+            "previous": "BV1gnWVegEpQ/?p=6",
+            "selected": "BV1gnWVegEpQ",
+            "reason": "Independent episode page identifies itself as 2.1.1 theory, episode 6/42."
           },
           {
-            "node": "recurrence_homogeneous",
-            "previous": "CMU P12-P13",
-            "selected": "BU Discrete Math II P106-P108",
-            "parts": [
-              106,
-              107,
-              108
-            ],
-            "reason": "three precise lessons separately cover first-order, second-order and general linear homogeneous recurrences"
+            "node": "graph_weighted",
+            "lesson": "6.1.1-赋权图和距离-理论",
+            "previous": "BV1gnWVegEpQ/?p=27",
+            "selected": "BV1MU5yzbETy",
+            "reason": "Independent episode page identifies itself as 6.1.1 weighted graph and distance theory, episode 27/42."
           },
           {
-            "node": "recurrence_nonhomogeneous",
-            "previous": "MIT Lecture 15",
-            "selected": "BU Discrete Math II P109",
-            "parts": [
-              109
-            ],
-            "reason": "the lesson title directly names non-homogeneous linear recurrence relations"
-          },
-          {
-            "node": "count_generating",
-            "previous": "CMU P14-P17",
-            "selected": "BU Discrete Math II P110-P116",
-            "parts": [
-              110,
-              111,
-              112,
-              113,
-              114,
-              115,
-              116
-            ],
-            "reason": "the BU sequence forms a complete progression from generating-function modeling and power series through counting applications, explicit forms and solving recurrences; it follows the same teacher's BU recurrence-solution sequence, making the cross-topic transition more coherent than switching back to CMU for the GF block"
+            "node": "graph_shortest",
+            "lesson": "6.1.1-赋权图和距离-理论",
+            "previous": "BV1gnWVegEpQ/?p=27",
+            "selected": "BV1MU5yzbETy",
+            "reason": "Same verified episode is reused as the theory component of the shortest-path node."
           }
         ],
-        "new_candidate_discovery": "BU Discrete Math II also contains exact lessons on pigeonhole principle, permutations/combinations, binomial theorem, inclusion-exclusion, generating functions and graph theory; these were not bulk-added because current CMU/BUI selections already have strong direct matches and duplicate course links were intentionally minimized.",
-        "limitations": "BU Discrete Math II part indices are calculated from the displayed 80-part Discrete Math I sequence followed by 54 Discrete Math II parts; target P106-P109 have not been independently played back. All other active mappings are based on indexed part titles or user-supplied CMU screenshots, not complete minute-by-minute viewing.",
-        "note": "The BU Discrete Math II P81-P134 block is the continuation of the same Bilibili upload after Discrete Math I P1-P80. P106-P109 map to the explicit homogeneous/non-homogeneous recurrence lessons; P110-P116 map to the complete generating-functions sequence. These part numbers follow the combined 80+54-part list; live playback of each target P was not independently verified."
+        "limitations": "Only these two exact lesson mappings are updated. The other Nanjing titles still need their own BV IDs; the 5.1.2.3, 6.3.1 and 6.4.1 direct videos found during research are not substituted for the selected ordinary matching/Euler/Hamilton lessons. BU Discrete Math II's separate Bilibili entry remains unresolved; no YouTube substitution or lesson deletion was made."
       }
     }
   },
