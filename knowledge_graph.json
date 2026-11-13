@@ -1,5 +1,5 @@
 {
-  "version": 34,
+  "version": 35,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -350,9 +350,11 @@
           "lessons": [
             {
               "title": "第2讲：数学归纳法，正向与反向归纳",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=2"
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=2",
+              "validation_status": "unverified_bilibili_part_number_and_title"
             }
-          ]
+          ],
+          "validation_status": "unverified_bilibili_part_number_and_title"
         }
       ]
     },
@@ -373,9 +375,11 @@
           "lessons": [
             {
               "title": "第3讲：归纳法进阶证明技巧",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=3"
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=3",
+              "validation_status": "unverified_bilibili_part_number_and_title"
             }
-          ]
+          ],
+          "validation_status": "unverified_bilibili_part_number_and_title"
         }
       ]
     },
@@ -911,9 +915,11 @@
           "lessons": [
             {
               "title": "第1讲：课程导引、基础计数原理",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=1"
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=1",
+              "validation_status": "unverified_bilibili_part_number_and_title"
             }
-          ]
+          ],
+          "validation_status": "unverified_bilibili_part_number_and_title"
         }
       ]
     },
@@ -980,9 +986,11 @@
           "lessons": [
             {
               "title": "第6讲：鸽巢原理",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=6"
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=6",
+              "validation_status": "unverified_bilibili_part_number_and_title"
             }
-          ]
+          ],
+          "validation_status": "unverified_bilibili_part_number_and_title"
         }
       ]
     },
@@ -1005,13 +1013,16 @@
           "lessons": [
             {
               "title": "第4讲：容斥原理基础",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=4"
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=4",
+              "validation_status": "unverified_bilibili_part_number_and_title"
             },
             {
               "title": "第5讲：容斥原理典型应用",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=5"
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=5",
+              "validation_status": "unverified_bilibili_part_number_and_title"
             }
-          ]
+          ],
+          "validation_status": "unverified_bilibili_part_number_and_title"
         }
       ]
     },
@@ -1971,7 +1982,7 @@
       "course": "21-228 Discrete Mathematics（Spring 2021）",
       "platform": "Bilibili",
       "publisher": "无为斋主",
-      "note": "卡内基梅隆大学Po-Shen Loh教授2021春季21-228离散数学。2021课程公开录播索引标注约35讲、约32小时；用户B站截图总时长31:26:24，不能把当前已映射的前6讲误认为课程总共只有6讲。现关联基本计数、数学归纳法、强归纳法、鸽巢原理、容斥原理共5节点；官方课表还包括二项式系数、递推、生成函数、图论、树、匹配、平面图等。当前B站具体分P标题及讲次还需逐个独立核实，未经核实不按官方课表推算P编号；只外链。"
+      "note": "CMU 21-228, Po-Shen Loh, Spring 2021. CMU官方14周大纲已核实：https://www.math.cmu.edu/~ploh/2021-228.shtml。第三方视频索引标示约35讲/32小时，用户B站卡片显示总时长31:26:24。用户截图只显示封面和时长，不显示分P列表，故此前映射的P1-P6和具体标题没有获得B站分P核验，均已标记provisional；不能把这些标题视为真实B站原始标题或将35讲直接顺序配成p=1..35。原始公开视频播放列表在CMU课程汇总网站标注为倒序，但B站上传版本排序无法独立确认。其余主题按官方大纲列入audit候选，非已配置视频。产品仅保留B站外链，不使用YouTube作为教学来源。"
     },
     {
       "id": "sawfin_bilibili",
@@ -2026,7 +2037,7 @@
     "primary_per_node": "one selected Bilibili course per node; multiple adjacent lessons from that source may be listed",
     "platform_policy": "Bilibili_only",
     "course_continuity": "Keep adjacent topics within one course where possible; avoid redundant or abrupt switches.",
-    "note": "Bilibili only. CMU 2021 21-228 is approximately 35 lectures and 31–32 hours, not six lectures; its existing mapped part titles need an independent Bilibili part-list audit before expansion. Steve Butler's Fall 2023 Spectral Graph Theory is permitted and selected for Matrix-Tree theorem, using Bilibili source P14/P15/P16 aligned to the original syllabus. The Bilibili Steve Butler upload has Chinese AI dubbing; live playback and translation quality are not independently verified. Other rejected sources remain excluded. Do not invent video URLs.",
+    "note": "Bilibili-only. CMU Po-Shen Loh 2021 full syllabus officially checked and covered topics mapped to existing graph nodes as a review crosswalk. ~35 lectures, ~32h; screenshot 31:26:24. Exact Bilibili bvid and part indices not independently confirmed; existing first-six video titles and p links are provisional, explicitly flagged. DO NOT add new CMU p links by interpolating from the official course weeks or from the reverse-ordered original playlist. Steve Butler P14-16 remains assigned for Matrix Tree. Previously rejected unrelated providers stay excluded.",
     "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs.",
     "audit_status": {
       "nodes_total": 68,
@@ -2035,7 +2046,9 @@
       "direct_episode_links": 131,
       "nested_or_missing_episode_urls": 0,
       "youtube_links": 0,
-      "last_audit_scope": "CMU total-course length corrected with 2021 syllabus and an external 35-lecture index; Steve Butler original 2023 syllabus confirms Laplacian P14/P15 and Matrix Tree P16; Bilibili live playback and CMU part titles still unverified"
+      "last_audit_scope": "2021 CMU official weekly syllabus mapped to current DMate node IDs; 35 lectures and total length crosschecked against a public recording index and user screenshot; exact Bilibili video BV and part list inaccessible, so previous six links flagged provisional rather than asserting false verification",
+      "cmu_provisional_part_links": 6,
+      "cmu_additional_verified_part_links": 0
     },
     "excluded_source_ids": [
       "scut_discrete_math",
@@ -2046,7 +2059,130 @@
     ],
     "approved_source_ids": [
       "steve_butler_spectral_2023_bilibili"
-    ]
+    ],
+    "cmu_2021_course_audit": {
+      "institution": "Carnegie Mellon University",
+      "course": "21-228 Discrete Mathematics",
+      "instructor": "Po-Shen Loh",
+      "term": "Spring 2021",
+      "official_syllabus_url": "https://www.math.cmu.edu/~ploh/2021-228.shtml",
+      "indexed_lecture_count_approx": 35,
+      "indexed_total_duration_hours_approx": 32,
+      "user_screenshot_duration": "31:26:24",
+      "upload_publisher": "无为斋主",
+      "upload_video_url": "https://www.bilibili.com/video/BV1jA4L66ELr/",
+      "bvid_independently_verified": false,
+      "bili_part_index_independently_verified": false,
+      "previous_assumed_first_six_part_links": 6,
+      "original_public_playlist_reverse_chronological": true,
+      "bilibili_upload_sort_order": "unknown",
+      "matching_basis": "official_2021_weekly_syllabus_only_not_video_part_list",
+      "weekly_alignment": [
+        {
+          "weeks": "1",
+          "syllabus_topic": "Basic counting; induction",
+          "matched_node_ids": [
+            "count_basic",
+            "proof_induction"
+          ],
+          "review_node_ids": [
+            "proof_strong_induction"
+          ]
+        },
+        {
+          "weeks": "2-3",
+          "syllabus_topic": "Inclusion-exclusion; pigeonhole principle",
+          "matched_node_ids": [
+            "count_inclusion",
+            "count_pigeonhole"
+          ],
+          "review_node_ids": []
+        },
+        {
+          "weeks": "4",
+          "syllabus_topic": "Binomial coefficients",
+          "matched_node_ids": [
+            "count_binomial"
+          ],
+          "review_node_ids": [
+            "count_perm_comb"
+          ]
+        },
+        {
+          "weeks": "5",
+          "syllabus_topic": "Linear algebra and recurrences",
+          "matched_node_ids": [
+            "recurrence_model"
+          ],
+          "review_node_ids": [
+            "recurrence_homogeneous",
+            "recurrence_nonhomogeneous",
+            "recurrence_initial"
+          ]
+        },
+        {
+          "weeks": "6-7",
+          "syllabus_topic": "Generating functions; more generating functions",
+          "matched_node_ids": [
+            "count_generating"
+          ],
+          "review_node_ids": []
+        },
+        {
+          "weeks": "8",
+          "syllabus_topic": "Introduction to graphs",
+          "matched_node_ids": [
+            "graph_basic"
+          ],
+          "review_node_ids": [
+            "graph_connectivity"
+          ]
+        },
+        {
+          "weeks": "9",
+          "syllabus_topic": "Trees",
+          "matched_node_ids": [
+            "tree_basic"
+          ],
+          "review_node_ids": [
+            "tree_spanning"
+          ]
+        },
+        {
+          "weeks": "10",
+          "syllabus_topic": "Traveling salesman problem",
+          "matched_node_ids": [],
+          "review_node_ids": [
+            "graph_hamilton"
+          ]
+        },
+        {
+          "weeks": "11",
+          "syllabus_topic": "Matchings",
+          "matched_node_ids": [
+            "graph_matching"
+          ],
+          "review_node_ids": [
+            "graph_bipartite"
+          ]
+        },
+        {
+          "weeks": "12-13",
+          "syllabus_topic": "Combinatorial geometry; Ramsey theory",
+          "matched_node_ids": [],
+          "review_node_ids": []
+        },
+        {
+          "weeks": "14",
+          "syllabus_topic": "Planar graphs",
+          "matched_node_ids": [
+            "graph_planar"
+          ],
+          "review_node_ids": []
+        }
+      ],
+      "reason_not_auto_replacing": "Source video metadata and full Bilibili part list cannot be independently read; blindly assigning ?p=7-35 risks wrong video-to-node links."
+    }
   },
   "video_resource_candidates": [
     {
