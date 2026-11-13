@@ -1,5 +1,5 @@
 {
-  "version": 41,
+  "version": 42,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -2287,7 +2287,7 @@
       "platform": "Bilibili",
       "publisher": "",
       "note": "东北大学离散数学课程，仅收录女教师讲授的P1–P19；P20《集合的基本概念》及之后均排除。B站页面标注原始课程来源为辽宁省本科教学网；B站上传者及授权状态未核实，仅提供原视频外链，不下载或托管。",
-      "display_name": "胡明涵"
+      "display_name": "胡明涵 东北大学"
     },
     {
       "id": "dogeman_discrete",
@@ -2943,10 +2943,9 @@
     "display_name_policy": {
       "format": "instructor SPACE institution",
       "exception": "MIT remains MIT without instructor",
-      "note": "Video labels use the teacher name followed by a space and the institution label where requested. Exceptions: MIT remains MIT; the selected Northeast University female lecturer is displayed as 胡明涵 only; Iowa State University is abbreviated ISU in Steve Butler ISU. Original video source and uploader metadata are retained.",
+      "note": "课程显示教师姓名和院校名称，以一个空格分隔。东北大学课程显示胡明涵 东北大学；爱荷华州立大学使用英文简称ISU，显示Steve Butler ISU；MIT保持MIT。保留原上传者及来源信息。",
       "exceptions": [
         "MIT",
-        "胡明涵",
         "Steve Butler ISU"
       ]
     }
