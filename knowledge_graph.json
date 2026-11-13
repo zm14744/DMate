@@ -1,5 +1,5 @@
 {
-  "version": 38,
+  "version": 39,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -2597,7 +2597,7 @@
       "platform": "Bilibili",
       "publisher": "常青藤中英字幕课程",
       "note": "Kimberly Brehm 的大学离散数学课程；B站页面标注中英字幕，上传者说明为唯一翻译发布账号。用于排列组合、二项式定理和递推建模。仅外链跳转，不下载或托管。",
-      "display_name": "常青藤中英字幕课程"
+      "display_name": "BU"
     },
     {
       "id": "chenggong_gta",
