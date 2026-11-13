@@ -1,5 +1,5 @@
 {
-  "version": 35,
+  "version": 36,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -343,7 +343,7 @@
       "videos": [
         {
           "source_id": "cmu_21_228_2021_bilibili",
-          "title": "第2讲：数学归纳法，正向与反向归纳",
+          "title": "数学归纳法",
           "sections": [
             "第2讲：数学归纳法，正向与反向归纳"
           ],
@@ -351,10 +351,11 @@
             {
               "title": "第2讲：数学归纳法，正向与反向归纳",
               "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=2",
-              "validation_status": "unverified_bilibili_part_number_and_title"
+              "part": 2,
+              "duration": "1:03:02",
+              "title_truncated_in_screenshot": true
             }
-          ],
-          "validation_status": "unverified_bilibili_part_number_and_title"
+          ]
         }
       ]
     },
@@ -368,7 +369,7 @@
       "videos": [
         {
           "source_id": "cmu_21_228_2021_bilibili",
-          "title": "第3讲：归纳法进阶证明技巧",
+          "title": "归纳法进阶证明技巧",
           "sections": [
             "第3讲：归纳法进阶证明技巧"
           ],
@@ -376,10 +377,11 @@
             {
               "title": "第3讲：归纳法进阶证明技巧",
               "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=3",
-              "validation_status": "unverified_bilibili_part_number_and_title"
+              "part": 3,
+              "duration": "57:42",
+              "title_truncated_in_screenshot": false
             }
-          ],
-          "validation_status": "unverified_bilibili_part_number_and_title"
+          ]
         }
       ]
     },
@@ -916,10 +918,11 @@
             {
               "title": "第1讲：课程导引、基础计数原理",
               "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=1",
-              "validation_status": "unverified_bilibili_part_number_and_title"
+              "part": 1,
+              "duration": "57:47",
+              "title_truncated_in_screenshot": false
             }
-          ],
-          "validation_status": "unverified_bilibili_part_number_and_title"
+          ]
         }
       ]
     },
@@ -955,6 +958,30 @@
       ],
       "videos": [
         {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "二项式系数基础与进阶",
+          "sections": [
+            "第8讲：二项式系数基础与恒等式",
+            "第9讲：二项式系数进阶、Lucas 定理"
+          ],
+          "lessons": [
+            {
+              "title": "第8讲：二项式系数基础与恒等式",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=8",
+              "part": 8,
+              "duration": "54:27",
+              "title_truncated_in_screenshot": false
+            },
+            {
+              "title": "第9讲：二项式系数进阶、Lucas 定理",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=9",
+              "part": 9,
+              "duration": "51:14",
+              "title_truncated_in_screenshot": false
+            }
+          ]
+        },
+        {
           "source_id": "sawfin_bilibili",
           "title": "p62 Discrete Math - 6.4.1 The Binomial Theorem",
           "sections": [
@@ -979,18 +1006,27 @@
       "videos": [
         {
           "source_id": "cmu_21_228_2021_bilibili",
-          "title": "第6讲：鸽巢原理",
+          "title": "鸽巢原理",
           "sections": [
-            "第6讲：鸽巢原理"
+            "第6讲：鸽巢原理",
+            "第7讲：鸽巢原理进阶、狄利克雷逼近…"
           ],
           "lessons": [
             {
               "title": "第6讲：鸽巢原理",
               "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=6",
-              "validation_status": "unverified_bilibili_part_number_and_title"
+              "part": 6,
+              "duration": "51:37",
+              "title_truncated_in_screenshot": false
+            },
+            {
+              "title": "第7讲：鸽巢原理进阶、狄利克雷逼近…",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=7",
+              "part": 7,
+              "duration": "52:42",
+              "title_truncated_in_screenshot": true
             }
-          ],
-          "validation_status": "unverified_bilibili_part_number_and_title"
+          ]
         }
       ]
     },
@@ -1005,7 +1041,7 @@
       "videos": [
         {
           "source_id": "cmu_21_228_2021_bilibili",
-          "title": "第4讲：容斥原理基础",
+          "title": "容斥原理",
           "sections": [
             "第4讲：容斥原理基础",
             "第5讲：容斥原理典型应用"
@@ -1014,15 +1050,18 @@
             {
               "title": "第4讲：容斥原理基础",
               "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=4",
-              "validation_status": "unverified_bilibili_part_number_and_title"
+              "part": 4,
+              "duration": "53:56",
+              "title_truncated_in_screenshot": false
             },
             {
               "title": "第5讲：容斥原理典型应用",
               "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=5",
-              "validation_status": "unverified_bilibili_part_number_and_title"
+              "part": 5,
+              "duration": "56:22",
+              "title_truncated_in_screenshot": false
             }
-          ],
-          "validation_status": "unverified_bilibili_part_number_and_title"
+          ]
         }
       ]
     },
@@ -1035,6 +1074,46 @@
         "排列与组合"
       ],
       "videos": [
+        {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "生成函数",
+          "sections": [
+            "第14讲：生成函数基础定义与运算",
+            "第15讲：生成函数经典计数案例",
+            "第16讲：生成函数进阶、组合级数",
+            "第17讲：更多生成函数技巧与变换"
+          ],
+          "lessons": [
+            {
+              "title": "第14讲：生成函数基础定义与运算",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=14",
+              "part": 14,
+              "duration": "48:34",
+              "title_truncated_in_screenshot": false
+            },
+            {
+              "title": "第15讲：生成函数经典计数案例",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=15",
+              "part": 15,
+              "duration": "50:51",
+              "title_truncated_in_screenshot": false
+            },
+            {
+              "title": "第16讲：生成函数进阶、组合级数",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=16",
+              "part": 16,
+              "duration": "55:12",
+              "title_truncated_in_screenshot": false
+            },
+            {
+              "title": "第17讲：更多生成函数技巧与变换",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=17",
+              "part": 17,
+              "duration": "53:29",
+              "title_truncated_in_screenshot": false
+            }
+          ]
+        },
         {
           "source_id": "nymu_combinatorics_fuhenglin",
           "title": "生成函数",
@@ -1062,6 +1141,22 @@
       "prerequisites": [],
       "videos": [
         {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "递推关系：线性代数方法",
+          "sections": [
+            "第11讲：线性代数在递推关系中的应用"
+          ],
+          "lessons": [
+            {
+              "title": "第11讲：线性代数在递推关系中的应用",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=11",
+              "part": 11,
+              "duration": "55:17",
+              "title_truncated_in_screenshot": false
+            }
+          ]
+        },
+        {
           "source_id": "sawfin_bilibili",
           "title": "p67 Discrete Math - 8.1.1 Modeling with Recurrence Relations",
           "sections": [
@@ -1085,6 +1180,30 @@
       ],
       "videos": [
         {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "线性递推与特征方程",
+          "sections": [
+            "第12讲：线性递推求解方法",
+            "第13讲：递推序列的特征方程法"
+          ],
+          "lessons": [
+            {
+              "title": "第12讲：线性递推求解方法",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=12",
+              "part": 12,
+              "duration": "56:22",
+              "title_truncated_in_screenshot": false
+            },
+            {
+              "title": "第13讲：递推序列的特征方程法",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=13",
+              "part": 13,
+              "duration": "50:32",
+              "title_truncated_in_screenshot": false
+            }
+          ]
+        },
+        {
           "source_id": "mit_6042j_2010_bilibili",
           "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
@@ -1107,6 +1226,22 @@
         "线性齐次递推"
       ],
       "videos": [
+        {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "线性递推求解方法",
+          "sections": [
+            "第12讲：线性递推求解方法"
+          ],
+          "lessons": [
+            {
+              "title": "第12讲：线性递推求解方法",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=12",
+              "part": 12,
+              "duration": "56:22",
+              "title_truncated_in_screenshot": false
+            }
+          ]
+        },
         {
           "source_id": "mit_6042j_2010_bilibili",
           "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
@@ -1178,6 +1313,24 @@
               "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=8"
             }
           ]
+        },
+        {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "CMU 图论基础补充",
+          "sections": [
+            "第18讲：图论基础：图的定义、路…"
+          ],
+          "lessons": [
+            {
+              "title": "第18讲：图论基础：图的定义、路…",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=18",
+              "part": 18,
+              "duration": "52:20",
+              "title_truncated_in_screenshot": true
+            }
+          ],
+          "supplementary": true,
+          "mapping_note": "P18标题直接对应图的定义与路径；哈工大图论仍保留为主课程。"
         }
       ]
     },
@@ -1302,6 +1455,24 @@
               "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=41"
             }
           ]
+        },
+        {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "CMU 图连通性补充",
+          "sections": [
+            "第19讲：图连通性、欧拉迹与欧拉…"
+          ],
+          "lessons": [
+            {
+              "title": "第19讲：图连通性、欧拉迹与欧拉…",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=19",
+              "part": 19,
+              "duration": "53:36",
+              "title_truncated_in_screenshot": true
+            }
+          ],
+          "supplementary": true,
+          "mapping_note": "P19涵盖图连通性；南京大学程龚课程仍保留为主课程，提供更细的DFS与算法内容。"
         }
       ]
     },
@@ -1391,6 +1562,24 @@
               "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=17"
             }
           ]
+        },
+        {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "CMU 欧拉迹与欧拉回路补充",
+          "sections": [
+            "第19讲：图连通性、欧拉迹与欧拉…"
+          ],
+          "lessons": [
+            {
+              "title": "第19讲：图连通性、欧拉迹与欧拉…",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=19",
+              "part": 19,
+              "duration": "53:36",
+              "title_truncated_in_screenshot": true
+            }
+          ],
+          "supplementary": true,
+          "mapping_note": "P19包含欧拉迹/欧拉回路；南京大学程龚课程仍保留为主课程。"
         }
       ]
     },
@@ -1414,6 +1603,24 @@
               "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=18"
             }
           ]
+        },
+        {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "CMU 旅行商问题应用补充",
+          "sections": [
+            "第23讲：旅行商问题（TSP）简介"
+          ],
+          "lessons": [
+            {
+              "title": "第23讲：旅行商问题（TSP）简介",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=23",
+              "part": 23,
+              "duration": "52:33",
+              "title_truncated_in_screenshot": false
+            }
+          ],
+          "supplementary": true,
+          "mapping_note": "P23是旅行商问题，作为哈密顿回路的优化应用补充；南京大学程龚课程仍保留为哈密顿图主课程。"
         }
       ]
     },
@@ -1491,6 +1698,32 @@
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=44"
             }
           ]
+        },
+        {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "CMU 图着色补充",
+          "sections": [
+            "第32讲：平面图着色、四色定理",
+            "第33讲：图着色进阶、色多项式"
+          ],
+          "lessons": [
+            {
+              "title": "第32讲：平面图着色、四色定理",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=32",
+              "part": 32,
+              "duration": "51:40",
+              "title_truncated_in_screenshot": false
+            },
+            {
+              "title": "第33讲：图着色进阶、色多项式",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=33",
+              "part": 33,
+              "duration": "52:42",
+              "title_truncated_in_screenshot": false
+            }
+          ],
+          "supplementary": true,
+          "mapping_note": "P32讲四色定理，P33讲进阶图着色与色多项式；dogeman课程仍保留点着色、边着色和五/六色定理内容。"
         }
       ]
     },
@@ -1519,6 +1752,32 @@
               "url": "https://www.bilibili.com/video/BV1Eb41137gB/?p=44"
             }
           ]
+        },
+        {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "CMU 平面图补充",
+          "sections": [
+            "第31讲：平面图定义、欧拉公式",
+            "第32讲：平面图着色、四色定理"
+          ],
+          "lessons": [
+            {
+              "title": "第31讲：平面图定义、欧拉公式",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=31",
+              "part": 31,
+              "duration": "58:04",
+              "title_truncated_in_screenshot": false
+            },
+            {
+              "title": "第32讲：平面图着色、四色定理",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=32",
+              "part": 32,
+              "duration": "51:40",
+              "title_truncated_in_screenshot": false
+            }
+          ],
+          "supplementary": true,
+          "mapping_note": "P31讲平面图与欧拉公式，P32继续讲平面图着色与四色定理；哈工大课程仍保留为主课程。"
         }
       ]
     },
@@ -1548,6 +1807,32 @@
               "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=15"
             }
           ]
+        },
+        {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "CMU 二部图匹配补充",
+          "sections": [
+            "第24讲：匹配理论基础、霍尔婚配…",
+            "第25讲：最大匹配、二分图匹配算法"
+          ],
+          "lessons": [
+            {
+              "title": "第24讲：匹配理论基础、霍尔婚配…",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=24",
+              "part": 24,
+              "duration": "57:01",
+              "title_truncated_in_screenshot": true
+            },
+            {
+              "title": "第25讲：最大匹配、二分图匹配算法",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=25",
+              "part": 25,
+              "duration": "52:51",
+              "title_truncated_in_screenshot": false
+            }
+          ],
+          "supplementary": true,
+          "mapping_note": "P24–P25从Hall婚配定理衔接到二分图匹配；南京大学程龚课程仍保留为主课程。"
         }
       ]
     },
@@ -1649,6 +1934,32 @@
               "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=26"
             }
           ]
+        },
+        {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "CMU 匹配理论补充",
+          "sections": [
+            "第24讲：匹配理论基础、霍尔婚配…",
+            "第25讲：最大匹配、二分图匹配算法"
+          ],
+          "lessons": [
+            {
+              "title": "第24讲：匹配理论基础、霍尔婚配…",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=24",
+              "part": 24,
+              "duration": "57:01",
+              "title_truncated_in_screenshot": true
+            },
+            {
+              "title": "第25讲：最大匹配、二分图匹配算法",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=25",
+              "part": 25,
+              "duration": "52:51",
+              "title_truncated_in_screenshot": false
+            }
+          ],
+          "supplementary": true,
+          "mapping_note": "P24包含匹配基础和Hall婚配定理，P25包含最大匹配及二分图匹配算法；南京大学程龚课程仍保留为算法主课程。"
         }
       ]
     },
@@ -1678,6 +1989,24 @@
               "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=20"
             }
           ]
+        },
+        {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "CMU 树论补充",
+          "sections": [
+            "第21讲：树的基础性质、生成树"
+          ],
+          "lessons": [
+            {
+              "title": "第21讲：树的基础性质、生成树",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=21",
+              "part": 21,
+              "duration": "53:57",
+              "title_truncated_in_screenshot": false
+            }
+          ],
+          "supplementary": true,
+          "mapping_note": "P21讲树的基础性质与生成树；电子科技大学课程仍保留为主课程。"
         }
       ]
     },
@@ -1725,6 +2054,32 @@
               "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=21"
             }
           ]
+        },
+        {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "CMU 生成树与树计数补充",
+          "sections": [
+            "第21讲：树的基础性质、生成树",
+            "第22讲：树的计数、Cayley 公式"
+          ],
+          "lessons": [
+            {
+              "title": "第21讲：树的基础性质、生成树",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=21",
+              "part": 21,
+              "duration": "53:57",
+              "title_truncated_in_screenshot": false
+            },
+            {
+              "title": "第22讲：树的计数、Cayley 公式",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=22",
+              "part": 22,
+              "duration": "51:49",
+              "title_truncated_in_screenshot": false
+            }
+          ],
+          "supplementary": true,
+          "mapping_note": "P21讲生成树，P22讲Cayley公式与树计数。Cayley公式不是矩阵树定理，未映射到tree_matrix_tree。"
         }
       ]
     },
@@ -1982,7 +2337,257 @@
       "course": "21-228 Discrete Mathematics（Spring 2021）",
       "platform": "Bilibili",
       "publisher": "无为斋主",
-      "note": "CMU 21-228, Po-Shen Loh, Spring 2021. CMU官方14周大纲已核实：https://www.math.cmu.edu/~ploh/2021-228.shtml。第三方视频索引标示约35讲/32小时，用户B站卡片显示总时长31:26:24。用户截图只显示封面和时长，不显示分P列表，故此前映射的P1-P6和具体标题没有获得B站分P核验，均已标记provisional；不能把这些标题视为真实B站原始标题或将35讲直接顺序配成p=1..35。原始公开视频播放列表在CMU课程汇总网站标注为倒序，但B站上传版本排序无法独立确认。其余主题按官方大纲列入audit候选，非已配置视频。产品仅保留B站外链，不使用YouTube作为教学来源。"
+      "note": "大陆版Bilibili上传，由用户提供的6张分P列表截图逐项核实：共35讲，UP主无为斋主，分P时长合计31:26:24，与视频封面总时长一致。截图中部分标题被列表宽度截断，episodes中保留可见文本并标注title_truncated_in_screenshot，不擅自补全。课程内容与DMate节点的映射按真实分P标题进行；P22是Cayley公式（树计数），不是矩阵树定理。P10、20、30、34、35为复习/综合回顾；P26、27组合几何及P28、29 Ramsey理论目前没有对应的现有DMate节点，不强行塞入其他知识点。所有链接均使用大陆版www.bilibili.com/video/BV1jA4L66ELr/?p=n。",
+      "episode_count": 35,
+      "duration": "31:26:24",
+      "url": "https://www.bilibili.com/video/BV1jA4L66ELr/",
+      "episodes": [
+        {
+          "p": 1,
+          "title": "第1讲：课程导引、基础计数原理",
+          "duration": "57:47",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=1",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 2,
+          "title": "第2讲：数学归纳法，正向与反向归纳",
+          "duration": "1:03:02",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=2",
+          "title_truncated_in_screenshot": true
+        },
+        {
+          "p": 3,
+          "title": "第3讲：归纳法进阶证明技巧",
+          "duration": "57:42",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=3",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 4,
+          "title": "第4讲：容斥原理基础",
+          "duration": "53:56",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=4",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 5,
+          "title": "第5讲：容斥原理典型应用",
+          "duration": "56:22",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=5",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 6,
+          "title": "第6讲：鸽巢原理",
+          "duration": "51:37",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=6",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 7,
+          "title": "第7讲：鸽巢原理进阶、狄利克雷逼近…",
+          "duration": "52:42",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=7",
+          "title_truncated_in_screenshot": true
+        },
+        {
+          "p": 8,
+          "title": "第8讲：二项式系数基础与恒等式",
+          "duration": "54:27",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=8",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 9,
+          "title": "第9讲：二项式系数进阶、Lucas 定理",
+          "duration": "51:14",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=9",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 10,
+          "title": "第10讲：第一阶段考前复习",
+          "duration": "53:02",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=10",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 11,
+          "title": "第11讲：线性代数在递推关系中的应用",
+          "duration": "55:17",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=11",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 12,
+          "title": "第12讲：线性递推求解方法",
+          "duration": "56:22",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=12",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 13,
+          "title": "第13讲：递推序列的特征方程法",
+          "duration": "50:32",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=13",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 14,
+          "title": "第14讲：生成函数基础定义与运算",
+          "duration": "48:34",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=14",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 15,
+          "title": "第15讲：生成函数经典计数案例",
+          "duration": "50:51",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=15",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 16,
+          "title": "第16讲：生成函数进阶、组合级数",
+          "duration": "55:12",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=16",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 17,
+          "title": "第17讲：更多生成函数技巧与变换",
+          "duration": "53:29",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=17",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 18,
+          "title": "第18讲：图论基础：图的定义、路…",
+          "duration": "52:20",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=18",
+          "title_truncated_in_screenshot": true
+        },
+        {
+          "p": 19,
+          "title": "第19讲：图连通性、欧拉迹与欧拉…",
+          "duration": "53:36",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=19",
+          "title_truncated_in_screenshot": true
+        },
+        {
+          "p": 20,
+          "title": "第20讲：第二阶段考前复习",
+          "duration": "54:58",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=20",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 21,
+          "title": "第21讲：树的基础性质、生成树",
+          "duration": "53:57",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=21",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 22,
+          "title": "第22讲：树的计数、Cayley 公式",
+          "duration": "51:49",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=22",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 23,
+          "title": "第23讲：旅行商问题（TSP）简介",
+          "duration": "52:33",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=23",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 24,
+          "title": "第24讲：匹配理论基础、霍尔婚配…",
+          "duration": "57:01",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=24",
+          "title_truncated_in_screenshot": true
+        },
+        {
+          "p": 25,
+          "title": "第25讲：最大匹配、二分图匹配算法",
+          "duration": "52:51",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=25",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 26,
+          "title": "第26讲：组合几何基础、离散点集…",
+          "duration": "54:06",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=26",
+          "title_truncated_in_screenshot": true
+        },
+        {
+          "p": 27,
+          "title": "第27讲：组合几何：凸包、Erdős 类…",
+          "duration": "52:11",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=27",
+          "title_truncated_in_screenshot": true
+        },
+        {
+          "p": 28,
+          "title": "第28讲：拉姆齐理论入门、拉姆齐数",
+          "duration": "55:08",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=28",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 29,
+          "title": "第29讲：拉姆齐理论进阶、超图拉…",
+          "duration": "51:08",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=29",
+          "title_truncated_in_screenshot": true
+        },
+        {
+          "p": 30,
+          "title": "第30讲：第三阶段考前复习",
+          "duration": "51:21",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=30",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 31,
+          "title": "第31讲：平面图定义、欧拉公式",
+          "duration": "58:04",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=31",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 32,
+          "title": "第32讲：平面图着色、四色定理",
+          "duration": "51:40",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=32",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 33,
+          "title": "第33讲：图着色进阶、色多项式",
+          "duration": "52:42",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=33",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 34,
+          "title": "第34讲：课程综合回顾",
+          "duration": "53:05",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=34",
+          "title_truncated_in_screenshot": false
+        },
+        {
+          "p": 35,
+          "title": "第35讲：期末总复习、开放问题与…",
+          "duration": "55:46",
+          "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=35",
+          "title_truncated_in_screenshot": true
+        }
+      ]
     },
     {
       "id": "sawfin_bilibili",
@@ -2034,21 +2639,22 @@
     }
   ],
   "video_resource_policy": {
-    "primary_per_node": "one selected Bilibili course per node; multiple adjacent lessons from that source may be listed",
+    "primary_per_node": "Keep one primary selected course per node; additional CMU lessons may be listed as supplementary when they add direct, non-duplicative coverage.",
     "platform_policy": "Bilibili_only",
     "course_continuity": "Keep adjacent topics within one course where possible; avoid redundant or abrupt switches.",
-    "note": "Bilibili-only. CMU Po-Shen Loh 2021 full syllabus officially checked and covered topics mapped to existing graph nodes as a review crosswalk. ~35 lectures, ~32h; screenshot 31:26:24. Exact Bilibili bvid and part indices not independently confirmed; existing first-six video titles and p links are provisional, explicitly flagged. DO NOT add new CMU p links by interpolating from the official course weeks or from the reverse-ordered original playlist. Steve Butler P14-16 remains assigned for Matrix Tree. Previously rejected unrelated providers stay excluded.",
+    "note": "Bilibili-only. CMU Po-Shen Loh Spring 2021 course is confirmed from the mainland Bilibili screenshots as 35 parts totaling 31:26:24, uploaded by 无为斋主. The full 35-part list is stored in the source record. Direct part links use the mainland www.bilibili.com domain. CMU is primary for counting, binomial coefficients, recurrences and generating functions; later graph/tree/matching/planar lectures are supplementary where existing specialist courses remain primary. P22 Cayley formula is not the Matrix-Tree theorem. P26–P29 do not have matching existing nodes and are not forced into unrelated topics. The Matrix-Tree node remains assigned to Steve Butler P14–P16.",
     "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs.",
     "audit_status": {
       "nodes_total": 68,
       "nodes_with_active_course": 68,
       "nodes_pending": "none",
-      "direct_episode_links": 131,
+      "direct_episode_links": 157,
       "nested_or_missing_episode_urls": 0,
       "youtube_links": 0,
-      "last_audit_scope": "2021 CMU official weekly syllabus mapped to current DMate node IDs; 35 lectures and total length crosschecked against a public recording index and user screenshot; exact Bilibili video BV and part list inaccessible, so previous six links flagged provisional rather than asserting false verification",
-      "cmu_provisional_part_links": 6,
-      "cmu_additional_verified_part_links": 0
+      "cmu_2021_parts_verified": 35,
+      "cmu_2021_total_duration": "31:26:24",
+      "cmu_2021_mapped_nodes": 18,
+      "last_audit_scope": "all 35 mainland Bilibili CMU parts transcribed from the user's screenshots; total duration sum checked; direct P1-P35 links added where matched to DMate nodes; existing specialist courses retained as primary for supplementary graph topics"
     },
     "excluded_source_ids": [
       "scut_discrete_math",
@@ -2066,122 +2672,236 @@
       "instructor": "Po-Shen Loh",
       "term": "Spring 2021",
       "official_syllabus_url": "https://www.math.cmu.edu/~ploh/2021-228.shtml",
-      "indexed_lecture_count_approx": 35,
-      "indexed_total_duration_hours_approx": 32,
-      "user_screenshot_duration": "31:26:24",
-      "upload_publisher": "无为斋主",
-      "upload_video_url": "https://www.bilibili.com/video/BV1jA4L66ELr/",
-      "bvid_independently_verified": false,
-      "bili_part_index_independently_verified": false,
-      "previous_assumed_first_six_part_links": 6,
-      "original_public_playlist_reverse_chronological": true,
-      "bilibili_upload_sort_order": "unknown",
-      "matching_basis": "official_2021_weekly_syllabus_only_not_video_part_list",
-      "weekly_alignment": [
+      "bvid": "BV1jA4L66ELr",
+      "mainland_bilibili_url": "https://www.bilibili.com/video/BV1jA4L66ELr/",
+      "uploader": "无为斋主",
+      "part_count": 35,
+      "total_duration": "31:26:24",
+      "total_duration_seconds": 113184,
+      "part_list_confirmed_from_user_screenshots": true,
+      "exact_titles_cropped_in_screenshot": [
+        2,
+        7,
+        18,
+        19,
+        24,
+        26,
+        27,
+        29,
+        35
+      ],
+      "mapped_parts": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        21,
+        22,
+        23,
+        24,
+        25,
+        31,
+        32,
+        33
+      ],
+      "review_or_general_parts": [
+        10,
+        20,
+        30,
+        34,
+        35
+      ],
+      "not_mapped_to_existing_nodes": [
+        26,
+        27,
+        28,
+        29
+      ],
+      "important_distinction": "P22 is Cayley’s tree-counting formula, not the Matrix-Tree theorem. P23 TSP is an application related to Hamiltonian cycles, not a replacement for Hamiltonian graph theory.",
+      "node_alignment": [
         {
-          "weeks": "1",
-          "syllabus_topic": "Basic counting; induction",
-          "matched_node_ids": [
-            "count_basic",
-            "proof_induction"
+          "parts": [
+            1
           ],
-          "review_node_ids": [
+          "nodes": [
+            "count_basic"
+          ]
+        },
+        {
+          "parts": [
+            2
+          ],
+          "nodes": [
+            "proof_induction"
+          ]
+        },
+        {
+          "parts": [
+            3
+          ],
+          "nodes": [
             "proof_strong_induction"
           ]
         },
         {
-          "weeks": "2-3",
-          "syllabus_topic": "Inclusion-exclusion; pigeonhole principle",
-          "matched_node_ids": [
-            "count_inclusion",
+          "parts": [
+            4,
+            5
+          ],
+          "nodes": [
+            "count_inclusion"
+          ]
+        },
+        {
+          "parts": [
+            6,
+            7
+          ],
+          "nodes": [
             "count_pigeonhole"
-          ],
-          "review_node_ids": []
+          ]
         },
         {
-          "weeks": "4",
-          "syllabus_topic": "Binomial coefficients",
-          "matched_node_ids": [
+          "parts": [
+            8,
+            9
+          ],
+          "nodes": [
             "count_binomial"
-          ],
-          "review_node_ids": [
-            "count_perm_comb"
           ]
         },
         {
-          "weeks": "5",
-          "syllabus_topic": "Linear algebra and recurrences",
-          "matched_node_ids": [
+          "parts": [
+            11
+          ],
+          "nodes": [
             "recurrence_model"
-          ],
-          "review_node_ids": [
-            "recurrence_homogeneous",
-            "recurrence_nonhomogeneous",
-            "recurrence_initial"
           ]
         },
         {
-          "weeks": "6-7",
-          "syllabus_topic": "Generating functions; more generating functions",
-          "matched_node_ids": [
-            "count_generating"
+          "parts": [
+            12,
+            13
           ],
-          "review_node_ids": []
+          "nodes": [
+            "recurrence_homogeneous"
+          ]
         },
         {
-          "weeks": "8",
-          "syllabus_topic": "Introduction to graphs",
-          "matched_node_ids": [
+          "parts": [
+            12
+          ],
+          "nodes": [
+            "recurrence_nonhomogeneous"
+          ],
+          "status": "broad-title-match; specific subtype should be confirmed while watching"
+        },
+        {
+          "parts": [
+            14,
+            15,
+            16,
+            17
+          ],
+          "nodes": [
+            "count_generating"
+          ]
+        },
+        {
+          "parts": [
+            18
+          ],
+          "nodes": [
             "graph_basic"
           ],
-          "review_node_ids": [
-            "graph_connectivity"
-          ]
+          "role": "supplementary"
         },
         {
-          "weeks": "9",
-          "syllabus_topic": "Trees",
-          "matched_node_ids": [
-            "tree_basic"
+          "parts": [
+            19
           ],
-          "review_node_ids": [
+          "nodes": [
+            "graph_connectivity",
+            "graph_euler"
+          ],
+          "role": "supplementary"
+        },
+        {
+          "parts": [
+            21
+          ],
+          "nodes": [
+            "tree_basic",
             "tree_spanning"
-          ]
-        },
-        {
-          "weeks": "10",
-          "syllabus_topic": "Traveling salesman problem",
-          "matched_node_ids": [],
-          "review_node_ids": [
-            "graph_hamilton"
-          ]
-        },
-        {
-          "weeks": "11",
-          "syllabus_topic": "Matchings",
-          "matched_node_ids": [
-            "graph_matching"
           ],
-          "review_node_ids": [
+          "role": "supplementary"
+        },
+        {
+          "parts": [
+            22
+          ],
+          "nodes": [
+            "tree_spanning"
+          ],
+          "role": "Cayley tree-counting extension"
+        },
+        {
+          "parts": [
+            23
+          ],
+          "nodes": [
+            "graph_hamilton"
+          ],
+          "role": "TSP application; supplementary"
+        },
+        {
+          "parts": [
+            24,
+            25
+          ],
+          "nodes": [
+            "graph_matching",
             "graph_bipartite"
-          ]
+          ],
+          "role": "supplementary"
         },
         {
-          "weeks": "12-13",
-          "syllabus_topic": "Combinatorial geometry; Ramsey theory",
-          "matched_node_ids": [],
-          "review_node_ids": []
-        },
-        {
-          "weeks": "14",
-          "syllabus_topic": "Planar graphs",
-          "matched_node_ids": [
+          "parts": [
+            31,
+            32
+          ],
+          "nodes": [
             "graph_planar"
           ],
-          "review_node_ids": []
+          "role": "supplementary"
+        },
+        {
+          "parts": [
+            32,
+            33
+          ],
+          "nodes": [
+            "graph_coloring"
+          ],
+          "role": "supplementary"
         }
       ],
-      "reason_not_auto_replacing": "Source video metadata and full Bilibili part list cannot be independently read; blindly assigning ?p=7-35 risks wrong video-to-node links."
+      "previous_first_six_part_links_status": "verified_against_user_screenshots",
+      "note": "The 35-part list and all durations were read from user-provided screenshots. Sum of the 35 displayed durations is exactly 31:26:24. For titles cropped by the screenshot viewport, only the visible text is stored; no completion has been invented."
     }
   },
   "video_resource_candidates": [
