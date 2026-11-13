@@ -1,5 +1,5 @@
 {
-  "version": 51,
+  "version": 52,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -2306,8 +2306,8 @@
       "platform": "YouTube",
       "publisher": "SawFin Mathematics",
       "display_name": "Kimberly Brehm BU",
-      "url": "https://www.youtube.com/playlist?list=PLl-gb0E4MII0CsY4AE2xeZwZIkds3jIGs",
-      "note": "Kimberly Brehm 的第二门离散数学课程。采用 SawFin Mathematics 官方频道逐集 watch 链接，不再使用未经确认的B站 P106–P116 偏移链接。递推单集8.2.1–8.2.4及生成函数8.4.1–8.4.7均按标题匹配；仅使用逐集视频地址。"
+      "url": "https://www.youtube.com/playlist?list=PLl-gb0E4MII0sGLCJeqDB3y63HZ6lM5LJ",
+      "note": "Kimberly Brehm 的第二门离散数学课程。官方课程播放列表为 SawFin Mathematics 的 Discrete Math II/Combinatorics (Rosen)，使用其单集 watch 链接，不再使用未经确认的B站 P106–P116 偏移链接。递推单集8.2.1–8.2.4及生成函数8.4.1–8.4.7按课程目录标题匹配。"
     }
   ],
   "video_resource_policy": {
