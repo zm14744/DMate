@@ -549,8 +549,6 @@ html[data-ui-language="en"] .kg-mobile-node-badge {
     hyphens: auto;
     line-height: 1.25;
 }
-html[data-ui-language="en"] .kg-mobile-node-name { font-size: 12px; }
-html[data-ui-language="en"] .kg-mobile-node-badge { font-size: 9px; }
 html[data-ui-language="en"] .graph-detail-title,
 html[data-ui-language="en"] .learning-review-section-title {
     line-height: 1.34;

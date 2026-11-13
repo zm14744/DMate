@@ -5152,9 +5152,9 @@ body[data-appearance-theme="light"] .input input {
         font-size:13px;
         font-weight:700;
         white-space:normal;
-        word-break:break-all;
-        overflow:hidden;
-        text-overflow:ellipsis;
+        word-break:normal;
+        overflow:visible;
+        text-overflow:clip;
     }
 
     .kg-mobile-node-badge {
@@ -5163,9 +5163,9 @@ body[data-appearance-theme="light"] .input input {
         font-size:10px;
         font-weight:600;
         opacity:.82;
-        white-space:nowrap;
-        overflow:hidden;
-        text-overflow:ellipsis;
+        white-space:pre;
+        overflow:visible;
+        text-overflow:clip;
     }
 
     /* 详情区不再被主图谱挤没；页面往下滚就能完整看到。 */

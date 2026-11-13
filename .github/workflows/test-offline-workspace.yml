@@ -18,6 +18,8 @@ on:
       - 'scripts/test_offline_workspace_browser.cjs'
       - 'scripts/test_knowledge_graph_browser.cjs'
       - 'scripts/test_offline_graph_browser.cjs'
+      - 'scripts/test_graph_labels_browser.cjs'
+      - 'scripts/test_composer_motion_browser.cjs'
       - 'scripts/test_offline_appearance_browser.cjs'
       - 'scripts/test_offline_data_migration_browser.cjs'
       - 'scripts/test_mobile_drawers_browser.cjs'
@@ -42,6 +44,8 @@ on:
       - 'scripts/test_offline_workspace_browser.cjs'
       - 'scripts/test_knowledge_graph_browser.cjs'
       - 'scripts/test_offline_graph_browser.cjs'
+      - 'scripts/test_graph_labels_browser.cjs'
+      - 'scripts/test_composer_motion_browser.cjs'
       - 'scripts/test_offline_appearance_browser.cjs'
       - 'scripts/test_offline_data_migration_browser.cjs'
       - 'scripts/test_mobile_drawers_browser.cjs'
@@ -80,10 +84,13 @@ jobs:
           node --check static/offline-shell.js
           node --check static/offline-appearance.js
           node --check static/offline-knowledge-graph.js
+          node --check static/knowledge-graph-labels.js
           node --check static/script.js
           node --check scripts/test_offline_workspace_browser.cjs
           node --check scripts/test_knowledge_graph_browser.cjs
           node --check scripts/test_offline_graph_browser.cjs
+          node --check scripts/test_graph_labels_browser.cjs
+          node --check scripts/test_composer_motion_browser.cjs
           node --check scripts/test_offline_appearance_browser.cjs
           node --check scripts/test_offline_data_migration_browser.cjs
           node --check scripts/test_mobile_drawers_browser.cjs
@@ -156,6 +163,8 @@ jobs:
           node scripts/test_mobile_drawers_browser.cjs
           node scripts/test_knowledge_graph_browser.cjs
           node scripts/test_offline_graph_browser.cjs
+          node scripts/test_graph_labels_browser.cjs
+          node scripts/test_composer_motion_browser.cjs
           node scripts/test_drawing_panels_browser.cjs
           node scripts/test_math_diagram_browser.cjs
       - name: Preserve browser screenshots

@@ -7,6 +7,75 @@ const {chromium,webkit}=require('playwright');
 const root=path.resolve(__dirname,'..');
 const style=fs.readFileSync(path.join(root,'static/chat-composer.css'),'utf8');
 const source=fs.readFileSync(path.join(root,'static/chat-composer.js'),'utf8');
+const uiSources=['language-catalog.js','language-knowledge.js','language.js','ui-tooltip.js']
+ .map(name=>fs.readFileSync(path.join(root,'static',name),'utf8'));
+const tooltipStyle=fs.readFileSync(path.join(root,'static/ui-tooltip.css'),'utf8');
+
+// Independent UI/Unicode oracle: do not obtain expected translations or values
+// from the implementation under test. Duplicate glyphs have category meanings.
+const symbols=[
+ {id:'logic',zh:'逻辑',en:'Logic',items:[
+ ['¬','逻辑非','Negation'],['∧','合取','Conjunction'],['∨','析取','Disjunction'],
+ ['⊕','异或','Exclusive or'],['→','蕴含','Implication'],['↔','等价','Biconditional'],
+ ['⇒','推出','Implies'],['⇔','等价推出','Logical equivalence'],
+ ['∀','全称量词','Universal quantifier'],['∃','存在量词','Existential quantifier'],
+ ['∄','不存在','Does not exist'],['⊤','永真','Tautology / true'],
+ ['⊥','矛盾／假','Contradiction / false'],['⊢','语法可证','Syntactic derivability'],
+ ['⊨','语义蕴含','Semantic entailment'],['⊭','不语义蕴含','Does not entail'],
+ ['∴','所以','Therefore'],['∵','因为','Because']
+ ]},
+ {id:'sets',zh:'集合',en:'Sets',items:[
+ ['∈','属于','Element of'],['∉','不属于','Not an element of'],
+ ['∋','包含元素','Contains as an element'],['∌','不包含元素','Does not contain as an element'],
+ ['⊆','子集或等于','Subset or equal'],['⊊','真子集','Proper subset'],
+ ['⊂','子集（依教材约定）','Subset (textbook convention)'],['⊇','超集或等于','Superset or equal'],
+ ['⊋','真超集','Proper superset'],['⊃','超集（依教材约定）','Superset (textbook convention)'],
+ ['∪','并集','Union'],['∩','交集','Intersection'],['∅','空集','Empty set'],
+ ['∖','集合差','Set difference'],['℘','幂集','Power Set'],['×','笛卡尔积','Cartesian Product'],
+ ['∁','补集','Complement'],['⊄','非子集','Not a subset'],
+ ['⊈','非子集或等于','Not a subset or equal'],['∣','整除／集合关系符号','Divides / set relation symbol']
+ ]},
+ {id:'relations',zh:'关系',en:'Relations',items:[
+ ['≠','不等于','Not equal'],['≡','恒等／同余','Identical / congruent'],
+ ['≢','不恒等','Not identical'],['≈','约等于','Approximately equal'],
+ ['≉','不约等于','Not approximately equal'],['∼','等价／相似关系','Equivalence / similarity relation'],
+ ['≃','相似','Similar'],['≤','小于等于','Less than or equal'],['≥','大于等于','Greater than or equal'],
+ ['≪','远小于','Much less than'],['≫','远大于','Much greater than'],
+ ['∝','正比于','Proportional to'],['∥','平行','Parallel'],['⊥','垂直','Perpendicular'],
+ ['∘','关系复合','Relation composition'],['≺','先于','Precedes'],['≼','不严格先于','Precedes or equals']
+ ]},
+ {id:'number',zh:'数论',en:'Number Theory',items:[
+ ['ℕ','自然数集','Natural numbers'],['ℤ','整数集','Integers'],['ℚ','有理数集','Rational numbers'],
+ ['ℝ','实数集','Real numbers'],['ℂ','复数集','Complex numbers'],['∣','整除','Divides'],
+ ['∤','不整除','Does not divide'],['≡','同余','Congruent'],['∞','无穷大','Infinity'],
+ ['⌊x⌋','向下取整','Floor'],['⌈x⌉','向上取整','Ceiling'],['√n','平方根','Square root']
+ ]},
+ {id:'count',zh:'计数',en:'Counting',items:[
+ ...Array.from('⁰¹²³⁴⁵⁶⁷⁸⁹',(value,i)=>[value,'上标 '+i,'Superscript '+i]),
+ ...Array.from('₀₁₂₃₄₅₆₇₈₉',(value,i)=>[value,'下标 '+i,'Subscript '+i]),
+ ['∑','求和','Summation'],['∏','连乘','Product'],['ⁿ','上标 n','Superscript n'],
+ ['ₙ','下标 n','Subscript n'],['…','省略号','Ellipsis']
+ ]},
+ {id:'greek',zh:'希腊',en:'Greek',items:[
+ ['α','小写阿尔法','Lowercase alpha'],['β','小写贝塔','Lowercase beta'],
+ ['γ','小写伽马','Lowercase gamma'],['δ','小写德尔塔','Lowercase delta'],
+ ['ε','小写艾普西龙','Lowercase epsilon'],['ζ','小写泽塔','Lowercase zeta'],
+ ['η','小写伊塔','Lowercase eta'],['θ','小写西塔','Lowercase theta'],
+ ['ι','小写约塔','Lowercase iota'],['κ','小写卡帕','Lowercase kappa'],
+ ['λ','小写拉姆达','Lowercase lambda'],['μ','小写缪','Lowercase mu'],
+ ['ν','小写纽','Lowercase nu'],['ξ','小写克西','Lowercase xi'],
+ ['π','小写派','Lowercase pi'],['ρ','小写柔','Lowercase rho'],
+ ['σ','小写西格马','Lowercase sigma'],['τ','小写陶','Lowercase tau'],
+ ['υ','小写宇普西龙','Lowercase upsilon'],['φ','小写斐','Lowercase phi'],
+ ['χ','小写希','Lowercase chi'],['ψ','小写普西','Lowercase psi'],
+ ['ω','小写欧米伽','Lowercase omega'],['Γ','大写伽马','Uppercase Gamma'],
+ ['Δ','大写德尔塔','Uppercase Delta'],['Θ','大写西塔','Uppercase Theta'],
+ ['Λ','大写拉姆达','Uppercase Lambda'],['Π','大写派','Uppercase Pi'],
+ ['Σ','大写西格马','Uppercase Sigma'],['Φ','大写斐','Uppercase Phi'],
+ ['Ψ','大写普西','Uppercase Psi'],['Ω','大写欧米伽','Uppercase Omega']
+ ]}
+];
+assert.equal(symbols.reduce((n,group)=>n+group.items.length,0),124);
 const base=[
 'html,body{width:100%;height:100%;margin:0;overflow:hidden}',
 'body[data-appearance-theme="dark"]{--text-primary:#ececec;--text-secondary:#c7c7c7;--text-muted:#9a9a9a;--text-strong:#f4f4f4;--surface-1:#171717;--surface-2:#242424;--surface-3:#313131;--border-strong:#3a3a3a;--accent:#3b82f6;--accent-bg:#26394c;background:#101010;color:#ececec}',
@@ -128,10 +197,146 @@ async function verify(browser,engine,size){
   console.log('PASS '+label+' '+box.vw+'x'+box.vh+' at '+Math.round(box.x)+','+Math.round(box.y));
  } finally {await context.close();}
 }
+
+async function verifyTranslations(browser,engine,size){
+ const context=await browser.newContext({
+  viewport:{width:size.width,height:size.height},hasTouch:size.compact,isMobile:size.compact
+ });
+ const label=engine+'/'+size.name+'/i18n';
+ try {
+  const page=await context.newPage(),errors=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  // Exercise the real delayed tooltip without spending 360 ms per symbol.
+  await page.clock.install();
+  await page.setContent(fixture.replace('</head>','<style>'+tooltipStyle+'</style></head>'));
+  await page.evaluate(()=>{
+   const content=document.createElement('div');
+   content.id='protected-math';content.dataset.i18nContent='';content.hidden=true;
+   content.textContent='等价 集合 ∣ α Γ 上标 2';document.body.append(content);
+  });
+  // Match the page's catalog registration order, including knowledge labels
+  // that can override an identically named generic catalog entry.
+  for(const content of uiSources.slice(0,3))await page.addScriptTag({content});
+  await page.addScriptTag({content:source});
+  await page.addScriptTag({content:uiSources[3]});
+  await page.evaluate(()=>{
+   window.DMateChatComposer.mount({input:document.getElementById('text'),onSend:()=>{}});
+   document.getElementById('text').addEventListener('input',event=>{
+    window.lastSymbolInput={data:event.data,inputType:event.inputType};
+   });
+  });
+  await page.locator('.dmate-symbol-keyboard').click();
+  const panel=page.locator('.dmate-symbol-panel');
+  const tab=id=>page.locator('.dmate-symbol-tab[data-symbol-category="'+id+'"]');
+  const keyAt=index=>page.locator('.dmate-symbol-key').nth(index);
+  const tooltip=page.locator('.dm-ui-tooltip:not([hidden])');
+  async function showTooltip(key,expected){
+   // Scrolling dismisses a real tooltip. Finish Playwright's key auto-scroll
+   // before initiating a fresh hover, particularly for the last Greek row.
+   await key.scrollIntoViewIfNeeded();
+   await page.clock.fastForward(50);
+   // Returning from outside also clears tooltip dismissal after insertion.
+   await page.mouse.move(1,1);
+   await key.hover();
+   await page.clock.fastForward(400);
+   assert.equal(await tooltip.count(),1,label+': missing hover tooltip '+expected);
+   assert.equal(await tooltip.textContent(),expected,label+': stale/incorrect tooltip');
+   assert.equal(await key.getAttribute('aria-describedby'),await tooltip.getAttribute('id'),label+': inaccessible tooltip');
+  }
+
+  // Switch languages while a key owns the suppressed native title. This
+  // catches stale tooltip caches and accidental rerenders/caret loss.
+  await tab('greek').click();
+  const gamma=keyAt(23);
+  await gamma.focus();
+  await page.evaluate(()=>{
+   const input=document.getElementById('text');
+   input.value='Before αΓ_² after';input.setSelectionRange(7,9,'backward');
+   window.savedSymbolKey=document.activeElement;
+   window.savedSymbolTab=document.querySelector('.dmate-symbol-tab[aria-selected="true"]');
+   window.savedSymbolState={value:input.value,start:input.selectionStart,end:input.selectionEnd,direction:input.selectionDirection};
+  });
+  await showTooltip(gamma,'大写伽马');
+  for(const language of ['en','zh-CN','en']){
+   await page.evaluate(value=>window.DMateI18n.setLanguage(value,false),language);
+   const retained=await page.evaluate(()=>{
+    const input=document.getElementById('text');
+    return {state:{value:input.value,start:input.selectionStart,end:input.selectionEnd,direction:input.selectionDirection},
+     saved:window.savedSymbolState,sameKey:document.activeElement===window.savedSymbolKey,
+     sameTab:document.querySelector('.dmate-symbol-tab[aria-selected="true"]')===window.savedSymbolTab,
+     category:document.querySelector('.dmate-symbol-tab[aria-selected="true"]').dataset.symbolCategory,
+     open:!document.querySelector('.dmate-symbol-panel').hidden};
+   });
+   assert.deepEqual(retained.state,retained.saved,label+': language switch changed draft/selection');
+   assert.equal(retained.sameKey,true,label+': language switch lost the focused key');
+   assert.equal(retained.sameTab,true,label+': language switch recreated the current tab');
+   assert.equal(retained.category,'greek');assert.equal(retained.open,true);
+   await showTooltip(gamma,language==='en'?'Uppercase Gamma':'大写伽马');
+  }
+  await page.locator('#outside').focus();
+  await page.mouse.move(1,1);
+  assert.equal(await gamma.getAttribute('title'),'Uppercase Gamma',label+': hover cache restored an old-language title');
+
+  let insertions=0;
+  for(const language of ['zh-CN','en']){
+   const english=language==='en';
+   await page.evaluate(value=>window.DMateI18n.setLanguage(value,false),language);
+   assert.equal(await page.locator('.dmate-symbol-panel-title').textContent(),english?'Math symbols':'数学符号');
+   assert.equal(await panel.getAttribute('aria-label'),english?'Math symbol keyboard':'数学符号键盘');
+   assert.equal(await page.locator('.dmate-symbol-keyboard').getAttribute('aria-label'),english?'Math symbol keyboard':'数学符号键盘');
+   assert.equal(await page.locator('.dmate-symbol-tabs').getAttribute('aria-label'),english?'Symbol categories':'符号分类');
+   assert.equal(await page.locator('.dmate-symbol-grid').getAttribute('aria-label'),english?'Insertable math symbols':'可插入的数学符号');
+   for(const group of symbols){
+    await tab(group.id).click();
+    await page.mouse.move(1,1);
+    await page.locator('#outside').focus();
+    assert.deepEqual(await page.locator('.dmate-symbol-tab').allTextContents(),symbols.map(item=>english?item.en:item.zh));
+    assert.equal(await tab(group.id).getAttribute('aria-selected'),'true');
+    const actual=await page.locator('.dmate-symbol-key').evaluateAll(keys=>keys.map(key=>({
+     text:key.textContent,value:key.dataset.symbolValue,title:key.getAttribute('title'),
+     aria:key.getAttribute('aria-label'),protectedGlyph:key.querySelector('span')?.getAttribute('translate')
+    })));
+    const expected=group.items.map(([value,zh,en])=>({
+     text:value,value,title:english?en:zh,aria:(english?en+': ':zh+'：')+value,protectedGlyph:'no'
+    }));
+    assert.deepEqual(actual,expected,label+'/'+language+'/'+group.id+': incomplete/incorrect symbol names or values');
+    for(let index=0;index<group.items.length;index++){
+     const [value,zh,en]=group.items[index],key=keyAt(index),name=english?en:zh;
+     assert.equal(await page.locator('.dmate-symbol-grid').getByRole('button',{name:(english?name+': ':name+'：')+value,exact:true}).count(),1);
+     await showTooltip(key,name);
+     await page.evaluate(()=>{
+      const input=document.getElementById('text');input.value='Before αΓ_² after';
+      input.setSelectionRange(7,9,'backward');window.lastSymbolInput=null;
+     });
+     await key.click();
+     const inserted=await page.locator('#text').evaluate(input=>({
+      value:input.value,start:input.selectionStart,end:input.selectionEnd,event:window.lastSymbolInput
+     }));
+     assert.deepEqual(inserted,{value:'Before '+value+'_² after',start:7+value.length,end:7+value.length,
+      event:{data:value,inputType:'insertText'}},label+'/'+language+'/'+group.id+': altered inserted Unicode '+value);
+     assert.equal(await panel.getAttribute('hidden'),null,label+': inserting a symbol closed the panel');
+     insertions++;
+    }
+   }
+   assert.equal(await page.locator('#protected-math').textContent(),'等价 集合 ∣ α Γ 上标 2',label+': language pass rewrote content');
+  }
+  assert.equal(insertions,248);
+  assert.deepEqual(errors,[],label+': JavaScript page errors');
+  console.log('PASS '+label+' all 124 symbols in both languages, hover names, insertion, open-panel language switching');
+ } finally {await context.close();}
+}
 (async()=>{
- for(const [engine,type] of [['Chromium',chromium],['WebKit Safari',webkit]]){
-  const browser=await type.launch({headless:true});
-  try {for(const size of sizes)await verify(browser,engine,size);}
+ const requested=(process.env.SYMBOL_PICKER_BROWSERS||'chromium,webkit').split(',');
+ assert.ok(requested.length && requested.every(name=>['chromium','webkit'].includes(name)),'Unknown SYMBOL_PICKER_BROWSERS engine');
+ for(const [id,engine,type] of [['chromium','Chromium',chromium],['webkit','WebKit Safari',webkit]]){
+  if(!requested.includes(id))continue;
+  const options={headless:true};
+  if(id==='chromium' && process.env.CHROMIUM_EXECUTABLE_PATH)options.executablePath=process.env.CHROMIUM_EXECUTABLE_PATH;
+  const browser=await type.launch(options);
+  try {
+   for(const size of sizes)await verify(browser,engine,size);
+   for(const size of [sizes[0],sizes.at(-1)])await verifyTranslations(browser,engine,size);
+  }
   finally {await browser.close();}
  }
  console.log('All browser regressions passed.');

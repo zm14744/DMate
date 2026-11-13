@@ -34,8 +34,12 @@ RUN python -m pip install --upgrade pip && \
 COPY ocr_runtime.py image_upload_limits.py ./
 COPY scripts/prepare_ocr_model_cache.py ./scripts/prepare_ocr_model_cache.py
 COPY scripts/ocr-model-lock.json ./scripts/ocr-model-lock.json
+# A 130 MB file needs over half an hour on a healthy 65 KiB/s link. This is a
+# build-time file budget, separate from short HTTP/idle timeouts and gunicorn.
+ARG DMATE_MODEL_DOWNLOAD_TIMEOUT=3600
 RUN --mount=type=cache,id=dmate-ocr-model-cache-v2,target=/var/cache/dmate-model-build,sharing=locked \
-    python scripts/prepare_ocr_model_cache.py --cache-dir /var/cache/dmate-model-build && \
+    python scripts/prepare_ocr_model_cache.py --cache-dir /var/cache/dmate-model-build \
+        --download-timeout "$DMATE_MODEL_DOWNLOAD_TIMEOUT" && \
     python scripts/prepare_ocr_model_cache.py --cache-dir /var/cache/dmate-model-build --verify-only && \
     mkdir -p /opt/dmate-model-cache/paddlex && \
     cp -a /var/cache/dmate-model-build/paddlex/official_models \

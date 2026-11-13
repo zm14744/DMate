@@ -11461,7 +11461,14 @@ function knowledgeGraphExportLayout(nodes) {
     // Export dimensions are independent of viewport, orientation, browser zoom
     // and the current zoom level of the fullscreen graph.
     const cellWidth = dmateUiLanguage() === "en" ? 220 : 164;
-    const cellHeight = dmateUiLanguage() === "en" ? 94 : 78;
+    const labels = window.DMateKnowledgeGraphLabels.prepare(nodes, {
+        label: node => dmateKnowledgeLabel(node.name),
+        badge: node => dmateUiText(knowledgeGraphNodeState(node.name, getActiveKnowledgeContext()).badge || node.level || ""),
+        width: cellWidth, minHeight: dmateUiLanguage() === "en" ? 94 : 78,
+        titleSize: 16, weight: 600, badgeSize: 12, badgeWeight: 500,
+        paddingX: 12, paddingY: 12, gap: 6
+    });
+    const cellHeight = labels.height;
     const spaceX = 100;
     const spaceY = 34;
     const marginX = 42;
@@ -11503,7 +11510,7 @@ function knowledgeGraphExportLayout(nodes) {
     for (const group of incoming.values()) {
         group.sort((a, b) => positions.get(a.from).y - positions.get(b.from).y);
     }
-    return { width, height, positions, edges, outgoing, incoming, cellWidth, cellHeight };
+    return { width, height, positions, edges, outgoing, incoming, cellWidth, cellHeight, labels };
 }
 
 function drawKnowledgeGraphRoundRect(ctx, x, y, width, height, radius) {
@@ -11521,42 +11528,12 @@ function drawKnowledgeGraphRoundRect(ctx, x, y, width, height, radius) {
     ctx.closePath();
 }
 
-function drawKnowledgeGraphWrappedLabel(ctx, label, centerX, centerY, maxWidth, maxLines) {
-    const glyphs = Array.from(String(label || ""));
-    const lines = [];
-    let current = "";
-    for (const glyph of glyphs) {
-        if (glyph === "\n") {
-            lines.push(current);
-            current = "";
-            continue;
-        }
-        const test = current + glyph;
-        if (current && ctx.measureText(test).width > maxWidth) {
-            lines.push(current);
-            current = glyph;
-        } else {
-            current = test;
-        }
-    }
-    if (current) lines.push(current);
-    if (lines.length > maxLines) {
-        lines.length = maxLines;
-        let last = lines[maxLines - 1];
-        while (last && ctx.measureText(last + "…").width > maxWidth) last = last.slice(0, -1);
-        lines[maxLines - 1] = last + "…";
-    }
-    const lineHeight = 20;
-    const firstY = centerY - ((lines.length - 1) * lineHeight) / 2;
-    lines.forEach((line, index) => ctx.fillText(line, centerX, firstY + index * lineHeight, maxWidth));
-}
-
 async function renderKnowledgeGraphOffscreenPngBlob() {
     const context = getActiveKnowledgeContext();
     const nodes = knowledgeGraphDisplayedNodes(context);
     if (!nodes?.length) throw new Error("当前范围没有可复制的知识节点");
     const layout = knowledgeGraphExportLayout(nodes);
-    const { width, height, positions, edges, outgoing, incoming, cellWidth, cellHeight } = layout;
+    const { width, height, positions, edges, outgoing, incoming, cellWidth, cellHeight, labels } = layout;
     const smallDevice = window.matchMedia?.("(max-width: 760px)")?.matches;
     const pixelBudget = smallDevice ? 7000000 : 10000000;
     // Render in a bounded pixel budget to avoid crashing mobile browsers.
@@ -11605,16 +11582,9 @@ async function renderKnowledgeGraphOffscreenPngBlob() {
         ctx.lineWidth = 2;
         ctx.strokeStyle = state.stroke || "#64748b";
         ctx.stroke();
-        const hasBadge = Boolean(state.badge);
-        ctx.font = '600 16px system-ui, "Microsoft YaHei", sans-serif';
-        ctx.fillStyle = "#ffffff";
-        drawKnowledgeGraphWrappedLabel(ctx, dmateKnowledgeLabel(node.name), pos.x + cellWidth / 2,
-            pos.y + (hasBadge ? 32 : cellHeight / 2), cellWidth - 18, hasBadge ? 2 : 3);
-        if (hasBadge) {
-            ctx.font = '12px system-ui, "Microsoft YaHei", sans-serif';
-            ctx.fillStyle = "#e9d5ff";
-            ctx.fillText(dmateUiText(state.badge), pos.x + cellWidth / 2, pos.y + cellHeight - 12);
-        }
+        window.DMateKnowledgeGraphLabels.paint(ctx, labels.layouts.get(node.id), pos.x, pos.y, {
+            width: cellWidth, height: cellHeight, titleColor: "#ffffff", badgeColor: "#e9d5ff"
+        });
     }
 
     return await new Promise((resolve, reject) => {
@@ -17005,7 +16975,10 @@ function renderChat(preparedReply = null) {
     const chat = document.getElementById("chat");
     if (!chat) return;
     const session = getCurrent();
-    chat.closest(".center")?.classList.toggle("chat-empty", !session);
+    const center = chat.closest(".center");
+    if (window.DMateChatComposer?.transitionConversation) {
+        window.DMateChatComposer.transitionConversation(center, !session);
+    } else center?.classList.toggle("chat-empty", !session);
 
     // Reuse unchanged ready content from this view. A history refresh must not
     // blank earlier answers while a new formula extension is being loaded.
@@ -19850,31 +19823,6 @@ function knowledgeGraphNodeState(nodeName, context) {
 }
 
 
-function splitKnowledgeGraphLabel(text, maxChars = 7) {
-    const value = String(dmateKnowledgeLabel(text) || "").trim();
-
-    if (!value) return [""];
-    if (dmateUiLanguage() === "en") {
-        const lines = [];
-        for (const word of value.split(/\s+/)) {
-            const last = lines.length - 1;
-            if (last >= 0 && (lines[last] + " " + word).length <= 23) lines[last] += " " + word;
-            else lines.push(word);
-        }
-        return lines;
-    }
-
-    const lines = [];
-
-    for (let index = 0; index < value.length; index += maxChars) {
-        lines.push(
-            value.slice(index, index + maxChars)
-        );
-    }
-
-    return lines.slice(0, 2);
-}
-
 function createSvgElement(tag, attrs = {}) {
     const element = document.createElementNS(
         "http://www.w3.org/2000/svg",
@@ -20240,8 +20188,14 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     const marginY = 48;
     const gapX = 116;
     const gapY = 60;
-    const nodeWidth = 144;
-    const nodeHeight = 76;
+    const nodeWidth = dmateUiLanguage() === "en" ? 190 : 144;
+    const labelPack = window.DMateKnowledgeGraphLabels.prepare(nodes, {
+        label: node => dmateKnowledgeLabel(node.name),
+        badge: node => dmateUiText(knowledgeGraphNodeState(node.name, context).badge || node.level || ""),
+        width: nodeWidth, minHeight: 76, titleSize: 13, weight: 700,
+        badgeSize: 10, badgeWeight: 600, paddingX: 12, paddingY: 10, gap: 5
+    });
+    const nodeHeight = labelPack.height;
     const maxRows = Math.max(...columnKeys.map(key => columns.get(key).length), 1);
     const stageWidth = marginX * 2 + columnCount * nodeWidth + (columnCount - 1) * gapX;
     const stageHeight = marginY * 2 + maxRows * nodeHeight + (maxRows - 1) * gapY;
@@ -20355,18 +20309,7 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
         button.style.borderColor = state.stroke;
         button.setAttribute("aria-label", dmateKnowledgeLabel(node.name));
 
-        const name = document.createElement("span");
-        name.className = "kg-mobile-node-name";
-        name.textContent = dmateKnowledgeLabel(node.name);
-        button.appendChild(name);
-
-        const badgeText = state.badge || node.level || "";
-        if (badgeText) {
-            const badge = document.createElement("span");
-            badge.className = "kg-mobile-node-badge";
-            badge.textContent = badgeText;
-            button.appendChild(badge);
-        }
+        window.DMateKnowledgeGraphLabels.applyHtml(button, labelPack.layouts.get(node.id));
 
         button.addEventListener("click", () => {
             selectKnowledgeGraphNode(node.id, button);
@@ -20594,6 +20537,16 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
         verticalGap = 22;
     }
 
+    const labelPack = window.DMateKnowledgeGraphLabels.prepare(nodes, {
+        label: node => dmateKnowledgeLabel(node.name),
+        badge: node => dmateUiText(knowledgeGraphNodeState(node.name, context).badge || node.level || ""),
+        width: nodeWidth, minHeight: nodeHeight,
+        titleSize: mobileGraphLayout ? 14 : 12, weight: mobileGraphLayout ? 600 : 500,
+        badgeSize: mobileGraphLayout ? 11 : 10, badgeWeight: 500,
+        paddingX: 10, paddingY: 10, gap: 5
+    });
+    nodeHeight = labelPack.height;
+
     const maxRows = Math.max(
         ...columnKeys.map(
             key => columns.get(key).length
@@ -20712,53 +20665,9 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
 
         group.appendChild(rect);
 
-        const lines = splitKnowledgeGraphLabel(
-            node.name
-        );
-        const text = createSvgElement("text", {
-            class: "kg-node-label",
-            x: nodeWidth / 2,
-            y: 22,
-            fill: state.text || "#ffffff",
-            "font-size": mobileGraphLayout ? 14 : 12,
-            "font-weight": mobileGraphLayout ? 600 : 500,
-            "text-anchor": "middle"
+        window.DMateKnowledgeGraphLabels.applySvg(group, labelPack.layouts.get(node.id), {
+            width: nodeWidth, height: nodeHeight, titleColor: state.text || "#ffffff"
         });
-
-        if (lines.length === 1) {
-            const tspan = createSvgElement("tspan", {
-                x: nodeWidth / 2,
-                dy: 0
-            });
-            tspan.textContent = lines[0];
-            text.appendChild(tspan);
-        } else {
-            lines.forEach((line, index) => {
-                const tspan = createSvgElement("tspan", {
-                    x: nodeWidth / 2,
-                    dy: index === 0 ? 0 : 14
-                });
-                tspan.textContent = line;
-                text.appendChild(tspan);
-            });
-        }
-
-        group.appendChild(text);
-
-        const nodeBadge = state.badge || node.level;
-
-        if (nodeBadge) {
-            const badge = createSvgElement("text", {
-                class: "kg-node-badge",
-                x: nodeWidth / 2,
-                y: nodeHeight - 10,
-                fill: "#e2e8f0",
-                "font-size": mobileGraphLayout ? 11 : 10,
-                "text-anchor": "middle"
-            });
-            badge.textContent = nodeBadge;
-            group.appendChild(badge);
-        }
 
         svg.appendChild(group);
     }

@@ -5,17 +5,17 @@
   const DB_VERSION = 2;
   const state = {
     db: null, concepts: [], questions: [], graph: null,
-    panel: "drawing", selectedQuestion: null, selectedConcept: null,
+    panel: "graph", selectedQuestion: null, selectedConcept: null,
     selectedOption: [], revealed: false,
     drawingController: null, backgroundUrl: "", graphCategory: "", questionCategory: "",
     questionDifficulty: "", conceptQuery: "", graphQuery: "", graphController: null,
     questionResponses: new Map(), appearanceQueue: Promise.resolve()
   };
   const panelMeta = {
-    drawing: ["绘图", "使用 DMate 图形编辑器，在本机创建和保存数学图形。"],
     graph: ["知识图谱", "浏览离散数学知识点及其前置关系。"],
-    questions: ["题库", "按章节和难度练习，查看参考答案与解析。"],
-    concepts: ["概念库", "使用简体中文查看定义、解释、例题和易错点。"]
+    concepts: ["概念库", "使用简体中文查看定义、解释、例题和易错点。"],
+    questions: ["练习库", "按章节和难度练习，查看参考答案与解析。"],
+    drawing: ["绘图", "使用 DMate 图形编辑器，在本机创建和保存数学图形。"]
   };
 
   function toast(message) {
@@ -163,12 +163,12 @@
   function setNetworkStatus() {
     const online = navigator.onLine;
     $("returnOnline").disabled = !online;
-    $("returnOnline").title = online ? "返回在线版" : "网络恢复后可返回在线版";
+    // Entry controls keep their accessible name without hover tooltips.
+    $("returnOnline").removeAttribute("title");
   }
 
   function switchPanel(name) {
     if (!panelMeta[name]) return;
-    if (name === "graph" && state.panel !== "graph") state.graphReturnPanel = state.panel;
     if (name !== "graph" && state.graphController) {
       state.graphController.destroy(); state.graphController = null;
     }
@@ -399,7 +399,6 @@
     state.graphController = window.DMateOfflineGraph.mount(host, {
       nodes: state.graph.nodes, category: state.graphCategory || "全部",
       onCategoryChange(category) { state.graphCategory = category === "全部" ? "" : category; },
-      onClose() { switchPanel(state.graphReturnPanel || "drawing"); },
       onStatus: toast,
       onSelect(node) {
       const concept = state.concepts.find(c => c.id === node.id || c.title === node.name);
@@ -478,7 +477,7 @@
       await migrateCurrentAccountData();
       await loadResources();
       bind();
-      await switchPanel("drawing");
+      await switchPanel("graph");
       document.documentElement.dataset.offlineReady = "true";
     } catch (error) {
       toast(error?.message || "离线工作区初始化失败");

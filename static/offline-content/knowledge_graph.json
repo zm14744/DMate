@@ -1,5 +1,5 @@
 {
-  "version": 44,
+  "version": 47,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -223,8 +223,7 @@
             }
           ]
         }
-      ],
-      "note": "原课程P13讨论谓词公式、量词的辖域与自由/约束变元；跟随P12基础概念之后观看。"
+      ]
     },
     {
       "id": "predicate_quantifier",
@@ -247,8 +246,7 @@
             }
           ]
         }
-      ],
-      "note": "原课程P14是量词符号化，建议先看P13的谓词公式与辖域，再看P14。这里的依赖表示建议的视频学习顺序。"
+      ]
     },
     {
       "id": "predicate_reasoning",
@@ -287,8 +285,7 @@
             }
           ]
         }
-      ],
-      "note": "按东北大学原课程的讲授顺序：P15–P16先学谓词等价与蕴含式，然后到“前束范式”节点学习P17，最后回来学习本节点P18–P19的推理理论。当前知识点合并了等价与推理，不能把P18–P19误当成P17的先修内容。"
+      ]
     },
     {
       "id": "predicate_prenex",
@@ -312,8 +309,7 @@
             }
           ]
         }
-      ],
-      "note": "这一讲是原课程P17，建议先学谓词等价（P15–P16），再学P17，最后学谓词推理（P18–P19）。此处不把整个“谓词逻辑等价与推理”节点设为硬性前置，以免出现视频顺序倒退。"
+      ]
     },
     {
       "id": "proof_direct_contradiction",
@@ -324,15 +320,20 @@
       ],
       "videos": [
         {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "1. Lec 1 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "source_id": "sawfin_bilibili",
+          "title": "Direct Proof and Proof by Contradiction",
           "sections": [
-            "1. Lec 1 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+            "p16 Discrete Math - 1.7.1 Direct Proof",
+            "p18 Discrete Math - 1.7.3 Proof by Contradiction"
           ],
           "lessons": [
             {
-              "title": "1. Lec 1 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=1"
+              "title": "p16 Discrete Math - 1.7.1 Direct Proof",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=17"
+            },
+            {
+              "title": "p18 Discrete Math - 1.7.3 Proof by Contradiction",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=19"
             }
           ]
         }
@@ -373,26 +374,10 @@
       ],
       "videos": [
         {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "归纳法进阶证明技巧",
-          "sections": [
-            "第3讲：归纳法进阶证明技巧"
-          ],
-          "lessons": [
-            {
-              "title": "第3讲：归纳法进阶证明技巧",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=3",
-              "part": 3,
-              "duration": "57:42",
-              "title_truncated_in_screenshot": false
-            }
-          ]
-        },
-        {
           "source_id": "mit_6042j_2010_bilibili",
           "title": "Lecture 3: Strong Induction",
           "sections": [
-            "Lecture 3: Strong Induction"
+            "3. Lec 3 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
@@ -401,8 +386,7 @@
             }
           ]
         }
-      ],
-      "note": "CMU P3为归纳证明技巧进阶；另提供MIT 2010 Lecture 3，标题明确为Strong Induction，适合需要专门学习强归纳法的学生。"
+      ]
     },
     {
       "id": "set_operation",
@@ -522,8 +506,7 @@
             "(2)--关系的性质——对称性",
             "(3)--关系的性质——传递性",
             "(4)--关系性质的判断",
-            "(5)--关系运算对性质的保持",
-            "(6)--扩展材料——特殊关系的计数"
+            "(5)--关系运算对性质的保持"
           ],
           "lessons": [
             {
@@ -545,10 +528,6 @@
             {
               "title": "(5)--关系运算对性质的保持",
               "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=57"
-            },
-            {
-              "title": "(6)--扩展材料——特殊关系的计数",
-              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=58"
             }
           ]
         }
@@ -784,15 +763,20 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "source_id": "sawfin_bilibili",
+          "title": "Divisibility and Primes",
           "sections": [
-            "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+            "p41 Discrete Math - 4.1.1 Divisibility",
+            "p47 Discrete Math - 4.3.1 Prime Numbers and Their Properties"
           ],
           "lessons": [
             {
-              "title": "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=4"
+              "title": "p41 Discrete Math - 4.1.1 Divisibility",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=42"
+            },
+            {
+              "title": "p47 Discrete Math - 4.3.1 Prime Numbers and Their Properties",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=48"
             }
           ]
         }
@@ -807,15 +791,20 @@
       ],
       "videos": [
         {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "source_id": "sawfin_bilibili",
+          "title": "GCD and the Euclidean Algorithm",
           "sections": [
-            "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+            "p48 Discrete Math - 4.3.2 Greatest Common Divisors and Least Common Multiples",
+            "p49 Discrete Math - 4.3.3 The Euclidean Algorithm"
           ],
           "lessons": [
             {
-              "title": "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=4"
+              "title": "p48 Discrete Math - 4.3.2 Greatest Common Divisors and Least Common Multiples",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=49"
+            },
+            {
+              "title": "p49 Discrete Math - 4.3.3 The Euclidean Algorithm",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=50"
             }
           ]
         }
@@ -830,15 +819,15 @@
       ],
       "videos": [
         {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "source_id": "sawfin_bilibili",
+          "title": "Modular Arithmetic",
           "sections": [
-            "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+            "p42 Discrete Math - 4.1.2 Modular Arithmetic"
           ],
           "lessons": [
             {
-              "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=5"
+              "title": "p42 Discrete Math - 4.1.2 Modular Arithmetic",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=43"
             }
           ]
         }
@@ -854,15 +843,15 @@
       ],
       "videos": [
         {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "source_id": "sawfin_bilibili",
+          "title": "Solving Linear Congruences",
           "sections": [
-            "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+            "p51 Discrete Math - 4.4.1 Solving Linear Congruences Using the Inverse"
           ],
           "lessons": [
             {
-              "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=5"
+              "title": "p51 Discrete Math - 4.4.1 Solving Linear Congruences Using the Inverse",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=52"
             }
           ]
         }
@@ -895,8 +884,7 @@
             }
           ]
         }
-      ],
-      "note": "丘维声教授采用较抽象的数论与代数视角。若只学过同余方程，建议先理解剩余类、模逆和剩余类环的基本概念，再观看中国剩余定理P29–P30；不代表其他数论节点需要提前掌握完整群环理论。"
+      ]
     },
     {
       "id": "number_euler_fermat",
@@ -954,18 +942,15 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "第1讲：课程导引、基础计数原理",
+          "source_id": "sawfin_bilibili",
+          "title": "Counting Rules",
           "sections": [
-            "第1讲：课程导引、基础计数原理"
+            "p59 Discrete Math - 6.1.1 Counting Rules"
           ],
           "lessons": [
             {
-              "title": "第1讲：课程导引、基础计数原理",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=1",
-              "part": 1,
-              "duration": "57:47",
-              "title_truncated_in_screenshot": false
+              "title": "p59 Discrete Math - 6.1.1 Counting Rules",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=60"
             }
           ]
         }
@@ -1014,33 +999,8 @@
               "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=63"
             }
           ]
-        },
-        {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "二项式系数基础与进阶",
-          "sections": [
-            "第8讲：二项式系数基础与恒等式",
-            "第9讲：二项式系数进阶、Lucas 定理"
-          ],
-          "lessons": [
-            {
-              "title": "第8讲：二项式系数基础与恒等式",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=8",
-              "part": 8,
-              "duration": "54:27",
-              "title_truncated_in_screenshot": false
-            },
-            {
-              "title": "第9讲：二项式系数进阶、Lucas 定理",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=9",
-              "part": 9,
-              "duration": "51:14",
-              "title_truncated_in_screenshot": false
-            }
-          ]
         }
-      ],
-      "note": "先看BU的二项式定理基本讲解，再看CMU P8二项式系数及恒等式；P9 Lucas定理属进阶拓展，不必作为入门必修。"
+      ]
     },
     {
       "id": "count_pigeonhole",
@@ -1054,28 +1014,16 @@
           "source_id": "cmu_21_228_2021_bilibili",
           "title": "鸽巢原理",
           "sections": [
-            "第6讲：鸽巢原理",
-            "第7讲：鸽巢原理进阶、狄利克雷逼近…"
+            "第6讲：鸽巢原理"
           ],
           "lessons": [
             {
               "title": "第6讲：鸽巢原理",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=6",
-              "part": 6,
-              "duration": "51:37",
-              "title_truncated_in_screenshot": false
-            },
-            {
-              "title": "第7讲：鸽巢原理进阶、狄利克雷逼近…",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=7",
-              "part": 7,
-              "duration": "52:42",
-              "title_truncated_in_screenshot": true
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=6"
             }
           ]
         }
-      ],
-      "note": "CMU P6为鸽巢原理基础；P7涉及进一步应用和狄利克雷逼近，建议理解基础后再选学。"
+      ]
     },
     {
       "id": "count_inclusion",
@@ -1126,56 +1074,16 @@
           "title": "生成函数",
           "sections": [
             "第14讲：生成函数基础定义与运算",
-            "第15讲：生成函数经典计数案例",
-            "第16讲：生成函数进阶、组合级数",
-            "第17讲：更多生成函数技巧与变换"
+            "第15讲：生成函数经典计数案例"
           ],
           "lessons": [
             {
               "title": "第14讲：生成函数基础定义与运算",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=14",
-              "part": 14,
-              "duration": "48:34",
-              "title_truncated_in_screenshot": false
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=14"
             },
             {
               "title": "第15讲：生成函数经典计数案例",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=15",
-              "part": 15,
-              "duration": "50:51",
-              "title_truncated_in_screenshot": false
-            },
-            {
-              "title": "第16讲：生成函数进阶、组合级数",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=16",
-              "part": 16,
-              "duration": "55:12",
-              "title_truncated_in_screenshot": false
-            },
-            {
-              "title": "第17讲：更多生成函数技巧与变换",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=17",
-              "part": 17,
-              "duration": "53:29",
-              "title_truncated_in_screenshot": false
-            }
-          ]
-        },
-        {
-          "source_id": "nymu_combinatorics_fuhenglin",
-          "title": "生成函数",
-          "sections": [
-            "Lec20 - 计数原理2与生成函数1",
-            "Lec21 - 生成函数2"
-          ],
-          "lessons": [
-            {
-              "title": "Lec20 - 计数原理2与生成函数1",
-              "url": "https://www.bilibili.com/video/BV1NJ4m1j77r/?p=20"
-            },
-            {
-              "title": "Lec21 - 生成函数2",
-              "url": "https://www.bilibili.com/video/BV1NJ4m1j77r/?p=21"
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=15"
             }
           ]
         }
@@ -1199,22 +1107,6 @@
               "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=68"
             }
           ]
-        },
-        {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "递推关系：线性代数方法",
-          "sections": [
-            "第11讲：线性代数在递推关系中的应用"
-          ],
-          "lessons": [
-            {
-              "title": "第11讲：线性代数在递推关系中的应用",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=11",
-              "part": 11,
-              "duration": "55:17",
-              "title_truncated_in_screenshot": false
-            }
-          ]
         }
       ]
     },
@@ -1236,30 +1128,11 @@
           "lessons": [
             {
               "title": "第12讲：线性递推求解方法",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=12",
-              "part": 12,
-              "duration": "56:22",
-              "title_truncated_in_screenshot": false
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=12"
             },
             {
               "title": "第13讲：递推序列的特征方程法",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=13",
-              "part": 13,
-              "duration": "50:32",
-              "title_truncated_in_screenshot": false
-            }
-          ]
-        },
-        {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-          "sections": [
-            "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
-          ],
-          "lessons": [
-            {
-              "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=15"
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=13"
             }
           ]
         }
@@ -1286,8 +1159,7 @@
             }
           ]
         }
-      ],
-      "note": "MIT 6.042J Fall 2010 Lecture 15 原授课实录明确讲授非齐次线性递推的通解、特解和初始条件。CMU P12仅能确认一般线性递推解法，不以该讲冒充非齐次专题。"
+      ]
     },
     {
       "id": "recurrence_initial",
@@ -1345,24 +1217,6 @@
               "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=8"
             }
           ]
-        },
-        {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "CMU 图论基础补充",
-          "sections": [
-            "第18讲：图论基础：图的定义、路…"
-          ],
-          "lessons": [
-            {
-              "title": "第18讲：图论基础：图的定义、路…",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=18",
-              "part": 18,
-              "duration": "52:20",
-              "title_truncated_in_screenshot": true
-            }
-          ],
-          "supplementary": true,
-          "mapping_note": "P18标题直接对应图的定义与路径；哈工大图论仍保留为主课程。"
         }
       ]
     },
@@ -1420,24 +1274,18 @@
         "图的基本概念",
         "邻接矩阵"
       ],
-      "note": "本节点的视频讲授邻接矩阵、邻接表和关联矩阵。邻接表属于图的存储表示，非矩阵；度矩阵、拉普拉斯矩阵由Steve Butler谱图论P14–P15进一步引入。",
       "videos": [
         {
           "source_id": "hit_graph_theory",
           "title": "图的矩阵表示",
           "sections": [
             "5.1.1 邻接矩阵",
-            "5.2.1 邻接表",
             "5.3.1 关联矩阵"
           ],
           "lessons": [
             {
               "title": "5.1.1 邻接矩阵",
               "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=27"
-            },
-            {
-              "title": "5.2.1 邻接表",
-              "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=28"
             },
             {
               "title": "5.3.1 关联矩阵",
@@ -1461,9 +1309,7 @@
           "sections": [
             "2.1.1-连通和DFS-理论",
             "2.1.2-连通和DFS-算法",
-            "7.3.1-有向图的连通-理论",
-            "7.3.2.1-有向图的连通-计算强连通定向的算法",
-            "7.3.2.2-有向图的连通-计算强连通分支的算法"
+            "7.3.1-有向图的连通-理论"
           ],
           "lessons": [
             {
@@ -1477,37 +1323,10 @@
             {
               "title": "7.3.1-有向图的连通-理论",
               "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=39"
-            },
-            {
-              "title": "7.3.2.1-有向图的连通-计算强连通定向的算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=40"
-            },
-            {
-              "title": "7.3.2.2-有向图的连通-计算强连通分支的算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=41"
             }
           ]
-        },
-        {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "CMU 图连通性补充",
-          "sections": [
-            "第19讲：图连通性、欧拉迹与欧拉…"
-          ],
-          "lessons": [
-            {
-              "title": "第19讲：图连通性、欧拉迹与欧拉…",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=19",
-              "part": 19,
-              "duration": "53:36",
-              "title_truncated_in_screenshot": true
-            }
-          ],
-          "supplementary": true,
-          "mapping_note": "P19涵盖图连通性；南京大学程龚课程仍保留为主课程，提供更细的DFS与算法内容。"
         }
-      ],
-      "note": "从P6–P7的无向图连通与DFS开始；P39–P41转入有向图强连通分支和算法，属于后续进阶，可在学完基础后按需观看。CMU P19是图连通性的额外讲解。"
+      ]
     },
     {
       "id": "graph_cut",
@@ -1522,8 +1341,7 @@
           "title": "割点、割边与割集",
           "sections": [
             "2.2.1-割点和割边-理论",
-            "2.2.2-割点和割边-算法",
-            "4.2-割集和连通度"
+            "2.2.2-割点和割边-算法"
           ],
           "lessons": [
             {
@@ -1533,10 +1351,6 @@
             {
               "title": "2.2.2-割点和割边-算法",
               "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=9"
-            },
-            {
-              "title": "4.2-割集和连通度",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=21"
             }
           ]
         }
@@ -1554,17 +1368,12 @@
           "source_id": "chenggong_gta",
           "title": "赋权图和距离",
           "sections": [
-            "6.1.1-赋权图和距离-理论",
-            "6.1.2-赋权图和距离-算法"
+            "6.1.1-赋权图和距离-理论"
           ],
           "lessons": [
             {
               "title": "6.1.1-赋权图和距离-理论",
               "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=27"
-            },
-            {
-              "title": "6.1.2-赋权图和距离-算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=28"
             }
           ]
         }
@@ -1595,24 +1404,6 @@
               "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=17"
             }
           ]
-        },
-        {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "CMU 欧拉迹与欧拉回路补充",
-          "sections": [
-            "第19讲：图连通性、欧拉迹与欧拉…"
-          ],
-          "lessons": [
-            {
-              "title": "第19讲：图连通性、欧拉迹与欧拉…",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=19",
-              "part": 19,
-              "duration": "53:36",
-              "title_truncated_in_screenshot": true
-            }
-          ],
-          "supplementary": true,
-          "mapping_note": "P19包含欧拉迹/欧拉回路；南京大学程龚课程仍保留为主课程。"
         }
       ]
     },
@@ -1636,24 +1427,6 @@
               "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=18"
             }
           ]
-        },
-        {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "CMU 旅行商问题应用补充",
-          "sections": [
-            "第23讲：旅行商问题（TSP）简介"
-          ],
-          "lessons": [
-            {
-              "title": "第23讲：旅行商问题（TSP）简介",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=23",
-              "part": 23,
-              "duration": "52:33",
-              "title_truncated_in_screenshot": false
-            }
-          ],
-          "supplementary": true,
-          "mapping_note": "P23是旅行商问题，作为哈密顿回路的优化应用补充；南京大学程龚课程仍保留为哈密顿图主课程。"
         }
       ]
     },
@@ -1699,8 +1472,7 @@
             }
           ]
         }
-      ],
-      "note": "建议按BFS无权最短路（P10–P11）→赋权图距离（P27–P28）→有向图距离（P42）的顺序学习；后半部分是进阶内容。"
+      ]
     },
     {
       "id": "graph_coloring",
@@ -1732,32 +1504,6 @@
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=44"
             }
           ]
-        },
-        {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "CMU 图着色补充",
-          "sections": [
-            "第32讲：平面图着色、四色定理",
-            "第33讲：图着色进阶、色多项式"
-          ],
-          "lessons": [
-            {
-              "title": "第32讲：平面图着色、四色定理",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=32",
-              "part": 32,
-              "duration": "51:40",
-              "title_truncated_in_screenshot": false
-            },
-            {
-              "title": "第33讲：图着色进阶、色多项式",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=33",
-              "part": 33,
-              "duration": "52:42",
-              "title_truncated_in_screenshot": false
-            }
-          ],
-          "supplementary": true,
-          "mapping_note": "P32讲四色定理，P33讲进阶图着色与色多项式；dogeman课程仍保留点着色、边着色和五/六色定理内容。"
         }
       ]
     },
@@ -1773,45 +1519,14 @@
           "source_id": "hit_set_graph_2017",
           "title": "平面图及欧拉公式",
           "sections": [
-            "43平面图及欧拉公式",
-            "44非平面哈密顿图 库氏定理 顶点着色1"
+            "43平面图及欧拉公式"
           ],
           "lessons": [
             {
               "title": "43平面图及欧拉公式",
               "url": "https://www.bilibili.com/video/BV1Eb41137gB/?p=43"
-            },
-            {
-              "title": "44非平面哈密顿图 库氏定理 顶点着色1",
-              "url": "https://www.bilibili.com/video/BV1Eb41137gB/?p=44"
             }
           ]
-        },
-        {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "CMU 平面图补充",
-          "sections": [
-            "第31讲：平面图定义、欧拉公式",
-            "第32讲：平面图着色、四色定理"
-          ],
-          "lessons": [
-            {
-              "title": "第31讲：平面图定义、欧拉公式",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=31",
-              "part": 31,
-              "duration": "58:04",
-              "title_truncated_in_screenshot": false
-            },
-            {
-              "title": "第32讲：平面图着色、四色定理",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=32",
-              "part": 32,
-              "duration": "51:40",
-              "title_truncated_in_screenshot": false
-            }
-          ],
-          "supplementary": true,
-          "mapping_note": "P31讲平面图与欧拉公式，P32继续讲平面图着色与四色定理；哈工大课程仍保留为主课程。"
         }
       ]
     },
@@ -1828,45 +1543,14 @@
           "source_id": "chenggong_gta",
           "title": "二部图",
           "sections": [
-            "3.2.1-二分图-理论",
-            "3.2.2-二分图-算法"
+            "3.2.1-二分图-理论"
           ],
           "lessons": [
             {
               "title": "3.2.1-二分图-理论",
               "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=14"
-            },
-            {
-              "title": "3.2.2-二分图-算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=15"
             }
           ]
-        },
-        {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "CMU 二部图匹配补充",
-          "sections": [
-            "第24讲：匹配理论基础、霍尔婚配…",
-            "第25讲：最大匹配、二分图匹配算法"
-          ],
-          "lessons": [
-            {
-              "title": "第24讲：匹配理论基础、霍尔婚配…",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=24",
-              "part": 24,
-              "duration": "57:01",
-              "title_truncated_in_screenshot": true
-            },
-            {
-              "title": "第25讲：最大匹配、二分图匹配算法",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=25",
-              "part": 25,
-              "duration": "52:51",
-              "title_truncated_in_screenshot": false
-            }
-          ],
-          "supplementary": true,
-          "mapping_note": "P24–P25从Hall婚配定理衔接到二分图匹配；南京大学程龚课程仍保留为主课程。"
         }
       ]
     },
@@ -1881,19 +1565,6 @@
       ],
       "videos": [
         {
-          "source_id": "bjtu_discrete",
-          "title": "第六讲(5)--拓扑排序",
-          "sections": [
-            "(5)--拓扑排序"
-          ],
-          "lessons": [
-            {
-              "title": "(5)--拓扑排序",
-              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=88"
-            }
-          ]
-        },
-        {
           "source_id": "graph_animation_bili",
           "title": "图-拓扑排序",
           "sections": [
@@ -1906,8 +1577,7 @@
             }
           ]
         }
-      ],
-      "note": "可先从北京交通大学偏序关系、哈斯图过渡到拓扑排序，再看动画视频理解有向无环图上的操作。偏序是建议前置，不是算法的严格必要条件。"
+      ]
     },
     {
       "id": "graph_domination",
@@ -1957,8 +1627,6 @@
           "sections": [
             "5.1.1-匹配和最大匹配-理论",
             "5.1.2.1-匹配和最大匹配-匈牙利算法",
-            "5.1.2.2-匹配和最大匹配-霍普克罗夫特-卡普算法",
-            "5.1.2.3-匹配和最大匹配-花算法",
             "5.2-完美匹配"
           ],
           "lessons": [
@@ -1971,47 +1639,12 @@
               "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=23"
             },
             {
-              "title": "5.1.2.2-匹配和最大匹配-霍普克罗夫特-卡普算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=24"
-            },
-            {
-              "title": "5.1.2.3-匹配和最大匹配-花算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=25"
-            },
-            {
               "title": "5.2-完美匹配",
               "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=26"
             }
           ]
-        },
-        {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "CMU 匹配理论补充",
-          "sections": [
-            "第24讲：匹配理论基础、霍尔婚配…",
-            "第25讲：最大匹配、二分图匹配算法"
-          ],
-          "lessons": [
-            {
-              "title": "第24讲：匹配理论基础、霍尔婚配…",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=24",
-              "part": 24,
-              "duration": "57:01",
-              "title_truncated_in_screenshot": true
-            },
-            {
-              "title": "第25讲：最大匹配、二分图匹配算法",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=25",
-              "part": 25,
-              "duration": "52:51",
-              "title_truncated_in_screenshot": false
-            }
-          ],
-          "supplementary": true,
-          "mapping_note": "P24包含匹配基础和Hall婚配定理，P25包含最大匹配及二分图匹配算法；南京大学程龚课程仍保留为算法主课程。"
         }
-      ],
-      "note": "建议先学二分图与匹配基础，再依次学最大匹配P22–P23；P24–P25介绍更高阶匹配算法，若只是学习离散数学基础可作为拓展。"
+      ]
     },
     {
       "id": "tree_basic",
@@ -2039,24 +1672,6 @@
               "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=20"
             }
           ]
-        },
-        {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "CMU 树论补充",
-          "sections": [
-            "第21讲：树的基础性质、生成树"
-          ],
-          "lessons": [
-            {
-              "title": "第21讲：树的基础性质、生成树",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=21",
-              "part": 21,
-              "duration": "53:57",
-              "title_truncated_in_screenshot": false
-            }
-          ],
-          "supplementary": true,
-          "mapping_note": "P21讲树的基础性质与生成树；电子科技大学课程仍保留为主课程。"
         }
       ]
     },
@@ -2104,32 +1719,6 @@
               "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=21"
             }
           ]
-        },
-        {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "CMU 生成树与树计数补充",
-          "sections": [
-            "第21讲：树的基础性质、生成树",
-            "第22讲：树的计数、Cayley 公式"
-          ],
-          "lessons": [
-            {
-              "title": "第21讲：树的基础性质、生成树",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=21",
-              "part": 21,
-              "duration": "53:57",
-              "title_truncated_in_screenshot": false
-            },
-            {
-              "title": "第22讲：树的计数、Cayley 公式",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=22",
-              "part": 22,
-              "duration": "51:49",
-              "title_truncated_in_screenshot": false
-            }
-          ],
-          "supplementary": true,
-          "mapping_note": "P21讲生成树，P22讲Cayley公式与树计数。Cayley公式不是矩阵树定理，未映射到tree_matrix_tree。"
         }
       ]
     },
@@ -2190,8 +1779,7 @@
             }
           ]
         }
-      ],
-      "note": "拓展专题。建议先掌握生成树、关联矩阵，以及基础线性代数中的矩阵和行列式，再依次看Steve Butler P14（拉普拉斯矩阵）→P15（性质）→P16（矩阵树定理）。"
+      ]
     },
     {
       "id": "algebra_system",
@@ -2219,8 +1807,7 @@
             }
           ]
         }
-      ],
-      "note": "先看P51二元运算及其性质，再看P52代数系统；之后可接P53一般同态同构，或继续学习半群、独异点、群。"
+      ]
     },
     {
       "id": "algebra_homomorphism",
@@ -2244,8 +1831,7 @@
             }
           ]
         }
-      ],
-      "note": "讲授一般代数系统的同态与同构，适合在代数系统（P52）之后、群（P56）之前学习；不要求先学群论。"
+      ]
     },
     {
       "id": "algebra_group",
@@ -2293,8 +1879,7 @@
             }
           ]
         }
-      ],
-      "note": "建议按P54–P55半群与独异点→P56群的定义→P57群的相关定理→P58–P59子群的顺序学习。半群和独异点作为群的前置概念，不要求先学P53的同态同构。"
+      ]
     },
     {
       "id": "algebra_ring_field",
@@ -2355,8 +1940,7 @@
             }
           ]
         }
-      ],
-      "note": "课程P67–P70连续讲格的定义与性质、相关定理、分配格、布尔格与布尔代数。若只需入门，P67和P70是核心；P68–P69用于理解中间推导。"
+      ]
     }
   ],
   "video_sources": [
@@ -2736,22 +2320,25 @@
     }
   ],
   "video_resource_policy": {
-    "primary_per_node": "Keep one primary selected course per node; additional CMU lessons may be listed as supplementary when they add direct, non-duplicative coverage.",
+    "primary_per_node": "Exactly one curated Bilibili course per knowledge node, with multiple precise lessons only when necessary to cover that node.",
     "platform_policy": "Bilibili_only",
-    "course_continuity": "Keep adjacent topics within one course where possible; avoid redundant or abrupt switches.",
-    "note": "Bilibili-only. CMU Po-Shen Loh Spring 2021 course is confirmed from the mainland Bilibili screenshots as 35 parts totaling 31:26:24, uploaded by 无为斋主. The full 35-part list is stored in the source record. Direct part links use the mainland www.bilibili.com domain. CMU is primary for counting, binomial coefficients, recurrences and generating functions; later graph/tree/matching/planar lectures are supplementary where existing specialist courses remain primary. P22 Cayley formula is not the Matrix-Tree theorem. P26–P29 do not have matching existing nodes and are not forced into unrelated topics. The Matrix-Tree node remains assigned to Steve Butler P14–P16. CRT node now uses Peking University professor Qiu Weisheng 1080p restored Bilibili video BV12Y411b7Yn, actual parts P29/P30. Display titles numbered 25/26 differ because the 88-part upload includes four intro videos. Avoid assigning P25/P26 for this upload.",
+    "course_continuity": "Choose source per node based on tight topic match, clear lecture content and natural adjacency; do not use graph edges as mandatory viewing order. Do not add unrelated advanced algorithms or duplicate supplementary teachers merely for prestige.",
+    "note": "Bilibili-only. Select lessons by direct relevance to each individual knowledge node; prefer natural continuity of course scope and difficulty within and across modules without prescribing a strict viewing order. Knowledge graph edges describe useful conceptual relationships, not mandatory steps or proof of mastering prerequisites. Do not show any study-order explanation notes in node detail panels.",
     "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs.",
     "audit_status": {
       "nodes_total": 68,
       "nodes_with_active_course": 68,
       "nodes_pending": "none",
-      "direct_episode_links": 169,
+      "direct_episode_links": 136,
       "nested_or_missing_episode_urls": 0,
       "youtube_links": 0,
       "cmu_2021_parts_verified": 35,
       "cmu_2021_total_duration": "31:26:24",
       "cmu_2021_mapped_nodes": 18,
-      "last_audit_scope": "Complete pedagogical-sequence pass: added dogeman binary operations and semigroup preludes; northeast logic P12–P19 prelude and lesson-order guidance (P13 before P14; P17 between P16 and P18); added foundational-to-advanced viewing guidance for recurrence, graph algorithms, binomial, pigeonhole and lattice."
+      "last_audit_scope": "One best-fit course per each of 68 existing DMate knowledge nodes; removed duplicate course alternatives and off-topic extras, replaced broad MIT basic-number-theory entries with precise BU lessons, preserved specialized MIT Euler/Fermat/RSA, CMU generating-function block and other topic-focused courses.",
+      "unique_episode_urls": 132,
+      "cross_node_reused_urls": 4,
+      "sources_with_selected_nodes": 13
     },
     "excluded_source_ids": [
       "scut_discrete_math",
@@ -3029,21 +2616,235 @@
         "Steve Butler ISU"
       ]
     },
-    "curriculum_continuity_audit": {
-      "date": "2026-11-13",
-      "status": "selected_fixes_applied_with_remaining_structural_caveats",
-      "outstanding": [
-        "Predicate equivalence and inference still share one node; guided cross-node viewing order P15-16 → P17 → P18-19 rather than adding a 69th node.",
-        "A few 50-80 minute MIT lectures are reused across several distinct number-theory / recurrence nodes and are not timestamp-deep-linked.",
-        "Course lesson-title alignment was audited from public lecture indices; complete spoken video content was not watched end-to-end."
+    "selection_criteria": [
+      "Exact match of the lecture topic to the knowledge node",
+      "Completeness of the necessary explanation without unrelated chapters",
+      "Clarity and accessibility appropriate to the concept",
+      "Continuity of selected course within adjacent knowledge areas",
+      "Avoid redundant teacher alternatives, broad all-in-one videos and unnecessarily advanced add-ons"
+    ],
+    "selection_audit": {
+      "evaluated_nodes": 68,
+      "source_selection_pool": "Existing curated Bilibili video sources and their published course part listings",
+      "original_multi_source_nodes": 16,
+      "multi_source_nodes_after": 0,
+      "changes": [
+        {
+          "node": "proof_direct_contradiction",
+          "before": "mit_6042j_2010_bilibili",
+          "selected": "sawfin_bilibili",
+          "parts": 2
+        },
+        {
+          "node": "number_prime",
+          "before": "mit_6042j_2010_bilibili",
+          "selected": "sawfin_bilibili",
+          "parts": 2
+        },
+        {
+          "node": "number_gcd",
+          "before": "mit_6042j_2010_bilibili",
+          "selected": "sawfin_bilibili",
+          "parts": 2
+        },
+        {
+          "node": "number_congruence",
+          "before": "mit_6042j_2010_bilibili",
+          "selected": "sawfin_bilibili",
+          "parts": 1
+        },
+        {
+          "node": "number_linear_congruence",
+          "before": "mit_6042j_2010_bilibili",
+          "selected": "sawfin_bilibili",
+          "parts": 1
+        },
+        {
+          "node": "count_basic",
+          "before": "cmu_21_228_2021_bilibili",
+          "selected": "sawfin_bilibili",
+          "parts": 1
+        },
+        {
+          "node": "proof_strong_induction",
+          "before": "cmu_21_228_2021_bilibili,mit_6042j_2010_bilibili",
+          "selected": "mit_6042j_2010_bilibili",
+          "parts": 1
+        },
+        {
+          "node": "count_binomial",
+          "before": "sawfin_bilibili,cmu_21_228_2021_bilibili",
+          "selected": "sawfin_bilibili",
+          "parts": 1
+        },
+        {
+          "node": "count_generating",
+          "before": "cmu_21_228_2021_bilibili,nymu_combinatorics_fuhenglin",
+          "selected": "cmu_21_228_2021_bilibili",
+          "parts": 2
+        },
+        {
+          "node": "recurrence_model",
+          "before": "sawfin_bilibili,cmu_21_228_2021_bilibili",
+          "selected": "sawfin_bilibili",
+          "parts": 1
+        },
+        {
+          "node": "recurrence_homogeneous",
+          "before": "cmu_21_228_2021_bilibili,mit_6042j_2010_bilibili",
+          "selected": "cmu_21_228_2021_bilibili",
+          "parts": 2
+        },
+        {
+          "node": "graph_basic",
+          "before": "hit_graph_theory,cmu_21_228_2021_bilibili",
+          "selected": "hit_graph_theory",
+          "parts": 4
+        },
+        {
+          "node": "graph_connectivity",
+          "before": "chenggong_gta,cmu_21_228_2021_bilibili",
+          "selected": "chenggong_gta",
+          "parts": 3
+        },
+        {
+          "node": "graph_euler",
+          "before": "chenggong_gta,cmu_21_228_2021_bilibili",
+          "selected": "chenggong_gta",
+          "parts": 2
+        },
+        {
+          "node": "graph_hamilton",
+          "before": "chenggong_gta,cmu_21_228_2021_bilibili",
+          "selected": "chenggong_gta",
+          "parts": 1
+        },
+        {
+          "node": "graph_coloring",
+          "before": "dogeman_discrete,cmu_21_228_2021_bilibili",
+          "selected": "dogeman_discrete",
+          "parts": 3
+        },
+        {
+          "node": "graph_planar",
+          "before": "hit_set_graph_2017,cmu_21_228_2021_bilibili",
+          "selected": "hit_set_graph_2017",
+          "parts": 1
+        },
+        {
+          "node": "graph_bipartite",
+          "before": "chenggong_gta,cmu_21_228_2021_bilibili",
+          "selected": "chenggong_gta",
+          "parts": 1
+        },
+        {
+          "node": "graph_topological",
+          "before": "bjtu_discrete,graph_animation_bili",
+          "selected": "graph_animation_bili",
+          "parts": 1
+        },
+        {
+          "node": "graph_matching",
+          "before": "chenggong_gta,cmu_21_228_2021_bilibili",
+          "selected": "chenggong_gta",
+          "parts": 3
+        },
+        {
+          "node": "tree_basic",
+          "before": "uestc_discrete_lower,cmu_21_228_2021_bilibili",
+          "selected": "uestc_discrete_lower",
+          "parts": 2
+        },
+        {
+          "node": "tree_spanning",
+          "before": "uestc_discrete_lower,cmu_21_228_2021_bilibili",
+          "selected": "uestc_discrete_lower",
+          "parts": 1
+        },
+        {
+          "node": "count_pigeonhole",
+          "before": "cmu_21_228_2021_bilibili",
+          "selected": "cmu_21_228_2021_bilibili",
+          "parts": 1
+        },
+        {
+          "node": "graph_weighted",
+          "before": "chenggong_gta",
+          "selected": "chenggong_gta",
+          "parts": 1
+        },
+        {
+          "node": "graph_cut",
+          "before": "chenggong_gta",
+          "selected": "chenggong_gta",
+          "parts": 2
+        },
+        {
+          "node": "relation_property",
+          "before": "bjtu_discrete",
+          "selected": "bjtu_discrete",
+          "parts": 5
+        }
       ],
-      "sources_checked": [
-        "https://www.bilibili.com/video/BV1r4411r7Ya/",
-        "https://www.bilibili.com/video/BV1yguazME3s/",
-        "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2010/video_galleries/video-lectures/",
-        "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2010/resources/lecture-15-linear-recurrences/"
+      "rationale_by_node": {
+        "proof_direct_contradiction": "Two individually targeted proof videos instead of an MIT introduction covering other material.",
+        "number_prime": "Direct short lessons on both divisibility and primes rather than a broad Number Theory I lecture.",
+        "number_gcd": "Covers exactly greatest common divisors and Euclid's algorithm.",
+        "number_congruence": "Modular arithmetic is a direct lesson, rather than first portion of MIT Number Theory II.",
+        "number_linear_congruence": "Specifically teaches linear congruences, while MIT Lecture 5 primarily builds toward Euler, Fermat and RSA.",
+        "count_basic": "Direct counting-rules lesson, followed naturally in the same course by permutations and the binomial theorem.",
+        "proof_strong_induction": "The MIT official lesson is explicitly titled Strong Induction; CMU P3 has a broader advanced-induction scope.",
+        "count_binomial": "The BU lesson explicitly teaches the binomial theorem; CMU P8-9 covers coefficients and advanced Lucas theorem.",
+        "count_generating": "One coherent teacher; definitions and computations followed by core counting applications, excluding advanced redundant lectures.",
+        "recurrence_model": "Only the BU lesson explicitly covers modeling with recurrence relations; CMU P11 starts with linear-algebra applications.",
+        "recurrence_homogeneous": "Focused linear recurrences and characteristic equations, without the generic MIT Lecture 15 duplicate.",
+        "graph_basic": "Brief modular definition, subgraph, degree and regular-graph lessons rather than CMU's broad introductory graph lecture.",
+        "graph_connectivity": "Theoretical and algorithmic connectedness with a directed connectivity unit; avoid redundant advanced P40-41 subroutines and mixed-topic CMU P19.",
+        "graph_euler": "Dedicated Euler graph theory and construction algorithm instead of CMU's mixed connectivity-Euler lecture.",
+        "graph_hamilton": "Direct Hamiltonian graph topic, rather than the traveling-salesperson application lecture.",
+        "graph_coloring": "Point and edge coloring through planar coloring and theorems; CMU P32 overlaps with planar graph node.",
+        "graph_planar": "Planar graphs and Euler's formula without dragging in the mixed nonplanar/Hamiltonian/coloring P44 and duplicate CMU lecture.",
+        "graph_bipartite": "Dedicated bipartite graph theory; CMU P24-25 instead centers on matching.",
+        "graph_topological": "Animation specifically illustrates topological sorting rather than a broader partial-order lecture.",
+        "graph_matching": "Dedicated matching theory, Hungarian maximum matching and perfect matching; omit advanced Hopcroft-Karp and blossom algorithm videos.",
+        "tree_basic": "Dedicated introductory tree lectures, not CMU's mixed tree-and-spanning-tree lecture.",
+        "tree_spanning": "Direct spanning-tree lecture; CMU P22 teaches Cayley counting, which is a different objective.",
+        "count_pigeonhole": "P6 teaches the core pigeonhole principle; P7 is advanced Diophantine approximation.",
+        "graph_weighted": "Weighted-graph definition and distances, not the shortest-path algorithm taught elsewhere.",
+        "graph_cut": "Cut vertices/edges theory and algorithms; cutsets/connectivity P21 is not central to the node title.",
+        "relation_property": "Five lectures directly about relation properties; omitted P58 on counting special relations."
+      },
+      "intentional_reuses": [
+        {
+          "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=5",
+          "nodes": [
+            "number_euler_fermat",
+            "number_rsa"
+          ]
+        },
+        {
+          "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=15",
+          "nodes": [
+            "recurrence_nonhomogeneous",
+            "recurrence_initial"
+          ]
+        },
+        {
+          "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=27",
+          "nodes": [
+            "graph_adjacency",
+            "graph_matrix"
+          ]
+        },
+        {
+          "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=27",
+          "nodes": [
+            "graph_weighted",
+            "graph_shortest"
+          ]
+        }
       ],
-      "note": "Playlist titles and official lecture content checked for selected corrections. Does not represent end-to-end viewing of all individual videos or live verification of every Bilibili link."
+      "scope_limitation": "Evaluated public syllabi, indexed video part names and available lecture descriptions/transcripts. These edits do not certify the teaching quality of every minute of every video; the live Bilibili playback status was not exhaustively checked."
     }
   },
   "video_resource_candidates": [

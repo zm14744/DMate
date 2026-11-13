@@ -38,7 +38,12 @@ MANIFEST_NAME = 'dmate-model-manifest.json'
 DEFAULT_CACHE_DIR = '/opt/dmate-model-cache'
 SCHEMA_VERSION = 2
 MODELSCOPE_API = 'https://modelscope.cn/api/v1/models/PaddlePaddle'
-DOWNLOAD_ATTEMPTS = 3
+DEFAULT_DOWNLOAD_TIMEOUT = 3600.
+MAX_DOWNLOAD_TIMEOUT = 7200.
+ONNX_EXPORT_TIMEOUT = 300.
+DOWNLOAD_ATTEMPTS = 6
+DOWNLOAD_RETRY_BACKOFF = 1.
+DOWNLOAD_CHUNK_BYTES = 16 * 1024
 DOWNLOAD_PROGRESS_INTERVAL = 15
 DOWNLOAD_PROGRESS_TIMEOUT = 60
 DOWNLOAD_RATE_WINDOW = 30
@@ -303,15 +308,22 @@ def _download_official_file(http, name, filename, record, destination, timeout_s
     if not sources:
         raise CachePreparationError('no_official_file_sources')
     blocked_sources = set()
-    # All mirrors and retries share one file budget, rather than spending a
-    # full 15 minutes on one slow host before starting another download stack.
+    slow_sources = set()
+    source_attempts = {}
+    # One bounded budget is shared by mirrors and retries. The 130 MB layout
+    # weights need about 33 minutes on a 65 KiB/s link; 300 seconds cannot work.
     started = time.monotonic()
     hard_deadline = started + timeout_seconds
     for attempt in range(DOWNLOAD_ATTEMPTS):
         available = [source for source in sources if source['url'] not in blocked_sources]
         if not available:
             break
-        source = available[attempt % len(available)]
+        # Try untested mirrors first. Once each has failed, rotate all viable
+        # sources, including a slow one: a repeatedly timing-out "fast" mirror
+        # must not starve the only source that actually transfers bytes.
+        preferred = [source for source in available if source['url'] not in source_attempts]
+        candidates = preferred or available
+        source = candidates[attempt % len(candidates)]
         prefix = f'Official {source["label"]} {name}/{filename}'
         offset = destination.stat().st_size if destination.exists() else 0
         if offset == expected_size:
@@ -326,6 +338,18 @@ def _download_official_file(http, name, filename, record, destination, timeout_s
             remaining = hard_deadline - time.monotonic()
             if remaining <= 0:
                 raise _DownloadDeadline('model file exhausted its total download budget')
+            previous_attempts = source_attempts.get(source['url'], 0)
+            if previous_attempts:
+                # Try a new official mirror immediately; back off only when
+                # retrying one already contacted, within the same hard budget.
+                delay = min(DOWNLOAD_RETRY_BACKOFF * 2 ** (previous_attempts - 1),
+                            5., remaining)
+                if delay:
+                    time.sleep(delay)
+                remaining = hard_deadline - time.monotonic()
+                if remaining <= 0:
+                    raise _DownloadDeadline('model file exhausted its total download budget')
+            source_attempts[source['url']] = previous_attempts + 1
             print(f'{prefix}: attempt {attempt + 1}/'
                   f'{DOWNLOAD_ATTEMPTS}, starting at {offset}/{expected_size} bytes; '
                   f'{remaining:.0f}s total download budget remaining.', file=sys.stderr, flush=True)
@@ -355,7 +379,9 @@ def _download_official_file(http, name, filename, record, destination, timeout_s
                     received = offset
                     transfer_started = time.monotonic()
                     with destination.open('ab' if offset else 'wb') as target:
-                        for chunk in response.iter_content(64 * 1024):
+                        # Yield often enough to preserve progress on slow links
+                        # instead of waiting for 64 KiB before refreshing idle.
+                        for chunk in response.iter_content(DOWNLOAD_CHUNK_BYTES):
                             received += len(chunk)
                             if received > expected_size:
                                 raise CachePreparationError('official_file_capacity')
@@ -364,12 +390,16 @@ def _download_official_file(http, name, filename, record, destination, timeout_s
                                 refresh()
                             now = time.monotonic()
                             elapsed = now - transfer_started
-                            if elapsed >= DOWNLOAD_RATE_WINDOW and len(available) > 1:
+                            if (elapsed >= DOWNLOAD_RATE_WINDOW and len(available) > 1
+                                    and source['url'] not in slow_sources):
                                 rate = (received - offset) / elapsed
                                 remaining = hard_deadline - now
                                 if (rate < MIN_DOWNLOAD_RATE and received < expected_size
                                         and (expected_size - received) / max(rate, 1) > remaining):
-                                    blocked_sources.add(source['url'])
+                                    # A slow mirror can still be the only one
+                                    # reachable. Prefer another once, then allow
+                                    # resuming here if the alternatives fail.
+                                    slow_sources.add(source['url'])
                                     raise CachePreparationError('official_transfer_too_slow')
                             if now - last_progress >= DOWNLOAD_PROGRESS_INTERVAL:
                                 print(f'{prefix}: '
@@ -436,8 +466,9 @@ def _download_official_model(cache_home, name, timeout_seconds):
 
 
 def prepare_model_cache(cache_dir=DEFAULT_CACHE_DIR, *, verify_only=False,
-                        timeout_seconds=300., manager_factory=None):
-    if type(timeout_seconds) not in (int, float) or not 0 < timeout_seconds <= 600:
+                        timeout_seconds=DEFAULT_DOWNLOAD_TIMEOUT, manager_factory=None):
+    if (type(timeout_seconds) not in (int, float)
+            or not 0 < timeout_seconds <= MAX_DOWNLOAD_TIMEOUT):
         raise CachePreparationError('invalid_download_deadline')
     cache_home, selection = configure_build_cache(cache_dir)
     manifest_path = cache_home/MANIFEST_NAME
@@ -485,7 +516,8 @@ def prepare_model_cache(cache_dir=DEFAULT_CACHE_DIR, *, verify_only=False,
     for record in records:
         if record['name'] not in TEXT_MODEL_NAMES:
             continue
-        exported, created = _export_onnx_model(cache_home, record, timeout_seconds)
+        exported, created = _export_onnx_model(cache_home, record,
+                                              min(timeout_seconds, ONNX_EXPORT_TIMEOUT))
         exports.append(exported)
         (converted if created else reused_exports).append(record['name'])
     versions = {}
@@ -521,7 +553,11 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cache-dir', default=os.environ.get('DMATE_MODEL_CACHE_DIR', DEFAULT_CACHE_DIR))
     parser.add_argument('--verify-only', action='store_true')
-    parser.add_argument('--download-timeout', type=float, default=300.)
+    parser.add_argument('--download-timeout', type=float, default=DEFAULT_DOWNLOAD_TIMEOUT,
+                        help='Total seconds per file across all mirrors/retries '
+                             f'(default: {DEFAULT_DOWNLOAD_TIMEOUT:g}; '
+                             f'maximum: {MAX_DOWNLOAD_TIMEOUT:g}). '
+                             'ONNX conversion remains capped at 300 seconds.')
     args = parser.parse_args(argv)
     try:
         result = prepare_model_cache(args.cache_dir, verify_only=args.verify_only,

@@ -5,7 +5,7 @@
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
-const panels = ['drawing', 'graph', 'questions', 'concepts'];
+const panels = ['graph', 'concepts', 'questions', 'drawing'];
 const iconReferences = { drawing: '#graphDrawingBtn svg', graph: '#knowledgeGraphBtn svg' };
 
 async function navigate(page, panel) {
@@ -38,9 +38,9 @@ async function ready(page) {
   'Removed wrong-book and notebook navigation, panels and editors are absent');
   assert.equal(await page.locator('#questionsPanel button').filter({ hasText: '加入错题本' }).count(), 0);
   assert.deepEqual(await page.locator('.offline-nav-item[data-panel]').evaluateAll(items => items.map(item => item.dataset.panel)), panels);
-  await page.locator('#drawingPanel').waitFor({ state: 'visible' });
-  assert.equal(await page.locator('.offline-nav-item.active').getAttribute('data-panel'), 'drawing', 'Drawing is the default module');
-  if (page.viewportSize().width <= 1100) assert.equal(await page.locator('#offlineMobileTitle').innerText(), '绘图');
+  await page.locator('#graphPanel').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('.offline-nav-item.active').getAttribute('data-panel'), 'graph', 'The first module is the default');
+  if (page.viewportSize().width <= 1100) assert.equal(await page.locator('#offlineMobileTitle').innerText(), '知识图谱');
   const schema = await page.evaluate(() => new Promise((resolve, reject) => {
     const request = indexedDB.open('dmate-offline-workspace', 2);
     request.onerror = () => reject(request.error);
@@ -213,8 +213,7 @@ async function drawingReference(page) {
 async function noOverflow(page, panel) {
   const state = await page.evaluate(id => {
     const main = document.querySelector('.offline-main').getBoundingClientRect();
-    const node = id === 'graph' ? document.querySelector('#knowledgeGraphModal .graph-modal-card')
-      : document.getElementById(id + 'Panel');
+    const node = document.getElementById(id + 'Panel');
     const bounds = node.getBoundingClientRect();
     return { viewport: innerWidth, document: document.documentElement.scrollWidth,
       mainLeft: main.left, mainRight: main.right, panelWidth: node.clientWidth, panelScroll: node.scrollWidth,
@@ -224,9 +223,7 @@ async function noOverflow(page, panel) {
   assert.ok(state.document <= state.viewport + 1, panel + ': page overflows horizontally: ' + JSON.stringify(state));
   assert.ok(state.mainLeft >= -1 && state.mainRight <= state.viewport + 1, panel + ': workspace outside viewport');
   assert.ok(state.panelScroll <= state.panelWidth + 1, panel + ': panel overflows outside its own controls');
-  if (panel === 'graph') assert.ok(state.top >= -1 && state.bottom <= state.viewportHeight + 1,
-    'The graph dialog stays within the viewport: ' + JSON.stringify(state));
-  else assert.ok(Math.abs(state.panelTop - state.marginTop) <= 2, panel + ': no empty header row precedes the content: ' + JSON.stringify(state));
+  assert.ok(Math.abs(state.panelTop - state.marginTop) <= 2, panel + ': no empty header row precedes the content: ' + JSON.stringify(state));
 }
 
 async function sidebarControls(page, width) {
@@ -237,15 +234,17 @@ async function sidebarControls(page, width) {
   }
   if (await opener.getAttribute('aria-expanded') !== 'true') await opener.click();
   assert.equal(await opener.isVisible(), false, 'Expanded sidebar has no floating opener');
-  const panelTop = await page.locator('#drawingPanel').evaluate(node => node.getBoundingClientRect().top);
+  const activePanel = await page.locator('.offline-nav-item.active').getAttribute('data-panel');
+  const currentPanel = page.locator('#' + activePanel + 'Panel');
+  const panelTop = await currentPanel.evaluate(node => node.getBoundingClientRect().top);
   await page.locator('#offlineDesktopSidebarToggle').click();
   await opener.waitFor({ state: 'visible' });
   assert.equal(await opener.getAttribute('aria-expanded'), 'false');
   assert.equal(await page.locator('#offlineSidebar').evaluate(node => node.inert), true);
   const floating = await opener.evaluate(node => ({ inMain: Boolean(node.closest('#offlineMain')), position: getComputedStyle(node).position }));
   assert.ok(floating.inMain && ['absolute', 'fixed'].includes(floating.position), 'Collapsed opener floats in the main area');
-  await noOverflow(page, 'drawing');
-  assert.ok(Math.abs(await page.locator('#drawingPanel').evaluate(node => node.getBoundingClientRect().top) - panelTop) <= 2,
+  await noOverflow(page, activePanel);
+  assert.ok(Math.abs(await currentPanel.evaluate(node => node.getBoundingClientRect().top) - panelTop) <= 2,
     'Collapsing navigation does not add a top content row');
   await opener.click();
   await opener.waitFor({ state: 'hidden' });
@@ -365,7 +364,7 @@ async function curriculum(page) {
 
 async function graph(page) {
   await navigate(page, 'graph');
-  const host = page.locator('#graphPanel #knowledgeGraphModal[data-ready="true"]');
+  const host = page.locator('#knowledgeGraphModal[data-ready="true"]');
   await host.waitFor();
   const mobile = await page.evaluate(() => matchMedia('(max-width:760px)').matches);
   if (mobile) await host.locator('.kg-mobile-expand').click();

@@ -5,31 +5,6 @@
 const dmateUiText=(source,english)=>root.DMateI18n?.t(source,english)??source;
 const dmateUiLanguage=()=>root.DMateI18n?.getLanguage()||'zh-CN';
 const dmateKnowledgeLabel=name=>dmateUiText(String(name||''));
-function splitKnowledgeGraphLabel(text, maxChars = 7) {
-    const value = String(dmateKnowledgeLabel(text) || "").trim();
-
-    if (!value) return [""];
-    if (dmateUiLanguage() === "en") {
-        const lines = [];
-        for (const word of value.split(/\s+/)) {
-            const last = lines.length - 1;
-            if (last >= 0 && (lines[last] + " " + word).length <= 23) lines[last] += " " + word;
-            else lines.push(word);
-        }
-        return lines;
-    }
-
-    const lines = [];
-
-    for (let index = 0; index < value.length; index += maxChars) {
-        lines.push(
-            value.slice(index, index + maxChars)
-        );
-    }
-
-    return lines.slice(0, 2);
-}
-
 function createSvgElement(tag, attrs = {}) {
     const element = document.createElementNS(
         "http://www.w3.org/2000/svg",
@@ -219,7 +194,7 @@ function mount(host,options={}) {
  let category=categories.includes(options.category)?options.category:'全部';
  let knowledgeGraphSelectedNodeId=String(options.selectedId||allNodes[0]?.id||'');
  let knowledgeGraphDesktopScale=1,desktopFitted=true,destroyed=false,resizeFrame=0;
- let visibleNodes=[],previousSize='';
+ let visibleNodes=[],previousSize='',fullscreenOrigin=null;
  const isMobileAppShell=()=>window.matchMedia('(max-width:760px)').matches;
  const knowledgeGraphNodeState=()=>({key:'neutral',label:'',fill:'#111827',stroke:'#475569',text:'#ffffff',badge:''});
  const categoryLabel=()=>dmateKnowledgeLabel(category);
@@ -272,7 +247,18 @@ function mount(host,options={}) {
   }
   updateMobileGraphEdgeEmphasis(canvas,knowledgeGraphSelectedNodeId);renderDetail();
  }
- function toggleKnowledgeGraphFullscreenView(){host.classList.toggle('graph-fullscreen-view');renderKnowledgeGraph();}
+ function restoreInline(){
+  host.classList.remove('graph-fullscreen-view');
+  if(fullscreenOrigin){fullscreenOrigin.replaceWith(host);fullscreenOrigin=null;}
+ }
+ function toggleKnowledgeGraphFullscreenView(){
+  if(host.classList.contains('graph-fullscreen-view'))restoreInline();
+  else{
+   fullscreenOrigin=document.createComment('offline graph fullscreen origin');
+   host.before(fullscreenOrigin);document.body.append(host);host.classList.add('graph-fullscreen-view');
+  }
+  renderKnowledgeGraph();
+ }
  function renderKnowledgeGraph(){
   if(destroyed)return;
   disposeViews();visibleNodes=allNodes.filter(n=>category==='全部'||n.category===category);
@@ -293,7 +279,7 @@ function mount(host,options={}) {
  async function exportPNG(){
   const target=document.createElement('div');target.style.cssText='position:fixed;left:-10000px;top:0;pointer-events:none';host.append(target);
   try{
-   renderKnowledgeGraphSection(target,visibleNodes,categoryLabel(),countLabel(),{});
+   renderKnowledgeGraphSection(target,visibleNodes,categoryLabel(),countLabel(),{},{forCopy:true});
    const source=target.querySelector('.kg-svg');if(!source)throw new Error('当前范围没有可复制的知识节点');
    const clone=source.cloneNode(true),original=[source,...source.querySelectorAll('*')],copies=[clone,...clone.querySelectorAll('*')];
    const properties=['fill','stroke','stroke-width','stroke-linecap','stroke-linejoin','opacity','font-size','font-family','font-weight','text-anchor'];
@@ -319,7 +305,6 @@ function mount(host,options={}) {
  choice.addEventListener('cancel',event=>{event.preventDefault();closeChoice();},{signal});
  choice.addEventListener('click',event=>{if(event.target===choice)closeChoice();},{signal});
  document.getElementById('knowledgeGraphFocusBtn').addEventListener('click',()=>setCategory('全部'),{signal});
- document.getElementById('knowledgeGraphClose').addEventListener('click',()=>{host.classList.remove('graph-fullscreen-view');options.onClose?.();},{signal});
  document.getElementById('knowledgeGraphDesktopZoomOut').addEventListener('click',()=>setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale/1.2),{signal});
  document.getElementById('knowledgeGraphDesktopZoomIn').addEventListener('click',()=>setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale*1.2),{signal});
  document.getElementById('knowledgeGraphDesktopZoomFit').addEventListener('click',fitKnowledgeGraphDesktop,{signal});
@@ -328,13 +313,19 @@ function mount(host,options={}) {
  document.addEventListener('keydown',event=>{
   if(event.key!=='Escape'||choice.open||host.closest('#graphPanel')?.hidden||!host.getClientRects().length)return;
   if(document.querySelector('dialog[open],.modal:not(.hidden):not(#knowledgeGraphModal):not(#mobileChoiceModal)'))return;
-  if(host.classList.contains('graph-fullscreen-view')){event.preventDefault();toggleKnowledgeGraphFullscreenView();}else options.onClose?.();
+  if(host.classList.contains('graph-fullscreen-view')){event.preventDefault();toggleKnowledgeGraphFullscreenView();}
  },{signal});
- const breakpoint=window.matchMedia('(max-width:760px)');breakpoint.addEventListener('change',renderKnowledgeGraph,{signal});
+ let lastFontScale=root.DMateKnowledgeGraphLabels.fontScale(document);
+ const fontObserver=new MutationObserver(()=>{
+  const next=root.DMateKnowledgeGraphLabels.fontScale(document);
+  if(next!==lastFontScale){lastFontScale=next;renderKnowledgeGraph();}
+ });
+ fontObserver.observe(document.documentElement,{attributes:true,attributeFilter:['style']});
+ const breakpoint=window.matchMedia('(max-width:760px)');breakpoint.addEventListener('change',()=>{if(!breakpoint.matches)restoreInline();renderKnowledgeGraph();},{signal});
  window.addEventListener('dmate:languagechange',renderKnowledgeGraph,{signal});
  const observer=new ResizeObserver(()=>{const size=canvas.clientWidth+':'+canvas.clientHeight;if(size===previousSize)return;previousSize=size;window.cancelAnimationFrame(resizeFrame);resizeFrame=window.requestAnimationFrame(()=>{if(!destroyed&&!isMobileAppShell()&&desktopFitted)fitKnowledgeGraphDesktop();});});observer.observe(canvas);
  host.classList.remove('graph-fullscreen-view');renderKnowledgeGraph();
- return {exportPNG,select(id){const node=canvas.querySelector(`[data-node-id="${CSS.escape(String(id))}"]`);selectKnowledgeGraphNode(id,node);},destroy(){destroyed=true;disposeViews();controller.abort();observer.disconnect();window.cancelAnimationFrame(resizeFrame);closeChoice();host.classList.remove('graph-fullscreen-view');canvas.replaceChildren();delete host.dataset.ready;}};
+ return {exportPNG,select(id){const node=canvas.querySelector(`[data-node-id="${CSS.escape(String(id))}"]`);selectKnowledgeGraphNode(id,node);},destroy(){destroyed=true;disposeViews();fontObserver.disconnect();controller.abort();observer.disconnect();window.cancelAnimationFrame(resizeFrame);closeChoice();restoreInline();canvas.replaceChildren();delete host.dataset.ready;}};
 function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     if (!viewport || !surface || !stage) return;
 
@@ -812,8 +803,14 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     const marginY = 48;
     const gapX = 116;
     const gapY = 60;
-    const nodeWidth = 144;
-    const nodeHeight = 76;
+    const nodeWidth = dmateUiLanguage() === "en" ? 190 : 144;
+    const labelPack = window.DMateKnowledgeGraphLabels.prepare(nodes, {
+        label: node => dmateKnowledgeLabel(node.name),
+        badge: node => dmateUiText(knowledgeGraphNodeState(node.name, context).badge || node.level || ""),
+        width: nodeWidth, minHeight: 76, titleSize: 13, weight: 700,
+        badgeSize: 10, badgeWeight: 600, paddingX: 12, paddingY: 10, gap: 5
+    });
+    const nodeHeight = labelPack.height;
     const maxRows = Math.max(...columnKeys.map(key => columns.get(key).length), 1);
     const stageWidth = marginX * 2 + columnCount * nodeWidth + (columnCount - 1) * gapX;
     const stageHeight = marginY * 2 + maxRows * nodeHeight + (maxRows - 1) * gapY;
@@ -927,18 +924,7 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
         button.style.borderColor = state.stroke;
         button.setAttribute("aria-label", dmateKnowledgeLabel(node.name));
 
-        const name = document.createElement("span");
-        name.className = "kg-mobile-node-name";
-        name.textContent = dmateKnowledgeLabel(node.name);
-        button.appendChild(name);
-
-        const badgeText = state.badge || node.level || "";
-        if (badgeText) {
-            const badge = document.createElement("span");
-            badge.className = "kg-mobile-node-badge";
-            badge.textContent = badgeText;
-            button.appendChild(badge);
-        }
+        window.DMateKnowledgeGraphLabels.applyHtml(button, labelPack.layouts.get(node.id));
 
         button.addEventListener("click", () => {
             selectKnowledgeGraphNode(node.id, button);
@@ -1067,7 +1053,7 @@ function fitKnowledgeGraphDesktop() {
     desktopFitted = true;
 }
 
-function renderKnowledgeGraphSection(container, nodes, title, description, context) {
+function renderKnowledgeGraphSection(container, nodes, title, description, context, options = {}) {
     const section = document.createElement("div");
     section.className = "kg-section";
 
@@ -1121,7 +1107,7 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
         );
     }
 
-    const mobileGraphLayout = isMobileAppShell();
+    const mobileGraphLayout = !options.forCopy && isMobileAppShell();
     let nodeWidth = dmateUiLanguage() === "en" ? 190 : 132;
     let nodeHeight = dmateUiLanguage() === "en" ? 78 : 58;
     let horizontalGap = 74;
@@ -1153,6 +1139,16 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
         nodeHeight = nodeWidth >= 108 ? 56 : 52;
         verticalGap = 22;
     }
+
+    const labelPack = window.DMateKnowledgeGraphLabels.prepare(nodes, {
+        label: node => dmateKnowledgeLabel(node.name),
+        badge: node => dmateUiText(knowledgeGraphNodeState(node.name, context).badge || node.level || ""),
+        width: nodeWidth, minHeight: nodeHeight,
+        titleSize: mobileGraphLayout ? 14 : 12, weight: mobileGraphLayout ? 600 : 500,
+        badgeSize: mobileGraphLayout ? 11 : 10, badgeWeight: 500,
+        paddingX: 10, paddingY: 10, gap: 5
+    });
+    nodeHeight = labelPack.height;
 
     const maxRows = Math.max(
         ...columnKeys.map(
@@ -1274,53 +1270,9 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
 
         group.appendChild(rect);
 
-        const lines = splitKnowledgeGraphLabel(
-            node.name
-        );
-        const text = createSvgElement("text", {
-            class: "kg-node-label",
-            x: nodeWidth / 2,
-            y: 22,
-            fill: state.text || "#ffffff",
-            "font-size": mobileGraphLayout ? 14 : 12,
-            "font-weight": mobileGraphLayout ? 600 : 500,
-            "text-anchor": "middle"
+        window.DMateKnowledgeGraphLabels.applySvg(group, labelPack.layouts.get(node.id), {
+            width: nodeWidth, height: nodeHeight, titleColor: state.text || "#ffffff"
         });
-
-        if (lines.length === 1) {
-            const tspan = createSvgElement("tspan", {
-                x: nodeWidth / 2,
-                dy: 0
-            });
-            tspan.textContent = lines[0];
-            text.appendChild(tspan);
-        } else {
-            lines.forEach((line, index) => {
-                const tspan = createSvgElement("tspan", {
-                    x: nodeWidth / 2,
-                    dy: index === 0 ? 0 : 14
-                });
-                tspan.textContent = line;
-                text.appendChild(tspan);
-            });
-        }
-
-        group.appendChild(text);
-
-        const nodeBadge = state.badge || node.level;
-
-        if (nodeBadge) {
-            const badge = createSvgElement("text", {
-                class: "kg-node-badge",
-                x: nodeWidth / 2,
-                y: nodeHeight - 10,
-                fill: "#e2e8f0",
-                "font-size": mobileGraphLayout ? 11 : 10,
-                "text-anchor": "middle"
-            });
-            badge.textContent = nodeBadge;
-            group.appendChild(badge);
-        }
 
         svg.appendChild(group);
     }

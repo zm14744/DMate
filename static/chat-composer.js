@@ -1,6 +1,8 @@
 (function (root) {
     'use strict';
     const instances = new WeakMap();
+    const conversationMotions = new WeakMap();
+    const uiText = source => root.DMateI18n?.t?.(source) ?? source;
 
     const SYMBOL_GROUPS = [
         { id:'logic', label:'逻辑', items:[
@@ -39,14 +41,14 @@
             ["…","省略号"]
         ]},
         { id:'greek', label:'希腊', items:[
-            ["α","alpha"], ["β","beta"], ["γ","gamma"], ["δ","delta"],
-            ["ε","epsilon"], ["ζ","zeta"], ["η","eta"], ["θ","theta"],
-            ["ι","iota"], ["κ","kappa"], ["λ","lambda"], ["μ","mu"],
-            ["ν","nu"], ["ξ","xi"], ["π","pi"], ["ρ","rho"],
-            ["σ","sigma"], ["τ","tau"], ["υ","upsilon"], ["φ","phi"],
-            ["χ","chi"], ["ψ","psi"], ["ω","omega"], ["Γ","Gamma"],
-            ["Δ","Delta"], ["Θ","Theta"], ["Λ","Lambda"], ["Π","Pi"],
-            ["Σ","Sigma"], ["Φ","Phi"], ["Ψ","Psi"], ["Ω","Omega"]
+            ["α","小写阿尔法"], ["β","小写贝塔"], ["γ","小写伽马"], ["δ","小写德尔塔"],
+            ["ε","小写艾普西龙"], ["ζ","小写泽塔"], ["η","小写伊塔"], ["θ","小写西塔"],
+            ["ι","小写约塔"], ["κ","小写卡帕"], ["λ","小写拉姆达"], ["μ","小写缪"],
+            ["ν","小写纽"], ["ξ","小写克西"], ["π","小写派"], ["ρ","小写柔"],
+            ["σ","小写西格马"], ["τ","小写陶"], ["υ","小写宇普西龙"], ["φ","小写斐"],
+            ["χ","小写希"], ["ψ","小写普西"], ["ω","小写欧米伽"], ["Γ","大写伽马"],
+            ["Δ","大写德尔塔"], ["Θ","大写西塔"], ["Λ","大写拉姆达"], ["Π","大写派"],
+            ["Σ","大写西格马"], ["Φ","大写斐"], ["Ψ","大写普西"], ["Ω","大写欧米伽"]
         ]},
     ];
 
@@ -71,8 +73,8 @@
         const toggle = doc.createElement('button');
         toggle.type = 'button';
         toggle.className = 'dmate-symbol-keyboard';
-        toggle.setAttribute('aria-label', '数学符号键盘');
-        toggle.setAttribute('title', '数学符号');
+        toggle.setAttribute('aria-label', uiText('数学符号键盘'));
+        toggle.setAttribute('title', uiText('数学符号'));
         toggle.setAttribute('aria-expanded', 'false');
         toggle.setAttribute('aria-controls', 'dmate-symbol-panel');
         toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.8" y="5.2" width="18.4" height="13.6" rx="2.2"/><path d="M6.5 9h.01M10 9h.01M13.5 9h.01M17 9h.01M6.5 12.3h.01M10 12.3h.01M13.5 12.3h.01M17 12.3h.01M8.5 15.5h7"/></svg>';
@@ -82,24 +84,24 @@
         panel.className = 'dmate-symbol-panel';
         panel.hidden = true;
         panel.setAttribute('role', 'dialog');
-        panel.setAttribute('aria-label', '数学符号键盘');
+        panel.setAttribute('aria-label', uiText('数学符号键盘'));
 
         const header = doc.createElement('div');
         header.className = 'dmate-symbol-panel-head';
         const heading = doc.createElement('div');
         heading.className = 'dmate-symbol-panel-title';
-        heading.textContent = '数学符号';
+        heading.textContent = uiText('数学符号');
         header.append(heading);
 
         const tabs = doc.createElement('div');
         tabs.className = 'dmate-symbol-tabs';
         tabs.setAttribute('role', 'tablist');
-        tabs.setAttribute('aria-label', '符号分类');
+        tabs.setAttribute('aria-label', uiText('符号分类'));
 
         const grid = doc.createElement('div');
         grid.className = 'dmate-symbol-grid';
         grid.setAttribute('role', 'group');
-        grid.setAttribute('aria-label', '可插入的数学符号');
+        grid.setAttribute('aria-label', uiText('可插入的数学符号'));
 
         panel.append(header, tabs, grid);
         host.append(toggle);
@@ -107,6 +109,34 @@
 
         let activeGroup = 'logic';
         let opened = false;
+
+        function translateSymbolKey(key) {
+            const label = uiText(key.dataset.symbolLabel);
+            // Write the canonical label again even while a tooltip owns an
+            // empty native title; its observer updates the held hover label.
+            key.setAttribute('title', label);
+            const separator = root.DMateI18n?.isEnglish?.() ? ': ' : '：';
+            key.setAttribute('aria-label', label + separator + key.dataset.symbolValue);
+        }
+
+        function refreshLanguage() {
+            toggle.setAttribute('aria-label', uiText('数学符号键盘'));
+            toggle.setAttribute('title', uiText('数学符号'));
+            panel.setAttribute('aria-label', uiText('数学符号键盘'));
+            heading.textContent = uiText('数学符号');
+            tabs.setAttribute('aria-label', uiText('符号分类'));
+            grid.setAttribute('aria-label', uiText('可插入的数学符号'));
+            for (const tab of tabs.children) {
+                const group = SYMBOL_GROUPS.find(item => item.id === tab.dataset.symbolCategory);
+                if (group) tab.textContent = uiText(group.label);
+            }
+            for (const key of grid.querySelectorAll('[data-symbol-value]')) translateSymbolKey(key);
+            const empty = grid.querySelector('.dmate-symbol-empty');
+            if (empty) empty.textContent = uiText('该分类暂无符号。');
+            // Translate in place: category, focus, scrolling, draft and caret
+            // all stay owned by the existing controls.
+            requestPanelPosition();
+        }
 
         function focusSafely(element) {
             try { element?.focus({ preventScroll:true }); }
@@ -130,7 +160,7 @@
                 const tab = doc.createElement('button');
                 tab.type = 'button';
                 tab.className = 'dmate-symbol-tab';
-                tab.textContent = group.label;
+                tab.textContent = uiText(group.label);
                 tab.dataset.symbolCategory = group.id;
                 tab.setAttribute('role', 'tab');
                 tab.setAttribute('aria-selected', String(group.id === activeGroup));
@@ -143,7 +173,7 @@
             if (!items.length) {
                 const empty = doc.createElement('div');
                 empty.className = 'dmate-symbol-empty';
-                empty.textContent = '该分类暂无符号。';
+                empty.textContent = uiText('该分类暂无符号。');
                 grid.appendChild(empty);
                 return;
             }
@@ -153,10 +183,13 @@
                 key.type = 'button';
                 key.className = 'dmate-symbol-key';
                 if (item.value.length > 3 || /[A-Za-z]/.test(item.value)) key.classList.add('is-text');
-                key.textContent = item.value;
+                const glyph = doc.createElement('span');
+                glyph.setAttribute('translate', 'no');
+                glyph.textContent = item.value;
+                key.append(glyph);
                 key.dataset.symbolValue = item.value;
-                key.title = item.label;
-                key.setAttribute('aria-label', item.label + '：' + item.value);
+                key.dataset.symbolLabel = item.label;
+                translateSymbolKey(key);
                 grid.appendChild(key);
             }
         }
@@ -302,8 +335,10 @@
         win.visualViewport?.addEventListener('resize', requestPanelPosition);
         win.visualViewport?.addEventListener('scroll', requestPanelPosition);
         doc.addEventListener('scroll', requestPanelPosition, true);
+        win.addEventListener('dmate:languagechange', refreshLanguage);
 
         return {
+            refreshPosition: positionSymbolPanel,
             refresh() {
                 toggle.disabled = Boolean(input.disabled || input.readOnly);
                 if (toggle.disabled && opened) setOpen(false);
@@ -319,11 +354,105 @@
                 win.visualViewport?.removeEventListener('resize', requestPanelPosition);
                 win.visualViewport?.removeEventListener('scroll', requestPanelPosition);
                 doc.removeEventListener('scroll', requestPanelPosition, true);
+                win.removeEventListener('dmate:languagechange', refreshLanguage);
                 if (positionFrame) win.cancelAnimationFrame(positionFrame);
                 toggle.remove();
                 panel.remove();
             }
         };
+    }
+
+    function transitionConversation(center, empty) {
+        if (!center || center.classList.contains('chat-empty') === empty) return;
+        const win = center.ownerDocument.defaultView || root;
+        const capsule = center.querySelector(':scope > .input-wrap > .input');
+        const mode = center.querySelector(':scope > .input-wrap > .manual-question-mode');
+        const input = capsule?.querySelector('textarea');
+        const targets = [capsule, mode].filter(node => node?.getClientRects().length);
+        // Read the visible, possibly interrupted frame before releasing any
+        // temporary styles. The textarea and its selection never move in DOM.
+        const first = targets.map(node => node.getBoundingClientRect());
+        conversationMotions.get(center)?.();
+        center.classList.toggle('chat-empty', empty);
+        const reduced = win.matchMedia?.('(prefers-reduced-motion:reduce)');
+        if (!capsule || !targets.length || reduced?.matches) return;
+        instances.get(input)?.refresh();
+        const last = targets.map(node => node.getBoundingClientRect());
+        if (last.some(rect => !rect.width || !rect.height)) return;
+        if (first.every((rect, i) => Math.abs(rect.x-last[i].x) < .5
+            && Math.abs(rect.y-last[i].y) < .5 && Math.abs(rect.width-last[i].width) < .5)) return;
+
+        const saved = targets.map(node => ['width', 'translate'].map(property => ({
+            property, value:node.style.getPropertyValue(property),
+            priority:node.style.getPropertyPriority(property)
+        })));
+        const restore = (node, properties) => {
+            for (const {property, value, priority} of properties) {
+                if (value) node.style.setProperty(property, value, priority);
+                else node.style.removeProperty(property);
+            }
+        };
+        let frame = 0, stopped = false;
+        const stop = () => {
+            if (stopped) return;
+            stopped = true;
+            win.cancelAnimationFrame(frame);
+            targets.forEach((node, i) => restore(node, saved[i]));
+            reduced?.removeEventListener?.('change', stop);
+            conversationMotions.delete(center);
+            delete center.dataset.composerMotion;
+            instances.get(input)?.refresh();
+        };
+        conversationMotions.set(center, stop);
+        center.dataset.composerMotion = 'moving';
+        reduced?.addEventListener?.('change', stop);
+        // Match the sidebar's .22s cubic-bezier(.2,.8,.2,1). Solve its
+        // x-coordinate instead of applying the bezier parameter as time.
+        const ease = progress => {
+            let low = 0, high = 1;
+            for (let i = 0; i < 16; i++) {
+                const t = (low+high)/2, inverse = 1-t;
+                const x = .6*inverse*inverse*t + .6*inverse*t*t + t*t*t;
+                if (x < progress) low = t; else high = t;
+            }
+            const t = (low+high)/2, inverse = 1-t;
+            return 2.4*inverse*inverse*t + 3*inverse*t*t + t*t*t;
+        };
+        // Start the clock on the first painted frame. Rendering a large
+        // conversation synchronously must not consume the movement unseen.
+        let started = null;
+        const tick = now => {
+            if (stopped) return;
+            if (!center.isConnected || capsule.closest('.input-wrap')?.hidden) { stop(); return; }
+            if (now !== null && started === null) started = now;
+            const progress = now === null ? 0 : Math.min(1, Math.max(0, (now-started)/220));
+            if (progress >= 1) { stop(); return; }
+            const remaining = progress ? 1-ease(progress) : 1;
+            // Measure the live destination, so the existing sidebar grid
+            // transition can continue underneath this vertical motion.
+            targets.forEach((node, i) => restore(node, saved[i]));
+            const natural = targets.map(node => node.getBoundingClientRect());
+            targets.forEach((node, i) => {
+                if (node === capsule) {
+                    const width = natural[i].width + (first[i].width-last[i].width)*remaining;
+                    node.style.setProperty('width', Math.max(1, width)+'px', 'important');
+                }
+            });
+            targets.forEach((node, i) => {
+                const rect = node.getBoundingClientRect();
+                const x = natural[i].x+natural[i].width/2
+                    + (first[i].x+first[i].width/2-last[i].x-last[i].width/2)*remaining;
+                const y = natural[i].y+natural[i].height/2
+                    + (first[i].y+first[i].height/2-last[i].y-last[i].height/2)*remaining;
+                // Translation plus real width interpolation keeps font size,
+                // caret geometry and mobile keyboard zoom unchanged.
+                node.style.setProperty('translate', (x-rect.x-rect.width/2)+'px '
+                    + (y-rect.y-rect.height/2)+'px', 'important');
+            });
+            instances.get(input)?.refreshPosition();
+            frame = win.requestAnimationFrame(tick);
+        };
+        tick(null);
     }
 
     function mount(options) {
@@ -373,7 +502,7 @@
         input.addEventListener('keydown', keydown);
         win.addEventListener('resize', refresh);
         win.visualViewport?.addEventListener('resize', refresh);
-        const api = { refresh, destroy() {
+        const api = { refresh, refreshPosition() { symbolKeyboard?.refreshPosition(); }, destroy() {
             if (destroyed) return;
             destroyed = true; widthObserver?.disconnect();
             symbolKeyboard?.destroy();
@@ -388,5 +517,5 @@
         instances.set(input, api); refresh();
         return api;
     }
-    root.DMateChatComposer = { mount };
+    root.DMateChatComposer = { mount, transitionConversation };
 })(typeof window !== 'undefined' ? window : globalThis);

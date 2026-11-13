@@ -121,7 +121,11 @@ async function verifyOfflineMigration(browser, legacy) {
     await guardRemovedData(context);
     await page.goto(baseURL + '/offline'); await ready(page);
     assert.equal(await page.locator(removed).count(), 0);
-    assert.equal(await page.locator('.offline-nav-item.active').getAttribute('data-panel'), 'drawing');
+    assert.equal(await page.locator('.offline-nav-item.active').getAttribute('data-panel'), 'graph');
+    assert.equal(await page.locator('#offlineDrawingHost .dmate-drawing-workspace').count(), 0,
+      'The graph default leaves drawing lazily mounted');
+    await page.locator('.offline-nav-item[data-panel="drawing"]').click();
+    await page.locator('#offlineDrawingHost .dmate-drawing-workspace').waitFor();
     let value = await readState(page);
     assert.deepEqual(value.accesses, [], 'The app neither reads nor writes removed stores/journals');
     assert.equal(value.journal, journal, 'Legacy journal bytes remain untouched');
@@ -132,7 +136,7 @@ async function verifyOfflineMigration(browser, legacy) {
       assert.deepEqual(value.records.mistakes, records.mistakes);
       assert.deepEqual(value.records.practice, records.practice);
       assert.deepEqual(value.records.settings.find(row => row.id === 'notebook-deletions'), records.settings[0]);
-      assert.deepEqual(value.gallery.custom, local.custom, 'Unknown gallery metadata survives migration and immediate default mount');
+      assert.deepEqual(value.gallery.custom, local.custom, 'Unknown gallery metadata survives migration and opening the drawing module');
       assert.equal(value.gallery.activeId, 'local-active');
       assert.deepEqual(value.gallery.pages.map(row => row.id), ['shared','local-active','incoming-only']);
       assert.equal(value.gallery.pages[0].name, 'Shared local', 'Local content wins even when incoming timestamps are newer');
@@ -157,6 +161,9 @@ async function verifyOfflineMigration(browser, legacy) {
       window.removedDataNative.setItem.call(localStorage, journalKey, '{broken journal after reload');
     }, { incoming, migrationKey, journalKey });
     await page.reload(); await ready(page);
+    assert.equal(await page.locator('.offline-nav-item.active').getAttribute('data-panel'), 'graph');
+    await page.locator('.offline-nav-item[data-panel="drawing"]').click();
+    await page.locator('#offlineDrawingHost .dmate-drawing-workspace').waitFor();
     value = await readState(page);
     assert.deepEqual(value.accesses, []);
     assert.equal(value.journal, '{broken journal after reload');

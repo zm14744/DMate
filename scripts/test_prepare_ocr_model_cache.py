@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Offline regression checks for bounded, resumable official model downloads."""
-from contextlib import redirect_stderr
+from contextlib import contextmanager, redirect_stderr
 from copy import deepcopy
 import hashlib
 import importlib.util
 import io
 import json
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import sys
 import tempfile
+import threading
 import time
 from types import SimpleNamespace
 import unittest
@@ -46,6 +48,7 @@ class Response:
         pass
 
     def iter_content(self, size):
+        assert size == 16 * 1024
         for chunk in self.chunks:
             if self.delay:
                 time.sleep(self.delay)
@@ -74,7 +77,10 @@ class HTTP:
         if kwargs['params'] is not None:
             assert kwargs['params']['Revision'] == 'a' * 40
         assert kwargs['timeout'] == (8, 30)
-        return next(self.responses)
+        response = next(self.responses)
+        if isinstance(response, Exception):
+            raise response
+        return response
 
 
 class DownloadTests(unittest.TestCase):
@@ -86,6 +92,9 @@ class DownloadTests(unittest.TestCase):
             'requests': SimpleNamespace(RequestException=RequestException, HTTPError=HTTPError)})
         self.requests.start()
         self.addCleanup(self.requests.stop)
+        backoff = patch.object(cache, 'DOWNLOAD_RETRY_BACKOFF', 0)
+        backoff.start()
+        self.addCleanup(backoff.stop)
         self.logs = io.StringIO()
         self.stderr = redirect_stderr(self.logs)
         self.stderr.__enter__()
@@ -141,6 +150,61 @@ class DownloadTests(unittest.TestCase):
         self.assertEqual(http.urls, [source['url'] for source in sources])
         self.assertEqual(http.ranges, ['bytes=0-', 'bytes=1-'])
         self.assertEqual(self.destination.read_bytes(), b'a' * 100)
+
+    def test_slow_source_is_resumable_after_alternative_is_forbidden(self):
+        sources = self.sources() + [{'label': 'fallback', 'url': 'https://fallback.invalid/model',
+                                     'params': None}]
+        forbidden = HTTPError('forbidden')
+        forbidden.response = SimpleNamespace(status_code=403)
+        http = HTTP([Response([b'a'], delay=0.06), forbidden,
+                     Response([b'a' * 99], status=206, content_range='bytes 1-99/100')])
+        with patch.object(cache, 'DOWNLOAD_RATE_WINDOW', 0.05):
+            self.download(http, expected=b'a' * 100, sources=sources)
+        self.assertEqual(http.urls, [sources[0]['url'], sources[1]['url'], sources[0]['url']])
+        self.assertEqual(http.ranges, ['bytes=0-', 'bytes=1-', 'bytes=1-'])
+        self.assertEqual(self.destination.read_bytes(), b'a' * 100)
+
+    def test_two_slow_sources_are_deprioritized_but_not_both_disabled(self):
+        sources = self.sources() + [{'label': 'fallback', 'url': 'https://fallback.invalid/model',
+                                     'params': None}]
+        http = HTTP([Response([b'a'], delay=0.06),
+                     Response([b'a'], status=206, content_range='bytes 1-99/100', delay=0.06),
+                     Response([b'a' * 98], status=206, content_range='bytes 2-99/100')])
+        with patch.object(cache, 'DOWNLOAD_RATE_WINDOW', 0.05):
+            self.download(http, expected=b'a' * 100, sources=sources)
+        self.assertEqual(http.ranges, ['bytes=0-', 'bytes=1-', 'bytes=2-'])
+        self.assertEqual(self.destination.read_bytes(), b'a' * 100)
+
+    def test_slow_source_is_not_starved_by_an_alternative_timing_out(self):
+        sources = self.sources() + [{'label': 'fallback', 'url': 'https://fallback.invalid/model',
+                                     'params': None}]
+        http = HTTP([Response([b'a'], delay=0.06),
+                     RequestException('timed out'),
+                     Response([b'a' * 99], status=206, content_range='bytes 1-99/100')])
+        with patch.object(cache, 'DOWNLOAD_RATE_WINDOW', 0.05):
+            self.download(http, expected=b'a' * 100, sources=sources)
+        self.assertEqual(http.urls, [sources[0]['url'], sources[1]['url'], sources[0]['url']])
+        self.assertEqual(self.destination.read_bytes(), b'a' * 100)
+
+    def test_every_source_continuously_failing_exhausts_finite_retries(self):
+        sources = self.sources() + [{'label': 'fallback', 'url': 'https://fallback.invalid/model',
+                                     'params': None}]
+        http = HTTP([Response([RequestException('disconnected')])
+                     for _ in range(cache.DOWNLOAD_ATTEMPTS)])
+        with self.assertRaisesRegex(cache.CachePreparationError, 'official_file_download_failed'):
+            self.download(http, sources=sources)
+        self.assertEqual(len(http.urls), 6)
+        self.assertEqual(set(http.urls), {source['url'] for source in sources})
+        self.assertIn('0 retries', self.logs.getvalue())
+
+    def test_retry_backoff_cannot_outlive_shared_hard_budget(self):
+        http = HTTP([Response([RequestException('disconnected')])])
+        started = time.monotonic()
+        with patch.object(cache, 'DOWNLOAD_RETRY_BACKOFF', 1):
+            with self.assertRaises(cache.CachePreparationError):
+                self.download(http, timeout=0.1)
+        self.assertLess(time.monotonic() - started, 0.4)
+        self.assertEqual(len(http.ranges), 1)
 
     def test_malformed_range_is_never_appended(self):
         self.destination.write_bytes(b'abc')
@@ -221,6 +285,33 @@ class DownloadTests(unittest.TestCase):
                     with self.assertRaises(cache.CachePreparationError):
                         cache._official_model_spec(name)
 
+    def test_default_budget_covers_reported_layout_transfer_and_cli_uses_it(self):
+        layout_bytes = cache._official_model_spec('PP-DocLayoutV3')['files']['inference.pdiparams']['size']
+        # The failed deployment transferred about 65 KiB/s, including healthy
+        # partial progress. This file cannot fit the previous 300/600 s limit.
+        self.assertGreater(cache.DEFAULT_DOWNLOAD_TIMEOUT, layout_bytes / (65 * 1024) + 60)
+        with patch.object(cache, 'prepare_model_cache', return_value={}) as prepare, \
+                patch('sys.stdout', new=io.StringIO()):
+            self.assertEqual(cache.main([]), 0)
+        self.assertEqual(prepare.call_args.kwargs['timeout_seconds'], 3600)
+
+    def test_longer_download_budget_does_not_extend_conversion_deadline(self):
+        home = Path(self.temporary.name) / 'paddlex'
+        home.mkdir()
+        with patch.object(cache, 'configure_build_cache', return_value=(home, {})), \
+                patch.object(cache, '_download_official_model'), \
+                patch.object(cache, 'inspect_model', side_effect=lambda _, name: {'name': name}), \
+                patch.object(cache, '_export_onnx_model', return_value=({}, True)) as export, \
+                patch.object(cache, 'verify_manifest'), \
+                patch.object(cache.metadata, 'version', return_value='test'):
+            cache.prepare_model_cache(home, timeout_seconds=7200)
+        self.assertEqual(len(export.call_args_list), 2)
+        self.assertEqual([call.args[2] for call in export.call_args_list], [300, 300])
+        for invalid in (0, -1, 7201, float('inf'), float('nan'), True):
+            with self.subTest(timeout=invalid), self.assertRaisesRegex(
+                    cache.CachePreparationError, 'invalid_download_deadline'):
+                cache.prepare_model_cache(home, timeout_seconds=invalid)
+
     def exercise_persistent_resume(self, *, change_spec=False):
         name = cache.MODEL_NAMES[0]
         cache_home = Path(self.temporary.name) / 'paddlex'
@@ -235,10 +326,9 @@ class DownloadTests(unittest.TestCase):
         first_spec = spec_for(bodies)
         first_http = HTTP([Response([bodies['inference.json']]),
                            Response([b'abc', RequestException('interrupted')]),
-                           Response([RequestException('offline')], status=206,
-                                    content_range='bytes 3-5/6'),
-                           Response([RequestException('offline')], status=206,
-                                    content_range='bytes 3-5/6')])
+                           *[Response([RequestException('offline')], status=206,
+                                      content_range='bytes 3-5/6')
+                             for _ in range(cache.DOWNLOAD_ATTEMPTS - 1)]])
         second_bodies = dict(bodies)
         if change_spec:
             second_bodies['inference.pdiparams'] = b'uvwxyz'
@@ -296,6 +386,101 @@ class DownloadTests(unittest.TestCase):
                 except cache._DownloadDeadline:
                     attempted.append(source)
         self.assertEqual(attempted, ['preferred', 'fallback'])
+
+
+class LocalHTTPTests(unittest.TestCase):
+    """Real requests streaming against a small controlled loopback server."""
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.destination = Path(self.temporary.name) / 'inference.pdiparams'
+        self.body = bytes(range(256)) * 384  # 96 KiB, never an external model.
+        self.logs = io.StringIO()
+        stderr = redirect_stderr(self.logs)
+        stderr.__enter__()
+        self.addCleanup(stderr.__exit__, None, None, None)
+        backoff = patch.object(cache, 'DOWNLOAD_RETRY_BACKOFF', 0)
+        backoff.start()
+        self.addCleanup(backoff.stop)
+
+    @contextmanager
+    def server(self, mode):
+        body, ranges = self.body, []
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_GET(self):
+                offset = int(self.headers.get('Range', 'bytes=0-')[6:-1])
+                ranges.append(offset)
+                self.send_response(206 if offset else 200)
+                self.send_header('Content-Length', str(len(body) - offset))
+                if offset:
+                    self.send_header('Content-Range', f'bytes {offset}-{len(body) - 1}/{len(body)}')
+                self.end_headers()
+                try:
+                    if mode == 'stall':
+                        time.sleep(0.4)
+                        return
+                    end = offset + 2 * 16 * 1024 if mode == 'interrupt' and len(ranges) == 1 else len(body)
+                    for start in range(offset, end, 16 * 1024):
+                        if mode == 'slow':
+                            time.sleep(0.06)
+                        self.wfile.write(body[start:min(start + 16 * 1024, end)])
+                        self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    pass  # The client intentionally aborts a stalled response.
+                finally:
+                    self.close_connection = True
+
+        server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, kwargs={'poll_interval': 0.02}, daemon=True)
+        thread.start()
+        try:
+            yield f'http://127.0.0.1:{server.server_port}/model', ranges
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=1)
+
+    def download(self, url, timeout):
+        import requests
+        record = {'size': len(self.body), 'sha256': hashlib.sha256(self.body).hexdigest()}
+        with requests.Session() as http:
+            # This test talks exclusively to its own loopback server.
+            http.trust_env = False
+            cache._download_official_file(http, cache.MODEL_NAMES[0], 'inference.pdiparams',
+                                          record, self.destination, timeout,
+                                          sources=[{'label': 'loopback', 'url': url, 'params': None}])
+
+    def test_real_disconnection_resumes_at_written_range_and_verifies_hash(self):
+        with self.server('interrupt') as (url, ranges):
+            self.download(url, 2)
+        self.assertEqual(ranges, [0, 2 * 16 * 1024])
+        self.assertEqual(self.destination.read_bytes(), self.body)
+        self.assertIn('ChunkedEncodingError', self.logs.getvalue())
+        self.assertIn('and SHA256', self.logs.getvalue())
+
+    def test_real_slow_progress_refreshes_idle_timer_before_full_64k_buffer(self):
+        with self.server('slow') as (url, ranges), \
+                patch.object(cache, 'DOWNLOAD_PROGRESS_TIMEOUT', 0.2):
+            self.download(url, 2)
+        self.assertEqual(ranges, [0])
+        self.assertEqual(self.destination.read_bytes(), self.body)
+
+    def test_real_stalled_stream_exhausts_hard_budget_and_never_succeeds(self):
+        with self.server('stall') as (url, ranges), \
+                patch.object(cache, 'DOWNLOAD_PROGRESS_TIMEOUT', 0.08):
+            started = time.monotonic()
+            with self.assertRaisesRegex(cache.CachePreparationError, 'official_file_download_failed'):
+                self.download(url, 0.25)
+            self.assertLess(time.monotonic() - started, 0.7)
+        self.assertGreaterEqual(len(ranges), 1)
+        self.assertLessEqual(len(ranges), cache.DOWNLOAD_ATTEMPTS)
+        self.assertNotEqual(self.destination.read_bytes(), self.body)
+        self.assertNotIn('and SHA256', self.logs.getvalue())
 
 
 if __name__ == '__main__':

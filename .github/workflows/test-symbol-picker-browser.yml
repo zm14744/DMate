@@ -6,6 +6,10 @@ on:
     paths:
       - 'static/chat-composer.css'
       - 'static/chat-composer.js'
+      - 'static/language-catalog.js'
+      - 'static/language-knowledge.js'
+      - 'static/language.js'
+      - 'static/ui-tooltip.js'
       - 'scripts/test_symbol_picker_browser.cjs'
       - '.github/workflows/test-symbol-picker-browser.yml'
   workflow_dispatch:

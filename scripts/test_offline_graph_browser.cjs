@@ -68,11 +68,13 @@ async function visual(page, size) {
       card.style.setProperty('height', size.height + 'px', 'important');
       card.style.setProperty('max-width', 'none', 'important');
       card.style.setProperty('max-height', 'none', 'important');
+      card.style.setProperty('min-width', '0', 'important');
+      card.style.setProperty('min-height', '0', 'important');
     }
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await Promise.all(card.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
     const origin = card.getBoundingClientRect(), result = {};
-    for (const selector of [':scope', '.modal-head', '.graph-toolbar', '.graph-toolbar-left',
+    for (const selector of ['.graph-toolbar', '.graph-toolbar-left',
       '#knowledgeGraphFocusBtn', '#knowledgeGraphCopyBtn', '.knowledge-graph-layout', '.knowledge-graph-main',
       '.knowledge-graph-canvas', '.kg-section', '.knowledge-graph-side', '.graph-side-tabs',
       '#knowledgeGraphDetailTab', '.graph-detail-title', '.graph-detail-body']) {
@@ -136,7 +138,7 @@ async function selectFirst(page) {
         value: field.querySelector('.graph-detail-field-value').textContent.trim() })));
 }
 
-async function onlineReference(browser, width, theme) {
+async function onlineReference(browser, width, theme, available) {
   const context = await browser.newContext({ viewport: { width, height: 900 },
     isMobile: width < 761, hasTouch: width < 761, serviceWorkers: 'block' });
   const page = await context.newPage();
@@ -151,7 +153,7 @@ async function onlineReference(browser, width, theme) {
     await frame(page).locator('.kg-section').waitFor();
     await removeOnlineOnly(page);
     await settle(page);
-    const initial = await visual(page), categories = await frame(page).locator('#knowledgeGraphCategory option').allTextContents();
+    const initial = await visual(page, available), categories = await frame(page).locator('#knowledgeGraphCategory option').allTextContents();
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/online-graph-' + width + '-' + theme + '.png' });
     const expected = {};
     await fullGraph(page);
@@ -213,10 +215,86 @@ async function disconnectWorkerNetwork(browser, page) {
 
 async function openOfflineGraph(page) {
   await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
-  const toggle = page.locator(mobile(page) ? '#offlineNavToggle' : '#offlineDesktopSidebarOpen');
+  const toggle = page.locator(page.viewportSize().width <= 1100 ? '#offlineNavToggle' : '#offlineDesktopSidebarOpen');
   if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
   await page.locator('.offline-nav-item[data-panel="graph"]').click();
   await frame(page).locator('.kg-section').waitFor();
+}
+
+async function inlineLayout(page) {
+  const state = await frame(page).evaluate(root => {
+    const main = document.getElementById('offlineMain'), sidebar = document.getElementById('offlineSidebar');
+    const box = element => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
+    };
+    return { parent: root.parentElement.id, insideMain: main.contains(root), modal: root.classList.contains('modal'),
+      fullscreen: root.classList.contains('graph-fullscreen-view'), close: root.querySelector('#knowledgeGraphClose') !== null,
+      position: getComputedStyle(root).position, background: getComputedStyle(root).backgroundColor,
+      root: box(root), main: box(main), sidebar: box(sidebar), documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: innerWidth, portalMarkers: [...document.getElementById('graphPanel').childNodes]
+        .filter(node => node.nodeType === Node.COMMENT_NODE && node.textContent.includes('fullscreen origin')).length };
+  });
+  assert.equal(state.parent, 'graphPanel');
+  assert.equal(state.insideMain, true, 'The normal graph belongs to the main content area');
+  assert.equal(state.modal, false, 'The embedded graph has no modal overlay');
+  assert.equal(state.fullscreen, false);
+  assert.equal(state.close, false, 'The embedded tool does not acquire a modal close dot');
+  assert.equal(state.position, 'relative');
+  assert.equal(state.background, 'rgba(0, 0, 0, 0)', 'The inline host has no backdrop');
+  assert.equal(state.portalMarkers, 0, 'Exited full view leaves no portal placeholder');
+  assert.ok(state.root.left >= state.main.left - 1 && state.root.right <= state.main.right + 1
+    && state.root.top >= state.main.top - 1 && state.root.bottom <= state.main.bottom + 1,
+  'The graph fits the main content bounds: ' + JSON.stringify(state));
+  assert.ok(state.root.width > 250 && state.root.height > 300, 'The main area provides a usable embedded graph');
+  assert.ok(state.documentWidth <= state.viewportWidth + 1, 'The graph does not overflow the page horizontally');
+  if (page.viewportSize().width > 1100) assert.ok(state.root.left >= state.sidebar.right - 1,
+    'The graph does not cover the desktop sidebar');
+}
+
+async function inlineLifecycle(page) {
+  await inlineLayout(page);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('.offline-nav-item.active').getAttribute('data-panel'), 'graph',
+    'Escape in the ordinary inline tool does not switch modules');
+  const switchPanel = async panel => {
+    const toggle = page.locator(page.viewportSize().width <= 1100 ? '#offlineNavToggle' : '#offlineDesktopSidebarOpen');
+    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+    await page.locator('.offline-nav-item[data-panel="' + panel + '"]').click();
+    await page.locator('#' + panel + 'Panel').waitFor({ state: 'visible' });
+  };
+  await switchPanel('concepts'); // Real navigation remains clickable beside an inline graph.
+  await openOfflineGraph(page);
+  await inlineLayout(page);
+  if (!mobile(page)) return;
+  for (const exit of ['button', 'Escape']) {
+    await fullGraph(page);
+    assert.equal(await frame(page).evaluate(root => root.parentElement === document.body), true,
+      'Only mobile full view is portalled to the body');
+    if (exit === 'button') await frame(page).locator('.kg-mobile-expand').click();
+    else await page.keyboard.press('Escape');
+    await settle(page);
+    await inlineLayout(page);
+    assert.equal(await frame(page).locator('.kg-mobile-entry-only').count(), 1);
+  }
+  await fullGraph(page);
+  await page.setViewportSize({ width: 820, height: 900 });
+  await frame(page).locator('.kg-node-group').first().waitFor();
+  await settle(page);
+  await inlineLayout(page);
+  await page.setViewportSize({ width: 390, height: 900 });
+  await frame(page).locator('.kg-mobile-entry-only').waitFor();
+  await inlineLayout(page);
+  await fullGraph(page);
+  // Exercise the real navigation handler during full view, as an application
+  // navigation can occur while its sidebar button is intentionally covered.
+  await page.locator('.offline-nav-item[data-panel="concepts"]').evaluate(button => button.click());
+  await page.locator('#conceptsPanel').waitFor({ state: 'visible' });
+  assert.equal(await frame(page).isVisible(), false, 'Switching modules removes the portalled full-view surface');
+  assert.equal(await frame(page).evaluate(root => root.parentElement.id), 'graphPanel');
+  await openOfflineGraph(page);
+  await inlineLayout(page);
+  assert.equal(await page.locator('#knowledgeGraphModal').count(), 1, 'Repeated portal lifecycles keep one graph instance');
 }
 
 async function gestures(page) {
@@ -316,7 +394,7 @@ async function png(page) {
 }
 
 async function runCase(browser, width, theme) {
-  const label = width + '/' + theme, reference = await onlineReference(browser, width, theme);
+  const label = width + '/' + theme;
   const context = await browser.newContext({ viewport: { width, height: 900 },
     isMobile: width <= 760, hasTouch: width <= 760, serviceWorkers: 'allow' });
   await context.addInitScript(theme => localStorage.setItem('dmate:offline:appearance:v1',
@@ -335,6 +413,14 @@ async function runCase(browser, width, theme) {
     });
     await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => navigator.serviceWorker.controller && document.documentElement.dataset.offlineReady === 'true');
+    await openOfflineGraph(page);
+    await inlineLayout(page);
+    const available = await frame(page).locator('.graph-modal-card').evaluate(card => {
+      const rect = card.getBoundingClientRect(); return { width: rect.width, height: rect.height };
+    });
+    const reference = await onlineReference(browser, width, theme, available);
+    near(reference.initial.size.width, available.width, 'Online reference uses the embedded content width');
+    near(reference.initial.size.height, available.height, 'Online reference uses the embedded content height');
     await context.setOffline(true);
     protocol = await disconnectWorkerNetwork(browser, page);
     page.on('requestfailed', request => failures.push(request.url()));
@@ -349,7 +435,8 @@ async function runCase(browser, width, theme) {
     assert.equal(await frame(page).locator('#knowledgeGraphScopeBtn,#knowledgeGraphHistoryTab,#knowledgeGraphHistoryWrap,'
       + '#knowledgeGraphLegendRelated,.graph-legend,.kg-video-section,iframe,a[href*="bilibili"],a[href*="youtube"]').count(), 0,
     'Question association, history, videos and the purple legend are absent');
-    const actual = await visual(page, reference.initial.size);
+    await inlineLayout(page);
+    const actual = await visual(page);
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/offline-graph-preview-' + width + '-' + theme + '.png' });
     for (const [selector, expected] of Object.entries(reference.initial.blocks)) {
       assert.deepEqual(actual.blocks[selector].style, expected.style, label + ': shared graph styles ' + selector);
@@ -367,6 +454,7 @@ async function runCase(browser, width, theme) {
     await gestures(page);
     await png(page);
     await liveLanguage(page);
+    await inlineLifecycle(page);
     await frame(page).locator('#knowledgeGraphFocusBtn').click();
     assert.equal(await frame(page).locator('#knowledgeGraphCategory').inputValue(), '全部', 'All knowledge resets the module filter');
     await page.reload({ waitUntil: 'networkidle' });

@@ -5257,9 +5257,9 @@ body[data-appearance-theme="light"] .input input {
         font-size:13px;
         font-weight:700;
         white-space:normal;
-        word-break:break-all;
-        overflow:hidden;
-        text-overflow:ellipsis;
+        word-break:normal;
+        overflow:visible;
+        text-overflow:clip;
     }
 
     .kg-mobile-node-badge {
@@ -5268,9 +5268,9 @@ body[data-appearance-theme="light"] .input input {
         font-size:10px;
         font-weight:600;
         opacity:.82;
-        white-space:nowrap;
-        overflow:hidden;
-        text-overflow:ellipsis;
+        white-space:pre;
+        overflow:visible;
+        text-overflow:clip;
     }
 
     /* 详情区不再被主图谱挤没；页面往下滚就能完整看到。 */
@@ -8922,7 +8922,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
     <div id="sessions"></div>
     <button id="downloadAppBtn" class="btn download-entry" type="button"{% if is_dmate_android_app or is_dmate_desktop_app %} hidden{% endif %}><svg class="dmate-lucide-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 15V3" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5" /></svg><span class="dmate-ui-label">下载 DMate</span></button>
     <button id="accountBtn" class="btn account-entry" type="button"><svg class="dmate-lucide-icon account-entry-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="5" /><path d="M20 21a8 8 0 0 0-16 0" /></svg><span id="accountEntryLabel">登录 / 注册</span></button>
-    <button id="offlineWorkspaceBtn" class="btn offline-entry" type="button" aria-label="打开离线学习工作区" title="离线版">
+    <button id="offlineWorkspaceBtn" class="btn offline-entry" type="button" aria-label="打开离线学习工作区">
         <svg class="dmate-lucide-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
             <path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><path d="M19 12.859a10 10 0 0 0-2.007-1.523"/><path d="M2 8.82a15 15 0 0 1 4.177-2.643"/><path d="M22 8.82a15 15 0 0 0-11.288-3.764"/><path d="m2 2 20 20"/>
         </svg>
@@ -9642,6 +9642,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script defer src="/static/language-catalog.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/language-knowledge.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/language.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/knowledge-graph-labels.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/exercise-intent.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/graph-editor-model.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/graph-editor-format.js?v={{ dmate_web_revision }}"></script>
@@ -10048,8 +10049,6 @@ html[data-ui-language="en"] .kg-mobile-node-badge {
     hyphens: auto;
     line-height: 1.25;
 }
-html[data-ui-language="en"] .kg-mobile-node-name { font-size: 12px; }
-html[data-ui-language="en"] .kg-mobile-node-badge { font-size: 9px; }
 html[data-ui-language="en"] .graph-detail-title,
 html[data-ui-language="en"] .learning-review-section-title {
     line-height: 1.34;
