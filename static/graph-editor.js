@@ -265,7 +265,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
                 aside.append(fromField,toField);
                 if(hasDirection(graph)){aside.append(field('方向', select(directionOptions, edge.direction, '当前边方向',
                     value => model.updateEdges(graph.id, ids, 'direction', value))));
-                aside.append(button('反转方向', () => model.reverseEdges(graph.id, ids)));}
+                if(!options.drawingOnly)aside.append(button('反转方向', () => model.reverseEdges(graph.id, ids)));}
                 if(graph.weighted!==false)aside.append(field('权值', input(edge.weight, '当前边权值',
                     value => model.updateEdges(graph.id, ids, 'weight', weightValue(value)))));
                 aside.append(field('边名', input(edge.edge_label, '当前边名称',
@@ -290,7 +290,13 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
                 const head=element('div','dge-property-head'),heading=aside.querySelector('h3');
                 if(heading)head.append(heading);
                 const close=button('',()=>{propertiesVisible=false;});close.classList.add('dge-panel-close');close.setAttribute('aria-label','关闭属性');close.title='关闭属性';
-                head.append(close);aside.prepend(head);
+                head.append(close);
+                if(options.drawingOnly){
+                    // Keep the close control outside the scrolling fields.
+                    const body=element('div','dge-property-body');
+                    body.append(...aside.childNodes);aside.classList.add('dge-drawing-properties');
+                    aside.append(head,body);
+                }else aside.prepend(head);
             }
             return aside;
         }
@@ -757,6 +763,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
         render();
         return { getDocument: model.getDocument, getIsQuestion: () => isQuestion,
             validate: model.validate, model, refresh: refreshDraftViews, getDrawingSvg: () => overlay?.getDrawingSvg?.() || null,
+            fitView: () => overlay?.fitView?.(),
             destroy() { destroyed = true; clearTimeout(textTimer); unsubscribe(); overlay?.destroy(); textOverlay?.destroy(); container.replaceChildren(); container.classList.remove('dmate-graph-editor'); } };
     }
     const api = { mount, createModel, importDocument, validateDocument, groupEdges };

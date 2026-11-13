@@ -196,7 +196,7 @@ function mount(host,o){
  const value=d.createElement('span');value.className='dge-overlay-zoom';viewControls.append(value);
  const zoomIn=button('＋','zoom-in',()=>{zoom(s.zoom*1.25);draw();},viewControls);
  zoomIn.setAttribute('aria-label','放大原图');
- button('适应','zoom-fit',()=>{fitImage();draw();},viewControls);
+ button('适应','zoom-fit',()=>fitView(),viewControls);
  // Hide the source photo independently from the drawing layer.
  // visibility:hidden preserves its dimensions and all source coordinates.
  const syncOriginal=()=>{
@@ -555,12 +555,16 @@ function mount(host,o){
  function drawingBounds(){
   let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   const include=(x,y,pad=0)=>{left=Math.min(left,x-pad);top=Math.min(top,y-pad);right=Math.max(right,x+pad);bottom=Math.max(bottom,y+pad);};
+  // Opening dialogs hide their whole subtree while the decoded drawing is
+  // fitted. Visibility does not affect SVG geometry; measure that drawing
+  // before revealing it, while still excluding individually hidden shapes.
+  const hiddenDrawing=d.defaultView.getComputedStyle(svg).visibility==='hidden';
   // Invisible hit targets and editing controls are deliberately excluded.
   // SVG getBBox already measures the true extrema of curves and text, but
   // Chromium does not include strokes or marker heads in those bounds.
   for(const shape of svg.querySelectorAll('.dge-overlay-stroke,.dge-overlay-dot,.dge-overlay-label')){
    const style=d.defaultView.getComputedStyle(shape);
-   if(style.display==='none'||style.visibility==='hidden'||Number(style.opacity)===0)continue;
+   if(style.display==='none'||style.visibility==='hidden'&&!hiddenDrawing||Number(style.opacity)===0)continue;
    const box=shape.getBBox(),stroke=style.stroke==='none'?0:parseFloat(style.strokeWidth)||0;
    if(![box.x,box.y,box.width,box.height].every(finite))continue;
    include(box.x,box.y,stroke/2);include(box.x+box.width,box.y+box.height,stroke/2);
@@ -748,9 +752,15 @@ function mount(host,o){
  svg.addEventListener('pointerup',e=>release(e));svg.addEventListener('pointercancel',e=>release(e,true));
  scroll.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();zoom(s.zoom*(e.deltaY>0?0.9:1.1));draw();},{passive:false});
  const syncGeometryReady=()=>{const ready=loaded&&autoFitted&&scroll.clientWidth>0&&scroll.clientHeight>0;root.dataset.geometryReady=String(ready);svg.setAttribute('aria-busy',String(!ready));};
- image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;loaded=true;fitImage(false);syncOriginal();buildSampler();draw();syncGeometryReady();};
+ function fitView(){
+  // The image or a reused page can be opened while its panel is hidden.
+  // Keep the requested fit pending until the viewport has real dimensions; later
+  // edits and ordinary resizes must preserve the user's chosen camera.
+  autoFitted=false;fitImage();draw();syncGeometryReady();
+ }
+ image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;loaded=true;syncOriginal();buildSampler();fitView();};
  image.onerror=()=>{status.textContent='原图未能显示，可使用下方结构编辑';};image.src=o.originalUrl;zoom(s.zoom);draw();
- const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(loaded&&!autoFitted)fitImage(false);else layoutWorld();draw();syncGeometryReady();}):null;observer?.observe(scroll);observer?.observe(viewControls);
+ const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(loaded&&!autoFitted)fitImage();else layoutWorld();draw();syncGeometryReady();}):null;observer?.observe(scroll);observer?.observe(viewControls);
  const resetInteraction=()=>{cancelResizePreview();active=null;ghost=null;base=null;pointers.clear();s.start=null;s.polygonDraft=[];scanSequence++;draw();};
  svg.addEventListener('keydown',e=>{if(e.key==='Escape')resetInteraction();});
  function getDrawingSvg(){
@@ -778,7 +788,7 @@ function mount(host,o){
   const background=E(d,'rect',{x,y,width,height,fill:'#ffffff'});output.insertBefore(background,output.firstChild);
   return output;
  }
- return {refresh:draw,resetInteraction,state:s,getDrawingSvg,destroy(){cancelResizePreview();observer?.disconnect();image.onload=null;image.onerror=null;host.replaceChildren();}};
+ return {refresh:draw,fitView,resetInteraction,state:s,getDrawingSvg,destroy(){cancelResizePreview();observer?.disconnect();image.onload=null;image.onerror=null;host.replaceChildren();}};
 }
 root.DMateGraphOverlay={mount,elasticRegionStart,elasticRegionPoints,nearestRegionBoundary};if(typeof module!=='undefined'&&module.exports)module.exports={mount,elasticRegionStart,elasticRegionPoints,nearestRegionBoundary};
 })(typeof window!=='undefined'?window:globalThis);

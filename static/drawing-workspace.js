@@ -361,6 +361,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   else{mountPage();persist();}
   const pageHide=()=>{collect();persist(false);};win.addEventListener('pagehide',pageHide);
   return{getDocument:()=>clone(currentDocument()),getPages:()=>clone(pages),isBusy:()=>uploadBusy,createPageFromDocument,
+   fitView:()=>editor?.fitView?.(),
    destroy(){if(destroyed)return;collect();persist(false);destroyed=true;noticeQueue=[];if(noticeFrame)win.cancelAnimationFrame(noticeFrame);root.DMateDeleteConfirm?.cancel(noticeOwner);cancelDelete();closeExportPreview();clearTimeout(timer);if(chromeFrame)win.cancelAnimationFrame(chromeFrame);chromeObserver.disconnect();resizeObserver?.disconnect();abortAnswer();doc.removeEventListener('pointerdown',outsidePointer,true);doc.removeEventListener('keydown',escapeKey,true);doc.removeEventListener('scroll',documentScrolled,true);win.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('scroll',queueChrome);win.removeEventListener('pagehide',pageHide);editor?.destroy();host.replaceChildren();host.classList.remove('has-drawing-workspace');}};
  }
  root.DMateDrawingWorkspace={mount,blankDocument:blank};

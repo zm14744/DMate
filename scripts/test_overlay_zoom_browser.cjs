@@ -16,8 +16,11 @@ const settle = page => page.evaluate(() => new Promise(resolve => requestAnimati
 
 async function mount(page, options = {}) {
   await page.evaluate(options => {
+    const previousState = window.fixtureState;
     window.fixtureOverlay?.destroy();
     document.body.replaceChildren(Object.assign(document.createElement('main'), { id: 'overlay-fixture' }));
+    if (options.hidden) document.getElementById('overlay-fixture').style.display = 'none';
+    if (options.positioning) document.getElementById('overlay-fixture').dataset.positioning = 'true';
     const vertices = [], edges = [];
     const rows = [
       ['solid-unknown', 'solid', 'unknown'], ['solid-undirected', 'solid', 'undirected'],
@@ -31,10 +34,10 @@ async function mount(page, options = {}) {
         ...(id === 'solid-polyline' ? { path: [[.1, y], [.3, y - .04], [.5, y + .04], [.7, y - .04], [.9, y]] } : {}) });
     }
     if (options.hugeDrawing) vertices[1].x = 30;
-    window.fixtureGraph = { id: 'G1', vertices, edges };
+    window.fixtureGraph = options.graph || { id: 'G1', vertices, edges };
     window.fixtureSelected = null;
     const zoom = options.invalidZoom === 'NaN' ? NaN : options.invalidZoom === 'Infinity' ? Infinity : options.zoom ?? 100;
-    window.fixtureState = { mode: 'select', zoom, visible: true };
+    window.fixtureState = options.reuseState ? previousState : { mode: 'select', zoom, visible: true };
     const imageHeight = options.tallImage ? 20000 : 400;
     const background = options.mixedImage ? '<rect width="1000" height="' + imageHeight + '" fill="white"/>'
       + Array.from({ length: 13 }, (_, i) => '<rect x="' + (i * 80) + '" width="40" height="' + imageHeight + '" fill="black"/>').join('')
@@ -47,8 +50,114 @@ async function mount(page, options = {}) {
     });
     window.fixtureRestoredZoom = fixtureState.zoom;
   }, options);
+  if (options.hidden) {
+    await page.waitForFunction(() => { const img = document.querySelector('.dge-overlay-image'); return img?.complete && img.naturalWidth > 0; });
+    await settle(page); return;
+  }
   await page.waitForFunction(() => document.querySelector('.dge-overlay')?.dataset.geometryReady === 'true');
   await settle(page);
+}
+
+async function camera(page) {
+  return page.evaluate(() => {
+    const viewport = document.querySelector('.dge-overlay-viewport'), svg = document.querySelector('.dge-overlay-svg'),
+      box = svg.viewBox.baseVal, rect = viewport.getBoundingClientRect();
+    let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+    for (const shape of svg.querySelectorAll('.dge-overlay-stroke,.dge-overlay-dot,.dge-overlay-label')) {
+      const style = getComputedStyle(shape), bounds = shape.getBBox(), matrix = shape.getScreenCTM(),
+        pad = style.stroke === 'none' ? 0 : Number.parseFloat(style.strokeWidth) * Math.hypot(matrix.a, matrix.b) / 2;
+      const a = new DOMPoint(bounds.x, bounds.y).matrixTransform(matrix),
+        b = new DOMPoint(bounds.x + bounds.width, bounds.y + bounds.height).matrixTransform(matrix);
+      left = Math.min(left, a.x - pad); top = Math.min(top, a.y - pad);
+      right = Math.max(right, b.x + pad); bottom = Math.max(bottom, b.y + pad);
+    }
+    const drawing = Number.isFinite(left) ? { left: left - rect.left, top: top - rect.top,
+      right: rect.left + viewport.clientWidth - right, bottom: rect.top + viewport.clientHeight - bottom,
+      cx: (left + right) / 2 - (rect.left + viewport.clientWidth / 2),
+      cy: (top + bottom) / 2 - (rect.top + viewport.clientHeight / 2) } : null;
+    return { zoom: fixtureState.zoom, x: viewport.scrollLeft, y: viewport.scrollTop,
+      bx: box.x, by: box.y, bw: box.width, bh: box.height, drawing };
+  });
+}
+
+function equalCamera(actual, expected, message) {
+  for (const key of ['zoom', 'x', 'y', 'bx', 'by', 'bw', 'bh']) assert.ok(Math.abs(actual[key] - expected[key]) < .1,
+    message + ' (' + key + '): ' + JSON.stringify({ actual, expected }));
+}
+
+async function initialFit(page, name, { bounds = true } = {}) {
+  // Capture the very first usable frame before ever invoking the Fit control.
+  const initial = await camera(page);
+  await page.locator('[data-overlay-tool="zoom-fit"]').click(); await settle(page);
+  equalCamera(initial, await camera(page), name + ' first frame already equals a real Fit');
+  if (bounds) {
+    assert.ok(initial.drawing, name + ' has actual rendered geometry');
+    for (const side of ['left', 'top', 'right', 'bottom']) assert.ok(initial.drawing[side] >= 27,
+      name + ' keeps the fitted 28px margin: ' + JSON.stringify(initial));
+    for (const axis of ['cx', 'cy']) assert.ok(Math.abs(initial.drawing[axis]) <= 1.1,
+      name + ' visible drawing is centred: ' + JSON.stringify(initial));
+  }
+  return initial;
+}
+
+async function automaticFitCases(page) {
+  const pageA = { id: 'saved-A', vertices: [{ id: 'a', label: 'A', x: .06, y: .12 }, { id: 'b', label: 'B', x: .35, y: .32 }],
+    edges: [{ id: 'ab', from: 'a', to: 'b', direction: 'undirected', style: 'solid' }] };
+  const pageB = { id: 'saved-B', vertices: [{ id: 'c', label: 'C', x: .58, y: .63 }, { id: 'd', label: 'D', x: .9, y: .88 }],
+    edges: [{ id: 'cd', from: 'c', to: 'd', direction: 'undirected', style: 'solid', path: [[.58, .63], [.74, .55], [.9, .88]] }] };
+  await mount(page, { graph: pageA, zoom: 25 }); const a = await initialFit(page, 'Saved page A');
+  await page.evaluate(() => {
+    for (let i = 0; i < 12; i++) document.querySelector('[data-overlay-tool="zoom-in"]').click();
+    const viewport = document.querySelector('.dge-overlay-viewport'); viewport.scrollLeft += 123; viewport.scrollTop += 91;
+  });
+  assert.equal(await page.evaluate(() => fixtureState.zoom), 400, 'Reopen fixture contains a real previous zoom');
+  await mount(page, { graph: pageB, reuseState: true }); await initialFit(page, 'Switch to differently placed page B');
+  await mount(page, { graph: pageA, reuseState: true }); equalCamera(await initialFit(page, 'Reopen page A'), a, 'Page A forgets previous pan and zoom');
+  await page.evaluate(() => {
+    for (let i = 0; i < 12; i++) document.querySelector('[data-overlay-tool="zoom-in"]').click();
+    const viewport = document.querySelector('.dge-overlay-viewport'); viewport.scrollLeft += 123; viewport.scrollTop += 91;
+    const host = document.getElementById('overlay-fixture'); host.style.display = 'none'; fixtureOverlay.fitView();
+  });
+  assert.deepEqual(await page.evaluate(() => ({ width: document.querySelector('.dge-overlay-viewport').clientWidth,
+    ready: document.querySelector('.dge-overlay').dataset.geometryReady })), { width: 0, ready: 'false' }, 'Reused hidden controller queues its explicit fit');
+  await page.locator('#overlay-fixture').evaluate(node => { node.style.display = ''; });
+  await page.waitForFunction(() => document.querySelector('.dge-overlay').dataset.geometryReady === 'true'); await settle(page);
+  equalCamera(await initialFit(page, 'Reused hidden controller after returning to drawing'), a, 'Returning to drawing discards old pan and zoom');
+  await page.evaluate(() => {
+    for (let i = 0; i < 12; i++) document.querySelector('[data-overlay-tool="zoom-in"]').click();
+    const viewport = document.querySelector('.dge-overlay-viewport'); viewport.scrollLeft += 123; viewport.scrollTop += 91;
+    fixtureOverlay.fitView();
+  }); await settle(page);
+  equalCamera(await camera(page), a, 'Visible explicit fitView uses the same Fit camera');
+  await mount(page, { graph: pageB, zoom: 400, hidden: true });
+  assert.deepEqual(await page.evaluate(() => ({ width: document.querySelector('.dge-overlay-viewport').clientWidth,
+    ready: document.querySelector('.dge-overlay').dataset.geometryReady })), { width: 0, ready: 'false' }, 'Loaded hidden image waits for real dimensions');
+  await page.locator('#overlay-fixture').evaluate(node => { node.style.display = ''; });
+  await page.waitForFunction(() => document.querySelector('.dge-overlay').dataset.geometryReady === 'true'); await settle(page);
+  await initialFit(page, 'Hidden mount after becoming visible');
+  await mount(page, { graph: pageA, zoom: 400, positioning: true });
+  assert.deepEqual(await page.evaluate(() => ({ width: document.querySelector('.dge-overlay-viewport').clientWidth > 0,
+    visibility: getComputedStyle(document.querySelector('.dge-overlay-svg')).visibility,
+    labelVisibility: getComputedStyle(document.querySelector('.dge-overlay-label')).visibility })),
+  { width: true, visibility: 'hidden', labelVisibility: 'hidden' }, 'Dialog positioning hides every descendant while retaining layout');
+  const positioningCamera = await camera(page);
+  await page.locator('#overlay-fixture').evaluate(node => { node.removeAttribute('data-positioning'); }); await settle(page);
+  equalCamera(await camera(page), positioningCamera, 'Revealing positioned dialog preserves its already fitted camera');
+  await initialFit(page, 'Initially visibility-hidden positioning dialog');
+  // These documents represent the existing import/generation mount contract.
+  await mount(page, { graph: { ...pageA, id: 'imported', vertices: pageA.vertices.map(v => ({ ...v, x: v.x + .3, y: v.y + .4 })) }, zoom: 400 });
+  await initialFit(page, 'Imported document');
+  await mount(page, { graph: { id: 'generated', vertices: [ { id: 'x', label: 'x', x: .18, y: .16 }, { id: 'y', label: 'y', x: .76, y: .22 }, { id: 'z', label: 'z', x: .39, y: .78 } ],
+    edges: [ { id: 'xy', from: 'x', to: 'y', direction: 'undirected', style: 'solid' }, { id: 'yz', from: 'y', to: 'z', direction: 'undirected', style: 'solid' } ] }, zoom: 25 });
+  await initialFit(page, 'Generated document');
+  await page.evaluate(() => { for (let i = 0; i < 12; i++) document.querySelector('[data-overlay-tool="zoom-in"]').click(); });
+  const editedCamera = await camera(page);
+  await page.evaluate(() => { fixtureGraph.vertices[0].x += .015; fixtureOverlay.refresh(); }); await settle(page);
+  equalCamera(await camera(page), editedCamera, 'Ordinary geometry edits keep the camera');
+  await page.locator('#overlay-fixture').evaluate(node => { node.style.width = '85%'; }); await settle(page);
+  assert.equal((await camera(page)).zoom, editedCamera.zoom, 'Ordinary ResizeObserver updates do not refit');
+  await mount(page, { graph: { id: 'empty', vertices: [], edges: [] }, zoom: 400 });
+  const empty = await initialFit(page, 'Blank page', { bounds: false }); assert.equal(empty.zoom, 100, 'Blank page naturally fits its source canvas');
 }
 
 async function paint(page, selected = null) {
@@ -127,11 +236,17 @@ async function run(browser, width) {
   const page = await context.newPage(), errors = []; page.on('pageerror', error => errors.push(error.message));
   try {
     await page.goto(baseURL + '/health', { waitUntil: 'domcontentloaded' });
-    await page.setContent('<meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0}#overlay-fixture{width:100%;max-width:1280px;margin:auto}</style>');
+    await page.setContent('<meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0}#overlay-fixture{width:100%;max-width:1280px;margin:auto}#overlay-fixture[data-positioning],#overlay-fixture[data-positioning] *{visibility:hidden!important}</style>');
     await page.addStyleTag({ path: path.join(root, 'static/graph-editor.css') });
     await page.addScriptTag({ content: source });
+    await automaticFitCases(page);
     await mount(page);
-    assert.equal(await page.evaluate(() => fixtureState.zoom), 100, 'Fixture begins at an exact 100%');
+    await initialFit(page, 'Full paint fixture', { bounds: false });
+    const session = await context.newCDPSession(page);
+    await page.evaluate(() => { for (let i = 0; i < 12; i++) document.querySelector('[data-overlay-tool="zoom-in"]').click(); }); await settle(page);
+    assert.equal(await page.evaluate(() => fixtureState.zoom), 400);
+    await pinch(page, session, .25);
+    assert.equal(await page.evaluate(() => fixtureState.zoom), 100, 'Real controls prepare exact 100% after the initial automatic fit');
     checkPaint(await paint(page), null);
     for (const id of ['solid-unknown', 'solid-polyline']) {
       const raster = await rasterContinuity(page, id); assert.ok(raster.samples > 100); assert.equal(raster.longestGap, 0, width + ' 100% continuous ' + id + ': ' + JSON.stringify(raster));
@@ -142,7 +257,6 @@ async function run(browser, width) {
     assert.equal(await page.locator('[data-overlay-tool="zoom-in"]').getAttribute('aria-disabled'), 'true');
     await page.locator('.dge-overlay-viewport').dispatchEvent('wheel', { ctrlKey: true, deltaY: -100 });
     assert.equal(await page.evaluate(() => fixtureState.zoom), 400, 'Ctrl-wheel respects maximum');
-    const session = await context.newCDPSession(page);
     await pinch(page, session, 2); assert.equal(await page.evaluate(() => fixtureState.zoom), 400, 'Native pinch respects maximum');
     checkPaint(await paint(page), null); checkPaint(await paint(page, 'solid-polyline'), 'solid-polyline');
     for (const id of ['solid-unknown', 'solid-polyline']) {

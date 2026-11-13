@@ -139,6 +139,10 @@
 .dge-property-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0}
 .dge-property-head h3{margin:0}
 .dge-property-head .dge-panel-close{flex:0 0 auto;align-self:center}
+.dge-workspace>.dge-selection-panel.dge-drawing-properties{--dge-property-padding:16px;--dge-property-gap:12px;padding:0;gap:0;overflow:hidden}
+.dge-drawing-properties>.dge-property-head{padding:var(--dge-property-padding) var(--dge-property-padding) var(--dge-property-gap)}
+.dge-property-body{display:flex;flex-direction:column;gap:var(--dge-property-gap);min-height:0;padding:0 var(--dge-property-padding) var(--dge-property-padding);overflow:auto;overscroll-behavior:contain;scrollbar-width:none}
+.dge-property-body::-webkit-scrollbar{display:none;width:0;height:0}
 .dge-selection-panel .dge-field{gap:5px}
 .dge-selection-panel .dge-muted{margin:0}
 .dge-selection-panel .dge-danger{margin-top:4px}
@@ -148,6 +152,7 @@
 @media(max-width:760px){
  .dge-workspace:has(.dge-overlay-host){grid-template-columns:1fr;gap:8px}
  .dge-selection-panel{padding:12px;gap:8px}
+ .dge-workspace>.dge-selection-panel.dge-drawing-properties{--dge-property-padding:12px;--dge-property-gap:8px}
  .dge-selection-panel .dge-field{flex:1 1 140px}
 }
 

@@ -8,6 +8,9 @@
 .ddw-page-actions>button{white-space:nowrap}
 .dmate-drawing-workspace button{font:inherit;color:inherit;background:var(--surface-2,#f8fafc);border:1px solid var(--border-strong,#cbd5e1);border-radius:9px;padding:9px 12px;cursor:pointer;touch-action:manipulation}
 .dmate-drawing-workspace button:hover:not(:disabled){filter:none}
+/* Keep the existing button dimensions while removing the visible frame. */
+.dmate-drawing-workspace :is(.ddw-page-actions>button:not(.ddw-upload-button),.ddw-editor>.dge-topline>button,.ddw-editor .dge-view-controls>button){--dm-control-bg:transparent;--dm-control-border:transparent;--dm-control-hover-bg:var(--dm-nav-hover,var(--dm-selected-hover,var(--surface-2)));--dm-control-hover-border:transparent;background-color:transparent!important;border-color:transparent!important;box-shadow:none!important}
+@media(hover:hover){.dmate-drawing-workspace :is(.ddw-page-actions>button:not(.ddw-upload-button),.ddw-editor>.dge-topline>button,.ddw-editor .dge-view-controls>button):hover:not(:disabled){background-color:var(--dm-nav-hover,var(--dm-selected-hover,var(--surface-2)))!important;border-color:transparent!important}}
 /* Disabled controls keep the same outline; only their text and icons fade. */
 .dmate-drawing-workspace button:disabled{opacity:1;color:color-mix(in srgb,var(--text-primary,#172033) 55%,transparent);cursor:wait}
 .dmate-drawing-workspace button:focus,.dmate-drawing-workspace summary:focus,.ddw-name:focus,.ddw-ai-requirement:focus{outline:none!important;box-shadow:none!important}
@@ -84,9 +87,10 @@
  .ddw-editor .dge-float-panel .dge-toolbar{gap:8px}
  .ddw-editor .dge-tool-palette>.dge-overlay-tools{width:156px;padding:8px;gap:6px}
  .ddw-editor .dge-tool-palette .dge-overlay-tools button{min-height:36px}
- .ddw-editor .dge-workspace .dge-selection-panel{right:12px;width:min(300px,calc(100% - 24px));padding:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;gap:8px}
- .ddw-editor .dge-selection-panel>*{grid-column:1/-1}
- .ddw-editor .dge-selection-panel>.dge-endpoint-field{grid-column:auto}
+ .ddw-editor .dge-workspace .dge-selection-panel{right:12px;width:min(300px,calc(100% - 24px));--dge-property-padding:10px;--dge-property-gap:8px}
+ .ddw-editor .dge-property-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start}
+ .ddw-editor .dge-property-body>*{grid-column:1/-1}
+ .ddw-editor .dge-property-body>.dge-endpoint-field{grid-column:auto}
  .ddw-editor .dge-selection-panel .dge-field{gap:4px}
  .ddw-editor :is(.dge-selection-panel,.dge-float-content) :is(input:not([type=checkbox]):not([type=radio]),select){font-size:16px;min-height:40px;padding:6px 8px;box-sizing:border-box}
  .ddw-editor .dge-selection-panel .dge-danger{min-height:36px}

@@ -15,6 +15,48 @@ const gallery = { version: 2, activeId: 'page-A', pages: names.map((name, index)
     edges: [{ id: 'e1', from: 'v1', to: 'v2', direction: 'forward', weight: 3, edge_label: 'AB', style: 'solid' }] }] }
 })) };
 const settle = page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+async function readyView(page) {
+  await page.locator('.dge-overlay[data-geometry-ready="true"]').waitFor();
+  await settle(page);
+}
+
+async function viewState(page) {
+  return page.locator('.dge-overlay').evaluate(node => {
+    const viewport = node.querySelector('.dge-overlay-viewport'), bounds = viewport.getBoundingClientRect();
+    return { camera: [parseFloat(node.querySelector('.dge-overlay-zoom').textContent), viewport.scrollLeft, viewport.scrollTop],
+      nodes: [...node.querySelectorAll('.dge-overlay-dot')].map(dot => {
+        const rect = dot.getBoundingClientRect();
+        return [rect.x - bounds.x, rect.y - bounds.y, rect.width, rect.height];
+      }), size: [viewport.clientWidth, viewport.clientHeight] };
+  });
+}
+
+async function automaticFit(page, label) {
+  const historyButton = page.locator('.ddw-page-actions>button[aria-expanded="true"]');
+  if (await historyButton.count()) await historyButton.click();
+  await readyView(page);
+  const initial = await viewState(page);
+  await page.locator('[data-overlay-tool="zoom-fit"]').click(); await settle(page);
+  const fitted = await viewState(page);
+  const actual = [...initial.camera, ...initial.nodes.flat()], expected = [...fitted.camera, ...fitted.nodes.flat()];
+  assert.equal(actual.length, expected.length);
+  actual.forEach((value, index) => assert.ok(Math.abs(value - expected[index]) <= (index === 0 ? .02 : 1),
+    label + ': opening must already match Fit: ' + JSON.stringify({ initial, fitted })));
+  for (const [x, y, width, height] of initial.nodes) {
+    assert.ok(x + width / 2 >= 0 && x + width / 2 <= initial.size[0]
+      && y + height / 2 >= 0 && y + height / 2 <= initial.size[1], label + ': fitted nodes stay visible');
+  }
+}
+
+async function zoomAway(page) {
+  const historyButton = page.locator('.ddw-page-actions>button[aria-expanded="true"]');
+  if (await historyButton.count()) await historyButton.click();
+  const before = (await viewState(page)).camera[0];
+  const plus = page.locator('[data-overlay-tool="zoom-in"]');
+  await page.locator('[data-overlay-tool="' + (await plus.isEnabled() ? 'zoom-in' : 'zoom-out') + '"]').click();
+  await settle(page);
+  assert.notEqual((await viewState(page)).camera[0], before, 'Fixture actually changes the camera before reopening');
+}
 
 async function mount(page, seed) {
   await page.evaluate(({ key, value, seed }) => {
@@ -27,7 +69,7 @@ async function mount(page, seed) {
   await page.waitForFunction(() => document.getElementById('graphEditorDialog').open
     && !document.getElementById('graphEditorDialog').dataset.positioning);
   await page.locator('.dge-overlay-viewport').waitFor();
-  await settle(page);
+  await readyView(page);
 }
 
 async function selectShape(page, kind, mobile) {
@@ -55,7 +97,8 @@ async function panelPosition(page) {
       .map(selector => document.querySelector(selector)?.getBoundingClientRect().bottom || 0));
     return { right: workspace.right - rect.right, bottom: workspace.bottom - rect.bottom,
       top: rect.top, width: rect.width, height: rect.height, toolbarBottom,
-      scrollHeight: panel.scrollHeight, clientHeight: panel.clientHeight };
+      scrollHeight: (panel.querySelector('.dge-property-body') || panel).scrollHeight,
+      clientHeight: (panel.querySelector('.dge-property-body') || panel).clientHeight };
   });
   assert.ok(Math.abs(state.right - 12) <= 2, 'Properties stay 12px from the canvas right: ' + JSON.stringify(state));
   assert.ok(Math.abs(state.bottom - 12) <= 2, 'Properties stay at the canvas bottom: ' + JSON.stringify(state));
@@ -66,6 +109,7 @@ async function panelPosition(page) {
 async function reachablePanelEnd(page, selector) {
   const panel = page.locator(selector);
   const overflow = await panel.evaluate(node => {
+    node = node.querySelector('.dge-property-body') || node;
     const overflow = node.scrollHeight > node.clientHeight + 1;
     node.scrollTop = node.scrollHeight;
     return { overflow, moved: node.scrollTop, scrollable: getComputedStyle(node).overflowY };
@@ -79,7 +123,7 @@ async function reachablePanelEnd(page, selector) {
   if (!actionable) last = panel.locator('*:visible').last();
   assert.ok(await last.count(), 'Panel has readable content');
   const inside = await last.evaluate((node, actionable) => {
-    const rect = node.getBoundingClientRect(), parent = node.closest('.dge-selection-panel,.dge-float-content,.ddw-side-panel,.dge-overlay-tools').getBoundingClientRect();
+    const rect = node.getBoundingClientRect(), parent = node.closest('.dge-property-body,.dge-selection-panel,.dge-float-content,.ddw-side-panel,.dge-overlay-tools').getBoundingClientRect();
     return (!actionable || rect.top >= Math.max(0, parent.top - 1))
       && rect.bottom >= parent.top - 1 && rect.bottom <= parent.bottom + 1
       && rect.left >= parent.left - 1 && rect.right <= parent.right + 1
@@ -107,6 +151,77 @@ async function compactPanel(page, selector, mobile) {
   return metrics;
 }
 
+async function propertyCard(page, mobile) {
+  const panel = page.locator('.dge-selection-panel');
+  assert.equal(await panel.getByRole('button', { name: /反转方向|Reverse direction/i }).count(), 0,
+    'Drawing properties omit the redundant Reverse direction action');
+  const body = panel.locator('.dge-property-body');
+  await body.evaluate(node => { node.scrollTop = 0; }); await settle(page);
+  const close = panel.locator('.dge-property-head .dge-panel-close');
+  const before = await close.boundingBox();
+  const bounds = await panel.evaluate(node => {
+    const panel = node.getBoundingClientRect(), head = node.querySelector('.dge-property-head'), dot = head.querySelector('.dge-panel-close').getBoundingClientRect();
+    const style = getComputedStyle(head);
+    return { right: panel.right - dot.right, top: dot.top - panel.top, width: dot.width, height: dot.height,
+      expectedRight: parseFloat(style.paddingRight) + parseFloat(getComputedStyle(node).borderRightWidth),
+      expectedTop: parseFloat(style.paddingTop) + parseFloat(getComputedStyle(node).borderTopWidth) };
+  });
+  assert.ok(bounds.right >= 8 && bounds.right <= 20 && bounds.top >= 8 && bounds.top <= 20,
+    'Close dot stays at the property card top-right: ' + JSON.stringify(bounds));
+  assert.ok(Math.abs(bounds.width - 20) <= 1 && Math.abs(bounds.height - 20) <= 1, 'Close dot keeps its original size');
+  await compactPanel(page, '.dge-selection-panel', mobile);
+  const after = await close.boundingBox();
+  for (const key of ['x', 'y', 'width', 'height']) assert.ok(Math.abs(before[key] - after[key]) <= .5, 'Property close dot does not scroll with fields');
+  const scroll = await body.evaluate(node => {
+    const style = getComputedStyle(node);
+    return { hidden: style.scrollbarWidth === 'none', gutter: node.offsetWidth - node.clientWidth
+      - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth) };
+  });
+  assert.equal(scroll.hidden, true, 'Property fields hide the native scrollbar while retaining scrolling');
+  assert.ok(scroll.gutter <= 1, 'Property fields reserve no large scrollbar gutter');
+  await close.click({ trial: true });
+}
+
+async function closeProperty(page) {
+  await page.locator('.dge-selection-panel .dge-panel-close').click();
+  await page.locator('.dge-selection-panel').waitFor({ state: 'hidden' });
+}
+
+async function borderlessButtons(page, mobile) {
+  const selector = '.ddw-page-actions>button:not(.ddw-upload-button),.ddw-editor>.dge-topline>button,.ddw-editor .dge-view-controls>button';
+  const original = await page.evaluate(() => [document.documentElement.dataset.appearanceTheme, document.body.dataset.appearanceTheme]);
+  try {
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate(theme => { document.documentElement.dataset.appearanceTheme = document.body.dataset.appearanceTheme = theme; }, theme);
+      await page.mouse.move(0, 0); await settle(page);
+      const borders = await page.locator(selector).evaluateAll(nodes => nodes.map(node => {
+        const s = getComputedStyle(node);
+        return { text: node.textContent || node.getAttribute('aria-label'),
+          borderless: ['Top', 'Right', 'Bottom', 'Left'].every(side => parseFloat(s['border' + side + 'Width']) === 0
+            || s['border' + side + 'Style'] === 'none' || /(?:transparent|rgba\([^)]*,\s*0\))/.test(s['border' + side + 'Color'])) };
+      }));
+      assert.ok(borders.length >= 8, 'All page, history, and zoom toolbar controls are checked');
+      assert.ok(borders.every(item => item.borderless), theme + ': toolbar buttons have no visible border: ' + JSON.stringify(borders));
+      if (!mobile) for (const group of ['.ddw-page-actions>button:not(.ddw-upload-button):enabled', '.ddw-editor>.dge-topline>button:enabled', '.ddw-editor .dge-view-controls>button:enabled']) {
+        const button = page.locator(group).first();
+        await page.mouse.move(0, 0); await settle(page);
+        const before = await button.evaluate(node => ({ background: getComputedStyle(node).backgroundColor,
+          rect: [...['x', 'y', 'width', 'height']].map(key => node.getBoundingClientRect()[key]) }));
+        await button.hover(); await settle(page);
+        const after = await button.evaluate(node => ({ background: getComputedStyle(node).backgroundColor,
+          rect: [...['x', 'y', 'width', 'height']].map(key => node.getBoundingClientRect()[key]) }));
+        assert.notEqual(after.background, before.background, theme + ': enabled toolbar button retains a visible hover state');
+        after.rect.forEach((value, i) => assert.ok(Math.abs(value - before.rect[i]) <= .5, 'Hover does not shift toolbar geometry'));
+      }
+    }
+  } finally {
+    await page.evaluate(values => [document.documentElement, document.body].forEach((node, i) => {
+      if (values[i] == null) delete node.dataset.appearanceTheme; else node.dataset.appearanceTheme = values[i];
+    }), original);
+    await page.mouse.move(0, 0); await settle(page);
+  }
+}
+
 async function canvasChrome(page) {
   return page.evaluate(() => {
     const viewport = document.querySelector('.dge-overlay-viewport'), frame = viewport.closest('.ddw-canvas-frame');
@@ -126,6 +241,8 @@ async function canvasChrome(page) {
 }
 
 async function viewportAndPopoverChecks(page, mobile, label, online = true) {
+  await automaticFit(page, label + ' initial');
+  await borderlessButtons(page, mobile);
   for (const language of ['en', 'zh-CN']) {
     await page.evaluate(language => DMateI18n.setLanguage(language, false), language);
     await settle(page);
@@ -226,7 +343,7 @@ async function runCase(browser, width) {
     await viewportAndPopoverChecks(page, width === 390, 'online-' + width);
     await selectShape(page, 'vertex', width === 390);
     const vertex = await panelPosition(page);
-    await compactPanel(page, '.dge-selection-panel', width === 390);
+    await propertyCard(page, width === 390);
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/drawing-' + width + '-vertex.png' });
     if (width === 390) {
       const oldStyle = await page.addStyleTag({ content: '.ddw-editor .dge-workspace .dge-selection-panel{top:var(--ddw-property-top,120px)!important;bottom:auto!important}' });
@@ -236,15 +353,20 @@ async function runCase(browser, width) {
       await settle(page);
       await panelPosition(page);
     }
+    await closeProperty(page);
     await selectShape(page, 'edge', width === 390);
     const edge = await panelPosition(page);
     // A compact layout may fit naturally. If it overflows it must scroll;
     // either way the final action must stay reachable, never clipped away.
-    await compactPanel(page, '.dge-selection-panel', width === 390);
+    await propertyCard(page, width === 390);
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/drawing-' + width + '-edge.png' });
+    await closeProperty(page);
     assert.deepEqual(await (await history(page)).allTextContents(), names, 'History follows saved array order, not updatedAt');
     for (const index of [1, 0, 2]) {
+      await zoomAway(page);
+      await history(page);
       await page.locator('.ddw-history-open').getByText(names[index], { exact: true }).click();
+      await automaticFit(page, 'Online selected ' + names[index]);
       assert.equal(await page.locator('.ddw-name').inputValue(), names[index]);
       assert.equal(await page.locator('.dge-overlay-node[data-vertex-id="v1"] .dge-overlay-label').textContent(), 'ABC'[index] + '1');
       assert.deepEqual(await (await history(page)).allTextContents(), names, 'Visiting another drawing must not reorder history');
@@ -303,7 +425,7 @@ async function openOnline(page) {
   await page.locator('#graphDrawingBtn').click();
   await page.locator('#graphEditorDialog[open] .dmate-drawing-workspace').waitFor();
   await page.waitForFunction(() => !document.getElementById('graphEditorDialog').dataset.positioning);
-  await settle(page);
+  await automaticFit(page, 'Actual online open/reopen');
 }
 
 async function closeOnline(page) {
@@ -350,6 +472,7 @@ async function runGuestBlankLifecycle(browser) {
     await page.locator('.ddw-name').fill('游客已有空白页');
     const existing = await onlineState(page);
     for (let i = 0; i < 2; i++) {
+      await zoomAway(page);
       await closeOnline(page); await openOnline(page);
       assert.deepEqual(await onlineState(page), existing, 'An existing empty drawing is reused, not replaced or duplicated');
     }
@@ -380,6 +503,8 @@ async function runAccountGalleryLifecycle(browser) {
     assert.equal((await onlineState(page)).name, names[1], 'Online entry restores selected existing drawing');
     assert.equal(await page.locator('.dge-overlay-node').count(), 2);
     assert.deepEqual((await onlineState(page)).pages.map(p => p.id), gallery.pages.map(p => p.id));
+    await zoomAway(page); await closeOnline(page); await openOnline(page);
+    assert.equal((await onlineState(page)).name, names[1], 'Reopening automatically fits the existing selected drawing');
     await page.locator('.ddw-page-actions').getByRole('button', { name: '新建空白页', exact: true }).click();
     await page.locator('.ddw-name').fill('账号保存空白页');
     const saved = await onlineState(page);
@@ -424,6 +549,29 @@ async function runDefaultEmptyContract(browser) {
   } finally { await page.close(); }
 }
 
+async function runOCRDirectionContract(browser) {
+  const page = await onlinePage(browser);
+  try {
+    await page.evaluate(documentValue => {
+      window.ocrDirectionFixture = DMateGraphEditor.mount(document.getElementById('graphEditorMount'), {
+        document: documentValue, initialDocument: documentValue, drawingOnly: false,
+        originalUrl: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700"><rect width="100%" height="100%" fill="white"/></svg>')
+      });
+      showGraphEditorDialog(document.getElementById('graphEditorDialog'));
+    }, gallery.pages[0].document);
+    await page.waitForFunction(() => document.getElementById('graphEditorDialog').open
+      && !document.getElementById('graphEditorDialog').dataset.positioning);
+    await readyView(page);
+    await page.locator('[data-overlay-tool="zoom-fit"]').click(); await settle(page);
+    await selectShape(page, 'edge', false);
+    await page.locator('.dge-selection-panel').getByRole('button', { name: /反转方向|Reverse direction/i }).click();
+    const edge = await page.evaluate(() => ocrDirectionFixture.getDocument().graphs[0].edges[0]);
+    assert.equal(edge.from, 'v2'); assert.equal(edge.to, 'v1'); assert.equal(edge.direction, 'forward');
+    assert.equal(page.modelCalls, 0); assert.deepEqual(page.regressionErrors, []);
+    console.log('PASS OCR isolation: Reverse direction remains available and swaps the actual edge endpoints');
+  } finally { await page.close(); }
+}
+
 async function runOfflineViewport(browser, width) {
   const page = await browser.newPage({ viewport: { width, height: width === 390 ? 740 : 900 },
     isMobile: width === 390, hasTouch: width === 390, serviceWorkers: 'block' });
@@ -437,16 +585,28 @@ async function runOfflineViewport(browser, width) {
     if (width === 390) await page.locator('#offlineNavToggle').click();
     await page.locator('#graphDrawingBtn').click();
     await page.locator('#offlineDrawingHost .dge-overlay-viewport').waitFor();
-    await settle(page);
+    await readyView(page);
     await viewportAndPopoverChecks(page, width === 390, 'offline-' + width, false);
     for (const kind of ['vertex', 'edge']) {
-      if (kind === 'edge') await page.locator('.dge-selection-panel .dge-panel-close').click();
       await selectShape(page, kind, width === 390);
       const position = await panelPosition(page);
-      await compactPanel(page, '.dge-selection-panel', width === 390);
+      await propertyCard(page, width === 390);
       if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/drawing-offline-' + width + '-' + kind + '.png' });
       console.log('PASS offline ' + width + ' ' + kind + ': ' + JSON.stringify(position) + '; last action reachable');
+      await closeProperty(page);
     }
+    for (const index of [1, 0]) {
+      await zoomAway(page); await history(page);
+      await page.locator('.ddw-history-open').getByText(names[index], { exact: true }).click();
+      await automaticFit(page, 'Offline selected ' + names[index]);
+    }
+    await zoomAway(page);
+    for (const target of ['concepts', 'drawing']) {
+      if (width === 390) await page.locator('#offlineNavToggle').click();
+      await page.locator('.offline-nav-item[data-panel="' + target + '"]').click();
+    }
+    await automaticFit(page, 'Offline navigation return');
+    assert.equal(await page.locator('.ddw-name').inputValue(), names[0], 'Returning to drawing preserves the selected page');
     assert.equal(modelCalls, 0); assert.deepEqual(errors, []);
   } finally { await page.close(); }
 }
@@ -461,6 +621,7 @@ async function runOfflineViewport(browser, width) {
     await runGuestBlankLifecycle(browser);
     await runAccountGalleryLifecycle(browser);
     await runDefaultEmptyContract(browser);
+    await runOCRDirectionContract(browser);
   }
   finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

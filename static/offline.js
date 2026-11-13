@@ -395,7 +395,10 @@
   }
 
   function mountDrawing() {
-    if (state.drawingController) return;
+    if (state.drawingController) {
+      state.drawingController.fitView?.();
+      return;
+    }
     const host = $("offlineDrawingHost");
     if (!window.DMateDrawingWorkspace?.mount) {
       toast("绘图组件尚未加载，请刷新页面后重试");
