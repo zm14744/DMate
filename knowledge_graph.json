@@ -1,5 +1,5 @@
 {
-  "version": 44,
+  "version": 45,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -223,8 +223,7 @@
             }
           ]
         }
-      ],
-      "note": "原课程P13讨论谓词公式、量词的辖域与自由/约束变元；跟随P12基础概念之后观看。"
+      ]
     },
     {
       "id": "predicate_quantifier",
@@ -247,8 +246,7 @@
             }
           ]
         }
-      ],
-      "note": "原课程P14是量词符号化，建议先看P13的谓词公式与辖域，再看P14。这里的依赖表示建议的视频学习顺序。"
+      ]
     },
     {
       "id": "predicate_reasoning",
@@ -287,8 +285,7 @@
             }
           ]
         }
-      ],
-      "note": "按东北大学原课程的讲授顺序：P15–P16先学谓词等价与蕴含式，然后到“前束范式”节点学习P17，最后回来学习本节点P18–P19的推理理论。当前知识点合并了等价与推理，不能把P18–P19误当成P17的先修内容。"
+      ]
     },
     {
       "id": "predicate_prenex",
@@ -312,8 +309,7 @@
             }
           ]
         }
-      ],
-      "note": "这一讲是原课程P17，建议先学谓词等价（P15–P16），再学P17，最后学谓词推理（P18–P19）。此处不把整个“谓词逻辑等价与推理”节点设为硬性前置，以免出现视频顺序倒退。"
+      ]
     },
     {
       "id": "proof_direct_contradiction",
@@ -401,8 +397,7 @@
             }
           ]
         }
-      ],
-      "note": "CMU P3为归纳证明技巧进阶；另提供MIT 2010 Lecture 3，标题明确为Strong Induction，适合需要专门学习强归纳法的学生。"
+      ]
     },
     {
       "id": "set_operation",
@@ -895,8 +890,7 @@
             }
           ]
         }
-      ],
-      "note": "丘维声教授采用较抽象的数论与代数视角。若只学过同余方程，建议先理解剩余类、模逆和剩余类环的基本概念，再观看中国剩余定理P29–P30；不代表其他数论节点需要提前掌握完整群环理论。"
+      ]
     },
     {
       "id": "number_euler_fermat",
@@ -1039,8 +1033,7 @@
             }
           ]
         }
-      ],
-      "note": "先看BU的二项式定理基本讲解，再看CMU P8二项式系数及恒等式；P9 Lucas定理属进阶拓展，不必作为入门必修。"
+      ]
     },
     {
       "id": "count_pigeonhole",
@@ -1074,8 +1067,7 @@
             }
           ]
         }
-      ],
-      "note": "CMU P6为鸽巢原理基础；P7涉及进一步应用和狄利克雷逼近，建议理解基础后再选学。"
+      ]
     },
     {
       "id": "count_inclusion",
@@ -1286,8 +1278,7 @@
             }
           ]
         }
-      ],
-      "note": "MIT 6.042J Fall 2010 Lecture 15 原授课实录明确讲授非齐次线性递推的通解、特解和初始条件。CMU P12仅能确认一般线性递推解法，不以该讲冒充非齐次专题。"
+      ]
     },
     {
       "id": "recurrence_initial",
@@ -1420,7 +1411,6 @@
         "图的基本概念",
         "邻接矩阵"
       ],
-      "note": "本节点的视频讲授邻接矩阵、邻接表和关联矩阵。邻接表属于图的存储表示，非矩阵；度矩阵、拉普拉斯矩阵由Steve Butler谱图论P14–P15进一步引入。",
       "videos": [
         {
           "source_id": "hit_graph_theory",
@@ -1506,8 +1496,7 @@
           "supplementary": true,
           "mapping_note": "P19涵盖图连通性；南京大学程龚课程仍保留为主课程，提供更细的DFS与算法内容。"
         }
-      ],
-      "note": "从P6–P7的无向图连通与DFS开始；P39–P41转入有向图强连通分支和算法，属于后续进阶，可在学完基础后按需观看。CMU P19是图连通性的额外讲解。"
+      ]
     },
     {
       "id": "graph_cut",
@@ -1699,8 +1688,7 @@
             }
           ]
         }
-      ],
-      "note": "建议按BFS无权最短路（P10–P11）→赋权图距离（P27–P28）→有向图距离（P42）的顺序学习；后半部分是进阶内容。"
+      ]
     },
     {
       "id": "graph_coloring",
@@ -1906,8 +1894,7 @@
             }
           ]
         }
-      ],
-      "note": "可先从北京交通大学偏序关系、哈斯图过渡到拓扑排序，再看动画视频理解有向无环图上的操作。偏序是建议前置，不是算法的严格必要条件。"
+      ]
     },
     {
       "id": "graph_domination",
@@ -2010,8 +1997,7 @@
           "supplementary": true,
           "mapping_note": "P24包含匹配基础和Hall婚配定理，P25包含最大匹配及二分图匹配算法；南京大学程龚课程仍保留为算法主课程。"
         }
-      ],
-      "note": "建议先学二分图与匹配基础，再依次学最大匹配P22–P23；P24–P25介绍更高阶匹配算法，若只是学习离散数学基础可作为拓展。"
+      ]
     },
     {
       "id": "tree_basic",
@@ -2190,8 +2176,7 @@
             }
           ]
         }
-      ],
-      "note": "拓展专题。建议先掌握生成树、关联矩阵，以及基础线性代数中的矩阵和行列式，再依次看Steve Butler P14（拉普拉斯矩阵）→P15（性质）→P16（矩阵树定理）。"
+      ]
     },
     {
       "id": "algebra_system",
@@ -2219,8 +2204,7 @@
             }
           ]
         }
-      ],
-      "note": "先看P51二元运算及其性质，再看P52代数系统；之后可接P53一般同态同构，或继续学习半群、独异点、群。"
+      ]
     },
     {
       "id": "algebra_homomorphism",
@@ -2244,8 +2228,7 @@
             }
           ]
         }
-      ],
-      "note": "讲授一般代数系统的同态与同构，适合在代数系统（P52）之后、群（P56）之前学习；不要求先学群论。"
+      ]
     },
     {
       "id": "algebra_group",
@@ -2293,8 +2276,7 @@
             }
           ]
         }
-      ],
-      "note": "建议按P54–P55半群与独异点→P56群的定义→P57群的相关定理→P58–P59子群的顺序学习。半群和独异点作为群的前置概念，不要求先学P53的同态同构。"
+      ]
     },
     {
       "id": "algebra_ring_field",
@@ -2355,8 +2337,7 @@
             }
           ]
         }
-      ],
-      "note": "课程P67–P70连续讲格的定义与性质、相关定理、分配格、布尔格与布尔代数。若只需入门，P67和P70是核心；P68–P69用于理解中间推导。"
+      ]
     }
   ],
   "video_sources": [
@@ -2738,8 +2719,8 @@
   "video_resource_policy": {
     "primary_per_node": "Keep one primary selected course per node; additional CMU lessons may be listed as supplementary when they add direct, non-duplicative coverage.",
     "platform_policy": "Bilibili_only",
-    "course_continuity": "Keep adjacent topics within one course where possible; avoid redundant or abrupt switches.",
-    "note": "Bilibili-only. CMU Po-Shen Loh Spring 2021 course is confirmed from the mainland Bilibili screenshots as 35 parts totaling 31:26:24, uploaded by 无为斋主. The full 35-part list is stored in the source record. Direct part links use the mainland www.bilibili.com domain. CMU is primary for counting, binomial coefficients, recurrences and generating functions; later graph/tree/matching/planar lectures are supplementary where existing specialist courses remain primary. P22 Cayley formula is not the Matrix-Tree theorem. P26–P29 do not have matching existing nodes and are not forced into unrelated topics. The Matrix-Tree node remains assigned to Steve Butler P14–P16. CRT node now uses Peking University professor Qiu Weisheng 1080p restored Bilibili video BV12Y411b7Yn, actual parts P29/P30. Display titles numbered 25/26 differ because the 88-part upload includes four intro videos. Avoid assigning P25/P26 for this upload.",
+    "course_continuity": "Each video must match the selected knowledge node. Prefer coherent courses within a module, but do not impose a strict viewing order based on graph edges or different module positions. Content fit matters more than following the prerequisite graph.",
+    "note": "Bilibili-only. Select lessons by direct relevance to each individual knowledge node; prefer natural continuity of course scope and difficulty within and across modules without prescribing a strict viewing order. Knowledge graph edges describe useful conceptual relationships, not mandatory steps or proof of mastering prerequisites. Do not show any study-order explanation notes in node detail panels.",
     "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs.",
     "audit_status": {
       "nodes_total": 68,
@@ -3028,22 +3009,6 @@
         "MIT",
         "Steve Butler ISU"
       ]
-    },
-    "curriculum_continuity_audit": {
-      "date": "2026-11-13",
-      "status": "selected_fixes_applied_with_remaining_structural_caveats",
-      "outstanding": [
-        "Predicate equivalence and inference still share one node; guided cross-node viewing order P15-16 → P17 → P18-19 rather than adding a 69th node.",
-        "A few 50-80 minute MIT lectures are reused across several distinct number-theory / recurrence nodes and are not timestamp-deep-linked.",
-        "Course lesson-title alignment was audited from public lecture indices; complete spoken video content was not watched end-to-end."
-      ],
-      "sources_checked": [
-        "https://www.bilibili.com/video/BV1r4411r7Ya/",
-        "https://www.bilibili.com/video/BV1yguazME3s/",
-        "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2010/video_galleries/video-lectures/",
-        "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2010/resources/lecture-15-linear-recurrences/"
-      ],
-      "note": "Playlist titles and official lecture content checked for selected corrections. Does not represent end-to-end viewing of all individual videos or live verification of every Bilibili link."
     }
   },
   "video_resource_candidates": [
