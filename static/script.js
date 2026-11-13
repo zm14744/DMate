@@ -21303,9 +21303,7 @@ function renderKnowledgeGraph() {
                     )
             )
             : (
-                knowledgeGraphFilter === "全部"
-                    ? `全部知识 · ${fullNodes.length} 个知识点`
-                    : `本模块知识 · ${fullNodes.length} 个知识点`
+                dmateUiText(`${fullNodes.length} 个知识点`, `${fullNodes.length} concepts`)
             )
     );
 
