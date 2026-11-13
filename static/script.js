@@ -17553,6 +17553,7 @@ function normalizeKnowledgeGraphData(data) {
                 id: typeof source.id === "string" ? source.id.trim() : "",
                 name: typeof source.name === "string" ? source.name.trim() : "",
                 publisher: typeof source.publisher === "string" ? source.publisher : "",
+                displayName: typeof source.display_name === "string" ? source.display_name.trim() : "",
                 course: typeof source.course === "string" ? source.course.trim() : "",
                 platform: typeof source.platform === "string" ? source.platform.trim() : "",
                 url: typeof source.url === "string" ? source.url.trim() : "",
@@ -21145,8 +21146,8 @@ function renderKnowledgeGraphDetail() {
             const source = (knowledgeGraphData.videoSources || []).find(
                 item => item.id === video.sourceId
             );
-            // Use the original platform uploader only, never an inferred affiliation.
-            return source ? String(source.publisher || "") : "";
+            // Show the requested school/course label; preserve the uploader in the source record.
+            return source ? String(source.displayName || source.publisher || "") : "";
         };
         const shortDescription = text => {
             const caption = document.createElement("small");
@@ -21158,28 +21159,43 @@ function renderKnowledgeGraphDetail() {
         const appendVideoInfo = (row, items) => {
             const info = document.createElement("div");
             info.className = "kg-video-info";
-            info.style.cssText = "display:flex;flex-direction:column;gap:1px;min-width:0;";
+            info.style.cssText = "display:flex;flex-direction:column;gap:9px;min-width:0;";
 
-            // 同一套课程可对应多个连续单集；标题严格使用原视频名称。
+            // Keep each course's name together with its own lesson links.
+            const groups = [];
             for (const item of items) {
-                const titleLink = document.createElement("a");
-                titleLink.className = "kg-video-lesson-title";
-                titleLink.textContent = item.title;
-                titleLink.href = item.url;
-                titleLink.target = "_blank";
-                titleLink.rel = "noopener noreferrer";
-                titleLink.style.cssText = "font-size:12px;line-height:1.6;color:var(--text-secondary,#a3a3a3);overflow-wrap:anywhere;text-decoration:none;";
-                titleLink.addEventListener("mouseenter", () => { titleLink.style.textDecoration = "underline"; });
-                titleLink.addEventListener("mouseleave", () => { titleLink.style.textDecoration = "none"; });
-                info.appendChild(titleLink);
+                let group = groups.find(entry => entry.sourceId === item.sourceId);
+                if (!group) {
+                    group = { sourceId: item.sourceId, label: item.publisher, lessons: [] };
+                    groups.push(group);
+                }
+                group.lessons.push(item);
             }
 
-            // The exact uploader name is optional when it cannot be verified.
-            const publisher = items.find(item => item.publisher)?.publisher || "";
-            if (publisher) {
-                const source = shortDescription(publisher);
-                source.style.opacity = "0.7";
-                info.appendChild(source);
+            for (const group of groups) {
+                const course = document.createElement("div");
+                course.className = "kg-video-course";
+                course.style.cssText = "display:flex;flex-direction:column;gap:1px;min-width:0;";
+
+                for (const item of group.lessons) {
+                    const titleLink = document.createElement("a");
+                    titleLink.className = "kg-video-lesson-title";
+                    titleLink.textContent = item.title;
+                    titleLink.href = item.url;
+                    titleLink.target = "_blank";
+                    titleLink.rel = "noopener noreferrer";
+                    titleLink.style.cssText = "font-size:12px;line-height:1.6;color:var(--text-secondary,#a3a3a3);overflow-wrap:anywhere;text-decoration:none;";
+                    titleLink.addEventListener("mouseenter", () => { titleLink.style.textDecoration = "underline"; });
+                    titleLink.addEventListener("mouseleave", () => { titleLink.style.textDecoration = "none"; });
+                    course.appendChild(titleLink);
+                }
+
+                if (group.label) {
+                    const label = shortDescription(group.label);
+                    label.style.opacity = "0.7";
+                    course.appendChild(label);
+                }
+                info.appendChild(course);
             }
             row.appendChild(info);
         };
@@ -21193,6 +21209,7 @@ function renderKnowledgeGraphDetail() {
                     platforms.get(platform).push({
                         title: String(lesson.title || ""),
                         publisher,
+                        sourceId: video.sourceId,
                         url
                     });
                 }
@@ -21212,14 +21229,10 @@ function renderKnowledgeGraphDetail() {
             row.className = "kg-video-platform-row";
             row.style.cssText = "display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;";
 
-            const link = document.createElement("a");
-            link.className = "kg-video-open";
-            link.textContent = platform;
-            link.href = item.url;
-            link.title = item.title;
-            link.target = "_blank";
-            link.rel = "noopener noreferrer";
-            row.appendChild(link);
+            const label = document.createElement("span");
+            label.className = "kg-video-platform-label";
+            label.textContent = platform;
+            row.appendChild(label);
             appendVideoInfo(row, items);
             entries.appendChild(row);
         }
