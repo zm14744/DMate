@@ -215,16 +215,14 @@ body[data-appearance-theme] {
     font-size:var(--font-xxs);
     line-height:1.55;
 }
-#knowledgeGraphModal .kg-video-open {
+#knowledgeGraphModal .kg-video-platform-label {
     display:inline-flex;
     margin-top:8px;
     color:var(--accent);
     font-size:var(--font-xs);
     font-weight:600;
     text-decoration:none;
-}
-#knowledgeGraphModal .kg-video-open:hover {
-    text-decoration:underline;
+    cursor:default;
 }
 #knowledgeGraphModal .kg-video-sections {
     display:flex;
@@ -232,7 +230,7 @@ body[data-appearance-theme] {
     align-items:flex-start;
     gap:5px;
 }
-#knowledgeGraphModal .kg-video-sections > .kg-video-open {
+#knowledgeGraphModal .kg-video-sections > .kg-video-platform-label {
     display:block;
     margin-top:0;
     min-width:0;
