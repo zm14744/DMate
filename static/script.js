@@ -16937,6 +16937,13 @@ function renderChat(preparedReply = null) {
                     : "ai"
             );
 
+        // User actions sit below the painted bubble; keep AI rendering unchanged.
+        const bubble = message.role === "user" ? document.createElement("div") : div;
+        if (bubble !== div) {
+            bubble.className = "msg-bubble";
+            div.appendChild(bubble);
+        }
+
         const content = document.createElement("div");
         content.className = "msg-content";
         if (message.isError || message.isNotice) content.setAttribute("data-i18n-ui", "");
@@ -16960,7 +16967,7 @@ function renderChat(preparedReply = null) {
             div.dmateRenderedText = displayText;
         }
 
-        div.appendChild(content);
+        bubble.appendChild(content);
 
         const difficultyTeaching = normalizeTeaching(
             message.role === "user"
@@ -16985,7 +16992,7 @@ function renderChat(preparedReply = null) {
             const difficultyBadge = document.createElement("div");
             difficultyBadge.className = "difficulty-badge";
             difficultyBadge.textContent = questionBadge;
-            div.insertBefore(difficultyBadge, content);
+            bubble.insertBefore(difficultyBadge, content);
         }
 
         // 难度仍显示，但不向用户展示模块分类标签。

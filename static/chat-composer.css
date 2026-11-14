@@ -23,6 +23,7 @@ body[data-appearance-theme] {
     --dmate-composer-bg:rgba(var(--surface-2-rgb),var(--panel-alpha,1));
     --dmate-composer-image:none;
     --dmate-composer-border:var(--border-strong,#cbd5e1);
+    --dmate-composer-radius:28px;
 }
 body[data-appearance-theme="light"] {
     --dmate-composer-border:rgba(148,163,184,.24);
@@ -129,17 +130,79 @@ body[data-appearance-theme] > .dmate-symbol-panel :is(.dmate-symbol-tab,.dmate-s
 }
 
 /* The ordinary message field and queued images reuse the same icon actions. */
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input,
+body[data-appearance-theme] .msg.user > .msg-bubble {
+    border:1px solid var(--dmate-composer-border) !important;
+    border-radius:var(--dmate-composer-radius) !important;
+    box-shadow:var(--dmate-composer-shadow,none) !important;
+}
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input {
     display:flex !important; align-items:flex-end !important; gap:8px !important;
     box-sizing:border-box !important; width:min(100%,1440px) !important; min-width:0 !important;
     min-height:52px !important; height:auto !important; max-height:none !important;
-    margin:0 auto !important; padding:6px 10px !important; border:1px solid var(--dmate-composer-border) !important;
-    border-radius:28px !important; background:var(--surface-2,#f4f4f5) !important;
-    box-shadow:var(--dmate-composer-shadow,none) !important;
+    margin:0 auto !important; padding:6px 10px !important;
+    background:var(--surface-2,#f4f4f5) !important;
 }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input.composer-expanded {
     border-radius:24px !important;
     box-shadow:var(--dmate-composer-shadow,none) !important;
+}
+
+/* A user message shares the composer's surface; its actions occupy a separate row. */
+body[data-appearance-theme] .msg.user {
+    width:fit-content;
+    margin-left:auto !important;
+    margin-right:0 !important;
+    padding:0 !important;
+    border:0 !important;
+    border-radius:0 !important;
+    background:transparent !important;
+    box-shadow:none !important;
+    color:var(--text-primary) !important;
+}
+body[data-appearance-theme] .msg.user > .msg-bubble {
+    box-sizing:border-box;
+    width:fit-content;
+    max-width:100%;
+    margin-left:auto;
+    padding:12px 18px;
+}
+body[data-appearance-theme] .msg.user > .msg-actions {
+    min-height:32px;
+    margin-top:6px;
+    padding-top:0;
+    border:0;
+}
+body[data-appearance-theme] .msg.user > .msg-actions > button {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:32px;
+    min-height:32px;
+    padding:6px;
+    border:0 !important;
+    border-radius:8px;
+    background:transparent !important;
+    box-shadow:none !important;
+    color:var(--text-secondary) !important;
+}
+body[data-appearance-theme] .msg.user > .msg-actions > button:hover {
+    background:var(--surface-3) !important;
+    color:var(--text-primary) !important;
+}
+body[data-appearance-theme] .msg.user > .msg-actions > button.danger:hover {
+    color:var(--dm-danger-text) !important;
+}
+@media(hover:hover) and (pointer:fine) {
+    body[data-appearance-theme] .msg.user > .msg-actions {
+        opacity:0;
+        pointer-events:none;
+    }
+    body[data-appearance-theme] .msg.user:hover > .msg-actions,
+    body[data-appearance-theme] .msg.user:focus-within > .msg-actions {
+        opacity:1;
+        pointer-events:auto;
+    }
 }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > .manual-question-composer {
     order:1; position:relative; flex:1 1 0 !important; align-self:stretch !important;
