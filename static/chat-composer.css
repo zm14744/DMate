@@ -689,3 +689,8 @@ body[data-appearance-theme] > .dmate-symbol-panel button:focus-visible {
         font-size:10.5px;
     }
 }
+
+/* The empty welcome state keeps the composer visually quiet. */
+body[data-appearance-theme] .center.chat-empty > .input-wrap:not([hidden]) > .dmate-disclaimer {
+    display:none !important;
+}
