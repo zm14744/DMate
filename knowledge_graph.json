@@ -1,5 +1,5 @@
 {
-  "version": 53,
+  "version": 54,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1180,12 +1180,12 @@
           "source_id": "sawfin_bilibili",
           "title": "Non-Homogeneous Linear Recurrence Relations",
           "sections": [
-            "Discrete Math II - 8.2.4 Non-Homogeneous Linear Recurrence Relations"
+            "p28 Discrete Math II - 8.2.4 Non-Homogeneous Linear Recurrence Relations"
           ],
           "lessons": [
             {
-              "title": "Discrete Math II - 8.2.4 Non-Homogeneous Linear Recurrence Relations",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=109"
+              "title": "p28 Discrete Math II - 8.2.4 Non-Homogeneous Linear Recurrence Relations",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=29"
             }
           ]
         }
@@ -1376,11 +1376,11 @@
           "lessons": [
             {
               "title": "2.2.1-割点和割边-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=8"
+              "url": "https://www.bilibili.com/video/BV13yHseiEGD/"
             },
             {
               "title": "2.2.2-割点和割边-算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=9"
+              "url": "https://www.bilibili.com/video/BV1JhHSeHEzA/"
             }
           ]
         }
@@ -1427,11 +1427,11 @@
           "lessons": [
             {
               "title": "3.3.1-欧拉图-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=16"
+              "url": "https://www.bilibili.com/video/BV1jWDmY8Ej7/"
             },
             {
               "title": "3.3.2-欧拉图-算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=17"
+              "url": "https://www.bilibili.com/video/BV111kTYCEHE/"
             }
           ]
         }
@@ -1454,7 +1454,7 @@
           "lessons": [
             {
               "title": "3.4-哈密尔顿图",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=18"
+              "url": "https://www.bilibili.com/video/BV1P1CwYAEZW/"
             }
           ]
         }
