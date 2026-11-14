@@ -1,5 +1,5 @@
 {
-  "version": 51,
+  "version": 52,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1147,21 +1147,21 @@
           "source_id": "sawfin_bilibili",
           "title": "Linear Homogeneous Recurrence Relations",
           "sections": [
-            "Discrete Math II - 8.2.1 Solving First-Order Linear Homogeneous Recurrence Relations",
-            "Discrete Math II - 8.2.2 Solving Second-Order Linear Homogeneous Recurrence",
-            "Discrete Math II - 8.2.3 General Case Linear Homogeneous Recurrence Relation"
+            "p25 Discrete Math II - 8.2.1 Solving First-Order Linear Homogeneous Recurrence Relations",
+            "p26 Discrete Math II - 8.2.2 Solving Second-Order Linear Homogeneous Recurrence",
+            "p27 Discrete Math II - 8.2.3 General Case Linear Homogeneous Recurrence Relation"
           ],
           "lessons": [
             {
-              "title": "Discrete Math II - 8.2.1 Solving First-Order Linear Homogeneous Recurrence Relations",
+              "title": "p25 Discrete Math II - 8.2.1 Solving First-Order Linear Homogeneous Recurrence Relations",
               "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=26"
             },
             {
-              "title": "Discrete Math II - 8.2.2 Solving Second-Order Linear Homogeneous Recurrence",
+              "title": "p26 Discrete Math II - 8.2.2 Solving Second-Order Linear Homogeneous Recurrence",
               "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=27"
             },
             {
-              "title": "Discrete Math II - 8.2.3 General Case Linear Homogeneous Recurrence Relation",
+              "title": "p27 Discrete Math II - 8.2.3 General Case Linear Homogeneous Recurrence Relation",
               "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=28"
             }
           ]
