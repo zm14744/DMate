@@ -24,12 +24,15 @@ body[data-appearance-theme] {
     --dmate-composer-image:none;
     --dmate-composer-border:var(--border-strong,#cbd5e1);
     --dmate-composer-radius:28px;
+    --dmate-chat-fade-rgb:15,23,42;
 }
 body[data-appearance-theme="light"] {
+    --dmate-chat-fade-rgb:248,250,252;
     --dmate-composer-border:rgba(148,163,184,.24);
     --dmate-composer-shadow:0 4px 16px rgba(15,23,42,.055),0 1px 3px rgba(15,23,42,.025);
 }
 body[data-appearance-theme="dark"] {
+    --dmate-chat-fade-rgb:13,13,13;
     --dmate-composer-shadow:0 5px 18px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.035);
 }
 body[data-appearance-theme="navy"] {
@@ -351,6 +354,35 @@ body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden])
     padding-top:var(--dmate-mode-row-height) !important;
 }
 body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) > .manual-question-mode { top:0; }
+
+/* The transcript keeps scrolling behind the floating composer instead of
+   ending at an opaque footer. Its final turn can still clear the controls. */
+body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) {
+    position:absolute;
+    z-index:6;
+    inset:auto 0 0;
+    isolation:isolate;
+    pointer-events:none;
+}
+body[data-appearance-theme] .center:not(.chat-empty):has(> .input-wrap:not([hidden])) > #chat {
+    padding-bottom:calc(var(--dmate-chat-input-height,160px) + 24px) !important;
+    scroll-padding-bottom:calc(var(--dmate-chat-input-height,160px) + 24px) !important;
+}
+body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden])::before {
+    content:"";
+    position:absolute;
+    z-index:-1;
+    inset:-24px -100vw 0;
+    background:linear-gradient(to bottom,
+        rgba(var(--dmate-chat-fade-rgb),0),
+        rgba(var(--dmate-chat-fade-rgb),.35) 36%,
+        rgba(var(--dmate-chat-fade-rgb),.72));
+    pointer-events:none;
+}
+body[data-appearance-theme].has-custom-background .center > .input-wrap::before { opacity:.7; }
+body[data-appearance-theme] .center > .input-wrap > :is(.input,.manual-question-mode) {
+    pointer-events:auto;
+}
 @media(max-width:1100px) {
     /* The empty composer has no wrapper padding; active conversations do. */
     body[data-appearance-theme] .center.chat-empty > .input-wrap:not([hidden]) > .manual-question-mode { left:0; }

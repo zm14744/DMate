@@ -19,7 +19,7 @@ from flask import Flask, jsonify, render_template, request, session, make_respon
 from ios_webclip import build_ios_webclip_profile
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from ai import ask_ai, analyze_image_structure, verify_graph_image_independently
+from ai import ask_ai, analyze_image_structure, verify_graph_image_independently, _trim_messages
 from chat_limits import (
     MAX_MESSAGE_CHARS,
     MAX_HISTORY_MESSAGES as MAX_MESSAGES_PER_REQUEST,
@@ -65,7 +65,8 @@ except (ImportError, OSError) as _fusion_import_error:
     review_direction_and_multiplicity = None
 from graph_ocr_cleanup import clean_graph_question_text, select_graph_question_text, ocr_is_label_dominated
 from classification_semantic import classify_ambiguous_questions
-from exercise_intent import EXERCISE_INTENT_RULES, classify_exercise_request
+from exercise_intent import (EXERCISE_INTENT_RULES, classify_exercise_request,
+                             is_generic_continuation, resolve_exercise_request)
 from exercise_relation_check import verify_relation_closure_count
 from teaching import (
     _extract_explicit_review_question,
@@ -3827,9 +3828,12 @@ def _chat_response(on_delta=None, cancelled=None):
         }), 400
 
     if len(messages) > MAX_MESSAGES_PER_REQUEST:
-        messages = messages[
-            -MAX_MESSAGES_PER_REQUEST:
-        ]
+        try:
+            # Apply the same bounded, whole-message selection used by the
+            # provider layer instead of blindly losing an earlier live rule.
+            messages = _trim_messages(messages, confirmed=confirmed_context is not None)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
 
     cleaned = []
 
@@ -3890,7 +3894,8 @@ def _chat_response(on_delta=None, cancelled=None):
     normalized_action_for_exercise = normalize_user_request_text(
         latest_action_for_exercise
     )
-    exercise_intent = classify_exercise_request(latest_action_for_exercise)
+    exercise_intent = resolve_exercise_request(latest_action_for_exercise, cleaned)
+    generic_continuation = is_generic_continuation(latest_action_for_exercise)
     navigation_anchor = re.search(
         r"【当前指向题目】\s*([\s\S]+?)\s*【当前指向题目结束】",
         latest_user_before_reference["content"] if latest_user_before_reference else "",
@@ -3903,6 +3908,10 @@ def _chat_response(on_delta=None, cancelled=None):
 
     # 同知识点出题的参照题由前端显式提交。只接收题干，分类由后端重新计算。
     reference = data.get("exercise_reference")
+    if generic_continuation and not exercise_intent["is_exercise"] and reference is None:
+        # Old clients classified every "another one" as an exercise. The
+        # preceding live task, rather than that stale hint, establishes intent.
+        client_requires_exercise = False
     reference_teaching = None
     is_wrongbook_retest = False
     original_retest_difficulty = ""
@@ -3943,7 +3952,8 @@ def _chat_response(on_delta=None, cancelled=None):
                    "【本轮唯一需要执行的用户请求】\n" + latest_action + "\n【本轮请求结束】")
         if len(content) > message_char_limit(content):
             return jsonify({"error": "参照题和出题要求过长，请精简后重试"}), 400
-        cleaned = [{"role": "user", "content": content}]
+        cleaned = [({"role": "user", "content": content} if item is latest_user else item)
+                   for item in cleaned]
 
     # A stale client-side label cannot override an explicit answer request,
     # negation or discussion of the generation feature. Preserve any supplied
@@ -4086,18 +4096,13 @@ def _chat_response(on_delta=None, cancelled=None):
         effective_exercise_request and explicit_explanation
     )
 
-    # 只对独立出题采用本轮请求。避免把几十轮历史题目交给模型，
-    # 造成串题、额外 token 和意外耗时。同知识点复测仍保留结构化参照题。
-    # 如果客户端显式提供参照题，前面已组装成单条带锚点的请求。
+    # Classify an independent exercise from its current topic, but retain the
+    # browser's scoped history: it can contain ongoing format requirements and
+    # corrections. The current action is still the only action to execute.
     explicit_topic_teaching = None
     if effective_exercise_request and not reference_teaching:
-        if normalized_action_for_exercise:
+        if normalized_action_for_exercise and not generic_continuation:
             explicit_topic_teaching = analyze_question(normalized_action_for_exercise)
-        if latest_user_before_reference is not None:
-            cleaned = [{
-                "role": "user",
-                "content": latest_user_before_reference["content"],
-            }]
 
     # 明确难度要求与内部默认难度必须区分。内部默认只用于提示 AI，
     # 不能作为拒绝正常生成题目的硬约束。

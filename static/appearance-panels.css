@@ -8,6 +8,24 @@ body[data-appearance-theme] {
 }
 
 @layer dmate-panel-surfaces {
+    /* Assistant replies are transcript text, including live streamed turns.
+       Keep user bubbles and independent learning panels on their own surfaces. */
+    body[data-appearance-theme] .center > #chat > .msg.ai {
+        width:100%!important;
+        max-width:100%!important;
+        padding:12px 0!important;
+        border:0!important;
+        border-radius:0!important;
+        background:transparent!important;
+        background-image:none!important;
+        box-shadow:none!important;
+    }
+    body[data-appearance-theme] .center > #chat > .msg.ai > .msg-actions {
+        justify-content:flex-start!important;
+        padding-top:0!important;
+        border:0!important;
+    }
+
     /* The page itself supplies the wallpaper or theme base. These structural
        wrappers must not paint a second opaque sheet over that base. */
     body[data-appearance-theme] :is(.layout,.center,.chat,.input-wrap),

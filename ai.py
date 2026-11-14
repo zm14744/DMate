@@ -11,7 +11,7 @@ import threading
 
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 
-from teaching import teaching_prompt, _active_question_from_messages
+from teaching import teaching_prompt, _active_question_from_messages, extract_current_request
 from proof_writing import proof_writing_prompt
 from server_i18n import normalize_language, localize_error_payload
 from graph_ocr_cleanup import ocr_is_label_dominated
@@ -86,8 +86,9 @@ SYSTEM_PROMPT = r"""你是离散数学智能辅学系统中的教学助手。
 3. 如果学生只是询问概念、定义、定理含义，可以正常直接解释，不必强制使用提示模式。
 4. 对“出题”“生成练习题”，只呈现可作答题目，不自动附提示、思路、解题方向、关键知识点或引导语；如果学生在同一轮明确要求“出题并给答案/解析”，仍执行完整的复合请求。题目生成与解题提示是不同阶段。
 5. 如果学生答案有错误，先指出错误类型和思路问题，不要立刻把整道题答案全部给出。
-6. 如果请求上下文中出现多条用户消息，以最后一条用户消息为准；但该条消息中同时提出的多个明确要求必须全部处理，例如“出题并附答案、解析、涉及知识点”，不得只完成第一个动作。更早的消息仅用于必要的指代和上下文。
-7. 图片识题会把内容整理成“【题目文字】”和“【图形信息】”（也兼容旧标签“【题干与公式识别】”“【图形结构识别】”），两部分职责不同：
+6. 如果请求上下文中出现多条用户消息，执行最后一条用户消息中的当前动作，并同时满足其中的多个明确要求，例如“出题并附答案、解析、涉及知识点”。较早轮次中未被撤回或替换的任务条件、格式要求、已纠正的数据和明确持续偏好仍然有效，不能把短追问当成独立的新任务。“继续、再来一个、按刚才的要求”等应结合最近的实际任务与助手内容理解，而不是一律当作出题。新要求与旧要求冲突时以较新的为准；明确换话题或给出新题时不沿用旧题的数据和临时限制。历史回答可能有误，学生指出错误后应复核并采用已确认的纠正；不要重新执行历史里已经完成的动作。
+7. 提示优先只适用于题目求解；对于改写、整理、翻译、代码示例、渲染测试等普通对话任务，按用户要求直接完成，不能因为文本中含有数学词语就强行只给提示。
+8. 图片识题会把内容整理成“【题目文字】”和“【图形信息】”（也兼容旧标签“【题干与公式识别】”“【图形结构识别】”），两部分职责不同：
    - 题目的文字要求、编号、问法，以“题目文字”为主。
    - 图中的顶点、边、箭头、邻接关系、层次和二维结构，以“图形信息”为主。
    - 图形区域附近的 OCR 乱码、边名、顶点名重复内容已尽量清理；不要把残留的局部噪声当成关键冲突。
@@ -366,8 +367,27 @@ def _failure(error):
     }
 
 
+_PERSISTENT_CONTEXT = re.compile(
+    r"(?:^|[\n。！？.!?；;])\s*(?:(?:请你?|我希望|麻烦|记住|注意)\s*)?(?:"
+    r"(?:本次|这次|整个|本轮)(?:对话|会话)(?:中|里|期间|都|一直|的所有)|"
+    r"(?:从现在开始|接下来|以后|今后|后续|往后|之后)(?:.{0,24})(?:都|一直|始终|保持|用|使用|不要|只|请)|"
+    r"(?:所有|每次|每条|每一条)(?:回答|回复|输出|讲解)|"
+    r"(?:please\s+)?(?:from now on|throughout (?:this|the) (?:chat|conversation)|"
+    r"for (?:all|every) (?:future )?(?:answers?|responses?|replies)|always (?:use|answer|respond|keep|write))\b)",
+    re.I,
+)
+
+
+def _has_persistent_requirement(content):
+    # Quotations and code describe material, not live conversational preferences.
+    request = extract_current_request(content)
+    prose = re.sub(r"```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`|"
+                   r'"[^"\n]*"|“[^”]*”|「[^」]*」|『[^』]*』|‘[^’]*’', "", request)
+    return bool(_PERSISTENT_CONTEXT.search(prose))
+
+
 def _current_task_messages(messages):
-    """Keep the actual current question together with the latest instruction."""
+    """Retain the live task, its nearest turn and explicit ongoing requirements."""
     users = [item for item in messages if item.get("role") == "user"]
     if not users:
         return []
@@ -380,6 +400,19 @@ def _current_task_messages(messages):
                 if item is not protected[0]:
                     protected.append(item)
                 break
+    # Short corrections and references often depend on the immediately previous
+    # request/answer, even when no mathematical question could be classified.
+    # Keep their complete text rather than inventing a lossy automatic summary.
+    for role in ("user", "assistant"):
+        previous = next((item for item in reversed(messages)
+                         if item.get("role") == role and item is not users[-1]), None)
+        if (previous is not None and previous not in protected
+                and len(previous["content"]) <= message_char_limit(previous["content"])):
+            protected.append(previous)
+    preferences = [item for item in users[:-1] if _has_persistent_requirement(item["content"])]
+    for item in preferences[-8:]:
+        if item not in protected and len(item["content"]) <= message_char_limit(item["content"]):
+            protected.append(item)
     return protected
 
 

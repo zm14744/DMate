@@ -19,6 +19,8 @@ on:
       - 'exercise_intent.py'
       - 'static/exercise-intent-rules.json'
       - 'scripts/test_exercise_generation_regression.py'
+      - 'scripts/test_conversation_context.py'
+      - 'scripts/test_exercise_context.py'
       - '.github/workflows/test-exercise-generation.yml'
   workflow_dispatch:
 
@@ -49,3 +51,7 @@ jobs:
         run: python -m pip install Flask==3.1.2 requests==2.32.5 Pillow==11.3.0
       - name: Run chat intent regressions without external AI calls
         run: python -m unittest discover -s scripts -p 'test_tutoring_chat.py' -v
+      - name: Verify multi-turn context and task continuation
+        run: |
+          python -m unittest discover -s scripts -p 'test_conversation_context.py' -v
+          python -m unittest discover -s scripts -p 'test_exercise_context.py' -v

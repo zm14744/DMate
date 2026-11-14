@@ -5239,7 +5239,7 @@ function looksLikeActualLearningProblem(message) {
     }
 
     const text = message.text.trim();
-    if (!text || isShortLearningFollowUp(text)) {
+    if (!text || isShortLearningFollowUp(text) || isContextDependentChatFollowUp(text)) {
         return false;
     }
 
@@ -5250,15 +5250,6 @@ function looksLikeActualLearningProblem(message) {
         "【题目文字】",
         "【图形信息】",
         "[图片识题]",
-        "已知",
-        "设",
-        "求",
-        "求解",
-        "证明",
-        "判断",
-        "计算",
-        "写出",
-        "列出",
         "回答下列问题",
         "选择题",
         "证明题",
@@ -5271,6 +5262,13 @@ function looksLikeActualLearningProblem(message) {
         return true;
     }
 
+    // Match actual problem stems, not substrings such as 要求/设计/设置 inside
+    // an ordinary writing request. Length alone does not establish a new problem.
+    if (/^(?:(?:请|帮我)(?:解答|解决|求解)[:：]?)?(?:设(?!计|置)|已知|给定|若|求(?:解|值|证)?|证明|判断|计算)/.test(compact)
+        || /^(?:let|given|suppose|find|compute|calculate|determine|prove|show\s+that)\b/i.test(text)) {
+        return true;
+    }
+
     if (/[（(]\s*[1-9]\s*[)）]/.test(text)) {
         return true;
     }
@@ -5278,11 +5276,6 @@ function looksLikeActualLearningProblem(message) {
     // 短而完整的自然学习问句也必须切换成新题，不能继续绑在上一题。
     // 例如“什么是欧拉图？”“两个图同构吗？”“如何判断欧拉图？”。
     if (looksLikeChatQuestionText(text)) {
-        return true;
-    }
-
-    // 一般完整题目会比“换个写法/再提示一下”长很多。
-    if (text.length >= 80) {
         return true;
     }
 
@@ -6023,6 +6016,89 @@ function splitQuestionBankText(text) {
 
 function isExerciseRequestText(text) {
     return Boolean(window.DMateExerciseIntent?.classify(text).is_exercise);
+}
+
+let genericContinuationPatterns = null;
+let conversationTaskPatterns = null;
+function isGenericConversationContinuation(text) {
+    if (!genericContinuationPatterns) {
+        let rules = {};
+        try { rules = JSON.parse(document.getElementById("exerciseIntentRules")?.textContent || "{}"); }
+        catch (_error) {}
+        genericContinuationPatterns = (rules.generic_continuation || []).map(pattern => new RegExp(pattern, "u"));
+        conversationTaskPatterns = (rules.conversation_task || []).map(pattern => new RegExp(pattern, "iu"));
+    }
+    const value = String(text || "").normalize("NFKC").toLowerCase().replace(/\s+/g, "");
+    const clauses = value.split(/[，,。.;；!?！？]+/).filter(Boolean);
+    const generic = clause => genericContinuationPatterns.some(pattern => pattern.test(clause));
+    return Boolean(clauses.length && generic(clauses[0]) && !clauses.slice(1).some(clause =>
+        isExerciseRequestText(clause) && !generic(clause)));
+}
+
+function isPersistentConversationPreference(text) {
+    return /(?:以后|今后|从现在起|此后|本轮都|接下来都|所有回复|所有回答|每次|始终|一直用|请记住|from now on|for (?:all|every) (?:future )?(?:repl|answer)|always |throughout (?:this|the) conversation)/i.test(String(text || ""));
+}
+
+function isIndependentConversationTask(text) {
+    if (!conversationTaskPatterns) isGenericConversationContinuation("");
+    return conversationTaskPatterns.some(pattern => pattern.test(String(text || "").trim()));
+}
+
+function isContextDependentChatFollowUp(text) {
+    const value = String(text || "").trim();
+    return isGenericConversationContinuation(value)
+        || isPersistentConversationPreference(value)
+        || isQuestionNavigationFollowUp(value)
+        || /^(?:继续|然后呢|下一步|为什么[。？?]?$|这一步|这个|这里|这段|这份|上述|上面|前面|刚才|之前|按(?:照)?(?:上|前|刚才)|根据(?:上|前|刚才)|仍然|还是|不对|不是|更正|纠正|改成|改用|换(?:个|一种)(?:写法|方式|表示)|用(?:中文|英文|英语|矩阵|大括号)|只给|先只|不要|别|再(?:讲|解释|说明|写|列|展开))/.test(value)
+        || /(?:上面|前面|刚才|之前|原来|同样|同一)(?:的)?(?:要求|格式|回答|内容|例子|条件|结论|定义|写法|方式)/.test(value)
+        || /(?:证明|解释|说明|检查|展开|重写)(?:一下)?(?:这个|上述|上面|刚才|前面|之前)/.test(value)
+        || /^(?:continue\b|go on\b|why[?.!]*$|that\b|this\b|the above\b|as before\b|keep\b|actually\b|instead\b|change\b|use\b|only\b|do not\b|don't\b|(?:explain|prove|rewrite|check) (?:it|that|this|the above)\b)/i.test(value);
+}
+
+function isSessionExerciseRequest(session, text) {
+    if (!isGenericConversationContinuation(text)) return isExerciseRequestText(text);
+    const messages = session?.messages || [];
+    const latest = [...messages].reverse().find(message => message?.role === "user");
+    let skipLatest = latest?.text === text;
+    for (let index = messages.length - 1; index >= 0; index--) {
+        const message = messages[index];
+        if (!message || message.role !== "user" || message.isError || message.isNotice) continue;
+        if (skipLatest) { skipLatest = false; continue; }
+        const previous = String(message.text || "").trim();
+        if (!previous || isContextDependentChatFollowUp(previous)) continue;
+        if (isExerciseRequestText(previous) || message.manualIsQuestion === true
+            || /^(?:设(?!计|置)|已知|给定|若|求(?:解|值|证)?|证明|计算|判断|let\b|given\b|suppose\b|find\b|compute\b|prove\b|show\s+that\b)/i.test(previous)) return true;
+        if (isIndependentConversationTask(previous)) return false;
+    }
+    return false;
+}
+
+function conversationTaskStartIndex(session, latestIndex) {
+    let first = latestIndex;
+    for (let index = latestIndex; index >= 0; index--) {
+        const message = session?.messages?.[index];
+        if (!message || message.role !== "user" || message.isError || message.isNotice || !message.text?.trim()) continue;
+        if (!isContextDependentChatFollowUp(message.text)) first = index;
+        // Ordinary multi-turn chat is continuous by default. Only a complete
+        // new problem or an explicit topic reset creates a hard history boundary.
+        if (!isContextDependentChatFollowUp(message.text)
+            && (looksLikeActualLearningProblem(message)
+                || /(?:换个话题|换个主题|换一个话题|开始新(?:任务|话题)|另一个问题|忘掉前面|不要管前面|new topic|switch (?:the )?topic|unrelated question|start (?:a )?new task)/i.test(message.text))) return index;
+    }
+    return first;
+}
+
+function scopedConversationQuestionTarget(session, latestUser, candidate) {
+    if (!candidate || !latestUser) return null;
+    if (isQuestionNavigationFollowUp(latestUser.text)) return candidate;
+    if (looksLikeActualLearningProblem(latestUser)) return null;
+    const latestIndex = session.messages.indexOf(latestUser);
+    // An old learning record must not drag a later writing/chat task back to that problem.
+    if (candidate.index < conversationTaskStartIndex(session, latestIndex)) return null;
+    const independentTask = session.messages.some((message, index) => index > candidate.index && index <= latestIndex
+        && message?.role === "user" && !isContextDependentChatFollowUp(message.text)
+        && isIndependentConversationTask(message.text));
+    return independentTask ? null : candidate;
 }
 
 function exerciseTopicReference(text) {
@@ -12603,7 +12679,15 @@ function updateChatJumpControls() {
     const taskStage = center.querySelector("#ocrUploadStage:not([hidden])");
     const inputHeight = taskStage?.getBoundingClientRect().height
         || inputWrap?.getBoundingClientRect().height || 80;
-    center.style.setProperty("--dmate-chat-input-height", `${Math.ceil(inputHeight)}px`);
+    const nextInputHeight = `${Math.ceil(inputHeight)}px`;
+    if (center.style.getPropertyValue("--dmate-chat-input-height") !== nextInputHeight) {
+        // The floating composer changes the chat's reserved scroll space.
+        // Keep the last answer visible when already at the bottom, while
+        // preserving the reader's position when reviewing earlier messages.
+        const wasAtBottom = chatBottomDistance(chat) <= 16;
+        center.style.setProperty("--dmate-chat-input-height", nextInputHeight);
+        if (wasAtBottom) chat.scrollTop = chat.scrollHeight;
+    }
 
     const maxScroll = Math.max(0, chat.scrollHeight - chat.clientHeight);
     const scrollTop = Math.max(0, Math.min(chat.scrollTop, maxScroll));
@@ -13356,190 +13440,94 @@ function buildTargetQuestionApiText(userText, candidate) {
         "【本轮请求结束】",
         "",
         "只回答上面的本轮最新请求。不要重新执行、补答、总结或继续处理更早的用户请求；",
-        "更早的内容只能用于理解指代和题目背景。"
+        "更早内容用于理解指代、持续要求、修正和背景；冲突或撤销的要求以较新的指令为准。"
     ].join("\n");
 }
 
-function buildApiMessages(session, targetCandidate = null) {
-    if (!session || !Array.isArray(session.messages)) {
-        return [];
+function boundedConversationMessages(history, latest, taskStart) {
+    // Stay below the server's 64-message/120k-character admission limit. Pin
+    // the task's origin and latest explanation before filling recent history.
+    const maximumChars = 100000;
+    const selected = new Map([[latest.index, latest]]);
+    let characters = Array.from(latest.content).length;
+    const add = entry => {
+        if (!entry || selected.has(entry.index) || selected.size >= FALLBACK_API_CONTEXT_MESSAGES) return;
+        const length = Array.from(entry.content).length;
+        if (characters + length > maximumChars) return;
+        selected.set(entry.index, entry);
+        characters += length;
+    };
+    add(history.find(entry => entry.index >= taskStart && entry.role === "user"));
+    add([...history].reverse().find(entry => entry.role === "assistant"));
+    add([...history].reverse().find(entry => entry.index >= taskStart && entry.role === "user"));
+    for (const entry of [...history].reverse()) {
+        if (entry.role === "user" && isPersistentConversationPreference(entry.content)) add(entry);
     }
+    for (const entry of [...history].reverse()) if (entry.role === "user") add(entry);
+    for (const entry of [...history].reverse()) add(entry);
+    return [...selected.values()].sort((left, right) => left.index - right.index)
+        .map(({ role, content }) => ({ role, content }));
+}
 
-    const valid = session.messages
-        .map((message, index) => ({ message, index }))
-        .filter(({ message }) => (
-            message
-            && !message.isError
-            && !message.isNotice
-            && typeof message.text === "string"
-            && message.text.trim()
-        ));
-
-    if (!valid.length) return [];
-
-    const latestUserEntry = [...valid]
-        .reverse()
-        .find(({ message }) => message.role === "user");
-
-    if (!latestUserEntry) return [];
-
-    const latestUser = latestUserEntry.message;
-    const latestIndex = latestUserEntry.index;
-    const target = targetCandidate
-        || activeQuestionCandidateFromHistory(session)
-        || currentQuestionCandidateFromLearningState(session);
-
-    const mapRole = role => (
-        role === "user" ? "user" : "assistant"
+function buildApiMessages(session, targetCandidate = null) {
+    if (!session || !Array.isArray(session.messages)) return [];
+    const valid = session.messages.map((message, index) => ({ message, index })).filter(({ message }) => (
+        message && ["user", "ai"].includes(message.role) && !message.isError && !message.isNotice
+        && typeof message.text === "string" && message.text.trim()
+    ));
+    const latestEntry = [...valid].reverse().find(({ message }) => message.role === "user");
+    if (!latestEntry) return [];
+    const latestUser = latestEntry.message, latestIndex = latestEntry.index;
+    const navigation = isQuestionNavigationFollowUp(latestUser.text);
+    const resolvedNavigation = navigation && latestUser.targetQuestionFingerprint
+        && !hasExplicitExerciseGenerationCue(latestUser.text);
+    const exercise = isSessionExerciseRequest(session, latestUser.text) && !resolvedNavigation;
+    const reference = exercise && isContextualExerciseRequest(latestUser.text)
+        ? (targetCandidate || resolveExerciseReference(session, latestUser.text)) : null;
+    const freshQuestion = !exercise && !navigation && looksLikeActualLearningProblem(latestUser);
+    const target = exercise ? reference : freshQuestion ? null : scopedConversationQuestionTarget(
+        session, latestUser,
+        targetCandidate || activeQuestionCandidateFromHistory(session) || currentQuestionCandidateFromLearningState(session)
     );
-
     const messageContent = message => {
-        let content = (
-            message.role === "user"
-            && typeof message.apiText === "string"
-            && message.apiText.trim()
-        )
-            ? message.apiText
-            : message.text;
-
-        if (
-            message.role === "user"
-            && message.source === "ocr"
-        ) {
-            content = `[图片识题]\n${content}`;
-        }
-
+        let content = message.role === "user" && message.apiText?.trim() ? message.apiText : message.text;
+        if (message.role === "user" && message.source === "ocr") content = `[图片识题]\n${content}`;
         return content;
     };
-
-    // 同知识点练习必须携带它引用的题目；指定新主题的独立出题不带旧题。
-    // 注意：裸“下一题”在历史中确实存在后一道题时，会被 send() 解析为
-    // 导航并写入 targetQuestionFingerprint，此时不能再误走出题分支。
-    const latestIsResolvedNavigation = Boolean(
-        isQuestionNavigationFollowUp(latestUser.text)
-        && latestUser.targetQuestionFingerprint
-        && !hasExplicitExerciseGenerationCue(latestUser.text)
-    );
-
-    if (
-        isExerciseRequestText(latestUser.text)
-        && !latestIsResolvedNavigation
-    ) {
-        const reference = isContextualExerciseRequest(latestUser.text)
-            ? (targetCandidate || resolveExerciseReference(session, latestUser.text))
-            : null;
-        return [{
-            role: "user",
-            content: reference
-                ? buildTargetQuestionApiText(latestUser.text, reference)
-                : messageContent(latestUser)
-        }];
-    }
-
-    // 真正的新自包含题也优先独立发送，不要因为会话中已有 target 就
-    // 被错误包装成“上一题的追问”。
-    if (
-        (
-            latestUser.source === "ocr"
-            || looksLikeActualLearningProblem(latestUser)
-        )
-        && !isQuestionNavigationFollowUp(latestUser.text)
-    ) {
-        return [{
-            role: "user",
-            content: messageContent(latestUser)
-        }];
-    }
-
-    if (target) {
-        const targetFingerprint = questionCandidateFingerprint(
-            target
-        );
-
-        // 对“上一题 / 第一题 / 继续 / 为什么 / 我不会”等追问，
-        // 请求中只允许存在一个“当前 user 指令”。题目正文是定位信息，
-        // 不能再单独伪装成另一条 user 消息，否则模型可能把两条都执行。
-        if (
-            target.index < latestIndex
-            || isShortLearningFollowUp(latestUser.text)
-            || latestUser.targetQuestionFingerprint
-        ) {
-            const scoped = [];
-
-            // 只有真正依赖上一段讲解位置的短追问，才保留最近一次相关
-            // assistant 回复作为背景。明确的“第一题/第二题/上一题”导航
-            // 不需要旧回答，直接围绕目标题处理最新一句即可。
-            const needsAssistantContext = (
-                !isQuestionNavigationFollowUp(latestUser.text)
-                && /(?:继续|为什么|然后呢|下一步|这一步|这里|这个|再解释|再讲一下)/.test(
-                    String(latestUser.text || "").replace(/\s+/g, "")
-                )
-            );
-
-            if (needsAssistantContext) {
-                let lastRelatedAssistant = null;
-
-                for (let index = latestIndex - 1; index >= 0; index -= 1) {
-                    const message = session.messages[index];
-
-                    if (!message || message.role !== "ai") {
-                        continue;
-                    }
-
-                    if (
-                        targetFingerprint
-                        && message.targetQuestionFingerprint === targetFingerprint
-                        && !message.isError
-                        && !message.isNotice
-                    ) {
-                        lastRelatedAssistant = message;
-                        break;
-                    }
-                }
-
-                if (lastRelatedAssistant) {
-                    scoped.push({
-                        role: "assistant",
-                        content: lastRelatedAssistant.text
-                    });
-                }
-            }
-
-            const latestContent = latestUser.isRetestAnswer
-                ? messageContent(latestUser)
-                : buildTargetQuestionApiText(
-                    latestUser.text,
-                    target
-                );
-
-            scoped.push({
-                role: "user",
-                content: latestContent
-            });
-
-            return scoped;
+    let start = freshQuestion || exercise && !reference && exerciseTopicReference(latestUser.text)
+        ? latestIndex : conversationTaskStartIndex(session, latestIndex);
+    let end = latestIndex;
+    if (target && Number.isInteger(target.index)) {
+        const precedingPrompt = session.messages[target.index - 1];
+        const targetStart = target.role === "ai" && precedingPrompt?.role === "user"
+            && isExerciseRequestText(precedingPrompt.text) ? target.index - 1 : target.index;
+        start = navigation ? targetStart : Math.max(start, targetStart);
+        if (navigation) {
+            // Navigation selects one problem's thread, not explanations of the
+            // unrelated problems that happened to follow it in the conversation.
+            const nextTask = valid.find(entry => entry.index > target.index && entry.index < latestIndex
+                && entry.message.role === "user" && !isContextDependentChatFollowUp(entry.message.text)
+                && (looksLikeActualLearningProblem(entry.message) || isIndependentConversationTask(entry.message.text)));
+            if (nextTask) end = nextTask.index;
         }
     }
-
-    // 一道全新的自包含题目，不需要把上一道题的完整回答继续塞进请求。
-    if (
-        latestUser.source === "ocr"
-        || looksLikeActualLearningProblem(latestUser)
-    ) {
-        return [{
-            role: "user",
-            content: messageContent(latestUser)
-        }];
-    }
-
-    // 兼容无法识别题目锚点的旧会话，退回有限的最近窗口。
-    // 正常题目追问仍优先使用显式题目状态，不会把整段历史无差别塞给模型。
-    return valid
-        .slice(-FALLBACK_API_CONTEXT_MESSAGES)
-        .map(({ message }) => ({
-            role: mapRole(message.role),
-            content: messageContent(message)
-        }));
+    const relevant = valid.filter(entry => entry.index < latestIndex && (
+        entry.index >= start && entry.index < end
+        || entry.message.role === "user" && isPersistentConversationPreference(entry.message.text)
+    ));
+    const history = relevant.map(({ message, index }) => {
+        let content = messageContent(message);
+        const characters = Array.from(content);
+        if (characters.length > MAX_CHAT_MESSAGE_CHARS) {
+            const marker = "\n[历史消息较长，中间部分已省略；完整原文仍保留在对话中]\n";
+            const half = Math.floor((MAX_CHAT_MESSAGE_CHARS - Array.from(marker).length) / 2);
+            content = characters.slice(0, half).join("") + marker + characters.slice(-half).join("");
+        }
+        return { index, role: message.role === "user" ? "user" : "assistant", content };
+    });
+    const content = target && !latestUser.isRetestAnswer
+        ? buildTargetQuestionApiText(latestUser.text, target) : messageContent(latestUser);
+    return boundedConversationMessages(history, { index: latestIndex, role: "user", content }, start);
 }
 
 async function parseResponseJson(response) {
@@ -13654,7 +13642,7 @@ async function requestAiReply(session, options = {}) {
             );
     }
 
-    const rawExerciseRequest = isExerciseRequestText(latestText);
+    const rawExerciseRequest = isSessionExerciseRequest(session, latestText);
     const latestIsExerciseRequest = Boolean(
         latestIsRetestGeneration
         || (
@@ -13764,7 +13752,8 @@ async function requestAiReply(session, options = {}) {
 
     const requestTargetCandidate = latestIsExerciseRequest
         ? exerciseReference
-        : latestIsFreshQuestion ? null : (
+        : latestIsFreshQuestion ? null : scopedConversationQuestionTarget(
+            session, latestUserBeforeRequest,
             supportingFollowUp
             || navigationCandidate
             || activeQuestionCandidateFromHistory(session)

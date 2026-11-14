@@ -24,6 +24,8 @@ on:
       - 'scripts/test_graph_labels_browser.cjs'
       - 'scripts/test_composer_motion_browser.cjs'
       - 'scripts/test_chat_finalization_browser.cjs'
+      - 'scripts/test_chat_surface_browser.cjs'
+      - 'scripts/test_conversation_context_browser.cjs'
       - 'scripts/test_math_markdown.cjs'
       - 'scripts/test_offline_appearance_browser.cjs'
       - 'scripts/test_offline_data_migration_browser.cjs'
@@ -56,6 +58,8 @@ on:
       - 'scripts/test_graph_labels_browser.cjs'
       - 'scripts/test_composer_motion_browser.cjs'
       - 'scripts/test_chat_finalization_browser.cjs'
+      - 'scripts/test_chat_surface_browser.cjs'
+      - 'scripts/test_conversation_context_browser.cjs'
       - 'scripts/test_math_markdown.cjs'
       - 'scripts/test_offline_appearance_browser.cjs'
       - 'scripts/test_offline_data_migration_browser.cjs'
@@ -107,6 +111,8 @@ jobs:
           node --check scripts/test_graph_labels_browser.cjs
           node --check scripts/test_composer_motion_browser.cjs
           node --check scripts/test_chat_finalization_browser.cjs
+          node --check scripts/test_chat_surface_browser.cjs
+          node --check scripts/test_conversation_context_browser.cjs
           node --check scripts/test_math_markdown.cjs
           node --check scripts/test_offline_appearance_browser.cjs
           node --check scripts/test_offline_data_migration_browser.cjs
@@ -174,6 +180,14 @@ jobs:
         env:
           DMATE_TEST_BASE_URL: 'http://127.0.0.1:5000'
         run: node scripts/test_chat_finalization_browser.cjs
+      - name: Verify assistant transcript and floating composer
+        env:
+          DMATE_TEST_BASE_URL: 'http://127.0.0.1:5000'
+        run: node scripts/test_chat_surface_browser.cjs
+      - name: Verify multi-turn context reaches the chat request
+        env:
+          DMATE_TEST_BASE_URL: 'http://127.0.0.1:5000'
+        run: node scripts/test_conversation_context_browser.cjs
       - name: Exercise the offline workspace and knowledge graph
         env:
           DMATE_TEST_BASE_URL: http://127.0.0.1:5000
