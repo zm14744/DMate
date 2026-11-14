@@ -1667,8 +1667,8 @@
           "sections": [
             "5.1.1-匹配和最大匹配-理论",
             "5.1.2.1-匹配和最大匹配-匈牙利算法",
-            "5.2-完美匹配",
-            "5.1.2.3-匹配和最大匹配-花算法"
+            "5.1.2.3-匹配和最大匹配-花算法",
+            "5.2-完美匹配"
           ],
           "lessons": [
             {
@@ -1680,12 +1680,12 @@
               "url": "https://www.bilibili.com/video/BV12SXrYNE58/"
             },
             {
-              "title": "5.2-完美匹配",
-              "url": "https://www.bilibili.com/video/BV1SidZYfEQK/"
-            },
-            {
               "title": "5.1.2.3-匹配和最大匹配-花算法",
               "url": "https://www.bilibili.com/video/BV14vZ1YfE8n/"
+            },
+            {
+              "title": "5.2-完美匹配",
+              "url": "https://www.bilibili.com/video/BV1SidZYfEQK/"
             }
           ]
         }
