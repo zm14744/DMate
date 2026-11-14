@@ -1,5 +1,5 @@
 {
-  "version": 52,
+  "version": 53,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1073,42 +1073,42 @@
           "source_id": "sawfin_bilibili",
           "title": "Generating Functions",
           "sections": [
-            "Discrete Math II - 8.4.1 Readiness for Generating Functions: Model with Generating Functions",
-            "Discrete Math II - 8.4.2 Readiness for Generating Functions: Power Series and Fundamental Identity",
-            "Discrete Math II - 8.4.3 Readiness for Generating Functions: The Finite Geometric Series",
-            "Discrete Math II - 8.4.4 Readiness for Generating Functions: Binomial and Extended Binomial Theorem",
-            "Discrete Math II - 8.4.5 Solve Counting Problems with Generating Functions",
-            "Discrete Math II - 8.4.6 The Explicit Form of a Generating Function",
-            "Discrete Math II - 8.4.7 Solve Recurrence Relations with Generating Function"
+            "p29 Discrete Math II - 8.4.1 Readiness for Generating Functions: Model with Generating Functions",
+            "p30 Discrete Math II - 8.4.2 Readiness for Generating Functions: Power Series and Fundamental Identity",
+            "p31 Discrete Math II - 8.4.3 Readiness for Generating Functions: The Finite Geometric Series",
+            "p32 Discrete Math II - 8.4.4 Readiness for Generating Functions: Binomial and Extended Binomial Theorem",
+            "p33 Discrete Math II - 8.4.5 Solve Counting Problems with Generating Functions",
+            "p34 Discrete Math II - 8.4.6 The Explicit Form of a Generating Function",
+            "p35 Discrete Math II - 8.4.7 Solve Recurrence Relations with Generating Function"
           ],
           "lessons": [
             {
-              "title": "Discrete Math II - 8.4.1 Readiness for Generating Functions: Model with Generating Functions",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=110"
+              "title": "p29 Discrete Math II - 8.4.1 Readiness for Generating Functions: Model with Generating Functions",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=30"
             },
             {
-              "title": "Discrete Math II - 8.4.2 Readiness for Generating Functions: Power Series and Fundamental Identity",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=111"
+              "title": "p30 Discrete Math II - 8.4.2 Readiness for Generating Functions: Power Series and Fundamental Identity",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=31"
             },
             {
-              "title": "Discrete Math II - 8.4.3 Readiness for Generating Functions: The Finite Geometric Series",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=112"
+              "title": "p31 Discrete Math II - 8.4.3 Readiness for Generating Functions: The Finite Geometric Series",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=32"
             },
             {
-              "title": "Discrete Math II - 8.4.4 Readiness for Generating Functions: Binomial and Extended Binomial Theorem",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=113"
+              "title": "p32 Discrete Math II - 8.4.4 Readiness for Generating Functions: Binomial and Extended Binomial Theorem",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=33"
             },
             {
-              "title": "Discrete Math II - 8.4.5 Solve Counting Problems with Generating Functions",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=114"
+              "title": "p33 Discrete Math II - 8.4.5 Solve Counting Problems with Generating Functions",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=34"
             },
             {
-              "title": "Discrete Math II - 8.4.6 The Explicit Form of a Generating Function",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=115"
+              "title": "p34 Discrete Math II - 8.4.6 The Explicit Form of a Generating Function",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=35"
             },
             {
-              "title": "Discrete Math II - 8.4.7 Solve Recurrence Relations with Generating Function",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=116"
+              "title": "p35 Discrete Math II - 8.4.7 Solve Recurrence Relations with Generating Function",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=36"
             }
           ]
         }
