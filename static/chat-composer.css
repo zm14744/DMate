@@ -606,3 +606,23 @@ body[data-appearance-theme] > .dmate-symbol-panel button:focus-visible {
         transition:none !important;
     }
 }
+
+/* A quiet, persistent reminder below the composer. */
+.dmate-disclaimer {
+    box-sizing:border-box;
+    width:min(100%,1440px);
+    margin:8px auto 0;
+    padding:0 12px;
+    color:var(--text-secondary,#a3a3a3);
+    font-size:11px;
+    line-height:1.5;
+    text-align:center;
+    opacity:.78;
+}
+@media(max-width:600px) {
+    .dmate-disclaimer {
+        margin-top:7px;
+        padding:0 4px;
+        font-size:10.5px;
+    }
+}
