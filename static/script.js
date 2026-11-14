@@ -14015,8 +14015,24 @@ async function requestAiReply(session, options = {}) {
         // Complete asynchronous formatting before committing answer-derived
         // learning/retest changes. Stopping during MathJax must not leave
         // learning records behind without the corresponding saved answer.
-        const preparedContent = activeRequest.streaming && currentId === session.id && !document.hidden
-            ? await activeRequest.streamPreview?.finish(data.reply) : null;
+        let preparedContent = null;
+        if (activeRequest.streaming && currentId === session.id && !document.hidden) {
+            try {
+                // Validated answer paths may send only a final event, without
+                // temporary deltas. Prepare those through the same rendering path.
+                if (!activeRequest.streamPreview) appendRequestStreamDelta(activeRequest, "");
+                preparedContent = await activeRequest.streamPreview?.finish(data.reply);
+            } catch (error) {
+                // A complete, validated response has already arrived. A preview
+                // formatting failure must not discard it or report a network error.
+                throwIfAiRequestCancelled(activeRequest);
+                console.warn("回答已收到，预览排版未完成，保留完整回答：", error);
+                preparedContent = document.createElement("div");
+                preparedContent.className = "ai-content math-render-fallback";
+                preparedContent.style.whiteSpace = "pre-wrap";
+                preparedContent.textContent = data.reply;
+            }
+        }
         throwIfAiRequestCancelled(activeRequest);
 
         // JSON compatibility replies still animate after the request ends.

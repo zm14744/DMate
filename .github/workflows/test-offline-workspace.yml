@@ -23,6 +23,8 @@ on:
       - 'scripts/test_offline_graph_browser.cjs'
       - 'scripts/test_graph_labels_browser.cjs'
       - 'scripts/test_composer_motion_browser.cjs'
+      - 'scripts/test_chat_finalization_browser.cjs'
+      - 'scripts/test_math_markdown.cjs'
       - 'scripts/test_offline_appearance_browser.cjs'
       - 'scripts/test_offline_data_migration_browser.cjs'
       - 'scripts/test_mobile_drawers_browser.cjs'
@@ -53,6 +55,8 @@ on:
       - 'scripts/test_offline_graph_browser.cjs'
       - 'scripts/test_graph_labels_browser.cjs'
       - 'scripts/test_composer_motion_browser.cjs'
+      - 'scripts/test_chat_finalization_browser.cjs'
+      - 'scripts/test_math_markdown.cjs'
       - 'scripts/test_offline_appearance_browser.cjs'
       - 'scripts/test_offline_data_migration_browser.cjs'
       - 'scripts/test_mobile_drawers_browser.cjs'
@@ -102,6 +106,8 @@ jobs:
           node --check scripts/test_offline_graph_browser.cjs
           node --check scripts/test_graph_labels_browser.cjs
           node --check scripts/test_composer_motion_browser.cjs
+          node --check scripts/test_chat_finalization_browser.cjs
+          node --check scripts/test_math_markdown.cjs
           node --check scripts/test_offline_appearance_browser.cjs
           node --check scripts/test_offline_data_migration_browser.cjs
           node --check scripts/test_mobile_drawers_browser.cjs
@@ -109,6 +115,8 @@ jobs:
           node --check scripts/test_drawing_panels_browser.cjs
           node --check scripts/test_overlay_zoom_browser.cjs
           node --check scripts/test_math_diagram_browser.cjs
+      - name: Test math startup, rendering queue and proof endings
+        run: node --test scripts/test_math_markdown.cjs
       - name: Verify offline styles match the online workspace
         run: |
           python scripts/sync_offline_styles.py --check
@@ -162,6 +170,10 @@ jobs:
           done
           cat /tmp/dmate-offline-browser-server.log
           exit 1
+      - name: Verify chat finalization survives first-render failures
+        env:
+          DMATE_TEST_BASE_URL: 'http://127.0.0.1:5000'
+        run: node scripts/test_chat_finalization_browser.cjs
       - name: Exercise the offline workspace and knowledge graph
         env:
           DMATE_TEST_BASE_URL: http://127.0.0.1:5000

@@ -1,5 +1,6 @@
 (function (root) {
     'use strict';
+    let mathQueue = Promise.resolve();
     // One Markdown/LaTeX pipeline for online replies and offline study content.
     function escapeRawHtml(text) {
         return String(text ?? "")
@@ -88,6 +89,15 @@
             .join("\n");
     }
 
+    function stripProofEndMarker(source) {
+        // Omit decorative QED squares after an explicit proof ending, while
+        // retaining squares used in mathematical expressions, code or questions.
+        const square = String.raw`(?:[□∎■◻◼]|\\(?:square|blacksquare|Box|qedhere|qed)(?![A-Za-z]))`;
+        const marker = String.raw`(?:${square}|\${1,2}\s*${square}\s*\${1,2}|\\\(\s*${square}\s*\\\)|\\\[\s*${square}\s*\\\])`;
+        const ending = new RegExp(String.raw`((?:证毕|得证|证明完毕|证明完成|\bQ\.?\s*E\.?\s*D\.?)[。.!！]?(?:\*\*|__)?[。.!！]?)\s*(?:${marker}\s*)+((?:\*\*|__)?\s*)$`, 'i');
+        return source.replace(ending, '$1$2');
+    }
+
     function prepareAiDisplayText(text) {
         // 老会话中已损坏的占位符没有保留对应公式，无法凭空恢复原式。
         // 显示明确提示而不是把内部字串当成数学式再次渲染。
@@ -97,6 +107,7 @@
         );
 
         if (!value) return "";
+        value = stripProofEndMarker(value);
 
         // Keep code and already-delimited math opaque before repairing prose.
         // Complete bare environments also need protection: otherwise Markdown
@@ -142,15 +153,23 @@
     }
 
     function renderMath(target) {
-        if (!root.MathJax || !root.MathJax.typesetPromise) {
-            return Promise.resolve();
-        }
-
-        return root.MathJax.typesetPromise(
-            target ? [target] : undefined
-        ).catch(error => {
-            console.warn("MathJax 渲染失败：", error);
-        });
+        // Startup may still be loading TeX extensions on the first reply.
+        // History, streamed previews and answer panels share one MathJax
+        // document, so they must not typeset it concurrently.
+        const render = async () => {
+            try {
+                await root.MathJax?.startup?.promise;
+                if (typeof root.MathJax?.typesetPromise !== 'function') return;
+                await root.MathJax.typesetPromise(target ? [target] : undefined);
+            } catch (error) {
+                // A presentation failure must not discard a completed answer
+                // or be reported as a failed network connection.
+                console.warn("MathJax 渲染失败：", error);
+            }
+        };
+        const pending = mathQueue.then(render, render);
+        mathQueue = pending;
+        return pending;
     }
 
     // The authored study packs also contain literal Unicode mathematics.
