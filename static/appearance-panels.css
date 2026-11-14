@@ -51,6 +51,31 @@ body[data-appearance-theme] {
         border-right-color:transparent!important;
     }
 
+    @media(max-width:1100px) {
+        /* Mobile drawers share the page's theme base, keeping opacity adjustable. */
+        body[data-appearance-theme] { --dm-mobile-background-rgb:15,23,42; }
+        body[data-appearance-theme="light"] { --dm-mobile-background-rgb:248,250,252; }
+        body[data-appearance-theme="dark"] { --dm-mobile-background-rgb:13,13,13; }
+        body[data-appearance-theme] :is(#conversationSidebar,#learningToolsPanel) {
+            background-color:rgba(var(--dm-mobile-background-rgb),var(--panel-alpha))!important;
+            background-image:none!important;
+        }
+
+        /* Keep just the two navigation controls, without a painted header strip. */
+        body[data-appearance-theme] #mobileTopbar {
+            display:flex!important;
+            justify-content:space-between;
+            background-color:transparent!important;
+            background-image:none!important;
+            border:0!important;
+            box-shadow:none!important;
+            backdrop-filter:none!important;
+            -webkit-backdrop-filter:none!important;
+            pointer-events:none;
+        }
+        #mobileTopbar .mobile-topbar-button { pointer-events:auto; }
+    }
+
     /* Session details are inline sidebar text, including the empty “无”. */
     body[data-appearance-theme] .right #info {
         padding:0!important;
