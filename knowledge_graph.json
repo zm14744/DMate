@@ -1,5 +1,5 @@
 {
-  "version": 50,
+  "version": 51,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1154,15 +1154,15 @@
           "lessons": [
             {
               "title": "Discrete Math II - 8.2.1 Solving First-Order Linear Homogeneous Recurrence Relations",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=106"
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=26"
             },
             {
               "title": "Discrete Math II - 8.2.2 Solving Second-Order Linear Homogeneous Recurrence",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=107"
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=27"
             },
             {
               "title": "Discrete Math II - 8.2.3 General Case Linear Homogeneous Recurrence Relation",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=108"
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=28"
             }
           ]
         }
