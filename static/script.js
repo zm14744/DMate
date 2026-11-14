@@ -6372,29 +6372,31 @@ async function copyChatMessageText(message, content) {
     return ok;
 }
 
+// Static Lucide artwork (ISC); keep action icons available without a CDN.
+function createChatActionIcon(name) {
+    const paths = {
+        copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+        trash: '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+        image: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+        'book-plus': '<path d="M12 7v6"/><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><path d="M9 10h6"/>'
+    };
+    const svg = createSvgElement("svg", {
+        class: "dmate-lucide-icon", viewBox: "0 0 24 24", width: 20, height: 20,
+        fill: "none", stroke: "currentColor", "stroke-width": 1.8,
+        "stroke-linecap": "round", "stroke-linejoin": "round",
+        "aria-hidden": "true", focusable: "false", "data-icon": name
+    });
+    svg.innerHTML = paths[name];
+    return svg;
+}
+
 function createChatTextCopyButton(onCopy) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "rich-copy-smart chat-text-copy";
     button.title = "复制这条消息的可编辑文本";
     button.setAttribute("aria-label", "复制文本");
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", "0 0 24 24");
-    svg.setAttribute("width", "16");
-    svg.setAttribute("height", "16");
-    svg.setAttribute("fill", "none");
-    svg.setAttribute("stroke", "currentColor");
-    svg.setAttribute("stroke-width", "1.8");
-    svg.setAttribute("stroke-linecap", "round");
-    svg.setAttribute("stroke-linejoin", "round");
-    const back = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    back.setAttribute("x", "8"); back.setAttribute("y", "8");
-    back.setAttribute("width", "12"); back.setAttribute("height", "12");
-    back.setAttribute("rx", "2");
-    const front = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    front.setAttribute("d", "M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2");
-    svg.append(back, front);
-    button.appendChild(svg);
+    button.appendChild(createChatActionIcon("copy"));
     button.addEventListener("click", () => {
         Promise.resolve(onCopy()).catch(error => {
             console.warn("文本复制失败：", error);
@@ -11095,12 +11097,17 @@ async function copyRenderedImageToClipboard(makeContent) {
     return deliverRenderedPng(renderContentAsPngBlob(makeContent));
 }
 
-// The original word-labelled button always copies/saves an image.
-function createSmartCopyButton(onCopy) {
+// Existing cards keep their label; chat actions use the compact image icon.
+function createSmartCopyButton(onCopy, { iconOnly = false } = {}) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "rich-copy-smart";
-    button.textContent = "以图片形式复制";
+    if (iconOnly) {
+        button.classList.add("chat-image-copy");
+        button.appendChild(createChatActionIcon("image"));
+    } else {
+        button.textContent = "以图片形式复制";
+    }
     button.title = "电脑复制图片，Android 安装版保存到相册；手机网页可预览并保存";
     button.setAttribute("aria-label", "以图片形式复制");
     button.addEventListener("click", () => {
@@ -17009,7 +17016,8 @@ function renderChat(preparedReply = null) {
             )
         ) {
             actions.appendChild(createSmartCopyButton(
-                () => copyChatQuestionOnly(message, session, messageIndex)
+                () => copyChatQuestionOnly(message, session, messageIndex),
+                { iconOnly: true }
             ));
         }
 
@@ -17027,7 +17035,9 @@ function renderChat(preparedReply = null) {
         ) {
             const wrongButton = document.createElement("button");
             wrongButton.type = "button";
-            wrongButton.textContent = "记为错题";
+            wrongButton.className = "chat-wrong-book";
+            wrongButton.setAttribute("aria-label", "记为错题");
+            wrongButton.appendChild(createChatActionIcon("book-plus"));
             wrongButton.title = "把这一条题目加入错题本";
             wrongButton.onclick = () => (
                 markChatMessageAsWrong(
@@ -17043,7 +17053,7 @@ function renderChat(preparedReply = null) {
         deleteButton.type = "button";
         deleteButton.className = "danger chat-message-delete";
         deleteButton.setAttribute("aria-label", "删除这一条聊天消息");
-        deleteButton.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6"/></svg>';
+        deleteButton.appendChild(createChatActionIcon("trash"));
         deleteButton.title = "删除这一条聊天消息";
         deleteButton.onclick = () => (
             deleteChatMessage(

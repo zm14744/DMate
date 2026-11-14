@@ -68,6 +68,7 @@ body[data-appearance-theme="navy"] {
         .dge-panel-close,.dgs-source-delete,.ddw-history-delete,.ddw-export-close,.session > button.del,
         .appearance-swatch,.mobile-topbar-button,.mobile-install-button,.chat-jump-button,
         .rich-copy-smart,.rich-copy-button,.dge-history-arrow,.ddw-guide-button,
+        .msg-actions button,#knowledgeGraphCopyBtn,
         .kg-mobile-zoom-btn,.kg-mobile-zoom-fit,.kg-mobile-expand,.kg-mobile-node,
         .kg-desktop-zoom-controls button,.kg-mobile-zoom-controls button,
         .mobile-choice-option,.dge-review-relation,.dcn-note-open,.ddw-history-open,
@@ -91,6 +92,7 @@ body[data-appearance-theme="navy"] {
         .dge-panel-close,.dgs-source-delete,.ddw-history-delete,.ddw-export-close,.session > button.del,
         .appearance-swatch,.mobile-topbar-button,.mobile-install-button,.chat-jump-button,
         .rich-copy-smart,.rich-copy-button,.dge-history-arrow,.ddw-guide-button,
+        .msg-actions button,#knowledgeGraphCopyBtn,
         .kg-mobile-zoom-btn,.kg-mobile-zoom-fit,.kg-mobile-expand,.kg-mobile-node,
         .kg-desktop-zoom-controls button,.kg-mobile-zoom-controls button,
         .mobile-choice-option,.dge-review-relation,.dcn-note-open,.ddw-history-open,
@@ -552,5 +554,86 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
     body[data-appearance-theme] {
         --dm-icon-rest:ButtonText;
         --dm-icon-emphasis:Highlight;
+    }
+}
+
+/* Message actions and graph controls are quiet until hovered or focused.
+   Keep the action row's dimensions while the user-message hover rule hides it. */
+@layer dmate-button-themes {
+    body[data-appearance-theme] :is(
+        .msg-actions > button,
+        #knowledgeGraphCopyBtn,
+        .kg-desktop-zoom-controls button,
+        .kg-mobile-zoom-controls button
+    ) {
+        border:0!important;
+        border-radius:8px!important;
+        background:transparent!important;
+        background-image:none!important;
+        box-shadow:none!important;
+        color:var(--dm-icon-rest,var(--text-secondary))!important;
+        -webkit-text-fill-color:currentColor!important;
+        cursor:pointer;
+        transition:var(--dm-control-transition);
+    }
+    body[data-appearance-theme] :is(.msg-actions > button,#knowledgeGraphCopyBtn) {
+        display:inline-flex!important;
+        align-items:center!important;
+        justify-content:center!important;
+        box-sizing:border-box!important;
+        width:32px!important;
+        min-width:32px!important;
+        height:32px!important;
+        min-height:32px!important;
+        margin:0!important;
+        padding:6px!important;
+        line-height:1!important;
+    }
+    body[data-appearance-theme] #knowledgeGraphCopyBtn { justify-self:end; }
+    body[data-appearance-theme] :is(.msg-actions > button,#knowledgeGraphCopyBtn) > svg {
+        display:block!important;
+        flex:0 0 20px!important;
+        width:20px!important;
+        min-width:20px!important;
+        height:20px!important;
+        min-height:20px!important;
+        color:inherit!important;
+        pointer-events:none;
+    }
+    @media(hover:hover) {
+        body[data-appearance-theme] :is(
+            .msg-actions > button,
+            #knowledgeGraphCopyBtn,
+            .kg-desktop-zoom-controls button,
+            .kg-mobile-zoom-controls button
+        ):not(:disabled):not([aria-disabled="true"]):hover {
+            background:var(--dm-nav-hover,var(--dm-selected-hover))!important;
+            color:var(--dm-icon-emphasis,var(--text-primary))!important;
+        }
+    }
+    body[data-appearance-theme] :is(
+        .msg-actions > button,
+        #knowledgeGraphCopyBtn,
+        .kg-desktop-zoom-controls button,
+        .kg-mobile-zoom-controls button
+    ):not(:disabled):not([aria-disabled="true"]):is(:focus-visible,:active) {
+        background:var(--dm-nav-hover,var(--dm-selected-hover))!important;
+        color:var(--dm-icon-emphasis,var(--text-primary))!important;
+    }
+    body[data-appearance-theme] :is(
+        .msg-actions > button,
+        #knowledgeGraphCopyBtn,
+        .kg-desktop-zoom-controls button,
+        .kg-mobile-zoom-controls button
+    ):not(:disabled):not([aria-disabled="true"]):focus-visible {
+        outline:2px solid var(--dm-selected-ring)!important;
+        outline-offset:2px!important;
+    }
+    body[data-appearance-theme] .msg-actions > button.danger:not(:disabled):not([aria-disabled="true"]):is(:hover,:focus-visible,:active) {
+        color:var(--dm-danger-text,#ef4444)!important;
+    }
+    body[data-appearance-theme] :is(.msg-actions > button,#knowledgeGraphCopyBtn):is(:disabled,[aria-disabled="true"]) {
+        opacity:.45;
+        cursor:not-allowed;
     }
 }

@@ -43,7 +43,7 @@
 
 ## 界面图标
 
-DMate 网页及 Edge / Firefox 浏览器扩展的部分按钮采用 [Lucide Icons](https://lucide.dev/) 的 8 个静态 SVG 线性图标，不通过外部 CDN 加载。Lucide 图标使用 ISC 许可证；其中由 Feather 衍生的 `download` 图标另包含 Feather 的 MIT 授权说明。完整许可证随网页及各浏览器扩展一同保存在 `static/lucide-icons-LICENSE.txt`。
+DMate 网页及 Edge / Firefox 浏览器扩展的部分按钮采用 [Lucide Icons](https://lucide.dev/) 的静态 SVG 线性图标，不通过外部 CDN 加载。聊天操作另外采用 `copy`、`trash`、`image`、`book-plus`，知识图谱图片复制同用 `image`。Lucide 图标使用 ISC 许可证；其中由 Feather 衍生的图标另包含 Feather 的 MIT 授权说明。完整许可证随网页及各浏览器扩展一同保存在 `static/lucide-icons-LICENSE.txt`。
 
 ## 模型与外部服务
 
