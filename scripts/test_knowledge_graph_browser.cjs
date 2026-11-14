@@ -75,6 +75,78 @@ async function fit(page) {
   return snapshot(page);
 }
 
+async function checkReturnPreservesView(browser, width) {
+  const mobile = width <= 760;
+  const page = await browser.newPage({ viewport: { width, height: 844 },
+    ...(mobile ? { isMobile: true, hasTouch: true } : {}) });
+  const viewSelector = mobile ? '.kg-mobile-viewport' : '.kg-desktop-viewport';
+  try {
+    await page.goto(baseURL, { waitUntil: 'networkidle' });
+    await page.evaluate(() => openKnowledgeGraph());
+    if (mobile) {
+      await page.locator('.kg-mobile-expand').click();
+      await settleGraph(page);
+    } else await page.waitForSelector(viewSelector);
+    await page.evaluate(() => selectKnowledgeGraphNode('logic_truth'));
+    const zoomIn = mobile ? page.locator('.kg-mobile-zoom-btn').last() : page.locator('#knowledgeGraphDesktopZoomIn');
+    for (let i = 0; i < 5; i++) await zoomIn.click();
+    const viewport = await page.locator(viewSelector).elementHandle();
+    const state = () => viewport.evaluate(view => ({
+      scale: view._kgScale || Number(view.querySelector('.kg-desktop-zoom-surface').dataset.scale),
+      left: view.scrollLeft, top: view.scrollTop
+    }));
+    await viewport.evaluate(view => { view.scrollLeft = 70; view.scrollTop = 160; });
+    const before = await state();
+    assert.ok(before.left > 0 && before.top > 0, width + ': test starts with a panned graph');
+    const checkPreserved = async label => {
+      assert.equal(await viewport.evaluate(view => view.isConnected), true, label + ': graph is not rebuilt');
+      assert.deepEqual(await state(), before, label + ': zoom and scroll are preserved');
+    };
+    for (const type of ['focus', 'pageshow', 'visibilitychange']) {
+      await page.evaluate(type => (type === 'visibilitychange' ? document : window).dispatchEvent(new Event(type)), type);
+      await checkPreserved(width + '/' + type);
+    }
+    // A real system theme change should update CSS without resetting the graph.
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.waitForFunction(() => document.documentElement.dataset.appearanceTheme === 'dark');
+    await checkPreserved(width + '/system theme');
+
+    // Open the real lesson link in its popup, substituting only the external page.
+    const video = page.locator('.kg-video-section a[target="_blank"]').first();
+    const href = await video.getAttribute('href');
+    await page.context().route(href, route => route.fulfill({ contentType: 'text/html', body: '<title>Lesson</title>' }));
+    const popupPromise = page.waitForEvent('popup');
+    await video.evaluate(link => link.click());
+    const popup = await popupPromise;
+    await popup.waitForLoadState('domcontentloaded');
+    await popup.close();
+    await page.bringToFront();
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await checkPreserved(width + '/video return');
+
+    // Switching category and reopening must still fit the newly displayed graph.
+    await page.evaluate(() => setKnowledgeGraphFilter('命题逻辑'));
+    if (mobile) await settleGraph(page);
+    assert.equal(await viewport.evaluate(view => view.isConnected), false, width + ': category rebuilds the graph');
+    const fitted = () => page.locator(viewSelector).evaluate(view => ({
+      scale: view._kgScale || Number(view.querySelector('.kg-desktop-zoom-surface').dataset.scale),
+      left: view.scrollLeft, top: view.scrollTop
+    }));
+    const categoryFit = await fitted();
+    await page.locator(mobile ? '.kg-mobile-zoom-fit' : '#knowledgeGraphDesktopZoomFit').click();
+    assert.deepEqual(await fitted(), categoryFit, width + ': category is already fitted');
+    await page.evaluate(() => { closeKnowledgeGraph(); openKnowledgeGraph(); });
+    if (mobile) {
+      await page.locator('.kg-mobile-expand').click();
+      await settleGraph(page);
+    } else await page.waitForSelector(viewSelector);
+    const openingFit = await fitted();
+    await page.locator(mobile ? '.kg-mobile-zoom-fit' : '#knowledgeGraphDesktopZoomFit').click();
+    assert.deepEqual(await fitted(), openingFit, width + ': opening is already fitted');
+    console.log('PASS ' + width + ': tab/video return preserves view; opening and category changes still fit');
+  } finally { await page.close(); }
+}
+
 async function checkPanelPresentation(browser, width) {
   const mobile = width <= 760;
   const page = await browser.newPage({ viewport: { width, height: 844 },
@@ -415,6 +487,7 @@ async function checkNodeGestures(browser, width) {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
+    for (const width of [1440, 390]) await checkReturnPreservesView(browser, width);
     for (const width of [1440, 820, 390]) await checkPanelPresentation(browser, width);
     for (const width of [390, 620]) await checkNodeGestures(browser, width);
     for (const theme of ['light', 'dark', 'navy']) await checkSelectionBorder(browser, theme);

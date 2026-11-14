@@ -342,6 +342,7 @@ function applyAppearanceSettings(options = {}) {
 
     if (!root || !body) return;
 
+    const previousFontScale = root.style.getPropertyValue("--font-scale");
     appearanceSettings = normalizeAppearanceSettings(appearanceSettings);
 
     const accent = APPEARANCE_ACCENTS[appearanceSettings.accent]
@@ -427,13 +428,19 @@ function applyAppearanceSettings(options = {}) {
 
     syncAppearanceControls();
 
+    // 主题等外观由 CSS 更新；只有字号变化才需要重新计算图谱节点布局。
+    // 返回标签页或视频时也会检查系统主题，不能因此重绘并重置缩放、位置。
     const graphModal = document.getElementById("knowledgeGraphModal");
     if (
         graphModal
         && !graphModal.classList.contains("hidden")
         && typeof renderKnowledgeGraph === "function"
     ) {
-        renderKnowledgeGraph();
+        knowledgeGraphPreparedPngPromise = null;
+        knowledgeGraphPreparedPngKey = "";
+        if (root.style.getPropertyValue("--font-scale") !== previousFontScale) {
+            renderKnowledgeGraph();
+        }
     }
 }
 
