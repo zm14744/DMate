@@ -1,5 +1,5 @@
 {
-  "version": 54,
+  "version": 55,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1482,11 +1482,11 @@
           "lessons": [
             {
               "title": "2.3.1-距离和BFS-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=10"
+              "url": "https://www.bilibili.com/video/BV1BC4neEE36/"
             },
             {
               "title": "2.3.2-距离和BFS-算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=11"
+              "url": "https://www.bilibili.com/video/BV1SRtVeDErF/"
             },
             {
               "title": "6.1.1-赋权图和距离-理论",
@@ -1494,11 +1494,11 @@
             },
             {
               "title": "6.1.2-赋权图和距离-算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=28"
+              "url": "https://www.bilibili.com/video/BV176Niz8E7A/"
             },
             {
               "title": "7.4-有向图的距离",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=42"
+              "url": "https://www.bilibili.com/video/BV11cuq6zEhK/"
             }
           ]
         }
@@ -1588,7 +1588,7 @@
           "lessons": [
             {
               "title": "3.2.1-二分图-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=14"
+              "url": "https://www.bilibili.com/video/BV1NPSEYoEY7/"
             }
           ]
         }
@@ -1672,15 +1672,15 @@
           "lessons": [
             {
               "title": "5.1.1-匹配和最大匹配-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=22"
+              "url": "https://www.bilibili.com/video/BV1njQdYcERV/"
             },
             {
               "title": "5.1.2.1-匹配和最大匹配-匈牙利算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=23"
+              "url": "https://www.bilibili.com/video/BV12SXrYNE58/"
             },
             {
               "title": "5.2-完美匹配",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=26"
+              "url": "https://www.bilibili.com/video/BV1SidZYfEQK/"
             }
           ]
         }
