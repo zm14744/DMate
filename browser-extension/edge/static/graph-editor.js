@@ -503,7 +503,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
                 clearTimeout(textTimer); textTimer=null; textState.regions=[]; textState.nextId=1; textState.selectedId=null; textState.manuallyEdited=false; textState.assemblyError='';
                 refreshTextPanel?.();
             }, 'dge-clear-button');
-            clear.dataset.editorClear = 'true'; clear.prepend(lucideIcon('trash-2', 20));
+            clear.dataset.editorClear = 'true';
             top.append(undo, redo, clear);
             container.append(top);
             if (useOverlay && !options.drawingOnly) {

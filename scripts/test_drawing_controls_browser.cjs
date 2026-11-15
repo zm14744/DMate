@@ -71,7 +71,7 @@ async function drawingPaint(page, searchBackground) {
   await checkIcon(page.locator('[data-editor-undo]'), 'undo-2', 24);
   await checkIcon(page.locator('[data-editor-redo]'), 'redo-2', 24);
   const clear = page.locator('[data-editor-clear].dge-clear-button');
-  await checkIcon(clear, 'trash-2', 20);
+  assert.equal(await clear.locator('svg').count(), 0, 'Clear is a text-only action');
   assert.ok((await clear.innerText()).includes('清空'), 'Clear keeps its text label');
 }
 
