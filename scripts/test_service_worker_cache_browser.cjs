@@ -62,9 +62,12 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     const networkCSS = await reference.text();
     assert.ok(networkCSS.trim().length, 'The shared stylesheet must not be empty');
     const sharedAssets = await Promise.all(['/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
-      '/static/select-controls.css?v=26', '/static/mobile-select.js?v=26', '/static/offline.css?v=27',
-      '/static/offline.js?v=27', '/static/offline-knowledge-graph.js?v=27',
-      '/static/search-controls.css?v=27', '/static/search-controls.js?v=27']
+      '/static/select-controls.css?v=26', '/static/mobile-select.js?v=26', '/static/offline.css?v=28',
+      '/static/offline.js?v=28', '/static/offline-knowledge-graph.js?v=28',
+      '/static/search-controls.css?v=27', '/static/search-controls.js?v=27',
+      '/static/offline-content/concepts.zh-CN.json?v=28', '/static/offline-content/questions.zh-CN.json?v=28',
+      '/static/offline-content/knowledge_graph.json?v=28',
+      '/static/offline-content/translations.en.json?v=28']
       .map(async path => {
         const response = await context.request.get(new URL(path, baseURL).href);
         assert.equal(response.status(), 200, 'The server must provide ' + path);
@@ -74,8 +77,8 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     // Simulate the pinned stylesheet left by the previous offline shell.
     await page.goto(new URL('/health', baseURL).href);
     await page.evaluate(async () => {
-      const cache = await caches.open('dmate-offline-shell-v26');
-      await cache.put('/static/button-themes.css?v=23', new Response('/* obsolete shell without shared search controls */'));
+      const cache = await caches.open('dmate-offline-shell-v27');
+      await cache.put('/static/button-themes.css?v=23', new Response('/* obsolete shell before the exercise migration */'));
     });
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });
     await page.evaluate(async () => {
@@ -92,7 +95,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       if (canonical.length !== 1) throw new Error('Expected exactly one precached shared stylesheet');
       return { name: names[0], canonical: canonical[0].url };
     }, assetPath);
-    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 27, 'Shared search controls require the refreshed cache');
+    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 28, 'Internal scrolling and migrated exercises require the refreshed cache');
     assert.equal((await fetchAsset(page, current.canonical)).text, networkCSS,
       'The refreshed shell loads current frameless controls instead of the obsolete stylesheet');
     for (const asset of sharedAssets) {

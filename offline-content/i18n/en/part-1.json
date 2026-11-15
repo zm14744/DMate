@@ -2738,6 +2738,629 @@
       "answer_text": "The least nonnegative solution is 8. All integer solutions are x=8+15k, k∈ℤ.",
       "explanation": "Substitute x=2+3t into the second condition: 3t≡1(mod5), so t≡2(mod5). Thus x=2+3(2+5k)=8+15k. Since 8 lies between 0 and 14, it is the least nonnegative solution.",
       "grading_criteria": "Find 8 and the period 15. Giving only 8 without all solutions earns partial credit."
+    },
+    "q-example-relation_operation__composition": {
+      "title": "Relation composition and intermediate elements: example practice",
+      "statement": "Let the membership relation be R={(Alpha,readers group)} and the group-resource relation be S={(readers group,document)}. Using the convention that S∘R applies R first, find S∘R and interpret its access meaning.",
+      "answer_text": "User Alpha belongs to the readers group, and the readers group may read a document. Composing group membership with group resource permissions shows that Alpha may read the document.",
+      "explanation": "User Alpha belongs to the readers group, and the readers group may read a document. Composing group membership with group resource permissions shows that Alpha may read the document.\n\nThe existential condition means that even if several intermediate elements realize the same endpoint pair, that pair appears only once. Composition is associative and distributes over relation union, but is generally not commutative. In relation matrices, multiplication uses AND and summation uses OR.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_operation__inverse_relation": {
+      "title": "Inverse relations and their laws: example practice",
+      "statement": "Let R={(1,a),(2,a)} relate {1,2} to {a}. Find the inverse relation and determine whether it is a function from {a} to {1,2}.",
+      "answer_text": "The inverse of R={(1,a),(2,a)} is {(a,1),(a,2)}. Since a has two associated values, this is not a function from {a} to {1,2}.",
+      "explanation": "The inverse of R={(1,a),(2,a)} is {(a,1),(a,2)}. Since a has two associated values, this is not a function from {a} to {1,2}.\n\nTaking the inverse twice recovers the original relation. Inversion respects union and intersection of relations of the same type. In a directed graph it reverses every edge; loops remain loops. In matrix form it is transposition. Inverting a composition reverses the order of composition.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_operation__powers": {
+      "title": "Relation powers and chains of fixed length: example practice",
+      "statement": "Let A={0,1,2} and R={(0,1),(1,2),(2,0)}. Express R³ and R⁴ in terms of R and the identity relation I_A.",
+      "answer_text": "The directed 3-cycle 0→1→2→0 satisfies R³=I_A and R⁴=R.",
+      "explanation": "The directed 3-cycle 0→1→2→0 satisfies R³=I_A and R⁴=R.\n\nA power records whether an endpoint pair is reachable, not the number of chains realizing it. A finite chain with no continuation can eventually have empty higher powers. Directed cycles give periodic behavior in the lengths and can produce diagonal pairs in positive powers.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_operation__set_operations": {
+      "title": "Union, intersection, and difference of relations: example practice",
+      "statement": "Let R={(1,a)} and S={(1,b)}. Find R∩S and R∪S.",
+      "answer_text": "If R={(1,a)} and S={(1,b)}, then R∩S=∅ and R∪S={(1,a),(1,b)}.",
+      "explanation": "If R={(1,a)} and S={(1,b)}, then R∩S=∅ and R∪S={(1,a),(1,b)}.\n\nThe result is still a relation from A to B. Union permits either set of rules, while intersection requires both sets of rules to permit a pair. Composition distributes over union, but for intersection only an inclusion generally holds; distribution cannot be assumed.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_property": {
+      "title": "Properties of relations: example practice",
+      "statement": "On A={1,2,3}, let R={(1,1),(2,2),(3,3),(1,2),(2,1)}. Determine whether R is reflexive, symmetric, antisymmetric, and transitive. For any property that fails, identify the relevant ordered pairs.",
+      "answer_text": "On A={1,2,3}, R={(1,1),(2,2),(3,3),(1,2),(2,1)} is reflexive, symmetric, and transitive, but not antisymmetric, since 1≠2 while 1R2 and 2R1.",
+      "explanation": "On A={1,2,3}, R={(1,1),(2,2),(3,3),(1,2),(2,1)} is reflexive, symmetric, and transitive, but not antisymmetric, since 1≠2 while 1R2 and 2R1.\n\nSymmetry and antisymmetry are not logical negations. A relation containing only diagonal pairs may satisfy both. A relation with a bidirectional pair of distinct elements and another edge lacking its reverse may satisfy neither. Properties must be checked relative to the specified set A. On nonempty A, for example, the empty relation is not reflexive but is irreflexive, symmetric, antisymmetric, and transitive. If A=∅, all these universal conditions hold.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_property__antisymmetry": {
+      "title": "Antisymmetric relations: example practice",
+      "statement": "Determine whether ≤ on the integers is antisymmetric, and whether {(1,2),(2,1)} on {1,2} is antisymmetric. Do loops by themselves violate antisymmetry?",
+      "answer_text": "The relation ≤ on integers is antisymmetric and contains every loop; {(1,2),(2,1)} is not antisymmetric when 1≠2.",
+      "explanation": "The relation ≤ on integers is antisymmetric and contains every loop; {(1,2),(2,1)} is not antisymmetric when 1≠2.\n\nAntisymmetry allows loops and one-way links between distinct objects. It is neither incompatible with symmetry nor its negation: every subrelation of the diagonal satisfies both, whereas a relation with a bidirectional edge and another edge lacking its reverse satisfies neither.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_property__irreflexivity": {
+      "title": "Irreflexive relations: example practice",
+      "statement": "On A={1,2}, determine whether R={(1,2)} is irreflexive. Then determine whether S={(1,1)} is reflexive or irreflexive.",
+      "answer_text": "On A={1,2}, {(1,2)} is irreflexive; {(1,1)} is neither reflexive nor irreflexive.",
+      "explanation": "On A={1,2}, {(1,2)} is irreflexive; {(1,1)} is neither reflexive nor irreflexive.\n\nFailure of reflexivity requires just one missing loop, whereas irreflexivity requires all loops to be absent. These are different conditions. On nonempty A, reflexivity and irreflexivity are incompatible, but both may fail; on empty A both hold.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_property__reflexivity": {
+      "title": "Reflexive relations: example practice",
+      "statement": "On A={1,2,3}, is R={(1,1),(2,2)} reflexive? If not, identify the required missing pair.",
+      "answer_text": "For A={1,2,3}, {(1,1),(2,2)} is not reflexive because (3,3) is missing.",
+      "explanation": "For A={1,2,3}, {(1,1),(2,2)} is not reflexive because (3,3) is missing.\n\nAll diagonal pairs must be checked relative to the specified A; finding one loop is insufficient. When A=∅, the empty relation is reflexive because there is no element violating the universal condition. Enlarging the underlying set without changing the relation may make a previously reflexive relation nonreflexive.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_property__symmetry": {
+      "title": "Symmetric relations: example practice",
+      "statement": "On A={1,2,3}, determine whether R={(1,2),(2,1),(3,3)} is symmetric. Is symmetry preserved if (2,3) alone is added without (3,2)?",
+      "answer_text": "R={(1,2),(2,1),(3,3)} is symmetric. Adding (2,3) without adding (3,2) destroys symmetry.",
+      "explanation": "R={(1,2),(2,1),(3,3)} is symmetric. Adding (2,3) without adding (3,2) destroys symmetry.\n\nA loop automatically satisfies its own reverse requirement. The empty relation and any relation consisting only of diagonal pairs are symmetric. To disprove symmetry, find an existing edge whose reverse is missing; finding two unrelated objects is insufficient.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_property__transitivity": {
+      "title": "Transitivity and the two-step test: example practice",
+      "statement": "On A={1,2}, determine whether R={(1,2),(2,1)} is transitive. If it is not, identify the loops that must be added. May a transitivity test require its three vertices to be distinct?",
+      "answer_text": "{(1,2),(2,1)} is not transitive because (1,1) and (2,2) are missing, even though it has no three distinct vertices.",
+      "explanation": "{(1,2),(2,1)} is not transitive because (1,1) and (2,2) are missing, even though it has no three distinct vertices.\n\nUnder the right-to-left composition convention used here, transitivity is equivalent to R∘R⊆R. A relation with no composable edges is still transitive because no failing instance exists. Even when R and S are separately transitive, their union need not be: edges from the two relations may create new two-step chains.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_equivalence": {
+      "title": "Equivalence relations and partitions: example practice",
+      "statement": "On A={0,1,2,3,4,5}, define R by congruence modulo 3. List its equivalence classes and find the number of ordered pairs in R.",
+      "answer_text": "On {0,1,2,3,4,5}, congruence modulo 3 gives the three classes {0,3}, {1,4}, {2,5}. The corresponding relation contains 3×2²=12 ordered pairs.",
+      "explanation": "On {0,1,2,3,4,5}, congruence modulo 3 gives the three classes {0,3}, {1,4}, {2,5}. The corresponding relation contains 3×2²=12 ordered pairs.\n\nDistinct equivalence classes are disjoint, and every element belongs to exactly one class. Conversely, declaring elements related when they belong to the same partition block gives an equivalence relation. These constructions correspond to each other. For a finite set with block sizes n₁,…,n_k, the relation has n₁²+…+n_k² ordered pairs, rather than the number of blocks or elements.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_equivalence__classes": {
+      "title": "Equivalence classes: example practice",
+      "statement": "Partition {0,1,2,3,4,5,6,7,8} by congruence modulo 3. List all equivalence classes.",
+      "answer_text": "Congruence modulo 3 on {0,…,8} has three classes: {0,3,6}, {1,4,7}, {2,5,8}.",
+      "explanation": "Congruence modulo 3 on {0,…,8} has three classes: {0,3,6}, {1,4,7}, {2,5,8}.\n\nReflexivity ensures a∈[a]. If aRb, symmetry and transitivity prove [a]=[b], so different representatives within one class do not give different classes. For finite class sizes n_i, the relation has size Σn_i².",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_equivalence__partitions": {
+      "title": "The correspondence between partitions and equivalence relations: example practice",
+      "statement": "Let A={1,2,3,4,5}. Determine whether {{1,3},{2,4,5}} is a partition of A. If R relates elements in the same block, determine whether 4R5, 5R4, and 1R2 hold.",
+      "answer_text": "{{1,3},{2,4,5}} partitions {1,2,3,4,5}. Its relation contains both directions between 4 and 5, but no link from 1 to 2.",
+      "explanation": "{{1,3},{2,4,5}} partitions {1,2,3,4,5}. Its relation contains both directions between 4 and 5, but no link from 1 to 2.\n\nEvery element must lie in exactly one block. Taking classes of the relation generated by a partition recovers its blocks; the reverse construction also works. The partition of the empty set is the empty family, consistent with requiring every block to be nonempty.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_equivalence__quotient_refinement": {
+      "title": "Partition refinement and the natural quotient map: example practice",
+      "statement": "Compare the partitions of the integers given by congruence modulo 4 and modulo 2. Which is finer? Under the natural map from the finer quotient to the coarser one, where do the modulo-4 classes [0] and [2] map?",
+      "answer_text": "Classification modulo 4 refines classification modulo 2: the classes of 0 and 2 modulo 4 both map to the even class modulo 2.",
+      "explanation": "Classification modulo 4 refines classification modulo 2: the classes of 0 and 2 modulo 4 both map to the even class modulo 2.\n\nThe natural map is well-defined because R-equivalent representatives are necessarily S-equivalent. It is always surjective, but distinct finer classes may merge, so it need not be injective. A larger relation has more links and hence coarser classes, possibly fewer of them.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_equivalence__quotient_set": {
+      "title": "Quotient sets: example practice",
+      "statement": "Let R be congruence modulo 3 on the integers Z. Write Z/R using equivalence-class notation, and state whether its elements are finite or infinite sets.",
+      "answer_text": "For congruence modulo 3 on the integers, the three elements of Z/R may be written [0], [1], [2]; each is itself an infinite set.",
+      "explanation": "For congruence modulo 3 on the integers, the three elements of Z/R may be written [0], [1], [2]; each is itself an infinite set.\n\nThe natural projection π:A→A/R, π(a)=[a]_R, is surjective. In the finite case, the quotient's size is the number of partition blocks, not the number of ordered pairs in the relation, and need not equal the number of representatives. The quotient of the empty set is empty.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_order": {
+      "title": "Partial orders: example practice",
+      "statement": "Order {1,2,3,6} by divisibility. Find the least and greatest elements, determine whether 2 and 3 are comparable, and list all cover relations.",
+      "answer_text": "In {1,2,3,6} ordered by divisibility, 1 is least and 6 is greatest; 2 and 3 are incomparable. The covers are 1→2, 1→3, 2→6, 3→6.",
+      "explanation": "In {1,2,3,6} ordered by divisibility, 1 is least and 6 is greatest; 2 and 3 are incomparable. The covers are 1→2, 1→3, 2→6, 3→6.\n\nA least element, if it exists, is unique and minimal. There may be several minimal elements, and a minimal element need not be comparable to the others. An upper bound of S is an element of the ambient poset A greater than or equal to every element of S; it need not belong to S. The least upper bound is the least of all upper bounds; greatest lower bounds are defined dually. A finite poset's Hasse diagram shows only covers, omitting loops and edges implied by transitivity. In a finite nonempty poset, following a strictly descending chain reaches a minimal element.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_order__greatest": {
+      "title": "Greatest elements: example practice",
+      "statement": "Find the greatest element of {1,2,3,6,12} ordered by divisibility.",
+      "answer_text": "In {1,2,3,6,12} ordered by divisibility, 12 is the greatest element.",
+      "explanation": "In {1,2,3,6,12} ordered by divisibility, 12 is the greatest element.\n\nA greatest element, if present, is unique and maximal; multiple maximal elements rule out a greatest element. Even if the whole poset has a greatest element, a subset may omit it and have no greatest element of its own.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_order__hasse_diagram": {
+      "title": "Covers and Hasse diagrams: example practice",
+      "statement": "List the cover edges in the Hasse diagram of {1,2,3,6} ordered by divisibility, and explain why the edge 1—6 is omitted.",
+      "answer_text": "The divisibility Hasse diagram of {1,2,3,6} has edges 1–2, 1–3, 2–6, 3–6; it omits 1–6.",
+      "explanation": "The divisibility Hasse diagram of {1,2,3,6} has edges 1–2, 1–3, 2–6, 3–6; it omits 1–6.\n\nIn a finite Hasse diagram, two distinct elements are comparable exactly when an upward chain of covers connects them. No direct edge does not imply incomparability, since an indirect upward chain may exist. Positions may be adjusted while preserving cover directions. For general infinite posets, the cover graph alone may not recover the order; for example, the usual order on the rationals has no covers.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_order__infimum": {
+      "title": "Greatest lower bounds (infima): example practice",
+      "statement": "In P({a,b,c}) ordered by inclusion, find the infimum of the family {{a},{b}}.",
+      "answer_text": "In P({a,b,c}), the infimum of {{a},{b}} is ∅.",
+      "explanation": "In P({a,b,c}), the infimum of {{a},{b}} is ∅.\n\nAn infimum, if present, is unique but need not belong to S. In a power set ordered by inclusion it is given by intersection. In a given divisibility poset, even a computable integer gcd must belong to the ambient set to serve as an infimum.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_order__least": {
+      "title": "Least elements: example practice",
+      "statement": "Find the least element of {1,2,3,6} ordered by divisibility.",
+      "answer_text": "In {1,2,3,6} ordered by divisibility, 1 is least; removing 1 can leave multiple minimal elements.",
+      "explanation": "In {1,2,3,6} ordered by divisibility, 1 is least; removing 1 can leave multiple minimal elements.\n\nA least element, if present, is unique and minimal. The converse does not hold in general. In a finite nonempty poset with a unique minimal element, every element descends to it, so it is least.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_order__linear_extension": {
+      "title": "Linear extensions of partial orders: example practice",
+      "statement": "List all linear extensions of the divisibility partial order on {1,2,3,6}.",
+      "answer_text": "The divisibility poset {1,2,3,6} has two linear extensions: 1,2,3,6 and 1,3,2,6.",
+      "explanation": "The divisibility poset {1,2,3,6} has two linear extensions: 1,2,3,6 and 1,3,2,6.\n\nA linear extension never reverses an established comparison; it chooses orders only for undecided pairs. Different topological sorts of a finite poset correspond to different linear extensions. Incomparable pairs affect the number of allowable permutations, but their directions cannot be chosen independently while ignoring transitivity.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_order__lower_bound": {
+      "title": "Lower bounds: example practice",
+      "statement": "Order A={2,3,6,12,18} by divisibility. Find all lower bounds of S={2,3} that belong to A.",
+      "answer_text": "For A={2,3,6,12,18} and S={2,3} ordered by divisibility, S has no lower bound: its only positive common divisor, 1, is outside A.",
+      "explanation": "For A={2,3,6,12,18} and S={2,3} ordered by divisibility, S has no lower bound: its only positive common divisor, 1, is outside A.\n\nA lower bound may lie outside S, and there may be none. In divisibility order, lower bounds are common divisors belonging to the ambient A; 1 cannot be included unconditionally. Every ambient element is a lower bound of the empty subset.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_order__maximal": {
+      "title": "Maximal elements: example practice",
+      "statement": "In the divisibility partial order on {2,3,6,10}, find all maximal elements and determine whether a greatest element exists.",
+      "answer_text": "In {2,3,6,10} ordered by divisibility, both 6 and 10 are maximal, but no greatest element exists.",
+      "explanation": "In {2,3,6,10} ordered by divisibility, both 6 and 10 are maximal, but no greatest element exists.\n\nA maximal element may be incomparable with others and therefore need not be greatest. Every finite nonempty poset has a maximal element and may have several. Maximal and minimal elements are dual under reversal of the order.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_order__minimal": {
+      "title": "Minimal elements: example practice",
+      "statement": "Find all minimal elements of {2,3,6,10} ordered by divisibility.",
+      "answer_text": "In {2,3,6,10} ordered by divisibility, both 2 and 3 are minimal.",
+      "explanation": "In {2,3,6,10} ordered by divisibility, both 2 and 3 are minimal.\n\nMinimality does not guarantee comparability with every other element, so several minimal elements may exist. Every finite nonempty poset has a minimal element. An infinite poset may have none, or have a unique minimal element without a least element.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_order__partial_order": {
+      "title": "Nonstrict partial orders: example practice",
+      "statement": "In the divisibility partial order on {1,2,3,6}, determine whether 2 and 3 are comparable, and explain.",
+      "answer_text": "In {1,2,3,6} ordered by divisibility, 2 and 3 are incomparable.",
+      "explanation": "In {1,2,3,6} ordered by divisibility, 2 and 3 are incomparable.\n\nSet inclusion and divisibility of positive integers are partial orders. Distinct elements with neither a≤b nor b≤a are incomparable. The strict relation a<b is defined by a≤b and a≠b; do not mix it with the reflexive nonstrict definition.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_order__supremum": {
+      "title": "Least upper bounds (suprema): example practice",
+      "statement": "In P({a,b,c}) ordered by inclusion, find the supremum of S={{a},{b}}, and determine whether that supremum belongs to S.",
+      "answer_text": "In P({a,b,c}), {{a},{b}} has supremum {a,b}, which is not a member of this two-element subset.",
+      "explanation": "In P({a,b,c}), {{a},{b}} has supremum {a,b}, which is not a member of this two-element subset.\n\nA supremum, if present, is unique but need not belong to S. In a power set ordered by inclusion, sup{A_i}=⋃A_i. An upper bound that is merely minimal but incomparable with another upper bound cannot be called the least upper bound on that basis.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_order__total_order": {
+      "title": "Total orders and comparability: example practice",
+      "statement": "Determine whether divisibility restricted to {1,2,4,8} and to {1,2,3,6} forms a total order in each case.",
+      "answer_text": "Divisibility restricted to {1,2,4,8} is a total order, but restricted to {1,2,3,6} it is not.",
+      "explanation": "Divisibility restricted to {1,2,4,8} is a total order, but restricted to {1,2,3,6} it is not.\n\nFirst establish a partial order, then check comparability of every pair. Lexicographic order prioritizes the first component; it differs from componentwise comparison, which generally has incomparable pairs.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_order__upper_bound": {
+      "title": "Upper bounds: example practice",
+      "statement": "In A={2,3,6,12,18} ordered by divisibility, find all upper bounds of S={2,3}.",
+      "answer_text": "In A={2,3,6,12,18} ordered by divisibility, the upper bounds of S={2,3} are 6,12,18.",
+      "explanation": "In A={2,3,6,12,18} ordered by divisibility, the upper bounds of S={2,3} are 6,12,18.\n\nAn upper bound need not belong to S or be unique. Fix the ambient A before finding bounds: an upper bound in a larger set may not belong to the current A. Every ambient element is an upper bound of the empty subset.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_closure": {
+      "title": "Relation closures: example practice",
+      "statement": "Let A={1,2,3} and R={(1,2),(2,3)}. Find the transitive closure R⁺ and the reflexive-transitive closure R*.",
+      "answer_text": "On A={1,2,3}, let R={(1,2),(2,3)}. Then R⁺={(1,2),(2,3),(1,3)}; R* also includes (1,1),(2,2),(3,3).",
+      "explanation": "On A={1,2,3}, let R={(1,2),(2,3)}. Then R⁺={(1,2),(2,3),(1,3)}; R* also includes (1,1),(2,2),(3,3).\n\nThe transitive closure collects endpoint pairs reachable by positive-length chains. Cycles can therefore add diagonal pairs, but isolated elements' diagonals do not automatically enter R⁺. The equivalence closure can be obtained by making every edge bidirectional, then adding pairs reachable in zero or any positive number of steps: (R∪R⁻¹)*. Leastness means each added pair is forced by the target property. Exhibiting a qualifying relation containing R does not alone prove it is the closure. Finite transitive closures can be computed by Warshall's Boolean matrix algorithm.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_closure__equivalence_closure": {
+      "title": "Equivalence closure and undirected connected components: example practice",
+      "statement": "Let A={a,b,c,d} and R={(a,b),(b,c)}. Find the equivalence classes of the smallest equivalence relation containing R, and count its ordered pairs.",
+      "answer_text": "For A={a,b,c,d}, R={(a,b),(b,c)}, the equivalence closure has classes {a,b,c} and {d}, hence 9+1=10 ordered pairs.",
+      "explanation": "For A={a,b,c,d}, R={(a,b),(b,c)}, the equivalence closure has classes {a,b,c} and {d}, hence 9+1=10 ordered pairs.\n\nAfter ignoring the original directions, all elements in the same undirected connected component must be equivalent. No links between distinct components are forced. Each isolated vertex forms its own class and must be included. For finite component sizes n_i, the closure has size Σn_i².",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_closure__reflexive_closure": {
+      "title": "Reflexive closure: example practice",
+      "statement": "Let A={1,2} and R={(1,2)}. Find the reflexive closure of R on A.",
+      "answer_text": "For A={1,2} and R={(1,2)}, the reflexive closure is {(1,1),(2,2),(1,2)}.",
+      "explanation": "For A={1,2} and R={(1,2)}, the reflexive closure is {(1,1),(2,2),(1,2)}.\n\nLeastness means adding only the loops required for reflexivity and leaving other edges as they are. Every reflexive relation containing R must contain I_A and thus R∪I_A. Existing loops are not counted twice.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_closure__reflexive_transitive_closure": {
+      "title": "Reflexive transitive closure: example practice",
+      "statement": "Let \\(A=\\{1,2,3\\}\\) and \\(R=\\{(1,2),(2,3)\\}\\). List the reflexive transitive closure \\(R^*\\) on \\(A\\) and count its ordered pairs.",
+      "answer_text": "For the chain 1→2→3, R* contains the two original edges, 1→3, and three diagonal pairs: 6 pairs in total.",
+      "explanation": "For the chain 1→2→3, R* contains the two original edges, 1→3, and three diagonal pairs: 6 pairs in total.\n\nR⁺ does not automatically include all loops, whereas R* always contains I_A. Zero-step reachability provides self-links even at sinks or isolated vertices of a finite graph. Vertices on closed walks already have self-links in R⁺.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_closure__symmetric_closure": {
+      "title": "Symmetric closure: example practice",
+      "statement": "Let \\(A=\\{1,2,3\\}\\) and \\(R=\\{(1,2)\\}\\). Find the symmetric closure of \\(R\\) and determine whether it contains any loops.",
+      "answer_text": "For A={1,2,3}, R={(1,2)}, the symmetric closure is only {(1,2),(2,1)}, with no loops.",
+      "explanation": "For A={1,2,3}, R={(1,2)}, the symmetric closure is only {(1,2),(2,1)}, with no loops.\n\nA loop is its own reverse, so symmetric closure does not unconditionally add loops. Existing bidirectional edges do not add new elements either. Reflexive and symmetric closure commute, but this does not imply that arbitrary closures commute.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_closure__transitive_closure": {
+      "title": "Transitive closure, reachability, and Warshall's algorithm: example practice",
+      "statement": "Consider the relations represented by the three-vertex chain \\(1\\to2\\to3\\) and the two-vertex cycle \\(1\\to2\\to1\\). Which ordered pairs are added in each transitive closure, and which closure contains loops?",
+      "answer_text": "The transitive closure of 1→2→3 adds 1→3 but no loops. For 1→2→1, it adds 1→1 and 2→2.",
+      "explanation": "The transitive closure of 1→2→3 adds 1→3 but no loops. For 1→2→1, it adds 1→1 and 2→2.\n\nWarshall's Boolean update is T[i,j]←T[i,j]∨(T[i,k]∧T[k,j]). For R⁺, initialize with the matrix of R itself. Setting every diagonal entry to 1 initially instead computes the version allowing zero-length chains. Vertices on cycles acquire loops in R⁺ via positive-length closed walks; isolated vertices do not.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_mapping": {
+      "title": "Functions and mappings: example practice",
+      "statement": "Let \\(A=\\{1,2,3\\}\\), \\(B=\\{a,b,c\\}\\), and \\(f(1)=a,f(2)=a,f(3)=b\\). Is this a function from \\(A\\) to \\(B\\)? State its image, codomain, and \\(f^{-1}[\\{a\\}]\\).",
+      "answer_text": "Let A={1,2,3}, B={a,b,c}, f(1)=a, f(2)=a, f(3)=b. This is a function with image {a,b}, codomain {a,b,c}, and f⁻¹[{a}]={1,2}.",
+      "explanation": "Let A={1,2,3}, B={a,b,c}, f(1)=a, f(2)=a, f(3)=b. This is a function with image {a,b}, codomain {a,b,c}, and f⁻¹[{a}]={1,2}.\n\nFor S⊆A, f(S)={f(x)｜x∈S}; for T⊆B, f⁻¹[T]={x∈A｜f(x)∈T}. Preimages exist for every function and do not require invertibility. For finite sets |A|=m, |B|=n with n>0, there are n^m functions. From an empty domain to any codomain there is exactly one empty function; from a nonempty domain to an empty codomain there is none.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_mapping__domain_codomain": {
+      "title": "Domain, codomain, and range: example practice",
+      "statement": "View the same rule \\(f(n)=2n\\) as maps \\(\\mathbb Z\\to\\mathbb Z\\) and \\(\\mathbb Z\\to2\\mathbb Z\\). Determine whether each map is surjective.",
+      "answer_text": "The rule n↦2n is not surjective as Z→Z, but is surjective as Z→2Z.",
+      "explanation": "The rule n↦2n is not surjective as Z→Z, but is surjective as Z→2Z.\n\nEvery domain element must have a unique value. The declared codomain must contain every output, but may have unused elements. Surjectivity depends on the codomain, not just an algebraic expression.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_mapping__function_counting": {
+      "title": "Counting finite functions and constrained assignments: example practice",
+      "statement": "How many functions are there from \\(\\{a,b,c\\}\\) to \\(\\{0,1\\}\\)? How many remain if \\(f(a)=0\\) is required?",
+      "answer_text": "There are 8 functions from {a,b,c} to {0,1}. If f(a)=0 is fixed, only f(b),f(c) are free, giving 4 functions.",
+      "explanation": "There are 8 functions from {a,b,c} to {0,1}. If f(a)=0 is fixed, only f(b),f(c) are free, giving 4 functions.\n\nAn empty domain has a unique empty function to any codomain, including the empty set. A nonempty domain has no function to an empty codomain. Function counting differs from relation counting: each row must choose exactly one output, rather than an arbitrary subset.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_mapping__image": {
+      "title": "Images of functions: example practice",
+      "statement": "Let \\(f:\\{1,2\\}\\to\\{a\\}\\) be constant. Compute and compare \\(f(\\{1\\})\\cap f(\\{2\\})\\) and \\(f(\\{1\\}\\cap\\{2\\})\\).",
+      "answer_text": "For the constant function f:{1,2}→{a}, f({1})∩f({2})={a}, while f({1}∩{2})=∅.",
+      "explanation": "For the constant function f:{1,2}→{a}, f({1})∩f({2})={a}, while f({1}∩{2})=∅.\n\nAn output produced by several inputs still occurs only once in the image set. Images preserve unions, but generally only f(S∩T)⊆f(S)∩f(T) holds. The reverse inclusion needs an extra condition such as injectivity.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_mapping__preimage": {
+      "title": "Preimages of functions: example practice",
+      "statement": "Let \\(f:\\{1,2,3\\}\\to\\{a,b\\}\\) satisfy \\(f(1)=f(2)=a,f(3)=b\\). Find the preimage of \\(\\{a\\}\\) under \\(f\\).",
+      "answer_text": "For f:{1,2,3}→{a,b} with f(1)=f(2)=a, f(3)=b, we have f⁻¹[{a}]={1,2}.",
+      "explanation": "For f:{1,2,3}→{a,b} with f(1)=f(2)=a, f(3)=b, we have f⁻¹[{a}]={1,2}.\n\nPreimages preserve unions, intersections, and relative complements. An unused codomain element may have empty preimage. Every preimage element belongs to the domain, and one target value may have several preimage elements.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_mapping__total_single_valued": {
+      "title": "Totality, single-valuedness, and function graphs: example practice",
+      "statement": "Is \\(G=\\{(a,0),(b,0)\\}\\) the graph of a function from \\(\\{a,b\\}\\) to \\(\\{0,1\\}\\)? Does the answer change if only the domain is enlarged to \\(\\{a,b,c\\}\\), leaving \\(G\\) unchanged?",
+      "answer_text": "{(a,0),(b,0)} is a function graph from {a,b} to {0,1}. Enlarging the domain to {a,b,c} without giving c a value makes it cease to be a function graph.",
+      "explanation": "{(a,0),(b,0)} is a function graph from {a,b} to {0,1}. Enlarging the domain to {a,b,c} without giving c a value makes it cease to be a function graph.\n\nTwo different inputs may share a value without violating the function definition. Unused codomain elements also cause no problem. The same ordered pairs may cease to be total after changing the domain, so specify both the rule and the sets.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_injection": {
+      "title": "Injections, surjections, and bijections: example practice",
+      "statement": "For \\(f:\\mathbb Z\\to\\mathbb Z\\), \\(f(n)=2n\\), determine injectivity and surjectivity. If only the codomain is changed to \\(2\\mathbb Z\\), is the same rule bijective?",
+      "answer_text": "f:Z→Z, f(n)=2n, is injective but not surjective. Changing the codomain to the even integers 2Z makes the same rule bijective.",
+      "explanation": "f:Z→Z, f(n)=2n, is injective but not surjective. Changing the codomain to the even integers 2Z makes the same rule bijective.\n\nFor finite A,B, an injection A→B requires |A|≤|B|; a surjection to nonempty B requires |A|≥|B|. When |A|=|B|, a function is injective if and only if it is surjective. This equivalence does not extend directly to infinite sets: n↦n+1 on nonnegative integers is injective but not surjective. Finite bijections are counted by the corresponding permutations.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_injection__bijection": {
+      "title": "Bijections, finite equal cardinality, and permutations: example practice",
+      "statement": "How many bijections are there from \\(\\{1,2,3\\}\\) to \\(\\{a,b,c\\}\\)? Explain how using each output only once determines the count.",
+      "answer_text": "There are 3×2×1=6 bijections from {1,2,3} to {a,b,c}; each output may be used only once.",
+      "explanation": "There are 3×2×1=6 bijections from {1,2,3} to {a,b,c}; each output may be used only once.\n\nEqual cardinality of finite sets means a bijection can be constructed; it does not make every given function bijective. Injectivity and surjectivity are no longer equivalent for infinite sets. Constructing a bijection proves equal cardinality and supplies the condition for an inverse function.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_injection__injection": {
+      "title": "Injectivity and distinguishing inputs: example practice",
+      "statement": "Let \\(f:\\mathbb Z\\to\\mathbb Z\\) be defined by \\(f(n)=2n+1\\). Prove that \\(f\\) is injective.",
+      "answer_text": "f:Z→Z, f(n)=2n+1, is injective because 2m+1=2n+1 implies m=n.",
+      "explanation": "f:Z→Z, f(n)=2n+1, is injective because 2m+1=2n+1 implies m=n.\n\nAn injectivity proof often starts with equal outputs and derives equal inputs. To disprove it, find two distinct inputs with the same value. Restricting an injection to any domain subset preserves injectivity. For finite sets, |A|>|B| rules out an injection.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_injection__surjection": {
+      "title": "Surjectivity and covering the codomain: example practice",
+      "statement": "Define \\(f:\\mathbb Z\\to\\{0,1,2\\}\\) by sending an integer to its remainder on division by \\(3\\). Is \\(f\\) surjective, and is each remainder preimage finite or infinite?",
+      "answer_text": "Mapping an integer to its remainder on division by 3 gives a surjection Z→{0,1,2}; every remainder has infinitely many input sources.",
+      "explanation": "Mapping an integer to its remainder on division by 3 gives a surjection Z→{0,1,2}; every remainder has infinitely many input sources.\n\nTo prove surjectivity, take an arbitrary codomain element and construct or prove the existence of an input mapping to it. To disprove it, one unattained codomain element suffices. Changing the codomain while keeping the rule can change surjectivity. For finite nonempty sets, |A|<|B| rules it out.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_composition": {
+      "title": "Function composition: example practice",
+      "statement": "On the integers, let \\(f(n)=n+2\\) and \\(g(n)=3n\\). Compute \\((g\\circ f)(n)\\) and \\((f\\circ g)(n)\\), and determine whether the composites are equal.",
+      "answer_text": "On integers, f(n)=n+2 and g(n)=3n give (g∘f)(n)=3n+6, while (f∘g)(n)=3n+2, so they differ.",
+      "explanation": "On integers, f(n)=n+2 and g(n)=3n give (g∘f)(n)=3n+6, while (f∘g)(n)=3n+2, so they differ.\n\nAssociativity follows from pointwise evaluation and does not allow changing the order. Even for self-maps of one set, g∘f may differ from f∘g. The identity id_A leaves inputs unchanged, with id_B∘f=f and f∘id_A=f. Before composing, check that each stage's image lies in the next stage's domain.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_composition__associativity": {
+      "title": "Associativity of function composition: example practice",
+      "statement": "Three successive functions send employee to department, department to manager, and manager to employee ID. Does combining the first two steps or the last two steps give the same final ID? Explain using the grouping of function composition.",
+      "answer_text": "The two parenthesizations of employee→department→manager→employee ID give the same final ID.",
+      "explanation": "The two parenthesizations of employee→department→manager→employee ID give the same final ID.\n\nOn either side, any input a passes through f,g,h to give h(g(f(a))). Associativity allows parentheses to be omitted in long compositions, but neither permits swapping functions nor removes type requirements.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_composition__identity": {
+      "title": "Identity functions as composition units: example practice",
+      "statement": "Given any function \\(f:\\{1,2\\}\\to\\{a,b\\}\\), on which sets must the input-side and output-side identity functions be defined when composed with \\(f\\)?",
+      "answer_text": "For f:{1,2}→{a,b}, the input-side identity is on {1,2}, and the output-side identity is on {a,b}.",
+      "explanation": "For f:{1,2}→{a,b}, the input-side identity is on {1,2}, and the output-side identity is on {a,b}.\n\nThe subscripts of the left and right units are determined by output and input types and cannot be exchanged freely. An identity function differs from a constant function: on a set with at least two elements, it has different outputs.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_composition__iteration": {
+      "title": "Function iteration and periods: example practice",
+      "statement": "On \\(\\mathbb Z_6\\), define \\(f(x)=x+2\\pmod 6\\). Find the least positive number of iterations for which the iterate is the identity.",
+      "answer_text": "Adding 2 on Z₆ becomes the identity after three applications, but not after one or two.",
+      "explanation": "Adding 2 on Z₆ becomes the identity after three applications, but not after one or two.\n\nIteration is not raising the value f(x) to a power. For a cyclic shift f(x)=x+c mod n, f^k(x)=x+kc mod n. The whole function is the identity only when the equality holds for every input.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_composition__noncommutativity": {
+      "title": "Noncommutativity and special commuting pairs: example practice",
+      "statement": "Let \\(f(n)=n+2\\) and \\(g(n)=3n\\) on the integers. Compare the expressions obtained by multiplying by three then adding two, and by adding two then multiplying by three. Do these functions commute under composition?",
+      "answer_text": "On Z, f(n)=n+2, g(n)=3n give the two composites 3n+2 and 3n+6.",
+      "explanation": "On Z, f(n)=n+2, g(n)=3n give the two composites 3n+2 and 3n+6.\n\nOne input with different results disproves commutativity for a pair. Proving a pair commutes requires comparison for every input. Transformations acting on independent positions may commute, but this is not a law for all functions.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_composition__typed_composition": {
+      "title": "Types and execution order in composition: example practice",
+      "statement": "Let \\(f:\\mathbb Z\\to\\mathbb Z\\) be \\(f(n)=n^2\\), while \\(g\\) is defined only on positive integers. Does \\(g\\circ f\\) define a function on all of \\(\\mathbb Z\\)? Examine \\(n=0\\).",
+      "answer_text": "Let f:Z→Z, f(n)=n². If g is defined only on positive integers, g(f(0)) is undefined, so this does not give a composite on all of Z.",
+      "explanation": "Let f:Z→Z, f(n)=n². If g is defined only on positive integers, g(f(0)) is undefined, so this does not give a composite on all of Z.\n\nAn algebraic expression g(f(x)) need not be defined for every input in the original domain. In finite function tables and data workflows, tracking each intermediate output checks both order and type.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_inverse": {
+      "title": "Inverse functions: example practice",
+      "statement": "Let \\(f:\\mathbb Z\\to2\\mathbb Z\\) satisfy \\(f(n)=2n\\). State its inverse and the inverse domain. If the codomain of \\(f\\) is changed to \\(\\mathbb Z\\), can an inverse be defined on the entire new codomain?",
+      "answer_text": "f:Z→2Z, f(n)=2n, is bijective with inverse f⁻¹(m)=m/2, where m must be even. With codomain Z, the same rule is not surjective and has no inverse on all of Z.",
+      "explanation": "f:Z→2Z, f(n)=2n, is bijective with inverse f⁻¹(m)=m/2, where m must be even. With codomain Z, the same rule is not surjective and has no inverse on all of Z.\n\nInjectivity gives a unique source for every attained output; surjectivity gives a source for every codomain element. Together they define an inverse on all of B. Restricting the codomain to f(A) makes any injection invertible on that codomain. Inverses reverse the order of two bijections: (g∘f)⁻¹=f⁻¹∘g⁻¹.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_inverse__inverse_composition": {
+      "title": "Reversing order when inverting composite bijections: example practice",
+      "statement": "On \\(\\mathbb Z_7\\), first add \\(2\\), then multiply by \\(3\\). Find the order of operations that undoes the whole process and the inverse-map formula, with all arithmetic modulo \\(7\\).",
+      "answer_text": "On Z₇, adding 2 then multiplying by 3 gives x↦3x+6. Undo it by multiplying by 5, the inverse of 3 modulo 7, then subtracting 2: y↦5y+5.",
+      "explanation": "On Z₇, adding 2 then multiplying by 3 gives x↦3x+6. Undo it by multiplying by 5, the inverse of 3 modulo 7, then subtracting 2: y↦5y+5.\n\nUsing associativity, check both composites are identities: f⁻¹∘g⁻¹∘g∘f=id_A and g∘f∘f⁻¹∘g⁻¹=id_C. For more than two bijections, apply their inverses step by step in reverse order.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_inverse__inverse_existence": {
+      "title": "Existence, uniqueness, and codomain of an inverse: example practice",
+      "statement": "Consider the rule \\(n\\mapsto2n\\) as maps \\(\\mathbb Z\\to\\mathbb Z\\) and \\(\\mathbb Z\\to2\\mathbb Z\\). Which has an inverse? State the inverse rule when it exists.",
+      "answer_text": "n↦2n from Z to Z is not bijective. As a map from Z to 2Z, its inverse is m↦m/2.",
+      "explanation": "n↦2n from Z to Z is not bijective. As a map from Z to 2Z, its inverse is m↦m/2.\n\nInjectivity ensures uniqueness of sources and surjectivity ensures a source for every codomain output; together they define an inverse on all of B. For an injection alone, restrict the codomain to f(A) to obtain an inverse. The preimage set f⁻¹[T] makes sense for every function.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_inverse__involution": {
+      "title": "Self-inverse functions (involutions): example practice",
+      "statement": "On \\(\\mathbb Z_8\\), define \\(f(x)=3x+2\\pmod 8\\). Prove that \\(f\\) is an involution: its inverse is itself.",
+      "answer_text": "On Z₈, f(x)=3x+2 mod 8 satisfies f(f(x))=x, so it is its own inverse.",
+      "explanation": "On Z₈, f(x)=3x+2 mod 8 satisfies f(f(x))=x, so it is its own inverse.\n\nAn involution may have fixed points and may swap disjoint pairs of elements. Restoring only some inputs after two applications is insufficient: the identity equation must hold for every input. The identity function itself meets the definition.\n\nDirect substitution gives \\(f(f(x))=3(3x+2)+2=9x+8\\equiv x\\pmod8\\), so the second iterate is the identity.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_inverse__left_inverse": {
+      "title": "Left inverses: example practice",
+      "statement": "Let \\(f:\\mathbb N_0\\to\\mathbb N_0\\) be \\(f(n)=n+1\\), where \\(\\mathbb N_0=\\{0,1,2,\\ldots\\}\\). Define \\(l(0)=0\\) and \\(l(n)=n-1\\) for \\(n\\ge1\\). Verify whether \\(l\\) is a left inverse of \\(f\\), and check whether \\(f\\circ l\\) restores the input at \\(0\\).",
+      "answer_text": "For f:N₀→N₀, f(n)=n+1, take l(0)=0 and l(n)=n−1 for n≥1. Then l∘f=id, but f∘l does not restore 0.",
+      "explanation": "For f:N₀→N₀, f(n)=n+1, take l(0)=0 and l(n)=n−1 for n≥1. Then l∘f=id, but f∘l does not restore 0.\n\nA left inverse forces f to be injective: applying l to equal outputs restores equal inputs. It does not ensure surjectivity or f∘l=id_B. For finite sets with nonempty A, an injection has a left inverse by assigning an arbitrary A-element to unused outputs. Empty-set cases require care.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-function_inverse__right_inverse": {
+      "title": "Right inverses: example practice",
+      "statement": "Let \\(h:\\mathbb Z\\to\\mathbb N_0\\) be \\(h(n)=|n|\\), and let \\(r:\\mathbb N_0\\to\\mathbb Z\\) be \\(r(k)=k\\). Is \\(r\\) a right inverse of \\(h\\)? Compute \\(r(h(-1))\\) and decide whether it restores \\(-1\\).",
+      "answer_text": "For h:Z→N₀, h(n)=|n|, r(k)=k is a right inverse, but r(h(−1))=1≠−1.",
+      "explanation": "For h:Z→N₀, h(n)=|n|, r(k)=k is a right inverse, but r(h(−1))=1≠−1.\n\nA right inverse forces f to be surjective, since b=f(r(b)) supplies a preimage for every codomain element. It does not ensure injectivity or r∘f=id_A. For finite sets, choose a preimage for each output of a surjection. Simultaneous choices for arbitrary infinite families involve a choice principle; no unconditional assertion is made here.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_prime": {
+      "title": "Divisibility and primes: example practice",
+      "statement": "Find the prime factorization of \\(756\\), and use it to count its positive divisors.",
+      "answer_text": "756=2²·3³·7, so it has (2+1)(3+1)(1+1)=24 positive divisors. Each divisor independently chooses an exponent for each prime.",
+      "explanation": "756=2²·3³·7, so it has (2+1)(3+1)(1+1)=24 positive divisors. Each divisor independently chooses an exponent for each prime.\n\nThe quotient in divisibility must be an integer: 4∣20, but 4 does not divide 22. The number 1 is neither prime nor composite. To test primality of n, check prime factors no greater than √n: if n is composite, at least one member of a nontrivial factor pair is at most √n.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_prime__divisibility": {
+      "title": "Integer divisibility and linear combinations: example practice",
+      "statement": "Given \\(5\\mid20\\) and \\(5\\mid35\\), compute \\(3\\cdot20-2\\cdot35\\), determine whether it is divisible by \\(5\\), and give the integer quotient.",
+      "answer_text": "Since 5∣20 and 5∣35, 5∣(3·20−2·35)=−10; the quotient −2 is still an integer.",
+      "explanation": "Since 5∣20 and 5∣35, 5∣(3·20−2·35)=−10; the quotient −2 is still an integer.\n\nEstablish divisibility using an integer-multiple representation, not merely the existence of a real quotient. Linear combinations are useful for proving divisibility of expressions and studying gcds.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_prime__divisor_counting": {
+      "title": "Counting positive and square divisors: example practice",
+      "statement": "Count the positive divisors of \\(756\\), and list those positive divisors that are perfect squares.",
+      "answer_text": "756=2²·3³·7 has 24 positive divisors; its square divisors are 1,4,9,36.",
+      "explanation": "756=2²·3³·7 has 24 positive divisors; its square divisors are 1,4,9,36.\n\nThis is the product rule: every exponent choice corresponds to exactly one divisor. The number of square divisors is ∏(⌊αᵢ/2⌋+1), not simply half the total number of divisors.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_prime__factorization": {
+      "title": "Unique prime factorization: example practice",
+      "statement": "Express \\(756\\) as a product of prime powers.",
+      "answer_text": "Factor 756 as 4·189, then 2²·3³·7. Every complete prime factorization must give the same three primes and exponents.",
+      "explanation": "Factor 756 as 4·189, then 2²·3³·7. Every complete prime factorization must give the same three primes and exponents.\n\nExistence follows by repeatedly splitting composites into smaller factors. Uniqueness relies on a prime dividing a product only if it divides a factor. Unique factorization turns divisibility into comparisons of exponents for each prime.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_prime__primality": {
+      "title": "Primality and trial division up to the square root: example practice",
+      "statement": "Use trial division up to the square root to decide whether \\(53\\) is prime. Also determine whether \\(221\\) is prime; if composite, give a nontrivial factorization.",
+      "answer_text": "For 53, test only 2,3,5,7. In contrast, 221 is divisible by 13: 221=13·17, so it is composite.",
+      "explanation": "For 53, test only 2,3,5,7. In contrast, 221 is divisible by 13: 221=13·17, so it is composite.\n\nIf n=ab with 1<a≤b, then a²≤n and a≤√n. Factoring a gives a prime factor no greater than √n. Thus trial division by all primes at most √n suffices: if all fail, n is prime.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_gcd": {
+      "title": "Greatest common divisors and the Euclidean algorithm: example practice",
+      "statement": "Use the Euclidean algorithm to find \\(\\gcd(252,198)\\), showing the successive divisions.",
+      "answer_text": "252=198+54, 198=3·54+36, 54=36+18, 36=2·18, hence gcd(252,198)=18.",
+      "explanation": "252=198+54, 198=3·54+36, 54=36+18, 36=2·18, hence gcd(252,198)=18.\n\nThe algorithm is correct because (a,b) and (b,a−bq) have exactly the same common divisors. For positive inputs, nonnegative remainders strictly decrease, so it terminates. Substituting the division equations backward gives Bézout coefficients x,y with ax+by=gcd(a,b).",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_gcd__bezout": {
+      "title": "Bézout's identity: example practice",
+      "statement": "Find integers \\(x,y\\) such that \\(35x+22y=1\\). Use the resulting Bezout identity to decide whether \\(35\\) and \\(22\\) are coprime.",
+      "answer_text": "35·(−5)+22·8=1, so 35 and 22 are coprime. These coefficients also help find the inverse of 35 modulo 22.",
+      "explanation": "35·(−5)+22·8=1, so 35 and 22 are coprime. These coefficients also help find the inverse of 35 modulo 22.\n\nEvery integer linear combination is divisible by the gcd; Bézout's identity says the gcd itself also occurs. This underlies modular inverses, divisibility cancellation, and Diophantine solvability. The extended Euclidean algorithm finds specific coefficients.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_gcd__coprimality": {
+      "title": "Coprimality and divisibility cancellation: example practice",
+      "statement": "For an integer \\(c\\), does \\(8\\mid15c\\) imply \\(8\\mid c\\)? If the condition is instead \\(8\\mid2c\\), can the same cancellation be made? Explain the role of coprimality.",
+      "answer_text": "8 and 15 are coprime, so 8∣15c implies 8∣c. From 8∣2c, however, 2 cannot be canceled in this way.",
+      "explanation": "8 and 15 are coprime, so 8∣15c implies 8∣c. From 8∣2c, however, 2 cannot be canceled in this way.\n\nMultiply au+bv=1 by c to obtain c=auc+bvc. If a∣bc, both terms on the right are divisible by a. This proves the precise cancellation condition.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_gcd__diophantine": {
+      "title": "Linear Diophantine equations in two variables: example practice",
+      "statement": "Find all integer solutions of \\(35x+22y=1\\), using an integer parameter.",
+      "answer_text": "A solution of 35x+22y=1 is (−5,8); all solutions are (−5+22t,8−35t).",
+      "explanation": "A solution of 35x+22y=1 is (−5,8); all solutions are (−5+22t,8−35t).\n\nNecessity follows because g divides each term on the left; sufficiency follows by multiplying Bézout's identity by c/g. The parameterization describes integer points, not arbitrary real solutions.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_gcd__euclidean": {
+      "title": "Decreasing remainders in the Euclidean algorithm: example practice",
+      "statement": "Use the Euclidean algorithm to compute \\(\\gcd(1071,462)\\), showing the division chain.",
+      "answer_text": "1071=2·462+147, 462=3·147+21, 147=7·21, so gcd(1071,462)=21.",
+      "explanation": "1071=2·462+147, 462=3·147+21, 147=7·21, so gcd(1071,462)=21.\n\nEach remainder is strictly smaller than the previous positive divisor, so the positive remainder chain is finite. The final identity gcd(d,0)=d, not 0, explains how to read the result.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_gcd__extended_euclidean": {
+      "title": "The extended Euclidean algorithm: example practice",
+      "statement": "Use the extended Euclidean algorithm to find \\(\\gcd(240,46)\\) and integers \\(u,v\\) satisfying \\(\\gcd(240,46)=240u+46v\\).",
+      "answer_text": "Backward substitution for 240 and 46 gives 2=−9·240+47·46.",
+      "explanation": "Backward substitution for 240 and 46 gives 2=−9·240+47·46.\n\nEvery substitution must use the corresponding division equation. Coefficients may be negative. Substituting the final coefficients directly into the original equation is the simplest independent check.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_gcd__gcd_definition": {
+      "title": "The gcd and common constraints: example practice",
+      "statement": "An 84 cm by 30 cm rectangle is tiled along its sides by equal squares with integer side length in centimetres. What is the greatest possible square side length?",
+      "answer_text": "An 84 cm by 30 cm rectangle tiled along its sides by equal squares of integer side length has maximum square side gcd(84,30)=6 cm.",
+      "explanation": "An 84 cm by 30 cm rectangle tiled along its sides by equal squares of integer side length has maximum square side gcd(84,30)=6 cm.\n\nIn geometric subdivision, allowable integer sizes often must divide both lengths, making the gcd the maximum allowable size. gcd(0,b)=|b| when b≠0.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_congruence": {
+      "title": "Congruence and modular arithmetic: example practice",
+      "statement": "Check whether \\(2\\cdot1\\) and \\(2\\cdot5\\) are congruent modulo \\(8\\). If they are, may the factor \\(2\\) be canceled to conclude \\(1\\equiv5\\pmod8\\)? Explain.",
+      "answer_text": "2·1≡2·5(mod 8), but 1 and 5 are not congruent modulo 8. The common factor 2 is not coprime to 8 and cannot simply be canceled.",
+      "explanation": "2·1≡2·5(mod 8), but 1 and 5 are not congruent modulo 8. The common factor 2 is not coprime to 8 and cannot simply be canceled.\n\nValues may be reduced before addition or multiplication. For example, −17≡3(mod 5); a negative number is not the least nonnegative remainder. Cancellation needs a condition: ca≡cb(mod m) does not generally permit canceling c with the same modulus; gcd(c,m)=1 allows this.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_congruence__arithmetic": {
+      "title": "Congruence arithmetic and periods of modular powers: example practice",
+      "statement": "Find the remainders of \\(7,7^2,7^3,7^4\\) modulo \\(10\\), and determine the repeating period of positive powers of \\(7\\) modulo \\(10\\).",
+      "answer_text": "Modulo 10, 7,7²,7³,7⁴ have remainders 7,9,3,1, so powers of 7 repeat every 4 steps.",
+      "explanation": "Modulo 10, 7,7²,7³,7⁴ have remainders 7,9,3,1, so powers of 7 repeat every 4 steps.\n\nCompatibility with addition, subtraction, and multiplication follows because the relevant differences are divisible by m. For large powers, compute a short initial cycle or use repeated squaring. Ordinary real division does not always preserve congruence.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_congruence__cancellation": {
+      "title": "Coprimality in congruence cancellation: example practice",
+      "statement": "Solve \\(2x\\equiv2\\pmod8\\). State the modulus after reduction and list all solutions with \\(0\\le x<8\\).",
+      "answer_text": "2x≡2(mod8) is equivalent to x≡1(mod4), giving two remainder solutions modulo 8: 1,5.",
+      "explanation": "2x≡2(mod8) is equivalent to x≡1(mod4), giving two remainder solutions modulo 8: 1,5.\n\nFrom m∣c(a−b), dividing out g leaves coprime m/g and c/g, so m/g divides a−b. Keeping the old modulus when the factors are not coprime generally loses solutions.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_congruence__modular_exponentiation": {
+      "title": "Modular power periods and repeated squaring: example practice",
+      "statement": "Use the period of powers of \\(7\\) modulo \\(10\\) to replace \\(7^{103}\\) by a congruent power with exponent between \\(0\\) and \\(3\\).",
+      "answer_text": "Powers of 7 have period 4 modulo 10, so 7¹⁰³≡7³. Repeated squaring gives the same result.",
+      "explanation": "Powers of 7 have period 4 modulo 10, so 7¹⁰³≡7³. Repeated squaring gives the same result.\n\nReducing after every multiplication preserves the final remainder. Do not simply reduce the exponent modulo m or assume an unproved period from a few apparently repeated terms.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_congruence__residue_classes": {
+      "title": "Congruence as an equivalence relation and residue classes: example practice",
+      "statement": "Find the standard representative of \\(-17\\) modulo \\(5\\), and use a division-with-remainder identity to identify its residue class.",
+      "answer_text": "−17=(−4)·5+3, so [−17]₅=[3]₅ and the standard representative is 3.",
+      "explanation": "−17=(−4)·5+3, so [−17]₅=[3]₅ and the standard representative is 3.\n\nDifferent representatives can describe the same class: −17,3,8 are in one class modulo 5, although they are not equal as integers. The least nonnegative remainder is just a standard representative.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_linear_congruence": {
+      "title": "Linear congruences: example practice",
+      "statement": "Solve \\(6x\\equiv8\\pmod{14}\\): first reduce the congruence appropriately, then list all residue solutions modulo the original modulus \\(14\\).",
+      "answer_text": "6x≡8(mod14) reduces, by dividing the coefficient, right-hand side, and modulus by 2, to 3x≡4(mod7). The inverse of 3 modulo 7 is 5, so x≡6(mod7), yielding 6 and 13 modulo 14.",
+      "explanation": "6x≡8(mod14) reduces, by dividing the coefficient, right-hand side, and modulus by 2, to 3x≡4(mod7). The inverse of 3 modulo 7 is 5, so x≡6(mod7), yielding 6 and 13 modulo 14.\n\nThe congruence is equivalent to ax−my=b. When solvable, use the extended Euclidean algorithm to invert the reduced coefficient, find a solution modulo m/g, and lift it to g solutions modulo m. The modulus must be divided too; canceling only the coefficients is invalid.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_linear_congruence__inverses": {
+      "title": "Modular inverses and coprime linear congruences: example practice",
+      "statement": "Find the multiplicative inverse of \\(7\\) modulo \\(26\\), and verify it by a congruence product.",
+      "answer_text": "7·15=105≡1(mod26), so the inverse of 7 modulo 26 is 15.",
+      "explanation": "7·15=105≡1(mod26), so the inverse of 7 modulo 26 is 15.\n\nThe extended Euclidean algorithm gives au+mv=1, so u is an inverse. This is not the real reciprocal 1/a, and an inverse cannot be forced when the coefficient and modulus are not coprime.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_linear_congruence__lifting": {
+      "title": "Reducing congruences and lifting all remainder solutions: example practice",
+      "statement": "The congruence \\(6x\\equiv8\\pmod{14}\\) reduces to \\(3x\\equiv4\\pmod7\\). Solve the reduced congruence and lift it to all residue solutions modulo \\(14\\).",
+      "answer_text": "6x≡8(mod14) reduces to 3x≡4(mod7), giving x≡6(mod7), so the solutions modulo 14 are 6,13.",
+      "explanation": "6x≡8(mod14) reduces to 3x≡4(mod7), giving x≡6(mod7), so the solutions modulo 14 are 6,13.\n\nDividing the divisibility relation by g changes the modulus as well. The resulting g solutions are pairwise distinct modulo the original modulus. Keeping only x₀ loses other congruence classes.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_linear_congruence__solvability": {
+      "title": "The gcd condition for solvability of linear congruences: example practice",
+      "statement": "Determine solvability only: which of \\(6x\\equiv5\\pmod9\\) and \\(6x\\equiv3\\pmod9\\) have integer solutions? Explain using the gcd condition.",
+      "answer_text": "6x≡5(mod9) has no solution, but 6x≡3(mod9) does, since gcd(6,9)=3 divides only the latter right-hand side.",
+      "explanation": "6x≡5(mod9) has no solution, but 6x≡3(mod9) does, since gcd(6,9)=3 divides only the latter right-hand side.\n\nThis check needs no explicit solution and often immediately rules out incompatible conditions. When solvable, there are g residue-class solutions modulo m. A noncoprime coefficient therefore does not automatically mean no solution.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_inverse_crt": {
+      "title": "The Chinese remainder theorem: example practice",
+      "statement": "Solve \\(x\\equiv2\\pmod3\\), \\(x\\equiv3\\pmod5\\), and explain why all solutions form one residue class modulo \\(15\\).",
+      "answer_text": "x≡2(mod3), x≡3(mod5) gives x≡8(mod15). The integer 8 meets both conditions. Any two solutions differ by a multiple of both 3 and 5, hence of 15.",
+      "explanation": "x≡2(mod3), x≡3(mod5) gives x≡8(mod15). The integer 8 meets both conditions. Any two solutions differ by a multiple of both 3 and 5, hence of 15.\n\nThe theorem gives both existence and uniqueness. For noncoprime moduli, uniqueness modulo the product cannot be assumed. Two conditions require their residue difference to be divisible by the gcd of the moduli; the solution period is their lcm.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_inverse_crt__compatibility": {
+      "title": "Compatibility and periods for noncoprime moduli: example practice",
+      "statement": "Solve \\(x\\equiv1\\pmod4\\), \\(x\\equiv3\\pmod6\\). Express all solutions using their least positive period, noting that the moduli are not coprime.",
+      "answer_text": "x≡1(mod4), x≡3(mod6) gives x≡9(mod12), rather than a single class modulo 24.",
+      "explanation": "x≡1(mod4), x≡3(mod6) gives x≡9(mod12), rather than a single class modulo 24.\n\nThe conditions must give the same remainder modulo their common factor g to come from one integer. Substitute x=a+mt into the second condition to reduce solvability to a linear congruence.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_inverse_crt__construction": {
+      "title": "CRT construction with inverses: example practice",
+      "statement": "Use the CRT weight construction to solve \\(x\\equiv4\\pmod5\\), \\(x\\equiv6\\pmod7\\). Give the weights and the resulting residue class modulo \\(35\\).",
+      "answer_text": "For moduli 5,7, M=35 and weights 21,15 work. Residues 4,6 give x≡4·21+6·15=174≡34(mod35).",
+      "explanation": "For moduli 5,7, M=35 and weights 21,15 work. Residues 4,6 give x≡4·21+6·15=174≡34(mod35).\n\nModulo mᵢ, its own weight Mᵢuᵢ is 1, while every other weight contains mᵢ and is 0. Each term therefore independently supplies the desired residue at its modulus. Finally reduce the sum to 0 through M−1.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_inverse_crt__coprime_systems": {
+      "title": "Combining systems with coprime moduli: example practice",
+      "statement": "Find all integers satisfying \\(x\\equiv1\\pmod4\\), \\(x\\equiv2\\pmod7\\), and \\(x\\equiv3\\pmod9\\).",
+      "answer_text": "Residues 1,2,3 modulo 4,7,9 give x≡93(mod252).",
+      "explanation": "Residues 1,2,3 modulo 4,7,9 give x≡93(mod252).\n\nCombine conditions successively: merge two into one modulo their product, then merge with later conditions. Check every pair of moduli, rather than only the collective gcd.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_euler_fermat": {
+      "title": "Euler's theorem and Fermat's little theorem: example practice",
+      "statement": "Compute \\(\\varphi(36)\\), and use an appropriate modular-power theorem to find the remainder of \\(3^{100}\\) modulo \\(7\\).",
+      "answer_text": "φ(36)=36·(1−1/2)·(1−1/3)=12. Since 3 and 7 are coprime, 3¹⁰⁰≡3⁴≡4(mod7).",
+      "explanation": "φ(36)=36·(1−1/2)·(1−1/3)=12. Since 3 and 7 are coprime, 3¹⁰⁰≡3⁴≡4(mod7).\n\nCheck coprimality before reducing a large exponent. If the distinct prime factors of n are p₁,…,pᵣ, then φ(n)=n∏(1−1/pᵢ). The form a^p≡a also holds when p divides a, but dividing by a to get a^(p−1)≡1 requires excluding that case.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_euler_fermat__euler_theorem": {
+      "title": "Euler's theorem and reduced residue systems: example practice",
+      "statement": "Compute \\(\\varphi(20)\\), then use Euler's theorem to find the remainder of \\(7^{123}\\) modulo \\(20\\), checking the required coprimality condition.",
+      "answer_text": "gcd(7,20)=1 and φ(20)=8, so 7¹²³≡7³≡3(mod20).",
+      "explanation": "gcd(7,20)=1 and φ(20)=8, so 7¹²³≡7³≡3(mod20).\n\nMultiply all reduced residues in the proof and cancel their invertible product. In applications, check coprimality first, then write the exponent as a multiple of φ(n) plus a remainder.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_euler_fermat__fermat_theorem": {
+      "title": "Fermat's little theorem and powers modulo primes: example practice",
+      "statement": "Use Fermat's little theorem to find the remainder of \\(2^{1000}\\) modulo \\(13\\).",
+      "answer_text": "For 2¹⁰⁰⁰ modulo 13, reduce 1000 modulo 12 to 4, giving 2⁴≡3(mod13).",
+      "explanation": "For 2¹⁰⁰⁰ modulo 13, reduce 1000 modulo 12 to 4, giving 2⁴≡3(mod13).\n\nWhen p∣a, aᵖ≡a still says 0≡0, but a^(p−1)≡1 generally fails. The two forms have different conditions. A composite can satisfy similar congruences for particular bases, so one successful test does not establish primality.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_euler_fermat__pseudoprimes": {
+      "title": "Fermat pseudoprimes and limits of the converse: example practice",
+      "statement": "For \\(n=341\\), verify \\(2^{340}\\equiv1\\pmod{341}\\) and determine whether \\(341\\) is prime, illustrating the limit of the converse to Fermat's primality test.",
+      "answer_text": "341=11·31, and 2¹⁰=1024≡1(mod341), so 2³⁴⁰≡1. Thus 341 is a base-2 Fermat pseudoprime.",
+      "explanation": "341=11·31, and 2¹⁰=1024≡1(mod341), so 2³⁴⁰≡1. Thus 341 is a base-2 Fermat pseudoprime.\n\nA successful test for one base establishes only that congruence. A nontrivial factor proves compositeness; primality needs other complete justification and cannot be replaced by one test that did not fail.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_euler_fermat__totient": {
+      "title": "Euler's totient and counting coprime residues: example practice",
+      "statement": "Compute \\(\\varphi(45)\\).",
+      "answer_text": "45=3²·5, so φ(45)=45·(2/3)·(4/5)=24.",
+      "explanation": "45=3²·5, so φ(45)=45·(2/3)·(4/5)=24.\n\nExclude integers divisible by the prime factors of n; inclusion-exclusion gives the product formula. Prime powers are already included in n, so do not repeat the same prime in the product.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_rsa": {
+      "title": "RSA public-key cryptography: example practice",
+      "statement": "For a toy RSA system take \\(p=5,q=11,e=3\\) and message \\(m=7\\). Find \\(n\\), \\(\\varphi(n)\\), the least positive private exponent \\(d\\), and the encryption and decryption results.",
+      "answer_text": "Toy parameters p=5,q=11 give n=55,φ(n)=40. Choose e=3,d=27 since 3·27=81≡1(mod40). The message m=7 encrypts to c=13, and 13²⁷ mod55 restores 7.",
+      "explanation": "Toy parameters p=5,q=11 give n=55,φ(n)=40. Choose e=3,d=27 since 3·27=81≡1(mod40). The message m=7 encrypts to c=13, and 13²⁷ mod55 restores 7.\n\nProve correctness separately modulo p and q, then combine by CRT. If a prime divides m, both sides are 0 for that modulus; otherwise apply Fermat's little theorem. Small primes and unpadded textbook RSA here are toy demonstrations, unsuitable for real encryption; real systems also require standard padding, randomness, and secure implementation.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_rsa__crt_correctness": {
+      "title": "CRT correctness of RSA for noncoprime messages: example practice",
+      "statement": "In toy RSA let \\(n=55,e=3,d=27\\) and \\(m=5\\). Compute the ciphertext and the decrypted residue, and determine whether the message is coprime to \\(n\\). Do not assume coprimality in the calculation.",
+      "answer_text": "For toy n=55,e=3,d=27,m=5, the message is not coprime to n, but ciphertext 15 raised to the 27th power is still 5 modulo 55.",
+      "explanation": "For toy n=55,e=3,d=27,m=5, the message is not coprime to n, but ciphertext 15 raised to the 27th power is still 5 modulo 55.\n\nIf p∣m, both sides are 0 modulo p; otherwise apply Fermat's little theorem. Treat q similarly, then combine because p,q are coprime. No assumption gcd(m,n)=1 is needed. This proves algebraic correctness of the teaching transformation, not real encryption security.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_rsa__key_generation": {
+      "title": "Generating exponents for teaching RSA: example practice",
+      "statement": "For toy RSA take \\(p=7,q=11,e=7\\). Find \\(n\\), \\(\\varphi(n)\\), and a positive private exponent \\(d\\), and verify the modular-inverse condition on the exponents.",
+      "answer_text": "Toy p=7,q=11 give n=77,φ(n)=60. For e=7, choose d=43 since 7·43=301≡1(mod60).",
+      "explanation": "Toy p=7,q=11 give n=77,φ(n)=60. For e=7, choose d=43 since 7·43=301≡1(mod60).\n\nThe inverse modulus is φ(n), not n. Once e is chosen, use the extended Euclidean algorithm to find d. These small parameters and unpadded textbook constructions illustrate algebraic relations and are unsuitable for secure real encryption.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
     }
   }
 }

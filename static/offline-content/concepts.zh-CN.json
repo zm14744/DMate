@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "pack_id": "discrete-mathematics-core-zh-cn",
-  "pack_version": "0.3.0",
+  "pack_version": "0.4.0",
   "language": "zh-CN",
   "subject": "离散数学",
   "title": "离散数学概念库",
@@ -36,7 +36,11 @@
         "q_logic_truth_05",
         "q_logic_truth_06",
         "q_logic_truth_07",
-        "q_logic_truth_08"
+        "q_logic_truth_08",
+        "q-example-logic_truth",
+        "q-example-logic_truth__proposition_sentence",
+        "q-example-logic_truth__truth_semantics",
+        "q-example-logic_truth__open_statement"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "logic_truth",
@@ -80,7 +84,8 @@
       ],
       "related_questions": [
         "q_logic_truth_01",
-        "q_logic_truth_05"
+        "q_logic_truth_05",
+        "q-example-logic_truth__proposition_sentence"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -118,7 +123,8 @@
       ],
       "related_questions": [
         "q_logic_truth_02",
-        "q_logic_truth_04"
+        "q_logic_truth_04",
+        "q-example-logic_truth__truth_semantics"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -156,7 +162,8 @@
       ],
       "related_questions": [
         "q_logic_truth_03",
-        "q_logic_truth_06"
+        "q_logic_truth_06",
+        "q-example-logic_truth__open_statement"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -204,7 +211,14 @@
         "q_logic_connectives_05",
         "q_logic_connectives_06",
         "q_logic_connectives_07",
-        "q_logic_connectives_08"
+        "q_logic_connectives_08",
+        "q-example-logic_connectives",
+        "q-example-logic_connectives__implication_conditions",
+        "q-example-logic_connectives__negation",
+        "q-example-logic_connectives__conjunction",
+        "q-example-logic_connectives__disjunction",
+        "q-example-logic_connectives__biconditional",
+        "q-example-logic_connectives__exclusive_or"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "logic_connectives",
@@ -253,7 +267,8 @@
         "q_logic_connectives_04",
         "q_logic_connectives_06",
         "q_logic_connectives_07",
-        "q_logic_connectives_08"
+        "q_logic_connectives_08",
+        "q-example-logic_connectives__implication_conditions"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -291,7 +306,8 @@
       ],
       "related_questions": [
         "q_logic_connectives_01",
-        "q_logic_connectives_05"
+        "q_logic_connectives_05",
+        "q-example-logic_connectives__negation"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -332,7 +348,8 @@
         "q_logic_connectives_02",
         "q_logic_connectives_03",
         "q_logic_connectives_04",
-        "q_logic_connectives_05"
+        "q_logic_connectives_05",
+        "q-example-logic_connectives__conjunction"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -371,7 +388,8 @@
       "related_questions": [
         "q_logic_connectives_01",
         "q_logic_connectives_02",
-        "q_logic_connectives_08"
+        "q_logic_connectives_08",
+        "q-example-logic_connectives__disjunction"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -409,7 +427,8 @@
       ],
       "related_questions": [
         "q_logic_connectives_03",
-        "q_logic_connectives_07"
+        "q_logic_connectives_07",
+        "q-example-logic_connectives__biconditional"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -446,7 +465,8 @@
         "logic_connectives"
       ],
       "related_questions": [
-        "q_logic_connectives_02"
+        "q_logic_connectives_02",
+        "q-example-logic_connectives__exclusive_or"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -491,7 +511,11 @@
         "q_logic_truth_table_05",
         "q_logic_truth_table_06",
         "q_logic_truth_table_07",
-        "q_logic_truth_table_08"
+        "q_logic_truth_table_08",
+        "q-example-logic_truth_table",
+        "q-example-logic_truth_table__assignment_enumeration",
+        "q-example-logic_truth_table__satisfiability_classification",
+        "q-example-logic_truth_table__semantic_counterexample"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "logic_truth_table",
@@ -535,7 +559,8 @@
       ],
       "related_questions": [
         "q_logic_truth_table_01",
-        "q_logic_truth_table_02"
+        "q_logic_truth_table_02",
+        "q-example-logic_truth_table__assignment_enumeration"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -573,7 +598,8 @@
       ],
       "related_questions": [
         "q_logic_truth_table_03",
-        "q_logic_truth_table_05"
+        "q_logic_truth_table_05",
+        "q-example-logic_truth_table__satisfiability_classification"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -611,7 +637,8 @@
       ],
       "related_questions": [
         "q_logic_truth_table_04",
-        "q_logic_truth_table_06"
+        "q_logic_truth_table_06",
+        "q-example-logic_truth_table__semantic_counterexample"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -659,7 +686,13 @@
         "q_logic_equivalence_06",
         "q_logic_equivalence_07",
         "q_logic_equivalence_08",
-        "q_logic_equivalence_09"
+        "q_logic_equivalence_09",
+        "q-example-logic_equivalence",
+        "q-example-logic_equivalence__de_morgan",
+        "q-example-logic_equivalence__implication_elimination",
+        "q-example-logic_equivalence__replacement_laws",
+        "q-example-logic_equivalence__distribution_laws",
+        "q-example-logic_equivalence__absorption_laws"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "logic_equivalence",
@@ -705,7 +738,8 @@
       ],
       "related_questions": [
         "q_logic_equivalence_01",
-        "q_logic_equivalence_05"
+        "q_logic_equivalence_05",
+        "q-example-logic_equivalence__de_morgan"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -743,7 +777,8 @@
       ],
       "related_questions": [
         "q_logic_equivalence_02",
-        "q_logic_equivalence_06"
+        "q_logic_equivalence_06",
+        "q-example-logic_equivalence__implication_elimination"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -782,7 +817,8 @@
       "related_questions": [
         "q_logic_equivalence_03",
         "q_logic_equivalence_04",
-        "q_logic_equivalence_07"
+        "q_logic_equivalence_07",
+        "q-example-logic_equivalence__replacement_laws"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -820,7 +856,8 @@
       ],
       "related_questions": [
         "q_logic_equivalence_04",
-        "q_logic_equivalence_07"
+        "q_logic_equivalence_07",
+        "q-example-logic_equivalence__distribution_laws"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -857,7 +894,8 @@
         "logic_equivalence"
       ],
       "related_questions": [
-        "q_logic_equivalence_09"
+        "q_logic_equivalence_09",
+        "q-example-logic_equivalence__absorption_laws"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -902,7 +940,15 @@
         "q_logic_normal_form_05",
         "q_logic_normal_form_06",
         "q_logic_normal_form_07",
-        "q_logic_normal_form_08"
+        "q_logic_normal_form_08",
+        "q-example-logic_normal_form",
+        "q-example-logic_normal_form__minterms_pdnf",
+        "q-example-logic_normal_form__maxterms_pcnf",
+        "q-example-logic_normal_form__literal",
+        "q-example-logic_normal_form__dnf",
+        "q-example-logic_normal_form__cnf",
+        "q-example-logic_normal_form__principal_dnf",
+        "q-example-logic_normal_form__principal_cnf"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "logic_normal_form",
@@ -952,7 +998,8 @@
         "q_logic_normal_form_02",
         "q_logic_normal_form_03",
         "q_logic_normal_form_04",
-        "q_logic_normal_form_07"
+        "q_logic_normal_form_07",
+        "q-example-logic_normal_form__minterms_pdnf"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -992,7 +1039,8 @@
         "q_logic_normal_form_02",
         "q_logic_normal_form_03",
         "q_logic_normal_form_04",
-        "q_logic_normal_form_06"
+        "q_logic_normal_form_06",
+        "q-example-logic_normal_form__maxterms_pcnf"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1030,7 +1078,8 @@
       ],
       "related_questions": [
         "q_logic_normal_form_01",
-        "q_logic_normal_form_05"
+        "q_logic_normal_form_05",
+        "q-example-logic_normal_form__literal"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1068,7 +1117,8 @@
       ],
       "related_questions": [
         "q_logic_normal_form_01",
-        "q_logic_normal_form_05"
+        "q_logic_normal_form_05",
+        "q-example-logic_normal_form__dnf"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1105,7 +1155,8 @@
         "logic_normal_form"
       ],
       "related_questions": [
-        "q_logic_normal_form_05"
+        "q_logic_normal_form_05",
+        "q-example-logic_normal_form__cnf"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1146,7 +1197,8 @@
         "q_logic_normal_form_03",
         "q_logic_normal_form_04",
         "q_logic_normal_form_07",
-        "q_logic_normal_form_08"
+        "q_logic_normal_form_08",
+        "q-example-logic_normal_form__principal_dnf"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1187,7 +1239,8 @@
         "q_logic_normal_form_03",
         "q_logic_normal_form_04",
         "q_logic_normal_form_06",
-        "q_logic_normal_form_08"
+        "q_logic_normal_form_08",
+        "q-example-logic_normal_form__principal_cnf"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1234,7 +1287,11 @@
         "q_logic_reasoning_05",
         "q_logic_reasoning_06",
         "q_logic_reasoning_07",
-        "q_logic_reasoning_08"
+        "q_logic_reasoning_08",
+        "q-example-logic_reasoning",
+        "q-example-logic_reasoning__basic_rules",
+        "q-example-logic_reasoning__invalid_inference",
+        "q-example-logic_reasoning__case_reasoning"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "logic_reasoning",
@@ -1278,7 +1335,8 @@
       ],
       "related_questions": [
         "q_logic_reasoning_01",
-        "q_logic_reasoning_04"
+        "q_logic_reasoning_04",
+        "q-example-logic_reasoning__basic_rules"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1316,7 +1374,8 @@
       ],
       "related_questions": [
         "q_logic_reasoning_02",
-        "q_logic_reasoning_05"
+        "q_logic_reasoning_05",
+        "q-example-logic_reasoning__invalid_inference"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1354,7 +1413,8 @@
       ],
       "related_questions": [
         "q_logic_reasoning_03",
-        "q_logic_reasoning_06"
+        "q_logic_reasoning_06",
+        "q-example-logic_reasoning__case_reasoning"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1399,7 +1459,11 @@
         "q_predicate_domain_05",
         "q_predicate_domain_06",
         "q_predicate_domain_07",
-        "q_predicate_domain_08"
+        "q_predicate_domain_08",
+        "q-example-predicate_domain",
+        "q-example-predicate_domain__predicate_arity",
+        "q-example-predicate_domain__domain_interpretation",
+        "q-example-predicate_domain__relation_extension"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "predicate_domain",
@@ -1448,7 +1512,8 @@
       ],
       "related_questions": [
         "q_predicate_domain_02",
-        "q_predicate_domain_05"
+        "q_predicate_domain_05",
+        "q-example-predicate_domain__predicate_arity"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1491,7 +1556,8 @@
       ],
       "related_questions": [
         "q_predicate_domain_03",
-        "q_predicate_domain_06"
+        "q_predicate_domain_06",
+        "q-example-predicate_domain__domain_interpretation"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1534,7 +1600,8 @@
       ],
       "related_questions": [
         "q_predicate_domain_01",
-        "q_predicate_domain_04"
+        "q_predicate_domain_04",
+        "q-example-predicate_domain__relation_extension"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1584,7 +1651,12 @@
         "q_predicate_variable_05",
         "q_predicate_variable_06",
         "q_predicate_variable_07",
-        "q_predicate_variable_08"
+        "q_predicate_variable_08",
+        "q-example-predicate_variable",
+        "q-example-predicate_variable__free_bound_scope",
+        "q-example-predicate_variable__alpha_renaming",
+        "q-example-predicate_variable__capture_avoidance",
+        "q-example-predicate_variable__quantifier_scope"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "predicate_variable",
@@ -1634,7 +1706,8 @@
       ],
       "related_questions": [
         "q_predicate_variable_01",
-        "q_predicate_variable_04"
+        "q_predicate_variable_04",
+        "q-example-predicate_variable__free_bound_scope"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1677,7 +1750,8 @@
       ],
       "related_questions": [
         "q_predicate_variable_02",
-        "q_predicate_variable_05"
+        "q_predicate_variable_05",
+        "q-example-predicate_variable__alpha_renaming"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1720,7 +1794,8 @@
       ],
       "related_questions": [
         "q_predicate_variable_03",
-        "q_predicate_variable_06"
+        "q_predicate_variable_06",
+        "q-example-predicate_variable__capture_avoidance"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1762,7 +1837,8 @@
         "predicate_variable"
       ],
       "related_questions": [
-        "q_predicate_variable_04"
+        "q_predicate_variable_04",
+        "q-example-predicate_variable__quantifier_scope"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1814,7 +1890,13 @@
         "q_predicate_quantifier_05",
         "q_predicate_quantifier_06",
         "q_predicate_quantifier_07",
-        "q_predicate_quantifier_08"
+        "q_predicate_quantifier_08",
+        "q-example-predicate_quantifier",
+        "q-example-predicate_quantifier__quantifier_order",
+        "q-example-predicate_quantifier__restricted_quantification",
+        "q-example-predicate_quantifier__universal_quantifier",
+        "q-example-predicate_quantifier__existential_quantifier",
+        "q-example-predicate_quantifier__unique_existence"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "predicate_quantifier",
@@ -1865,7 +1947,8 @@
       ],
       "related_questions": [
         "q_predicate_quantifier_02",
-        "q_predicate_quantifier_04"
+        "q_predicate_quantifier_04",
+        "q-example-predicate_quantifier__quantifier_order"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1908,7 +1991,8 @@
       ],
       "related_questions": [
         "q_predicate_quantifier_03",
-        "q_predicate_quantifier_06"
+        "q_predicate_quantifier_06",
+        "q-example-predicate_quantifier__restricted_quantification"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1951,7 +2035,8 @@
       ],
       "related_questions": [
         "q_predicate_quantifier_01",
-        "q_predicate_quantifier_05"
+        "q_predicate_quantifier_05",
+        "q-example-predicate_quantifier__universal_quantifier"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -1994,7 +2079,8 @@
       ],
       "related_questions": [
         "q_predicate_quantifier_01",
-        "q_predicate_quantifier_05"
+        "q_predicate_quantifier_05",
+        "q-example-predicate_quantifier__existential_quantifier"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2036,7 +2122,8 @@
         "predicate_quantifier"
       ],
       "related_questions": [
-        "q_predicate_quantifier_08"
+        "q_predicate_quantifier_08",
+        "q-example-predicate_quantifier__unique_existence"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2088,7 +2175,14 @@
         "q_predicate_reasoning_05",
         "q_predicate_reasoning_06",
         "q_predicate_reasoning_07",
-        "q_predicate_reasoning_08"
+        "q_predicate_reasoning_08",
+        "q-example-predicate_reasoning",
+        "q-example-predicate_reasoning__quantifier_negation",
+        "q-example-predicate_reasoning__quantifier_distribution",
+        "q-example-predicate_reasoning__universal_instantiation",
+        "q-example-predicate_reasoning__existential_instantiation",
+        "q-example-predicate_reasoning__existential_generalization",
+        "q-example-predicate_reasoning__universal_generalization"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "predicate_reasoning",
@@ -2140,7 +2234,8 @@
       ],
       "related_questions": [
         "q_predicate_reasoning_01",
-        "q_predicate_reasoning_05"
+        "q_predicate_reasoning_05",
+        "q-example-predicate_reasoning__quantifier_negation"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2183,7 +2278,8 @@
       ],
       "related_questions": [
         "q_predicate_reasoning_03",
-        "q_predicate_reasoning_06"
+        "q_predicate_reasoning_06",
+        "q-example-predicate_reasoning__quantifier_distribution"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2226,7 +2322,8 @@
       ],
       "related_questions": [
         "q_predicate_reasoning_02",
-        "q_predicate_reasoning_08"
+        "q_predicate_reasoning_08",
+        "q-example-predicate_reasoning__universal_instantiation"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2269,7 +2366,8 @@
       ],
       "related_questions": [
         "q_predicate_reasoning_02",
-        "q_predicate_reasoning_04"
+        "q_predicate_reasoning_04",
+        "q-example-predicate_reasoning__existential_instantiation"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2311,7 +2409,8 @@
         "predicate_reasoning"
       ],
       "related_questions": [
-        "q_predicate_reasoning_02"
+        "q_predicate_reasoning_02",
+        "q-example-predicate_reasoning__existential_generalization"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2354,7 +2453,8 @@
       ],
       "related_questions": [
         "q_predicate_reasoning_07",
-        "q_predicate_reasoning_08"
+        "q_predicate_reasoning_08",
+        "q-example-predicate_reasoning__universal_generalization"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2405,7 +2505,11 @@
         "q_predicate_prenex_05",
         "q_predicate_prenex_06",
         "q_predicate_prenex_07",
-        "q_predicate_prenex_08"
+        "q_predicate_prenex_08",
+        "q-example-predicate_prenex",
+        "q-example-predicate_prenex__prenex_structure",
+        "q-example-predicate_prenex__standardizing_apart",
+        "q-example-predicate_prenex__quantifier_movement"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "predicate_prenex",
@@ -2459,7 +2563,8 @@
       ],
       "related_questions": [
         "q_predicate_prenex_01",
-        "q_predicate_prenex_05"
+        "q_predicate_prenex_05",
+        "q-example-predicate_prenex__prenex_structure"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2507,7 +2612,8 @@
       ],
       "related_questions": [
         "q_predicate_prenex_03",
-        "q_predicate_prenex_04"
+        "q_predicate_prenex_04",
+        "q-example-predicate_prenex__standardizing_apart"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2555,7 +2661,8 @@
       ],
       "related_questions": [
         "q_predicate_prenex_02",
-        "q_predicate_prenex_06"
+        "q_predicate_prenex_06",
+        "q-example-predicate_prenex__quantifier_movement"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2610,7 +2717,11 @@
         "q_proof_direct_contradiction_05",
         "q_proof_direct_contradiction_06",
         "q_proof_direct_contradiction_07",
-        "q_proof_direct_contradiction_08"
+        "q_proof_direct_contradiction_08",
+        "q-example-proof_direct_contradiction",
+        "q-example-proof_direct_contradiction__direct_proof",
+        "q-example-proof_direct_contradiction__contradiction",
+        "q-example-proof_direct_contradiction__contrapositive"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "proof_direct_contradiction",
@@ -2654,7 +2765,8 @@
       ],
       "related_questions": [
         "q_proof_direct_contradiction_01",
-        "q_proof_direct_contradiction_06"
+        "q_proof_direct_contradiction_06",
+        "q-example-proof_direct_contradiction__direct_proof"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2693,7 +2805,8 @@
       "related_questions": [
         "q_proof_direct_contradiction_02",
         "q_proof_direct_contradiction_03",
-        "q_proof_direct_contradiction_04"
+        "q_proof_direct_contradiction_04",
+        "q-example-proof_direct_contradiction__contradiction"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2730,7 +2843,8 @@
         "proof_direct_contradiction"
       ],
       "related_questions": [
-        "q_proof_direct_contradiction_05"
+        "q_proof_direct_contradiction_05",
+        "q-example-proof_direct_contradiction__contrapositive"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2776,7 +2890,11 @@
         "q_proof_induction_05",
         "q_proof_induction_06",
         "q_proof_induction_07",
-        "q_proof_induction_08"
+        "q_proof_induction_08",
+        "q-example-proof_induction",
+        "q-example-proof_induction__induction_principle",
+        "q-example-proof_induction__induction_algebra_inequality",
+        "q-example-proof_induction__induction_failure"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "proof_induction",
@@ -2820,7 +2938,8 @@
       ],
       "related_questions": [
         "q_proof_induction_01",
-        "q_proof_induction_05"
+        "q_proof_induction_05",
+        "q-example-proof_induction__induction_principle"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2858,7 +2977,8 @@
       ],
       "related_questions": [
         "q_proof_induction_02",
-        "q_proof_induction_03"
+        "q_proof_induction_03",
+        "q-example-proof_induction__induction_algebra_inequality"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2896,7 +3016,8 @@
       ],
       "related_questions": [
         "q_proof_induction_04",
-        "q_proof_induction_06"
+        "q_proof_induction_06",
+        "q-example-proof_induction__induction_failure"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2941,7 +3062,11 @@
         "q_proof_strong_induction_05",
         "q_proof_strong_induction_06",
         "q_proof_strong_induction_07",
-        "q_proof_strong_induction_08"
+        "q_proof_strong_induction_08",
+        "q-example-proof_strong_induction",
+        "q-example-proof_strong_induction__strong_hypothesis",
+        "q-example-proof_strong_induction__recursive_decomposition",
+        "q-example-proof_strong_induction__multibase_induction"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "proof_strong_induction",
@@ -2985,7 +3110,8 @@
       ],
       "related_questions": [
         "q_proof_strong_induction_01",
-        "q_proof_strong_induction_05"
+        "q_proof_strong_induction_05",
+        "q-example-proof_strong_induction__strong_hypothesis"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3023,7 +3149,8 @@
       ],
       "related_questions": [
         "q_proof_strong_induction_02",
-        "q_proof_strong_induction_06"
+        "q_proof_strong_induction_06",
+        "q-example-proof_strong_induction__recursive_decomposition"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3061,7 +3188,8 @@
       ],
       "related_questions": [
         "q_proof_strong_induction_03",
-        "q_proof_strong_induction_04"
+        "q_proof_strong_induction_04",
+        "q-example-proof_strong_induction__multibase_induction"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3105,7 +3233,17 @@
         "q_set_operation_05",
         "q_set_operation_06",
         "q_set_operation_07",
-        "q_set_operation_08"
+        "q_set_operation_08",
+        "q-example-set_operation",
+        "q-example-set_operation__complement",
+        "q-example-set_operation__difference",
+        "q-example-set_operation__inclusion_exclusion",
+        "q-example-set_operation__intersection",
+        "q-example-set_operation__membership",
+        "q-example-set_operation__power_set",
+        "q-example-set_operation__subset",
+        "q-example-set_operation__symmetric_difference",
+        "q-example-set_operation__union"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "set_operation",
@@ -3152,7 +3290,8 @@
       ],
       "related_questions": [
         "q_set_operation_01",
-        "q_set_operation_07"
+        "q_set_operation_07",
+        "q-example-set_operation__complement"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3185,7 +3324,8 @@
         "set_operation__intersection"
       ],
       "related_questions": [
-        "q_set_operation_01"
+        "q_set_operation_01",
+        "q-example-set_operation__difference"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3220,7 +3360,8 @@
       ],
       "related_questions": [
         "q_set_operation_03",
-        "q_set_operation_08"
+        "q_set_operation_08",
+        "q-example-set_operation__inclusion_exclusion"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3256,7 +3397,8 @@
         "q_set_operation_03",
         "q_set_operation_04",
         "q_set_operation_07",
-        "q_set_operation_08"
+        "q_set_operation_08",
+        "q-example-set_operation__intersection"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3289,7 +3431,8 @@
       ],
       "related_questions": [
         "q_set_operation_02",
-        "q_set_operation_05"
+        "q_set_operation_05",
+        "q-example-set_operation__membership"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3324,7 +3467,8 @@
       "related_questions": [
         "q_set_operation_02",
         "q_set_operation_04",
-        "q_set_operation_06"
+        "q_set_operation_06",
+        "q-example-set_operation__power_set"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3359,7 +3503,8 @@
       "related_questions": [
         "q_set_operation_02",
         "q_set_operation_04",
-        "q_set_operation_05"
+        "q_set_operation_05",
+        "q-example-set_operation__subset"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3393,7 +3538,8 @@
       ],
       "related_questions": [
         "q_set_operation_01",
-        "q_set_operation_03"
+        "q_set_operation_03",
+        "q-example-set_operation__symmetric_difference"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3428,7 +3574,8 @@
       "related_questions": [
         "q_set_operation_01",
         "q_set_operation_03",
-        "q_set_operation_07"
+        "q_set_operation_07",
+        "q-example-set_operation__union"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3469,7 +3616,13 @@
         "q_relation_cartesian_06",
         "q_relation_cartesian_07",
         "q_relation_cartesian_08",
-        "q_relation_closure_06"
+        "q_relation_closure_06",
+        "q-example-relation_cartesian",
+        "q-example-relation_cartesian__binary_relation",
+        "q-example-relation_cartesian__cartesian_product",
+        "q-example-relation_cartesian__ordered_pair",
+        "q-example-relation_cartesian__relation_counting",
+        "q-example-relation_cartesian__representations"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "relation_cartesian",
@@ -3513,7 +3666,8 @@
         "q_relation_cartesian_02",
         "q_relation_cartesian_03",
         "q_relation_cartesian_05",
-        "q_relation_cartesian_08"
+        "q_relation_cartesian_08",
+        "q-example-relation_cartesian__binary_relation"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3548,7 +3702,8 @@
       "related_questions": [
         "q_relation_cartesian_01",
         "q_relation_cartesian_04",
-        "q_relation_cartesian_07"
+        "q_relation_cartesian_07",
+        "q-example-relation_cartesian__cartesian_product"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3582,7 +3737,8 @@
       ],
       "related_questions": [
         "q_relation_cartesian_01",
-        "q_relation_cartesian_07"
+        "q_relation_cartesian_07",
+        "q-example-relation_cartesian__ordered_pair"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3618,7 +3774,8 @@
       "related_questions": [
         "q_relation_cartesian_02",
         "q_relation_cartesian_06",
-        "q_relation_cartesian_08"
+        "q_relation_cartesian_08",
+        "q-example-relation_cartesian__relation_counting"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3652,7 +3809,8 @@
       ],
       "related_questions": [
         "q_relation_cartesian_05",
-        "q_relation_closure_06"
+        "q_relation_closure_06",
+        "q-example-relation_cartesian__representations"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3693,7 +3851,13 @@
         "q_relation_operation_06",
         "q_relation_operation_07",
         "q_relation_operation_08",
-        "q_function_inverse_08"
+        "q_function_inverse_08",
+        "q-example-relation_operation",
+        "q-example-relation_operation__complement_relation",
+        "q-example-relation_operation__composition",
+        "q-example-relation_operation__inverse_relation",
+        "q-example-relation_operation__powers",
+        "q-example-relation_operation__set_operations"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "relation_operation",
@@ -3740,7 +3904,8 @@
         "set_operation__complement"
       ],
       "related_questions": [
-        "q_relation_operation_02"
+        "q_relation_operation_02",
+        "q-example-relation_operation__complement_relation"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3782,7 +3947,8 @@
         "q_relation_operation_03",
         "q_relation_operation_04",
         "q_relation_operation_05",
-        "q_relation_operation_07"
+        "q_relation_operation_07",
+        "q-example-relation_operation__composition"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3823,7 +3989,8 @@
         "q_relation_operation_02",
         "q_relation_operation_04",
         "q_relation_operation_08",
-        "q_function_inverse_08"
+        "q_function_inverse_08",
+        "q-example-relation_operation__inverse_relation"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3862,7 +4029,8 @@
       ],
       "related_questions": [
         "q_relation_operation_03",
-        "q_relation_operation_06"
+        "q_relation_operation_06",
+        "q-example-relation_operation__powers"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3902,7 +4070,8 @@
       ],
       "related_questions": [
         "q_relation_operation_07",
-        "q_relation_operation_08"
+        "q_relation_operation_08",
+        "q-example-relation_operation__set_operations"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -3949,7 +4118,13 @@
         "q_relation_property_05",
         "q_relation_property_06",
         "q_relation_property_08",
-        "q_relation_equivalence_07"
+        "q_relation_equivalence_07",
+        "q-example-relation_property",
+        "q-example-relation_property__antisymmetry",
+        "q-example-relation_property__irreflexivity",
+        "q-example-relation_property__reflexivity",
+        "q-example-relation_property__symmetry",
+        "q-example-relation_property__transitivity"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "relation_property",
@@ -3999,7 +4174,8 @@
         "q_relation_property_03",
         "q_relation_property_07",
         "q_relation_property_05",
-        "q_relation_property_08"
+        "q_relation_property_08",
+        "q-example-relation_property__antisymmetry"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4037,7 +4213,8 @@
         "relation_property__reflexivity"
       ],
       "related_questions": [
-        "q_relation_property_01"
+        "q_relation_property_01",
+        "q-example-relation_property__irreflexivity"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4078,7 +4255,8 @@
         "q_relation_property_01",
         "q_relation_property_02",
         "q_relation_property_07",
-        "q_relation_property_08"
+        "q_relation_property_08",
+        "q-example-relation_property__reflexivity"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4120,7 +4298,8 @@
         "q_relation_property_03",
         "q_relation_property_07",
         "q_relation_property_05",
-        "q_relation_property_08"
+        "q_relation_property_08",
+        "q-example-relation_property__symmetry"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4162,7 +4341,8 @@
         "q_relation_property_04",
         "q_relation_property_07",
         "q_relation_property_06",
-        "q_relation_equivalence_07"
+        "q_relation_equivalence_07",
+        "q-example-relation_property__transitivity"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4208,7 +4388,12 @@
         "q_relation_equivalence_05",
         "q_relation_equivalence_06",
         "q_relation_equivalence_07",
-        "q_relation_equivalence_08"
+        "q_relation_equivalence_08",
+        "q-example-relation_equivalence",
+        "q-example-relation_equivalence__classes",
+        "q-example-relation_equivalence__partitions",
+        "q-example-relation_equivalence__quotient_refinement",
+        "q-example-relation_equivalence__quotient_set"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "relation_equivalence",
@@ -4253,7 +4438,8 @@
         "q_relation_equivalence_01",
         "q_relation_equivalence_03",
         "q_relation_equivalence_05",
-        "q_relation_equivalence_07"
+        "q_relation_equivalence_07",
+        "q-example-relation_equivalence__classes"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4290,7 +4476,8 @@
         "q_relation_equivalence_04",
         "q_relation_equivalence_05",
         "q_relation_equivalence_07",
-        "q_relation_equivalence_08"
+        "q_relation_equivalence_08",
+        "q-example-relation_equivalence__partitions"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4325,7 +4512,8 @@
       ],
       "related_questions": [
         "q_relation_equivalence_04",
-        "q_relation_equivalence_06"
+        "q_relation_equivalence_06",
+        "q-example-relation_equivalence__quotient_refinement"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4361,7 +4549,8 @@
         "q_relation_equivalence_01",
         "q_relation_equivalence_03",
         "q_relation_equivalence_06",
-        "q_relation_equivalence_08"
+        "q_relation_equivalence_08",
+        "q-example-relation_equivalence__quotient_set"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4402,7 +4591,20 @@
         "q_relation_order_05",
         "q_relation_order_06",
         "q_relation_order_07",
-        "q_relation_order_08"
+        "q_relation_order_08",
+        "q-example-relation_order",
+        "q-example-relation_order__greatest",
+        "q-example-relation_order__hasse_diagram",
+        "q-example-relation_order__infimum",
+        "q-example-relation_order__least",
+        "q-example-relation_order__linear_extension",
+        "q-example-relation_order__lower_bound",
+        "q-example-relation_order__maximal",
+        "q-example-relation_order__minimal",
+        "q-example-relation_order__partial_order",
+        "q-example-relation_order__supremum",
+        "q-example-relation_order__total_order",
+        "q-example-relation_order__upper_bound"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "relation_order",
@@ -4456,7 +4658,8 @@
       ],
       "related_questions": [
         "q_relation_order_01",
-        "q_relation_order_03"
+        "q_relation_order_03",
+        "q-example-relation_order__greatest"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4494,7 +4697,8 @@
         "relation_order__partial_order"
       ],
       "related_questions": [
-        "q_relation_order_01"
+        "q_relation_order_01",
+        "q-example-relation_order__hasse_diagram"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4534,7 +4738,8 @@
       ],
       "related_questions": [
         "q_relation_order_02",
-        "q_relation_order_07"
+        "q_relation_order_07",
+        "q-example-relation_order__infimum"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4574,7 +4779,8 @@
       "related_questions": [
         "q_relation_order_01",
         "q_relation_order_03",
-        "q_relation_order_04"
+        "q_relation_order_04",
+        "q-example-relation_order__least"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4613,7 +4819,8 @@
         "relation_order__hasse_diagram"
       ],
       "related_questions": [
-        "q_relation_order_08"
+        "q_relation_order_08",
+        "q-example-relation_order__linear_extension"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4652,7 +4859,8 @@
       ],
       "related_questions": [
         "q_relation_order_02",
-        "q_relation_order_07"
+        "q_relation_order_07",
+        "q-example-relation_order__lower_bound"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4690,7 +4898,8 @@
         "relation_order__partial_order"
       ],
       "related_questions": [
-        "q_relation_order_03"
+        "q_relation_order_03",
+        "q-example-relation_order__maximal"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4729,7 +4938,8 @@
       ],
       "related_questions": [
         "q_relation_order_03",
-        "q_relation_order_04"
+        "q_relation_order_04",
+        "q-example-relation_order__minimal"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4771,7 +4981,8 @@
       "related_questions": [
         "q_relation_order_01",
         "q_relation_order_06",
-        "q_relation_order_08"
+        "q_relation_order_08",
+        "q-example-relation_order__partial_order"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4811,7 +5022,8 @@
       ],
       "related_questions": [
         "q_relation_order_02",
-        "q_relation_order_07"
+        "q_relation_order_07",
+        "q-example-relation_order__supremum"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4850,7 +5062,8 @@
       ],
       "related_questions": [
         "q_relation_order_05",
-        "q_relation_order_06"
+        "q_relation_order_06",
+        "q-example-relation_order__total_order"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4889,7 +5102,8 @@
       ],
       "related_questions": [
         "q_relation_order_02",
-        "q_relation_order_07"
+        "q_relation_order_07",
+        "q-example-relation_order__upper_bound"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -4935,7 +5149,13 @@
         "q_relation_closure_05",
         "q_relation_closure_06",
         "q_relation_closure_07",
-        "q_relation_closure_08"
+        "q_relation_closure_08",
+        "q-example-relation_closure",
+        "q-example-relation_closure__equivalence_closure",
+        "q-example-relation_closure__reflexive_closure",
+        "q-example-relation_closure__reflexive_transitive_closure",
+        "q-example-relation_closure__symmetric_closure",
+        "q-example-relation_closure__transitive_closure"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "relation_closure",
@@ -4983,7 +5203,8 @@
       ],
       "related_questions": [
         "q_relation_closure_03",
-        "q_relation_closure_04"
+        "q_relation_closure_04",
+        "q-example-relation_closure__equivalence_closure"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5022,7 +5243,8 @@
       ],
       "related_questions": [
         "q_relation_closure_02",
-        "q_relation_closure_05"
+        "q_relation_closure_05",
+        "q-example-relation_closure__reflexive_closure"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5064,7 +5286,8 @@
         "q_relation_closure_01",
         "q_relation_closure_02",
         "q_relation_closure_04",
-        "q_relation_closure_08"
+        "q_relation_closure_08",
+        "q-example-relation_closure__reflexive_transitive_closure"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5104,7 +5327,8 @@
       ],
       "related_questions": [
         "q_relation_closure_02",
-        "q_relation_closure_05"
+        "q_relation_closure_05",
+        "q-example-relation_closure__symmetric_closure"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5147,7 +5371,8 @@
         "q_relation_closure_02",
         "q_relation_closure_06",
         "q_relation_closure_07",
-        "q_relation_closure_08"
+        "q_relation_closure_08",
+        "q-example-relation_closure__transitive_closure"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5193,7 +5418,13 @@
         "q_function_mapping_06",
         "q_function_mapping_07",
         "q_function_mapping_08",
-        "q_function_inverse_08"
+        "q_function_inverse_08",
+        "q-example-function_mapping",
+        "q-example-function_mapping__domain_codomain",
+        "q-example-function_mapping__function_counting",
+        "q-example-function_mapping__image",
+        "q-example-function_mapping__preimage",
+        "q-example-function_mapping__total_single_valued"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "function_mapping",
@@ -5240,7 +5471,8 @@
       ],
       "related_questions": [
         "q_function_mapping_03",
-        "q_function_mapping_05"
+        "q_function_mapping_05",
+        "q-example-function_mapping__domain_codomain"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5280,7 +5512,8 @@
       ],
       "related_questions": [
         "q_function_mapping_02",
-        "q_function_mapping_06"
+        "q_function_mapping_06",
+        "q-example-function_mapping__function_counting"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5320,7 +5553,8 @@
       "related_questions": [
         "q_function_mapping_03",
         "q_function_mapping_04",
-        "q_function_mapping_08"
+        "q_function_mapping_08",
+        "q-example-function_mapping__image"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5361,7 +5595,8 @@
         "q_function_mapping_03",
         "q_function_mapping_04",
         "q_function_mapping_08",
-        "q_function_inverse_08"
+        "q_function_inverse_08",
+        "q-example-function_mapping__preimage"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5401,7 +5636,8 @@
       "related_questions": [
         "q_function_mapping_01",
         "q_function_mapping_05",
-        "q_function_mapping_07"
+        "q_function_mapping_07",
+        "q-example-function_mapping__total_single_valued"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5447,7 +5683,11 @@
         "q_function_injection_05",
         "q_function_injection_06",
         "q_function_injection_07",
-        "q_function_injection_08"
+        "q_function_injection_08",
+        "q-example-function_injection",
+        "q-example-function_injection__bijection",
+        "q-example-function_injection__injection",
+        "q-example-function_injection__surjection"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "function_injection",
@@ -5495,7 +5735,8 @@
         "q_function_injection_03",
         "q_function_injection_04",
         "q_function_injection_05",
-        "q_function_injection_08"
+        "q_function_injection_08",
+        "q-example-function_injection__bijection"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5539,7 +5780,8 @@
         "q_function_injection_05",
         "q_function_injection_06",
         "q_function_injection_07",
-        "q_function_injection_08"
+        "q_function_injection_08",
+        "q-example-function_injection__injection"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5582,7 +5824,8 @@
         "q_function_injection_03",
         "q_function_injection_04",
         "q_function_injection_06",
-        "q_function_injection_07"
+        "q_function_injection_07",
+        "q-example-function_injection__surjection"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5627,7 +5870,13 @@
         "q_function_composition_05",
         "q_function_composition_06",
         "q_function_composition_07",
-        "q_function_composition_08"
+        "q_function_composition_08",
+        "q-example-function_composition",
+        "q-example-function_composition__associativity",
+        "q-example-function_composition__identity",
+        "q-example-function_composition__iteration",
+        "q-example-function_composition__noncommutativity",
+        "q-example-function_composition__typed_composition"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "function_composition",
@@ -5674,7 +5923,8 @@
       ],
       "related_questions": [
         "q_function_composition_03",
-        "q_function_composition_06"
+        "q_function_composition_06",
+        "q-example-function_composition__associativity"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5713,7 +5963,8 @@
       ],
       "related_questions": [
         "q_function_composition_03",
-        "q_function_composition_08"
+        "q_function_composition_08",
+        "q-example-function_composition__identity"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5753,7 +6004,8 @@
       ],
       "related_questions": [
         "q_function_composition_04",
-        "q_function_composition_08"
+        "q_function_composition_08",
+        "q-example-function_composition__iteration"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5792,7 +6044,8 @@
       ],
       "related_questions": [
         "q_function_composition_02",
-        "q_function_composition_07"
+        "q_function_composition_07",
+        "q-example-function_composition__noncommutativity"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5833,7 +6086,8 @@
         "q_function_composition_01",
         "q_function_composition_03",
         "q_function_composition_04",
-        "q_function_composition_05"
+        "q_function_composition_05",
+        "q-example-function_composition__typed_composition"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5879,7 +6133,13 @@
         "q_function_inverse_05",
         "q_function_inverse_06",
         "q_function_inverse_07",
-        "q_function_inverse_08"
+        "q_function_inverse_08",
+        "q-example-function_inverse",
+        "q-example-function_inverse__inverse_composition",
+        "q-example-function_inverse__inverse_existence",
+        "q-example-function_inverse__involution",
+        "q-example-function_inverse__left_inverse",
+        "q-example-function_inverse__right_inverse"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "function_inverse",
@@ -5927,7 +6187,8 @@
       ],
       "related_questions": [
         "q_function_inverse_03",
-        "q_function_inverse_06"
+        "q_function_inverse_06",
+        "q-example-function_inverse__inverse_composition"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -5969,7 +6230,8 @@
         "q_function_inverse_02",
         "q_function_inverse_03",
         "q_function_inverse_07",
-        "q_function_inverse_08"
+        "q_function_inverse_08",
+        "q-example-function_inverse__inverse_existence"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6008,7 +6270,8 @@
         "function_composition__iteration"
       ],
       "related_questions": [
-        "q_function_inverse_07"
+        "q_function_inverse_07",
+        "q-example-function_inverse__involution"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6047,7 +6310,8 @@
       ],
       "related_questions": [
         "q_function_inverse_04",
-        "q_function_inverse_05"
+        "q_function_inverse_05",
+        "q-example-function_inverse__left_inverse"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6086,7 +6350,8 @@
       ],
       "related_questions": [
         "q_function_inverse_04",
-        "q_function_inverse_05"
+        "q_function_inverse_05",
+        "q-example-function_inverse__right_inverse"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6128,7 +6393,12 @@
         "q_number_prime_05",
         "q_number_prime_06",
         "q_number_prime_07",
-        "q_number_prime_08"
+        "q_number_prime_08",
+        "q-example-number_prime",
+        "q-example-number_prime__divisibility",
+        "q-example-number_prime__divisor_counting",
+        "q-example-number_prime__factorization",
+        "q-example-number_prime__primality"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "number_prime",
@@ -6173,7 +6443,8 @@
       ],
       "related_questions": [
         "q_number_prime_03",
-        "q_number_prime_05"
+        "q_number_prime_05",
+        "q-example-number_prime__divisibility"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6211,7 +6482,8 @@
       ],
       "related_questions": [
         "q_number_prime_02",
-        "q_number_prime_07"
+        "q_number_prime_07",
+        "q-example-number_prime__divisor_counting"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6248,7 +6520,8 @@
         "number_prime__primality"
       ],
       "related_questions": [
-        "q_number_prime_02"
+        "q_number_prime_02",
+        "q-example-number_prime__factorization"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6286,7 +6559,8 @@
       ],
       "related_questions": [
         "q_number_prime_01",
-        "q_number_prime_06"
+        "q_number_prime_06",
+        "q-example-number_prime__primality"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6331,7 +6605,14 @@
         "q_number_gcd_05",
         "q_number_gcd_06",
         "q_number_gcd_07",
-        "q_number_gcd_08"
+        "q_number_gcd_08",
+        "q-example-number_gcd",
+        "q-example-number_gcd__bezout",
+        "q-example-number_gcd__coprimality",
+        "q-example-number_gcd__diophantine",
+        "q-example-number_gcd__euclidean",
+        "q-example-number_gcd__extended_euclidean",
+        "q-example-number_gcd__gcd_definition"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "number_gcd",
@@ -6378,7 +6659,8 @@
       ],
       "related_questions": [
         "q_number_gcd_02",
-        "q_number_gcd_06"
+        "q_number_gcd_06",
+        "q-example-number_gcd__bezout"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6415,7 +6697,8 @@
         "number_gcd__bezout"
       ],
       "related_questions": [
-        "q_number_gcd_07"
+        "q_number_gcd_07",
+        "q-example-number_gcd__coprimality"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6453,7 +6736,8 @@
       ],
       "related_questions": [
         "q_number_gcd_06",
-        "q_number_gcd_08"
+        "q_number_gcd_08",
+        "q-example-number_gcd__diophantine"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6491,7 +6775,8 @@
       ],
       "related_questions": [
         "q_number_gcd_01",
-        "q_number_gcd_05"
+        "q_number_gcd_05",
+        "q-example-number_gcd__euclidean"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6530,7 +6815,8 @@
       ],
       "related_questions": [
         "q_number_gcd_02",
-        "q_number_gcd_06"
+        "q_number_gcd_06",
+        "q-example-number_gcd__extended_euclidean"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6568,7 +6854,8 @@
       ],
       "related_questions": [
         "q_number_gcd_01",
-        "q_number_gcd_03"
+        "q_number_gcd_03",
+        "q-example-number_gcd__gcd_definition"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6612,7 +6899,12 @@
         "q_number_congruence_05",
         "q_number_congruence_06",
         "q_number_congruence_07",
-        "q_number_congruence_08"
+        "q_number_congruence_08",
+        "q-example-number_congruence",
+        "q-example-number_congruence__arithmetic",
+        "q-example-number_congruence__cancellation",
+        "q-example-number_congruence__modular_exponentiation",
+        "q-example-number_congruence__residue_classes"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "number_congruence",
@@ -6657,7 +6949,8 @@
       ],
       "related_questions": [
         "q_number_congruence_04",
-        "q_number_congruence_06"
+        "q_number_congruence_06",
+        "q-example-number_congruence__arithmetic"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6696,7 +6989,8 @@
       ],
       "related_questions": [
         "q_number_congruence_03",
-        "q_number_congruence_07"
+        "q_number_congruence_07",
+        "q-example-number_congruence__cancellation"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6733,7 +7027,8 @@
         "number_congruence__arithmetic"
       ],
       "related_questions": [
-        "q_number_congruence_02"
+        "q_number_congruence_02",
+        "q-example-number_congruence__modular_exponentiation"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6771,7 +7066,8 @@
       ],
       "related_questions": [
         "q_number_congruence_01",
-        "q_number_congruence_05"
+        "q_number_congruence_05",
+        "q-example-number_congruence__residue_classes"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6816,7 +7112,11 @@
         "q_number_linear_congruence_05",
         "q_number_linear_congruence_06",
         "q_number_linear_congruence_07",
-        "q_number_linear_congruence_08"
+        "q_number_linear_congruence_08",
+        "q-example-number_linear_congruence",
+        "q-example-number_linear_congruence__inverses",
+        "q-example-number_linear_congruence__lifting",
+        "q-example-number_linear_congruence__solvability"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "number_linear_congruence",
@@ -6861,7 +7161,8 @@
       ],
       "related_questions": [
         "q_number_linear_congruence_06",
-        "q_number_linear_congruence_07"
+        "q_number_linear_congruence_07",
+        "q-example-number_linear_congruence__inverses"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6900,7 +7201,8 @@
       ],
       "related_questions": [
         "q_number_linear_congruence_02",
-        "q_number_linear_congruence_03"
+        "q_number_linear_congruence_03",
+        "q-example-number_linear_congruence__lifting"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6938,7 +7240,8 @@
       ],
       "related_questions": [
         "q_number_linear_congruence_01",
-        "q_number_linear_congruence_05"
+        "q_number_linear_congruence_05",
+        "q-example-number_linear_congruence__solvability"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -6983,7 +7286,11 @@
         "q_number_inverse_crt_05",
         "q_number_inverse_crt_06",
         "q_number_inverse_crt_07",
-        "q_number_inverse_crt_08"
+        "q_number_inverse_crt_08",
+        "q-example-number_inverse_crt",
+        "q-example-number_inverse_crt__compatibility",
+        "q-example-number_inverse_crt__construction",
+        "q-example-number_inverse_crt__coprime_systems"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "number_inverse_crt",
@@ -7033,7 +7340,8 @@
       ],
       "related_questions": [
         "q_number_inverse_crt_03",
-        "q_number_inverse_crt_07"
+        "q_number_inverse_crt_07",
+        "q-example-number_inverse_crt__compatibility"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -7077,7 +7385,8 @@
       ],
       "related_questions": [
         "q_number_inverse_crt_05",
-        "q_number_inverse_crt_06"
+        "q_number_inverse_crt_06",
+        "q-example-number_inverse_crt__construction"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -7120,7 +7429,8 @@
       ],
       "related_questions": [
         "q_number_inverse_crt_01",
-        "q_number_inverse_crt_02"
+        "q_number_inverse_crt_02",
+        "q-example-number_inverse_crt__coprime_systems"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -7170,7 +7480,12 @@
         "q_number_euler_fermat_05",
         "q_number_euler_fermat_06",
         "q_number_euler_fermat_07",
-        "q_number_euler_fermat_08"
+        "q_number_euler_fermat_08",
+        "q-example-number_euler_fermat",
+        "q-example-number_euler_fermat__euler_theorem",
+        "q-example-number_euler_fermat__fermat_theorem",
+        "q-example-number_euler_fermat__pseudoprimes",
+        "q-example-number_euler_fermat__totient"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "number_euler_fermat",
@@ -7225,7 +7540,8 @@
       ],
       "related_questions": [
         "q_number_euler_fermat_04",
-        "q_number_euler_fermat_06"
+        "q_number_euler_fermat_06",
+        "q-example-number_euler_fermat__euler_theorem"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -7274,7 +7590,8 @@
       ],
       "related_questions": [
         "q_number_euler_fermat_02",
-        "q_number_euler_fermat_07"
+        "q_number_euler_fermat_07",
+        "q-example-number_euler_fermat__fermat_theorem"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -7321,7 +7638,8 @@
         "number_euler_fermat__fermat_theorem"
       ],
       "related_questions": [
-        "q_number_euler_fermat_08"
+        "q_number_euler_fermat_08",
+        "q-example-number_euler_fermat__pseudoprimes"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -7369,7 +7687,8 @@
       ],
       "related_questions": [
         "q_number_euler_fermat_01",
-        "q_number_euler_fermat_05"
+        "q_number_euler_fermat_05",
+        "q-example-number_euler_fermat__totient"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -7424,7 +7743,12 @@
         "q_number_rsa_05",
         "q_number_rsa_06",
         "q_number_rsa_07",
-        "q_number_rsa_08"
+        "q_number_rsa_08",
+        "q-example-number_rsa",
+        "q-example-number_rsa__crt_correctness",
+        "q-example-number_rsa__key_generation",
+        "q-example-number_rsa__modular_powers",
+        "q-example-number_rsa__textbook_determinism"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "number_rsa",
@@ -7470,7 +7794,8 @@
       ],
       "related_questions": [
         "q_number_rsa_04",
-        "q_number_rsa_06"
+        "q_number_rsa_06",
+        "q-example-number_rsa__crt_correctness"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -7509,7 +7834,8 @@
       ],
       "related_questions": [
         "q_number_rsa_01",
-        "q_number_rsa_05"
+        "q_number_rsa_05",
+        "q-example-number_rsa__key_generation"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -7547,7 +7873,8 @@
       ],
       "related_questions": [
         "q_number_rsa_02",
-        "q_number_rsa_03"
+        "q_number_rsa_03",
+        "q-example-number_rsa__modular_powers"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -7585,7 +7912,8 @@
       ],
       "related_questions": [
         "q_number_rsa_07",
-        "q_number_rsa_08"
+        "q_number_rsa_08",
+        "q-example-number_rsa__textbook_determinism"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -7628,7 +7956,11 @@
         "q_count_basic_05",
         "q_count_basic_06",
         "q_count_basic_07",
-        "q_count_basic_08"
+        "q_count_basic_08",
+        "q-example-count_basic",
+        "q-example-count_basic__disjoint_sum",
+        "q-example-count_basic__step_product",
+        "q-example-count_basic__equal_fiber"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "count_basic",
@@ -7672,7 +8004,8 @@
       ],
       "related_questions": [
         "q_count_basic_01",
-        "q_count_basic_07"
+        "q_count_basic_07",
+        "q-example-count_basic__disjoint_sum"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -7710,7 +8043,8 @@
       ],
       "related_questions": [
         "q_count_basic_02",
-        "q_count_basic_05"
+        "q_count_basic_05",
+        "q-example-count_basic__step_product"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -7748,7 +8082,8 @@
       ],
       "related_questions": [
         "q_count_basic_04",
-        "q_count_basic_06"
+        "q_count_basic_06",
+        "q-example-count_basic__equal_fiber"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -7793,7 +8128,11 @@
         "q_count_perm_comb_05",
         "q_count_perm_comb_06",
         "q_count_perm_comb_07",
-        "q_count_perm_comb_08"
+        "q_count_perm_comb_08",
+        "q-example-count_perm_comb",
+        "q-example-count_perm_comb__ordered_selection",
+        "q-example-count_perm_comb__subset_selection",
+        "q-example-count_perm_comb__multiset_permutation"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "count_perm_comb",
@@ -7837,7 +8176,8 @@
       ],
       "related_questions": [
         "q_count_perm_comb_05",
-        "q_count_perm_comb_06"
+        "q_count_perm_comb_06",
+        "q-example-count_perm_comb__ordered_selection"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -7875,7 +8215,8 @@
       ],
       "related_questions": [
         "q_count_perm_comb_01",
-        "q_count_perm_comb_02"
+        "q_count_perm_comb_02",
+        "q-example-count_perm_comb__subset_selection"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -7913,7 +8254,8 @@
       ],
       "related_questions": [
         "q_count_perm_comb_03",
-        "q_count_perm_comb_07"
+        "q_count_perm_comb_07",
+        "q-example-count_perm_comb__multiset_permutation"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -7958,7 +8300,11 @@
         "q_count_binomial_05",
         "q_count_binomial_06",
         "q_count_binomial_07",
-        "q_count_binomial_08"
+        "q_count_binomial_08",
+        "q-example-count_binomial",
+        "q-example-count_binomial__coefficient",
+        "q-example-count_binomial__binomial_sum",
+        "q-example-count_binomial__vandermonde"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "count_binomial",
@@ -7996,7 +8342,8 @@
       ],
       "related_questions": [
         "q_count_binomial_01",
-        "q_count_binomial_02"
+        "q_count_binomial_02",
+        "q-example-count_binomial__coefficient"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8029,7 +8376,8 @@
       ],
       "related_questions": [
         "q_count_binomial_03",
-        "q_count_binomial_05"
+        "q_count_binomial_05",
+        "q-example-count_binomial__binomial_sum"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8062,7 +8410,8 @@
       ],
       "related_questions": [
         "q_count_binomial_04",
-        "q_count_binomial_06"
+        "q_count_binomial_06",
+        "q-example-count_binomial__vandermonde"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8103,7 +8452,11 @@
         "q_count_pigeonhole_05",
         "q_count_pigeonhole_06",
         "q_count_pigeonhole_07",
-        "q_count_pigeonhole_08"
+        "q_count_pigeonhole_08",
+        "q-example-count_pigeonhole",
+        "q-example-count_pigeonhole__capacity",
+        "q-example-count_pigeonhole__residue",
+        "q-example-count_pigeonhole__structured_boxes"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "count_pigeonhole",
@@ -8141,7 +8494,8 @@
       ],
       "related_questions": [
         "q_count_pigeonhole_01",
-        "q_count_pigeonhole_05"
+        "q_count_pigeonhole_05",
+        "q-example-count_pigeonhole__capacity"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8174,7 +8528,8 @@
       ],
       "related_questions": [
         "q_count_pigeonhole_02",
-        "q_count_pigeonhole_06"
+        "q_count_pigeonhole_06",
+        "q-example-count_pigeonhole__residue"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8207,7 +8562,8 @@
       ],
       "related_questions": [
         "q_count_pigeonhole_03",
-        "q_count_pigeonhole_07"
+        "q_count_pigeonhole_07",
+        "q-example-count_pigeonhole__structured_boxes"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8248,7 +8604,11 @@
         "q_count_inclusion_05",
         "q_count_inclusion_06",
         "q_count_inclusion_07",
-        "q_count_inclusion_08"
+        "q_count_inclusion_08",
+        "q-example-count_inclusion",
+        "q-example-count_inclusion__two_set",
+        "q-example-count_inclusion__multiple_set",
+        "q-example-count_inclusion__forbidden_events"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "count_inclusion",
@@ -8291,7 +8651,8 @@
       ],
       "related_questions": [
         "q_count_inclusion_01",
-        "q_count_inclusion_05"
+        "q_count_inclusion_05",
+        "q-example-count_inclusion__two_set"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8329,7 +8690,8 @@
       ],
       "related_questions": [
         "q_count_inclusion_02",
-        "q_count_inclusion_06"
+        "q_count_inclusion_06",
+        "q-example-count_inclusion__multiple_set"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8367,7 +8729,8 @@
       ],
       "related_questions": [
         "q_count_inclusion_03",
-        "q_count_inclusion_07"
+        "q_count_inclusion_07",
+        "q-example-count_inclusion__forbidden_events"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8414,7 +8777,11 @@
         "q_count_generating_05",
         "q_count_generating_06",
         "q_count_generating_07",
-        "q_count_generating_08"
+        "q_count_generating_08",
+        "q-example-count_generating",
+        "q-example-count_generating__formal_series",
+        "q-example-count_generating__counting_product",
+        "q-example-count_generating__recurrence_series"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "count_generating",
@@ -8458,7 +8825,8 @@
       ],
       "related_questions": [
         "q_count_generating_01",
-        "q_count_generating_05"
+        "q_count_generating_05",
+        "q-example-count_generating__formal_series"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8496,7 +8864,8 @@
       ],
       "related_questions": [
         "q_count_generating_02",
-        "q_count_generating_06"
+        "q_count_generating_06",
+        "q-example-count_generating__counting_product"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8534,7 +8903,8 @@
       ],
       "related_questions": [
         "q_count_generating_03",
-        "q_count_generating_07"
+        "q_count_generating_07",
+        "q-example-count_generating__recurrence_series"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8577,7 +8947,11 @@
         "q_recurrence_model_05",
         "q_recurrence_model_06",
         "q_recurrence_model_07",
-        "q_recurrence_model_08"
+        "q_recurrence_model_08",
+        "q-example-recurrence_model",
+        "q-example-recurrence_model__state_partition",
+        "q-example-recurrence_model__memory_states",
+        "q-example-recurrence_model__divide_conquer"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "recurrence_model",
@@ -8621,7 +8995,8 @@
       ],
       "related_questions": [
         "q_recurrence_model_01",
-        "q_recurrence_model_05"
+        "q_recurrence_model_05",
+        "q-example-recurrence_model__state_partition"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8659,7 +9034,8 @@
       ],
       "related_questions": [
         "q_recurrence_model_02",
-        "q_recurrence_model_06"
+        "q_recurrence_model_06",
+        "q-example-recurrence_model__memory_states"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8696,7 +9072,8 @@
       ],
       "related_questions": [
         "q_recurrence_model_03",
-        "q_recurrence_model_07"
+        "q_recurrence_model_07",
+        "q-example-recurrence_model__divide_conquer"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8741,7 +9118,11 @@
         "q_recurrence_homogeneous_05",
         "q_recurrence_homogeneous_06",
         "q_recurrence_homogeneous_07",
-        "q_recurrence_homogeneous_08"
+        "q_recurrence_homogeneous_08",
+        "q-example-recurrence_homogeneous",
+        "q-example-recurrence_homogeneous__distinct_roots",
+        "q-example-recurrence_homogeneous__repeated_roots",
+        "q-example-recurrence_homogeneous__complex_roots"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "recurrence_homogeneous",
@@ -8784,7 +9165,8 @@
       ],
       "related_questions": [
         "q_recurrence_homogeneous_02",
-        "q_recurrence_homogeneous_05"
+        "q_recurrence_homogeneous_05",
+        "q-example-recurrence_homogeneous__distinct_roots"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8821,7 +9203,8 @@
       ],
       "related_questions": [
         "q_recurrence_homogeneous_03",
-        "q_recurrence_homogeneous_06"
+        "q_recurrence_homogeneous_06",
+        "q-example-recurrence_homogeneous__repeated_roots"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8858,7 +9241,8 @@
       ],
       "related_questions": [
         "q_recurrence_homogeneous_04",
-        "q_recurrence_homogeneous_07"
+        "q_recurrence_homogeneous_07",
+        "q-example-recurrence_homogeneous__complex_roots"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8903,7 +9287,11 @@
         "q_recurrence_nonhomogeneous_05",
         "q_recurrence_nonhomogeneous_06",
         "q_recurrence_nonhomogeneous_07",
-        "q_recurrence_nonhomogeneous_08"
+        "q_recurrence_nonhomogeneous_08",
+        "q-example-recurrence_nonhomogeneous",
+        "q-example-recurrence_nonhomogeneous__superposition",
+        "q-example-recurrence_nonhomogeneous__nonresonant",
+        "q-example-recurrence_nonhomogeneous__resonance"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "recurrence_nonhomogeneous",
@@ -8946,7 +9334,8 @@
       ],
       "related_questions": [
         "q_recurrence_nonhomogeneous_01",
-        "q_recurrence_nonhomogeneous_05"
+        "q_recurrence_nonhomogeneous_05",
+        "q-example-recurrence_nonhomogeneous__superposition"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -8983,7 +9372,8 @@
       ],
       "related_questions": [
         "q_recurrence_nonhomogeneous_02",
-        "q_recurrence_nonhomogeneous_06"
+        "q_recurrence_nonhomogeneous_06",
+        "q-example-recurrence_nonhomogeneous__nonresonant"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9021,7 +9411,8 @@
       ],
       "related_questions": [
         "q_recurrence_nonhomogeneous_03",
-        "q_recurrence_nonhomogeneous_07"
+        "q_recurrence_nonhomogeneous_07",
+        "q-example-recurrence_nonhomogeneous__resonance"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9066,7 +9457,11 @@
         "q_recurrence_initial_05",
         "q_recurrence_initial_06",
         "q_recurrence_initial_07",
-        "q_recurrence_initial_08"
+        "q_recurrence_initial_08",
+        "q-example-recurrence_initial",
+        "q-example-recurrence_initial__forward_unique",
+        "q-example-recurrence_initial__boundary_range",
+        "q-example-recurrence_initial__compatibility"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "recurrence_initial",
@@ -9109,7 +9504,8 @@
       ],
       "related_questions": [
         "q_recurrence_initial_01",
-        "q_recurrence_initial_05"
+        "q_recurrence_initial_05",
+        "q-example-recurrence_initial__forward_unique"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9146,7 +9542,8 @@
       ],
       "related_questions": [
         "q_recurrence_initial_02",
-        "q_recurrence_initial_03"
+        "q_recurrence_initial_03",
+        "q-example-recurrence_initial__boundary_range"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9183,7 +9580,8 @@
       ],
       "related_questions": [
         "q_recurrence_initial_04",
-        "q_recurrence_initial_06"
+        "q_recurrence_initial_06",
+        "q-example-recurrence_initial__compatibility"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9227,7 +9625,16 @@
         "q_graph_basic_05",
         "q_graph_basic_06",
         "q_graph_basic_07",
-        "q_graph_basic_08"
+        "q_graph_basic_08",
+        "q-example-graph_basic",
+        "q-example-graph_basic__simple_graph",
+        "q-example-graph_basic__degree",
+        "q-example-graph_basic__directed_degree",
+        "q-example-graph_basic__undirected_graph",
+        "q-example-graph_basic__directed_graph",
+        "q-example-graph_basic__parallel_edges",
+        "q-example-graph_basic__loops",
+        "q-example-graph_basic__handshake"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "graph_basic",
@@ -9274,7 +9681,8 @@
         "q_graph_basic_05",
         "q_graph_basic_06",
         "q_graph_basic_07",
-        "q_graph_basic_08"
+        "q_graph_basic_08",
+        "q-example-graph_basic__simple_graph"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9309,7 +9717,8 @@
         "q_graph_basic_01",
         "q_graph_basic_02",
         "q_graph_basic_07",
-        "q_graph_basic_08"
+        "q_graph_basic_08",
+        "q-example-graph_basic__degree"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9342,7 +9751,8 @@
       ],
       "related_questions": [
         "q_graph_basic_03",
-        "q_graph_basic_06"
+        "q_graph_basic_06",
+        "q-example-graph_basic__directed_degree"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9374,7 +9784,8 @@
         "graph_basic"
       ],
       "related_questions": [
-        "q_graph_basic_07"
+        "q_graph_basic_07",
+        "q-example-graph_basic__undirected_graph"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9407,7 +9818,8 @@
       ],
       "related_questions": [
         "q_graph_basic_03",
-        "q_graph_basic_06"
+        "q_graph_basic_06",
+        "q-example-graph_basic__directed_graph"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9440,7 +9852,8 @@
       ],
       "related_questions": [
         "q_graph_basic_04",
-        "q_graph_basic_05"
+        "q_graph_basic_05",
+        "q-example-graph_basic__parallel_edges"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9473,7 +9886,8 @@
       ],
       "related_questions": [
         "q_graph_basic_03",
-        "q_graph_basic_04"
+        "q_graph_basic_04",
+        "q-example-graph_basic__loops"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9508,7 +9922,8 @@
         "q_graph_basic_01",
         "q_graph_basic_02",
         "q_graph_basic_04",
-        "q_graph_basic_08"
+        "q_graph_basic_08",
+        "q-example-graph_basic__handshake"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9548,7 +9963,11 @@
         "q_graph_isomorphism_05",
         "q_graph_isomorphism_06",
         "q_graph_isomorphism_07",
-        "q_graph_isomorphism_08"
+        "q_graph_isomorphism_08",
+        "q-example-graph_isomorphism",
+        "q-example-graph_isomorphism__mapping",
+        "q-example-graph_isomorphism__invariants",
+        "q-example-graph_isomorphism__automorphism"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "graph_isomorphism",
@@ -9587,7 +10006,8 @@
       ],
       "related_questions": [
         "q_graph_isomorphism_01",
-        "q_graph_isomorphism_04"
+        "q_graph_isomorphism_04",
+        "q-example-graph_isomorphism__mapping"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9620,7 +10040,8 @@
       ],
       "related_questions": [
         "q_graph_isomorphism_02",
-        "q_graph_isomorphism_05"
+        "q_graph_isomorphism_05",
+        "q-example-graph_isomorphism__invariants"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9653,7 +10074,8 @@
       ],
       "related_questions": [
         "q_graph_isomorphism_03",
-        "q_graph_isomorphism_06"
+        "q_graph_isomorphism_06",
+        "q-example-graph_isomorphism__automorphism"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9693,7 +10115,12 @@
         "q_graph_adjacency_05",
         "q_graph_adjacency_06",
         "q_graph_adjacency_07",
-        "q_graph_adjacency_08"
+        "q_graph_adjacency_08",
+        "q-example-graph_adjacency",
+        "q-example-graph_adjacency__construction",
+        "q-example-graph_adjacency__degree_sums",
+        "q-example-graph_adjacency__walk_powers",
+        "q-example-graph_adjacency__vertex_order"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "graph_adjacency",
@@ -9738,7 +10165,8 @@
       ],
       "related_questions": [
         "q_graph_adjacency_01",
-        "q_graph_adjacency_05"
+        "q_graph_adjacency_05",
+        "q-example-graph_adjacency__construction"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9776,7 +10204,8 @@
       ],
       "related_questions": [
         "q_graph_adjacency_02",
-        "q_graph_adjacency_06"
+        "q_graph_adjacency_06",
+        "q-example-graph_adjacency__degree_sums"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9814,7 +10243,8 @@
       ],
       "related_questions": [
         "q_graph_adjacency_03",
-        "q_graph_adjacency_04"
+        "q_graph_adjacency_04",
+        "q-example-graph_adjacency__walk_powers"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9851,7 +10281,8 @@
         "graph_adjacency"
       ],
       "related_questions": [
-        "q_graph_adjacency_05"
+        "q_graph_adjacency_05",
+        "q-example-graph_adjacency__vertex_order"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9897,7 +10328,12 @@
         "q_graph_matrix_05",
         "q_graph_matrix_06",
         "q_graph_matrix_07",
-        "q_graph_matrix_08"
+        "q_graph_matrix_08",
+        "q-example-graph_matrix",
+        "q-example-graph_matrix__unsigned_incidence",
+        "q-example-graph_matrix__laplacian",
+        "q-example-graph_matrix__reachability",
+        "q-example-graph_matrix__signed_incidence"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "graph_matrix",
@@ -9942,7 +10378,8 @@
       ],
       "related_questions": [
         "q_graph_matrix_01",
-        "q_graph_matrix_07"
+        "q_graph_matrix_07",
+        "q-example-graph_matrix__unsigned_incidence"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -9981,7 +10418,8 @@
       "related_questions": [
         "q_graph_matrix_02",
         "q_graph_matrix_04",
-        "q_graph_matrix_07"
+        "q_graph_matrix_07",
+        "q-example-graph_matrix__laplacian"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10019,7 +10457,8 @@
       ],
       "related_questions": [
         "q_graph_matrix_03",
-        "q_graph_matrix_06"
+        "q_graph_matrix_06",
+        "q-example-graph_matrix__reachability"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10057,7 +10496,8 @@
       ],
       "related_questions": [
         "q_graph_matrix_02",
-        "q_graph_matrix_05"
+        "q_graph_matrix_05",
+        "q-example-graph_matrix__signed_incidence"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10104,7 +10544,17 @@
         "q_graph_connectivity_06",
         "q_graph_connectivity_07",
         "q_graph_connectivity_08",
-        "q_graph_connectivity_09"
+        "q_graph_connectivity_09",
+        "q-example-graph_connectivity",
+        "q-example-graph_connectivity__simple_paths",
+        "q-example-graph_connectivity__components",
+        "q-example-graph_connectivity__strong_components",
+        "q-example-graph_connectivity__walks",
+        "q-example-graph_connectivity__trails",
+        "q-example-graph_connectivity__cycles",
+        "q-example-graph_connectivity__connected_graph",
+        "q-example-graph_connectivity__weak_connectivity",
+        "q-example-graph_connectivity__condensation"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "graph_connectivity",
@@ -10151,7 +10601,8 @@
         "q_graph_connectivity_03",
         "q_graph_connectivity_04",
         "q_graph_connectivity_08",
-        "q_graph_connectivity_09"
+        "q_graph_connectivity_09",
+        "q-example-graph_connectivity__simple_paths"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10185,7 +10636,8 @@
       "related_questions": [
         "q_graph_connectivity_01",
         "q_graph_connectivity_05",
-        "q_graph_connectivity_07"
+        "q_graph_connectivity_07",
+        "q-example-graph_connectivity__components"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10219,7 +10671,8 @@
       "related_questions": [
         "q_graph_connectivity_02",
         "q_graph_connectivity_06",
-        "q_graph_connectivity_08"
+        "q_graph_connectivity_08",
+        "q-example-graph_connectivity__strong_components"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10251,7 +10704,8 @@
         "graph_connectivity"
       ],
       "related_questions": [
-        "q_graph_connectivity_09"
+        "q_graph_connectivity_09",
+        "q-example-graph_connectivity__walks"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10283,7 +10737,8 @@
         "graph_connectivity"
       ],
       "related_questions": [
-        "q_graph_connectivity_09"
+        "q_graph_connectivity_09",
+        "q-example-graph_connectivity__trails"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10315,7 +10770,8 @@
         "graph_connectivity"
       ],
       "related_questions": [
-        "q_graph_connectivity_09"
+        "q_graph_connectivity_09",
+        "q-example-graph_connectivity__cycles"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10349,7 +10805,8 @@
       "related_questions": [
         "q_graph_connectivity_01",
         "q_graph_connectivity_05",
-        "q_graph_connectivity_07"
+        "q_graph_connectivity_07",
+        "q-example-graph_connectivity__connected_graph"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10382,7 +10839,8 @@
       ],
       "related_questions": [
         "q_graph_connectivity_02",
-        "q_graph_connectivity_08"
+        "q_graph_connectivity_08",
+        "q-example-graph_connectivity__weak_connectivity"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10414,7 +10872,8 @@
         "graph_connectivity"
       ],
       "related_questions": [
-        "q_graph_connectivity_06"
+        "q_graph_connectivity_06",
+        "q-example-graph_connectivity__condensation"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10454,7 +10913,11 @@
         "q_graph_cut_05",
         "q_graph_cut_06",
         "q_graph_cut_07",
-        "q_graph_cut_08"
+        "q_graph_cut_08",
+        "q-example-graph_cut",
+        "q-example-graph_cut__articulation",
+        "q-example-graph_cut__bridges",
+        "q-example-graph_cut__edge_connectivity"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "graph_cut",
@@ -10498,7 +10961,8 @@
       ],
       "related_questions": [
         "q_graph_cut_01",
-        "q_graph_cut_05"
+        "q_graph_cut_05",
+        "q-example-graph_cut__articulation"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10536,7 +11000,8 @@
       ],
       "related_questions": [
         "q_graph_cut_02",
-        "q_graph_cut_04"
+        "q_graph_cut_04",
+        "q-example-graph_cut__bridges"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10574,7 +11039,8 @@
       ],
       "related_questions": [
         "q_graph_cut_03",
-        "q_graph_cut_06"
+        "q_graph_cut_06",
+        "q-example-graph_cut__edge_connectivity"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10619,7 +11085,12 @@
         "q_graph_weighted_05",
         "q_graph_weighted_06",
         "q_graph_weighted_07",
-        "q_graph_weighted_08"
+        "q_graph_weighted_08",
+        "q-example-graph_weighted",
+        "q-example-graph_weighted__path_cost",
+        "q-example-graph_weighted__cost_matrix",
+        "q-example-graph_weighted__negative_walks",
+        "q-example-graph_weighted__optimization_objectives"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "graph_weighted",
@@ -10659,7 +11130,8 @@
       ],
       "related_questions": [
         "q_graph_weighted_01",
-        "q_graph_weighted_03"
+        "q_graph_weighted_03",
+        "q-example-graph_weighted__path_cost"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10692,7 +11164,8 @@
       ],
       "related_questions": [
         "q_graph_weighted_02",
-        "q_graph_weighted_05"
+        "q_graph_weighted_05",
+        "q-example-graph_weighted__cost_matrix"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10725,7 +11198,8 @@
       ],
       "related_questions": [
         "q_graph_weighted_04",
-        "q_graph_weighted_06"
+        "q_graph_weighted_06",
+        "q-example-graph_weighted__negative_walks"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10758,7 +11232,8 @@
       ],
       "related_questions": [
         "q_graph_weighted_03",
-        "q_graph_weighted_08"
+        "q_graph_weighted_08",
+        "q-example-graph_weighted__optimization_objectives"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10798,7 +11273,12 @@
         "q_graph_euler_05",
         "q_graph_euler_06",
         "q_graph_euler_07",
-        "q_graph_euler_08"
+        "q_graph_euler_08",
+        "q-example-graph_euler",
+        "q-example-graph_euler__undirected_circuit",
+        "q-example-graph_euler__directed_balance",
+        "q-example-graph_euler__construction",
+        "q-example-graph_euler__open_trail"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "graph_euler",
@@ -10840,7 +11320,8 @@
         "q_graph_euler_01",
         "q_graph_euler_02",
         "q_graph_euler_07",
-        "q_graph_euler_08"
+        "q_graph_euler_08",
+        "q-example-graph_euler__undirected_circuit"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10873,7 +11354,8 @@
       ],
       "related_questions": [
         "q_graph_euler_03",
-        "q_graph_euler_05"
+        "q_graph_euler_05",
+        "q-example-graph_euler__directed_balance"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10906,7 +11388,8 @@
       ],
       "related_questions": [
         "q_graph_euler_04",
-        "q_graph_euler_06"
+        "q_graph_euler_06",
+        "q-example-graph_euler__construction"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10940,7 +11423,8 @@
       "related_questions": [
         "q_graph_euler_01",
         "q_graph_euler_04",
-        "q_graph_euler_08"
+        "q_graph_euler_08",
+        "q-example-graph_euler__open_trail"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -10980,7 +11464,12 @@
         "q_graph_hamilton_05",
         "q_graph_hamilton_06",
         "q_graph_hamilton_07",
-        "q_graph_hamilton_08"
+        "q_graph_hamilton_08",
+        "q-example-graph_hamilton",
+        "q-example-graph_hamilton__spanning_paths",
+        "q-example-graph_hamilton__necessary",
+        "q-example-graph_hamilton__dirac",
+        "q-example-graph_hamilton__spanning_cycle"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "graph_hamilton",
@@ -11020,7 +11509,8 @@
       ],
       "related_questions": [
         "q_graph_hamilton_02",
-        "q_graph_hamilton_05"
+        "q_graph_hamilton_05",
+        "q-example-graph_hamilton__spanning_paths"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11054,7 +11544,8 @@
       "related_questions": [
         "q_graph_hamilton_02",
         "q_graph_hamilton_04",
-        "q_graph_hamilton_07"
+        "q_graph_hamilton_07",
+        "q-example-graph_hamilton__necessary"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11087,7 +11578,8 @@
       ],
       "related_questions": [
         "q_graph_hamilton_03",
-        "q_graph_hamilton_06"
+        "q_graph_hamilton_06",
+        "q-example-graph_hamilton__dirac"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11124,7 +11616,8 @@
         "q_graph_hamilton_04",
         "q_graph_hamilton_05",
         "q_graph_hamilton_07",
-        "q_graph_hamilton_08"
+        "q_graph_hamilton_08",
+        "q-example-graph_hamilton__spanning_cycle"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11165,7 +11658,13 @@
         "q_graph_shortest_05",
         "q_graph_shortest_06",
         "q_graph_shortest_07",
-        "q_graph_shortest_08"
+        "q_graph_shortest_08",
+        "q-example-graph_shortest",
+        "q-example-graph_shortest__bfs",
+        "q-example-graph_shortest__dijkstra",
+        "q-example-graph_shortest__bellman_ford",
+        "q-example-graph_shortest__negative_cycles",
+        "q-example-graph_shortest__optimality_certificate"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "graph_shortest",
@@ -11206,7 +11705,8 @@
       ],
       "related_questions": [
         "q_graph_shortest_05",
-        "q_graph_shortest_06"
+        "q_graph_shortest_06",
+        "q-example-graph_shortest__bfs"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11239,7 +11739,8 @@
       ],
       "related_questions": [
         "q_graph_shortest_01",
-        "q_graph_shortest_03"
+        "q_graph_shortest_03",
+        "q-example-graph_shortest__dijkstra"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11271,7 +11772,8 @@
         "graph_shortest"
       ],
       "related_questions": [
-        "q_graph_shortest_02"
+        "q_graph_shortest_02",
+        "q-example-graph_shortest__bellman_ford"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11304,7 +11806,8 @@
       ],
       "related_questions": [
         "q_graph_shortest_04",
-        "q_graph_shortest_07"
+        "q_graph_shortest_07",
+        "q-example-graph_shortest__negative_cycles"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11336,7 +11839,8 @@
         "graph_shortest"
       ],
       "related_questions": [
-        "q_graph_shortest_08"
+        "q_graph_shortest_08",
+        "q-example-graph_shortest__optimality_certificate"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11376,7 +11880,12 @@
         "q_graph_coloring_05",
         "q_graph_coloring_06",
         "q_graph_coloring_07",
-        "q_graph_coloring_08"
+        "q_graph_coloring_08",
+        "q-example-graph_coloring",
+        "q-example-graph_coloring__chromatic_bounds",
+        "q-example-graph_coloring__bipartite",
+        "q-example-graph_coloring__greedy",
+        "q-example-graph_coloring__disconnected"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "graph_coloring",
@@ -11416,7 +11925,8 @@
       ],
       "related_questions": [
         "q_graph_coloring_02",
-        "q_graph_coloring_05"
+        "q_graph_coloring_05",
+        "q-example-graph_coloring__chromatic_bounds"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11449,7 +11959,8 @@
       ],
       "related_questions": [
         "q_graph_coloring_01",
-        "q_graph_coloring_04"
+        "q_graph_coloring_04",
+        "q-example-graph_coloring__bipartite"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11482,7 +11993,8 @@
       ],
       "related_questions": [
         "q_graph_coloring_03",
-        "q_graph_coloring_06"
+        "q_graph_coloring_06",
+        "q-example-graph_coloring__greedy"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11514,7 +12026,8 @@
         "graph_coloring"
       ],
       "related_questions": [
-        "q_graph_coloring_05"
+        "q_graph_coloring_05",
+        "q-example-graph_coloring__disconnected"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11555,7 +12068,11 @@
         "q_graph_planar_05",
         "q_graph_planar_06",
         "q_graph_planar_07",
-        "q_graph_planar_08"
+        "q_graph_planar_08",
+        "q-example-graph_planar",
+        "q-example-graph_planar__embedding",
+        "q-example-graph_planar__euler",
+        "q-example-graph_planar__edge_bounds"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "graph_planar",
@@ -11595,7 +12112,8 @@
       ],
       "related_questions": [
         "q_graph_planar_03",
-        "q_graph_planar_05"
+        "q_graph_planar_05",
+        "q-example-graph_planar__embedding"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11628,7 +12146,8 @@
       ],
       "related_questions": [
         "q_graph_planar_01",
-        "q_graph_planar_06"
+        "q_graph_planar_06",
+        "q-example-graph_planar__euler"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11661,7 +12180,8 @@
       ],
       "related_questions": [
         "q_graph_planar_02",
-        "q_graph_planar_07"
+        "q_graph_planar_07",
+        "q-example-graph_planar__edge_bounds"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11702,7 +12222,11 @@
         "q_graph_bipartite_05",
         "q_graph_bipartite_06",
         "q_graph_bipartite_07",
-        "q_graph_bipartite_08"
+        "q_graph_bipartite_08",
+        "q-example-graph_bipartite",
+        "q-example-graph_bipartite__bipartition",
+        "q-example-graph_bipartite__odd_cycle",
+        "q-example-graph_bipartite__two_coloring"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "graph_bipartite",
@@ -11746,7 +12270,8 @@
       ],
       "related_questions": [
         "q_graph_bipartite_03",
-        "q_graph_bipartite_05"
+        "q_graph_bipartite_05",
+        "q-example-graph_bipartite__bipartition"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11784,7 +12309,8 @@
       ],
       "related_questions": [
         "q_graph_bipartite_01",
-        "q_graph_bipartite_06"
+        "q_graph_bipartite_06",
+        "q-example-graph_bipartite__odd_cycle"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11822,7 +12348,8 @@
       ],
       "related_questions": [
         "q_graph_bipartite_02",
-        "q_graph_bipartite_07"
+        "q_graph_bipartite_07",
+        "q-example-graph_bipartite__two_coloring"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11870,7 +12397,11 @@
         "q_graph_topological_05",
         "q_graph_topological_06",
         "q_graph_topological_07",
-        "q_graph_topological_08"
+        "q_graph_topological_08",
+        "q-example-graph_topological",
+        "q-example-graph_topological__dag",
+        "q-example-graph_topological__kahn",
+        "q-example-graph_topological__uniqueness"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "graph_topological",
@@ -11914,7 +12445,8 @@
       ],
       "related_questions": [
         "q_graph_topological_03",
-        "q_graph_topological_05"
+        "q_graph_topological_05",
+        "q-example-graph_topological__dag"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11952,7 +12484,8 @@
       ],
       "related_questions": [
         "q_graph_topological_01",
-        "q_graph_topological_06"
+        "q_graph_topological_06",
+        "q-example-graph_topological__kahn"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -11990,7 +12523,8 @@
       ],
       "related_questions": [
         "q_graph_topological_02",
-        "q_graph_topological_07"
+        "q_graph_topological_07",
+        "q-example-graph_topological__uniqueness"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12038,7 +12572,12 @@
         "q_graph_domination_06",
         "q_graph_domination_07",
         "q_graph_domination_08",
-        "q_graph_domination_09"
+        "q_graph_domination_09",
+        "q-example-graph_domination",
+        "q-example-graph_domination__dominating",
+        "q-example-graph_domination__vertex_cover",
+        "q-example-graph_domination__independent",
+        "q-example-graph_domination__edge_cover"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "graph_domination",
@@ -12084,7 +12623,8 @@
       "related_questions": [
         "q_graph_domination_01",
         "q_graph_domination_02",
-        "q_graph_domination_05"
+        "q_graph_domination_05",
+        "q-example-graph_domination__dominating"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12122,7 +12662,8 @@
       ],
       "related_questions": [
         "q_graph_domination_03",
-        "q_graph_domination_06"
+        "q_graph_domination_06",
+        "q-example-graph_domination__vertex_cover"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12159,7 +12700,8 @@
         "graph_domination"
       ],
       "related_questions": [
-        "q_graph_domination_07"
+        "q_graph_domination_07",
+        "q-example-graph_domination__independent"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12198,7 +12740,8 @@
         "graph_matching"
       ],
       "related_questions": [
-        "q_graph_domination_09"
+        "q_graph_domination_09",
+        "q-example-graph_domination__edge_cover"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12245,7 +12788,11 @@
         "q_graph_matching_05",
         "q_graph_matching_06",
         "q_graph_matching_07",
-        "q_graph_matching_08"
+        "q_graph_matching_08",
+        "q-example-graph_matching",
+        "q-example-graph_matching__maximal_maximum",
+        "q-example-graph_matching__augmenting",
+        "q-example-graph_matching__hall"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "graph_matching",
@@ -12289,7 +12836,8 @@
       ],
       "related_questions": [
         "q_graph_matching_01",
-        "q_graph_matching_05"
+        "q_graph_matching_05",
+        "q-example-graph_matching__maximal_maximum"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12327,7 +12875,8 @@
       ],
       "related_questions": [
         "q_graph_matching_02",
-        "q_graph_matching_06"
+        "q_graph_matching_06",
+        "q-example-graph_matching__augmenting"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12365,7 +12914,8 @@
       ],
       "related_questions": [
         "q_graph_matching_03",
-        "q_graph_matching_07"
+        "q_graph_matching_07",
+        "q-example-graph_matching__hall"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12413,7 +12963,11 @@
         "q_tree_basic_05",
         "q_tree_basic_06",
         "q_tree_basic_07",
-        "q_tree_basic_08"
+        "q_tree_basic_08",
+        "q-example-tree_basic",
+        "q-example-tree_basic__equivalent",
+        "q-example-tree_basic__forest",
+        "q-example-tree_basic__degree_leaves"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "tree_basic",
@@ -12452,7 +13006,8 @@
       ],
       "related_questions": [
         "q_tree_basic_02",
-        "q_tree_basic_05"
+        "q_tree_basic_05",
+        "q-example-tree_basic__equivalent"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12485,7 +13040,8 @@
       ],
       "related_questions": [
         "q_tree_basic_01",
-        "q_tree_basic_06"
+        "q_tree_basic_06",
+        "q-example-tree_basic__forest"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12518,7 +13074,8 @@
       ],
       "related_questions": [
         "q_tree_basic_03",
-        "q_tree_basic_07"
+        "q_tree_basic_07",
+        "q-example-tree_basic__degree_leaves"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12559,7 +13116,11 @@
         "q_tree_rooted_05",
         "q_tree_rooted_06",
         "q_tree_rooted_07",
-        "q_tree_rooted_08"
+        "q_tree_rooted_08",
+        "q-example-tree_rooted",
+        "q-example-tree_rooted__hierarchy",
+        "q-example-tree_rooted__depth_height",
+        "q-example-tree_rooted__full_mary"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "tree_rooted",
@@ -12597,7 +13158,8 @@
         "tree_rooted"
       ],
       "related_questions": [
-        "q_tree_rooted_05"
+        "q_tree_rooted_05",
+        "q-example-tree_rooted__hierarchy"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12631,7 +13193,8 @@
       "related_questions": [
         "q_tree_rooted_01",
         "q_tree_rooted_03",
-        "q_tree_rooted_06"
+        "q_tree_rooted_06",
+        "q-example-tree_rooted__depth_height"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12664,7 +13227,8 @@
       ],
       "related_questions": [
         "q_tree_rooted_02",
-        "q_tree_rooted_07"
+        "q_tree_rooted_07",
+        "q-example-tree_rooted__full_mary"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12706,7 +13270,11 @@
         "q_tree_spanning_05",
         "q_tree_spanning_06",
         "q_tree_spanning_07",
-        "q_tree_spanning_08"
+        "q_tree_spanning_08",
+        "q-example-tree_spanning",
+        "q-example-tree_spanning__construction",
+        "q-example-tree_spanning__exchange",
+        "q-example-tree_spanning__bridge_count"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "tree_spanning",
@@ -12745,7 +13313,8 @@
       ],
       "related_questions": [
         "q_tree_spanning_01",
-        "q_tree_spanning_05"
+        "q_tree_spanning_05",
+        "q-example-tree_spanning__construction"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12778,7 +13347,8 @@
       ],
       "related_questions": [
         "q_tree_spanning_03",
-        "q_tree_spanning_06"
+        "q_tree_spanning_06",
+        "q-example-tree_spanning__exchange"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12811,7 +13381,8 @@
       ],
       "related_questions": [
         "q_tree_spanning_02",
-        "q_tree_spanning_07"
+        "q_tree_spanning_07",
+        "q-example-tree_spanning__bridge_count"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12853,7 +13424,11 @@
         "q_tree_mst_05",
         "q_tree_mst_06",
         "q_tree_mst_07",
-        "q_tree_mst_08"
+        "q_tree_mst_08",
+        "q-example-tree_mst",
+        "q-example-tree_mst__greedy",
+        "q-example-tree_mst__cut",
+        "q-example-tree_mst__uniqueness"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "tree_mst",
@@ -12898,7 +13473,8 @@
       "related_questions": [
         "q_tree_mst_01",
         "q_tree_mst_02",
-        "q_tree_mst_05"
+        "q_tree_mst_05",
+        "q-example-tree_mst__greedy"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12935,7 +13511,8 @@
         "tree_mst"
       ],
       "related_questions": [
-        "q_tree_mst_06"
+        "q_tree_mst_06",
+        "q-example-tree_mst__cut"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -12973,7 +13550,8 @@
       ],
       "related_questions": [
         "q_tree_mst_03",
-        "q_tree_mst_07"
+        "q_tree_mst_07",
+        "q-example-tree_mst__uniqueness"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13020,7 +13598,11 @@
         "q_tree_matrix_tree_05",
         "q_tree_matrix_tree_06",
         "q_tree_matrix_tree_07",
-        "q_tree_matrix_tree_08"
+        "q_tree_matrix_tree_08",
+        "q-example-tree_matrix_tree",
+        "q-example-tree_matrix_tree__laplacian",
+        "q-example-tree_matrix_tree__cofactor",
+        "q-example-tree_matrix_tree__decomposition"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "tree_matrix_tree",
@@ -13058,7 +13640,8 @@
         "tree_matrix_tree"
       ],
       "related_questions": [
-        "q_tree_matrix_tree_05"
+        "q_tree_matrix_tree_05",
+        "q-example-tree_matrix_tree__laplacian"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13093,7 +13676,8 @@
         "q_tree_matrix_tree_01",
         "q_tree_matrix_tree_02",
         "q_tree_matrix_tree_03",
-        "q_tree_matrix_tree_06"
+        "q_tree_matrix_tree_06",
+        "q-example-tree_matrix_tree__cofactor"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13125,7 +13709,8 @@
         "tree_matrix_tree"
       ],
       "related_questions": [
-        "q_tree_matrix_tree_07"
+        "q_tree_matrix_tree_07",
+        "q-example-tree_matrix_tree__decomposition"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13165,7 +13750,14 @@
         "q_algebra_system_05",
         "q_algebra_system_06",
         "q_algebra_system_07",
-        "q_algebra_system_08"
+        "q_algebra_system_08",
+        "q-example-algebra_system",
+        "q-example-algebra_system__associativity",
+        "q-example-algebra_system__binary_operations",
+        "q-example-algebra_system__commutativity",
+        "q-example-algebra_system__identity_elements",
+        "q-example-algebra_system__inverse_elements",
+        "q-example-algebra_system__semigroups_monoids"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "algebra_system",
@@ -13208,7 +13800,8 @@
       "related_questions": [
         "q_algebra_system_02",
         "q_algebra_system_03",
-        "q_algebra_system_06"
+        "q_algebra_system_06",
+        "q-example-algebra_system__associativity"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13241,7 +13834,8 @@
       ],
       "related_questions": [
         "q_algebra_system_01",
-        "q_algebra_system_05"
+        "q_algebra_system_05",
+        "q-example-algebra_system__binary_operations"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13274,7 +13868,8 @@
       ],
       "related_questions": [
         "q_algebra_system_02",
-        "q_algebra_system_06"
+        "q_algebra_system_06",
+        "q-example-algebra_system__commutativity"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13309,7 +13904,8 @@
       "related_questions": [
         "q_algebra_system_02",
         "q_algebra_system_04",
-        "q_algebra_system_07"
+        "q_algebra_system_07",
+        "q-example-algebra_system__identity_elements"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13342,7 +13938,8 @@
       ],
       "related_questions": [
         "q_algebra_system_02",
-        "q_algebra_system_08"
+        "q_algebra_system_08",
+        "q-example-algebra_system__inverse_elements"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13375,7 +13972,8 @@
         "algebra_system__identity_elements"
       ],
       "related_questions": [
-        "q_algebra_system_08"
+        "q_algebra_system_08",
+        "q-example-algebra_system__semigroups_monoids"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13416,7 +14014,13 @@
         "q_algebra_homomorphism_05",
         "q_algebra_homomorphism_06",
         "q_algebra_homomorphism_07",
-        "q_algebra_homomorphism_08"
+        "q_algebra_homomorphism_08",
+        "q-example-algebra_homomorphism",
+        "q-example-algebra_homomorphism__images",
+        "q-example-algebra_homomorphism__isomorphism_invariants",
+        "q-example-algebra_homomorphism__kernels",
+        "q-example-algebra_homomorphism__operation_preservation",
+        "q-example-algebra_homomorphism__structural_invariants"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "algebra_homomorphism",
@@ -13458,7 +14062,8 @@
       ],
       "related_questions": [
         "q_algebra_homomorphism_02",
-        "q_algebra_homomorphism_08"
+        "q_algebra_homomorphism_08",
+        "q-example-algebra_homomorphism__images"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13490,7 +14095,8 @@
         "algebra_homomorphism__operation_preservation"
       ],
       "related_questions": [
-        "q_algebra_homomorphism_06"
+        "q_algebra_homomorphism_06",
+        "q-example-algebra_homomorphism__isomorphism_invariants"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13525,7 +14131,8 @@
         "q_algebra_homomorphism_01",
         "q_algebra_homomorphism_02",
         "q_algebra_homomorphism_04",
-        "q_algebra_homomorphism_08"
+        "q_algebra_homomorphism_08",
+        "q-example-algebra_homomorphism__kernels"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13559,7 +14166,8 @@
       "related_questions": [
         "q_algebra_homomorphism_02",
         "q_algebra_homomorphism_05",
-        "q_algebra_homomorphism_07"
+        "q_algebra_homomorphism_07",
+        "q-example-algebra_homomorphism__operation_preservation"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13592,7 +14200,8 @@
         "algebra_group__element_orders"
       ],
       "related_questions": [
-        "q_algebra_homomorphism_03"
+        "q_algebra_homomorphism_03",
+        "q-example-algebra_homomorphism__structural_invariants"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13632,7 +14241,14 @@
         "q_algebra_group_05",
         "q_algebra_group_06",
         "q_algebra_group_07",
-        "q_algebra_group_08"
+        "q_algebra_group_08",
+        "q-example-algebra_group",
+        "q-example-algebra_group__axioms_inverses",
+        "q-example-algebra_group__cyclic_subgroups",
+        "q-example-algebra_group__element_orders",
+        "q-example-algebra_group__generators",
+        "q-example-algebra_group__group_axioms",
+        "q-example-algebra_group__subgroups"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "algebra_group",
@@ -13680,7 +14296,8 @@
       ],
       "related_questions": [
         "q_algebra_group_03",
-        "q_algebra_group_07"
+        "q_algebra_group_07",
+        "q-example-algebra_group__axioms_inverses"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13717,7 +14334,8 @@
         "algebra_group__subgroups"
       ],
       "related_questions": [
-        "q_algebra_group_02"
+        "q_algebra_group_02",
+        "q-example-algebra_group__cyclic_subgroups"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13756,7 +14374,8 @@
       "related_questions": [
         "q_algebra_group_02",
         "q_algebra_group_06",
-        "q_algebra_group_08"
+        "q_algebra_group_08",
+        "q-example-algebra_group__element_orders"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13795,7 +14414,8 @@
       ],
       "related_questions": [
         "q_algebra_group_06",
-        "q_algebra_group_08"
+        "q_algebra_group_08",
+        "q-example-algebra_group__generators"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13833,7 +14453,8 @@
       ],
       "related_questions": [
         "q_algebra_group_03",
-        "q_algebra_group_08"
+        "q_algebra_group_08",
+        "q-example-algebra_group__group_axioms"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13872,7 +14493,8 @@
       "related_questions": [
         "q_algebra_group_01",
         "q_algebra_group_04",
-        "q_algebra_group_05"
+        "q_algebra_group_05",
+        "q-example-algebra_group__subgroups"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13917,7 +14539,13 @@
         "q_algebra_ring_field_05",
         "q_algebra_ring_field_06",
         "q_algebra_ring_field_07",
-        "q_algebra_ring_field_08"
+        "q_algebra_ring_field_08",
+        "q-example-algebra_ring_field",
+        "q-example-algebra_ring_field__finite_fields",
+        "q-example-algebra_ring_field__integral_domains",
+        "q-example-algebra_ring_field__ring_axioms",
+        "q-example-algebra_ring_field__units",
+        "q-example-algebra_ring_field__zero_divisors"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "algebra_ring_field",
@@ -13961,7 +14589,8 @@
         "q_algebra_ring_field_02",
         "q_algebra_ring_field_04",
         "q_algebra_ring_field_07",
-        "q_algebra_ring_field_08"
+        "q_algebra_ring_field_08",
+        "q-example-algebra_ring_field__finite_fields"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -13993,7 +14622,8 @@
         "algebra_ring_field__zero_divisors"
       ],
       "related_questions": [
-        "q_algebra_ring_field_04"
+        "q_algebra_ring_field_04",
+        "q-example-algebra_ring_field__integral_domains"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -14026,7 +14656,8 @@
         "algebra_ring_field"
       ],
       "related_questions": [
-        "q_algebra_ring_field_08"
+        "q_algebra_ring_field_08",
+        "q-example-algebra_ring_field__ring_axioms"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -14062,7 +14693,8 @@
         "q_algebra_ring_field_01",
         "q_algebra_ring_field_02",
         "q_algebra_ring_field_03",
-        "q_algebra_ring_field_06"
+        "q_algebra_ring_field_06",
+        "q-example-algebra_ring_field__units"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -14096,7 +14728,8 @@
       "related_questions": [
         "q_algebra_ring_field_03",
         "q_algebra_ring_field_05",
-        "q_algebra_ring_field_08"
+        "q_algebra_ring_field_08",
+        "q-example-algebra_ring_field__zero_divisors"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -14135,7 +14768,13 @@
         "q_algebra_lattice_bool_05",
         "q_algebra_lattice_bool_06",
         "q_algebra_lattice_bool_07",
-        "q_algebra_lattice_bool_08"
+        "q_algebra_lattice_bool_08",
+        "q-example-algebra_lattice_bool",
+        "q-example-algebra_lattice_bool__boolean_algebras",
+        "q-example-algebra_lattice_bool__bounded_lattices",
+        "q-example-algebra_lattice_bool__complements",
+        "q-example-algebra_lattice_bool__distributive_lattices",
+        "q-example-algebra_lattice_bool__meets_joins"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "graph_node_id": "algebra_lattice_bool",
@@ -14178,7 +14817,8 @@
       "related_questions": [
         "q_algebra_lattice_bool_01",
         "q_algebra_lattice_bool_03",
-        "q_algebra_lattice_bool_08"
+        "q_algebra_lattice_bool_08",
+        "q-example-algebra_lattice_bool__boolean_algebras"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -14212,7 +14852,8 @@
       "related_questions": [
         "q_algebra_lattice_bool_02",
         "q_algebra_lattice_bool_04",
-        "q_algebra_lattice_bool_07"
+        "q_algebra_lattice_bool_07",
+        "q-example-algebra_lattice_bool__bounded_lattices"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -14246,7 +14887,8 @@
       "related_questions": [
         "q_algebra_lattice_bool_02",
         "q_algebra_lattice_bool_04",
-        "q_algebra_lattice_bool_07"
+        "q_algebra_lattice_bool_07",
+        "q-example-algebra_lattice_bool__complements"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -14279,7 +14921,8 @@
       ],
       "related_questions": [
         "q_algebra_lattice_bool_03",
-        "q_algebra_lattice_bool_04"
+        "q_algebra_lattice_bool_04",
+        "q-example-algebra_lattice_bool__distributive_lattices"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -14314,7 +14957,8 @@
         "q_algebra_lattice_bool_01",
         "q_algebra_lattice_bool_02",
         "q_algebra_lattice_bool_05",
-        "q_algebra_lattice_bool_06"
+        "q_algebra_lattice_bool_06",
+        "q-example-algebra_lattice_bool__meets_joins"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [

@@ -2771,6 +2771,629 @@
       "answer_text": "R is neither reflexive nor irreflexive. Adding only (3,3) makes it reflexive.",
       "explanation": "Reflexivity requires all three diagonal pairs, but (3,3) is absent. Irreflexivity requires no diagonal pairs, whereas (1,1) and (2,2) are present. Adding the only missing diagonal pair, (3,3), establishes reflexivity, and every reflexive superrelation must contain it.",
       "grading_criteria": "Give a witness for the failure of each property and identify the unique diagonal pair whose addition is minimally required."
+    },
+    "q-example-logic_truth": {
+      "title": "Propositions and truth values: example practice",
+      "statement": "Over the integers, let P(n) mean “n²=4”. Determine whether P(2), P(3), P(n) with n unspecified, and the question “Is there an n such that n²=4?” are propositions. Give the truth value of each proposition.",
+      "answer_text": "Over the integers, let P(n) mean ‘n²=4’. P(2) is a true proposition and P(3) is a false proposition; with n unspecified, P(n) remains an open sentence. ‘Is there an n satisfying n²=4?’ is a question; the corresponding existential statement is a proposition.",
+      "explanation": "Over the integers, let P(n) mean ‘n²=4’. P(2) is a true proposition and P(3) is a false proposition; with n unspecified, P(n) remains an open sentence. ‘Is there an n satisfying n²=4?’ is a question; the corresponding existential statement is a proposition.\n\nFirst fix the objects and context of the statement, then determine whether it asserts a fact, and finally discuss its truth. A false statement is still a proposition, and a fixed mathematical assertion whose truth we have not yet calculated can also be a proposition. The same open sentence may yield different truth values under different assignments. This does not violate the two-valued nature of propositions, because the assignments produce different specific propositions.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_truth__proposition_sentence": {
+      "title": "Propositional and nonpropositional sentences: example practice",
+      "statement": "Determine whether “Give a composite number” and “25 is composite” are propositions. Give the truth value where applicable.",
+      "answer_text": "‘Please give a composite number’ is a command and is neither true nor false; ‘25 is composite’ is a true proposition because 25=5×5.",
+      "explanation": "‘Please give a composite number’ is a command and is neither true nor false; ‘25 is composite’ is a true proposition because 25=5×5.\n\nDetermine a sentence's logical role before determining its truth. Replacing a question by the statement expressed by an affirmative answer changes the form of the sentence. Having an answer does not make the question itself a true proposition.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_truth__truth_semantics": {
+      "title": "Truth values and interpretive context: example practice",
+      "statement": "Eight people attended on one day and nine on another. Determine the truth value of “Nine people attended on the first day” and explain whether it describes the same fact as “Nine people attended on the second day”.",
+      "answer_text": "If the attendance record for a certain day lists 8 people, ‘9 people attended that day’ is a false proposition. Exactly 9 people attending on another day concerns a fact about a different date.",
+      "explanation": "If the attendance record for a certain day lists 8 people, ‘9 people attended that day’ is a false proposition. Exactly 9 people attending on another day concerns a fact about a different date.\n\nTruth, whether something has been proved, and whether a particular person knows the answer are different issues. The primality of a fixed integer is a definite mathematical assertion even before it has been checked. A change in truth after changing context does not mean that truth and falsity coexist in the original context.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_truth__open_statement": {
+      "title": "Assigning and closing open sentences: example practice",
+      "statement": "Over the integers, let P(x) be x²=1. Find the truth values of P(1), P(0), ∃xP(x), and ∀xP(x), and determine whether P(x) with x unspecified is a closed proposition.",
+      "answer_text": "Over the integers, let P(x) be x²=1. P(1) is true, P(0) is false, ∃xP(x) is true, and ∀xP(x) is false. All differ from the unassigned P(x).",
+      "explanation": "Over the integers, let P(x) be x²=1. P(1) is true, P(0) is false, ∃xP(x) is true, and ∀xP(x) is false. All differ from the unassigned P(x).\n\nClosure does not guarantee truth; it guarantees only that the assertion no longer depends on unspecified free variables. Different assignments, universal quantification, and existential quantification may produce statements with different truth values. The domain must be consistent with the assignments and quantification.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_connectives": {
+      "title": "Logical connectives: example practice",
+      "statement": "Let s mean “submission succeeds”, l mean “the user is logged in”, and n mean “the network is available”. Formalize “Submission can succeed only if the user is logged in and the network is available”. Does this guarantee success whenever both conditions hold?",
+      "answer_text": "Let s mean ‘the submission succeeds’, l mean ‘the user is logged in’, and n mean ‘the network is available’. ‘A submission can succeed only if the user is logged in and the network is available’ is s→(l∧n). This does not guarantee that logging in and having a network connection suffice for a successful submission.",
+      "explanation": "Let s mean ‘the submission succeeds’, l mean ‘the user is logged in’, and n mean ‘the network is available’. ‘A submission can succeed only if the user is logged in and the network is available’ is s→(l∧n). This does not guarantee that logging in and having a network connection suffice for a successful submission.\n\nThe truth of a compound proposition is determined jointly by the truth values of its atomic propositions and the connective structure. Parentheses should make the scope clear. ‘p is sufficient for q’ corresponds to p→q, as does ‘p only if q’; ‘if and only if’ requires both directions. Material implication is a truth relation in logic and does not automatically express temporal order or causation.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_connectives__implication_conditions": {
+      "title": "Material implication and sufficient and necessary conditions: example practice",
+      "statement": "For the same integer, let p mean “divisible by 8” and q mean “even”. Determine the sufficient and necessary condition relationships between p and q. If q does not imply p, give a counterexample.",
+      "answer_text": "Let p be ‘the integer is divisible by 8’ and q be ‘the integer is even’. p is sufficient for q, but q does not suffice to guarantee p; 2 is an example.",
+      "explanation": "Let p be ‘the integer is divisible by 8’ and q be ‘the integer is even’. p is sufficient for q, but q does not suffice to guarantee p; 2 is an example.\n\n‘p only if q’ is written p→q, as is ‘if p, then q’. Material implication does not by itself establish a real causal connection, and the entire formula is true when its antecedent is false.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_connectives__negation": {
+      "title": "Negation: example practice",
+      "statement": "Given that p is true and q is false, evaluate ¬(p∧q) and ¬p∧¬q.",
+      "answer_text": "When p is true and q is false, ¬(p∧q) is true, whereas ¬p∧¬q is false.",
+      "explanation": "When p is true and q is false, ¬(p∧q) is true, whereas ¬p∧¬q is false.\n\n‘Not all hold’ and ‘none hold’ have different parenthesis structures. Double negation ¬¬A is equivalent to A, but a single negation does not alter whether a sentence qualifies as a proposition.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_connectives__conjunction": {
+      "title": "Conjunction: example practice",
+      "statement": "Let p mean “the documents are complete” and q mean “payment has been made”. Express “both conditions are met” as a logical formula and state when it is true.",
+      "answer_text": "If p means ‘the documents are complete’ and q means ‘payment has been made’, p∧q requires both conditions to be satisfied.",
+      "explanation": "If p means ‘the documents are complete’ and q means ‘payment has been made’, p∧q requires both conditions to be satisfied.\n\nThe word ‘and’ usually expresses conjunction. A true conjunction implies each component separately, but one true component alone does not guarantee the entire conjunction.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_connectives__disjunction": {
+      "title": "Inclusive disjunction: example practice",
+      "statement": "When p and q are both true, evaluate p∨q and explain whether inclusive disjunction allows both statements to hold.",
+      "answer_text": "When p=q=true, p∨q is still true; this distinguishes it from exclusive or.",
+      "explanation": "When p=q=true, p∨q is still true; this distinguishes it from exclusive or.\n\nA implies A∨B, but A∨B does not allow A to be selected arbitrarily. If ¬A is also known, B can then be inferred.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_connectives__biconditional": {
+      "title": "The biconditional: example practice",
+      "statement": "Suppose p=0 and p↔(q∧r) is true. Determine the truth value of q∧r. Can one conclude that both q and r are true?",
+      "answer_text": "If p=0 and p↔(q∧r) is true, q∧r must also be false; it does not mean that both components are true.",
+      "explanation": "If p=0 and p↔(q∧r) is true, q∧r must also be false; it does not mean that both components are true.\n\nA↔B is a formula, whereas A≡B means that two formulas agree under every assignment. A true biconditional under one assignment does not establish logical equivalence under all assignments.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_connectives__exclusive_or": {
+      "title": "Exclusive disjunction and XOR: example practice",
+      "statement": "Let p and q indicate whether two backup lines are switched on. Exactly one line must be on. Should this requirement be expressed by p⊕q or p∨q?",
+      "answer_text": "When exactly one of two mutually exclusive backup lines must be switched on, use p⊕q rather than p∨q.",
+      "explanation": "When exactly one of two mutually exclusive backup lines must be switched on, use p⊕q rather than p∨q.\n\nAt least one and at most one are distinct requirements. Merely excluding simultaneous truth still allows both to be false, while inclusive disjunction still allows both to be true. Together the two conditions require exactly one.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_truth_table": {
+      "title": "Truth tables: example practice",
+      "statement": "In the order (p,q)=(0,0),(0,1),(1,0),(1,1), list the truth-value columns of p→q and q→p. Determine whether they are equivalent and whether (p→q)∨(q→p) is a tautology.",
+      "answer_text": "In the order (p,q)=(0,0),(0,1),(1,0),(1,1), the truth column of p→q is 1,1,0,1, and that of q→p is 1,0,1,1. Thus the formulas are not equivalent, but (p→q)∨(q→p) is true in every row.",
+      "explanation": "In the order (p,q)=(0,0),(0,1),(1,0),(1,1), the truth column of p→q is 1,1,0,1, and that of q→p is 1,0,1,1. Thus the formulas are not equivalent, but (p→q)∨(q→p) is true in every row.\n\nFix the variable order and row order before constructing the table. Repeated occurrences of the same variable do not add rows. Compute the parenthesized subformulas first, then the outer connectives. Equivalence requires agreement in every row; one differing row refutes it. To test an inference from premises to a conclusion, check whether every row making all premises true also makes the conclusion true.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_truth_table__assignment_enumeration": {
+      "title": "Enumerating assignments and computing truth values in stages: example practice",
+      "statement": "A propositional formula contains only the three distinct letters p, q, and r, but p occurs ten times. How many rows are needed in its complete truth table, and which quantity determines the count?",
+      "answer_text": "A formula containing only p, q, r still has only 8 rows even if p occurs ten times; the number of occurrences is not used to count rows.",
+      "explanation": "A formula containing only p, q, r still has only 8 rows even if p occurs ten times; the number of occurrences is not used to count rows.\n\nA letter always has the same value throughout a row; repeated occurrences do not add rows. Intermediate columns help locate errors in negation, calculations inside parentheses, or the outermost connective.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_truth_table__satisfiability_classification": {
+      "title": "Tautologies, contradictions, and satisfiability: example practice",
+      "statement": "Classify p∨¬p, p∧¬p, and p∧q as tautologies, contradictions, or satisfiable formulas that are not tautologies.",
+      "answer_text": "p∨¬p is a tautology; p∧¬p is a contradiction; p∧q is satisfiable but not a tautology.",
+      "explanation": "p∨¬p is a tautology; p∧¬p is a contradiction; p∧q is satisfiable but not a tautology.\n\nSatisfiability is an existential condition, whereas being a tautology is a universal condition. One true row cannot prove a tautology, but one false row refutes it. One true row suffices to show a formula is not a contradiction.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_truth_table__semantic_counterexample": {
+      "title": "Truth-table counterexamples to equivalence and inference: example practice",
+      "statement": "For p=0 and q=1, evaluate p→q and q→p. Determine whether this assignment refutes their logical equivalence and the inference p→q ⊨ q→p.",
+      "answer_text": "p=0, q=1 makes p→q true and q→p false. It disproves their equivalence and also refutes the inference of q→p from p→q.",
+      "explanation": "p=0, q=1 makes p→q true and q→p false. It disproves their equivalence and also refutes the inference of q→p from p→q.\n\nA counterexample needs just one row, but state fully which conditions it satisfies. Proving validity or equivalence requires checking every possible row. ‘No counterexample found so far’ does not mean exhaustive checking is complete.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_equivalence": {
+      "title": "Logical equivalence: example practice",
+      "statement": "Simplify (p→q)∧(p→¬q) using logical equivalences, and determine the restrictions on p and q for the original formula to hold.",
+      "answer_text": "(p→q)∧(p→¬q)≡(¬p∨q)∧(¬p∨¬q)≡¬p∨(q∧¬q)≡¬p. The key to the first two implications holding together is that p must be false; q need not be fixed.",
+      "explanation": "(p→q)∧(p→¬q)≡(¬p∨q)∧(¬p∨¬q)≡¬p∨(q∧¬q)≡¬p. The key to the first two implications holding together is that p must be false; q need not be fixed.\n\nEquivalence is a semantic relationship between formulas and cannot be established by a single assignment. Common transformations include implication elimination, De Morgan's laws, distribution, absorption, and double negation. Each step must preserve the scope of parentheses; in particular, the negation in ¬(p∧q) applies to the whole conjunction. Equivalent transformations do not add an assumption that some variable must be true.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_equivalence__de_morgan": {
+      "title": "De Morgan's laws and pushing negations inward: example practice",
+      "statement": "Use De Morgan’s laws to move all negations in ¬(p∨(q∧r)) directly in front of propositional letters.",
+      "answer_text": "¬(p∨(q∧r))≡¬p∧¬(q∧r)≡¬p∧(¬q∨¬r).",
+      "explanation": "¬(p∨(q∧r))≡¬p∧¬(q∧r)≡¬p∧(¬q∨¬r).\n\n‘Not all hold’ means ‘at least one does not hold’; ‘none holds’ means ‘every one fails’. Push nested negations inward one level at a time; do not skip parentheses and miss changes to inner connectives.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_equivalence__implication_elimination": {
+      "title": "Equivalent elimination of implication and the biconditional: example practice",
+      "statement": "Eliminate the implication in ¬(p→q), simplify the result, and state the antecedent and consequent truth values that make an implication false.",
+      "answer_text": "¬(p→q)≡¬(¬p∨q)≡p∧¬q precisely describes when an implication fails.",
+      "explanation": "¬(p→q)≡¬(¬p∨q)≡p∧¬q precisely describes when an implication fails.\n\nIf the antecedent is compound, negate the whole expression before proceeding. For example, (A∨B)→C is not ¬A∨¬B∨C; it is ¬(A∨B)∨C, to which De Morgan's law is then applied.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_equivalence__replacement_laws": {
+      "title": "Equivalent replacement, distribution, and absorption: example practice",
+      "statement": "Simplify (p∧q)∨(p∧¬q) using logical equivalences, naming the main laws used.",
+      "answer_text": "(p∧q)∨(p∧¬q)≡p∧(q∨¬q)≡p, using distribution, the law of excluded middle, and the identity law in turn.",
+      "explanation": "(p∧q)∨(p∧¬q)≡p∧(q∨¬q)≡p, using distribution, the law of excluded middle, and the identity law in turn.\n\nEquivalent replacements can be combined step by step, but must not alter other variables or add premises. Simplification aims to preserve truth under every assignment, rather than merely shortening an expression in one numerical case.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_equivalence__distribution_laws": {
+      "title": "Propositional distributive laws: example practice",
+      "statement": "Use distributivity to rewrite (¬p∨r)∧(¬q∨r) as an equivalent formula with r as a disjunct.",
+      "answer_text": "(¬p∨r)∧(¬q∨r)≡(¬p∧¬q)∨r.",
+      "explanation": "(¬p∨r)∧(¬q∨r)≡(¬p∧¬q)∨r.\n\nDistribution changes syntax while preserving semantics. It is used for DNF, CNF, and combining common components. The common component must not be copied to only one branch.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_equivalence__absorption_laws": {
+      "title": "Propositional absorption laws: example practice",
+      "statement": "Simplify (p∨q)∧((p∨q)∨r), and identify the compound subformula to treat as a single operand when applying absorption.",
+      "answer_text": "By absorption, (p∨q)∧((p∨q)∨r) is equivalent to p∨q, treating the entire p∨q as A.",
+      "explanation": "By absorption, (p∨q)∧((p∨q)∨r) is equivalent to p∨q, treating the entire p∨q as A.\n\nAbsorption removes only a part guaranteed by an existing component; A∨(¬A∧B) must not be simplified to A. Check that the literals match and the structure fits the law.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_normal_form": {
+      "title": "Normal forms: example practice",
+      "statement": "With designated variables p and q, find the principal disjunctive and principal conjunctive normal forms of p⊕q.",
+      "answer_text": "For variables p,q, the true rows of exclusive or are (0,1) and (1,0), so its principal DNF is (¬p∧q)∨(p∧¬q). Its false rows are (0,0) and (1,1), so its principal CNF is (p∨q)∧(¬p∨¬q).",
+      "explanation": "For variables p,q, the true rows of exclusive or are (0,1) and (1,0), so its principal DNF is (¬p∧q)∨(p∧¬q). Its false rows are (0,0) and (1,1), so its principal CNF is (p∨q)∧(¬p∨¬q).\n\nThe minterm for a true row must be true on that row: write the variable itself for value 1 and its negation for value 0. The maxterm for a false row must be false on that row: write the variable itself for value 0 and its negation for value 1. Terms in ordinary normal forms may omit variables; principal normal forms may not. For tautologies or contradictions, specify the textbook's conventions for empty conjunctions, empty disjunctions, or constants 1 and 0.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_normal_form__minterms_pdnf": {
+      "title": "Minterms: example practice",
+      "statement": "Taking p, q, and r as the complete designated variable set, write the principal disjunctive normal form of p∧q.",
+      "answer_text": "For variables (p,q,r), the true rows 110 and 111 of p∧q give (p∧q∧¬r)∨(p∧q∧r). Do not omit r merely because it is absent from the original formula.",
+      "explanation": "For variables (p,q,r), the true rows 110 and 111 of p∧q give (p∧q∧¬r)∨(p∧q∧r). Do not omit r merely because it is absent from the original formula.\n\nTo construct a term from a true row, use the variable itself for value 1 and its negation for value 0. The term matches only that row; disjoining terms for all true rows precisely describes the formula's set of satisfying assignments.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_normal_form__maxterms_pcnf": {
+      "title": "Maxterms: example practice",
+      "statement": "A formula in p and q is false only when (p,q)=(1,0). Write its principal conjunctive normal form.",
+      "answer_text": "If a formula is false only at (p,q)=(1,0), its principal CNF is ¬p∨q, since this disjunction is false exactly at 10.",
+      "explanation": "If a formula is false only at (p,q)=(1,0), its principal CNF is ¬p∨q, since this disjunction is false exactly at 10.\n\nEvery literal in a maxterm must be false on its target false row, so use the unnegated variable for value 0 and its negation for value 1, opposite to the minterm rule. True rows are not used directly to construct principal CNF.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_normal_form__literal": {
+      "title": "Propositional literals: example practice",
+      "statement": "Identify the two literals in p∧¬q. In (p→q)∧r, is the subformula p→q a propositional literal?",
+      "answer_text": "p∧¬q conjoins two literals, whereas (p→q)∧r contains an implication subformula that has not been eliminated.",
+      "explanation": "p∧¬q conjoins two literals, whereas (p→q)∧r contains an implication subformula that has not been eliminated.\n\nA literal differs from an arbitrary subformula. Principal normal forms require each specified variable exactly once in every term, as either its positive or its negative literal.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_normal_form__dnf": {
+      "title": "Disjunctive normal form: example practice",
+      "statement": "Determine whether (p∧q)∨¬r is in disjunctive normal form, and whether its disjunctive terms must contain the same number of variables.",
+      "answer_text": "(p∧q)∨¬r is DNF; its two terms need not contain the same number of variables.",
+      "explanation": "(p∧q)∨¬r is DNF; its two terms need not contain the same number of variables.\n\nConstruct DNF by first eliminating implications and pushing negations inward, then distributing conjunction over disjunction. A semantically equivalent expression that has not been expanded does not automatically have the required syntactic form.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_normal_form__cnf": {
+      "title": "Conjunctive normal form: example practice",
+      "statement": "Determine whether (p∨¬q)∧r is in conjunctive normal form, and identify its clauses.",
+      "answer_text": "(p∨¬q)∧r contains a two-literal clause and a single-literal clause, so it is CNF.",
+      "explanation": "(p∨¬q)∧r contains a two-literal clause and a single-literal clause, so it is CNF.\n\nConstruct CNF by distributing disjunction over conjunction. The conjunction p∧q is also CNF, because it is a conjunction of two single-literal clauses.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_normal_form__principal_dnf": {
+      "title": "Principal disjunctive normal form: example practice",
+      "statement": "For designated variables p, q, and r, complete p∧q into principal disjunctive normal form without omitting r.",
+      "answer_text": "Over variables p, q, r, expand p∧q to (p∧q∧r)∨(p∧q∧¬r).",
+      "explanation": "Over variables p, q, r, expand p∧q to (p∧q∧r)∨(p∧q∧¬r).\n\nSpecify both the variable set and its order. A variable absent from the original formula still requires separate terms for its different values. The order of terms does not affect the meaning.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_normal_form__principal_cnf": {
+      "title": "Principal conjunctive normal form: example practice",
+      "statement": "Find the principal conjunctive normal form of p→q for designated variables p and q. If r is added to the designated variable set, is the previous result still principal? Explain how its false rows must be handled.",
+      "answer_text": "p→q is false only at 10, so its principal CNF is ¬p∨q. Adding variable r requires splitting this into two complete maxterms for the two 10r rows.",
+      "explanation": "p→q is false only at 10, so its principal CNF is ¬p∨q. Adding variable r requires splitting this into two complete maxterms for the two 10r rows.\n\nPrincipal CNF is not simply any minimal CNF. Its greater number of terms retains complete information about individual false rows. Handle tautologies according to the declared convention for an empty conjunction.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_reasoning": {
+      "title": "Propositional inference: example practice",
+      "statement": "Prove that r follows from p∨q, p→r, and q→r, using cases on the truth value of p if desired.",
+      "answer_text": "Infer r from p∨q, p→r, q→r: if p is true, p→r gives r. If p is false, p∨q forces q to be true, and q→r gives r. These two cases exhaust all assignments making the premises true together.",
+      "explanation": "Infer r from p∨q, p→r, q→r: if p is true, p→r gives r. If p is false, p∨q forces q to be true, and q→r gives r. These two cases exhaust all assignments making the premises true together.\n\nModus ponens, modus tollens, hypothetical syllogism, and proof by cases are common valid rules. For example, p→q and p imply q; p→q and ¬q imply ¬p. In contrast, affirming the consequent and denying the antecedent are generally invalid. Inference rules test formal truth preservation and do not require each premise to hold in reality. When applying them to a concrete problem, verify the premises as well.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_reasoning__basic_rules": {
+      "title": "Modus ponens, modus tollens, and implication chains: example practice",
+      "statement": "Assume “Passing verification implies admission” is true. What follows if a person cannot be admitted? Conversely, does admission alone imply that verification was passed?",
+      "answer_text": "If ‘passing verification implies admission’ is true and admission has been confirmed impossible, modus tollens gives failure to pass verification. Admission alone cannot establish that verification was passed.",
+      "explanation": "If ‘passing verification implies admission’ is true and admission has been confirmed impossible, modus tollens gives failure to pass verification. Admission alone cannot establish that verification was passed.\n\nState line by line which premises are currently known. Compound formulas may replace p, q, r in the rules, provided corresponding positions remain consistent. Formal validity and factual reliability of premises are separate matters.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_reasoning__invalid_inference": {
+      "title": "Invalid inferences and counterexample assignments: example practice",
+      "statement": "Using the assignment p=0, q=1, test both inferences: from p→q and q infer p; from p→q and ¬p infer ¬q. Are they valid?",
+      "answer_text": "p=0, q=1 refutes both affirming the consequent and denying the antecedent: the original implication and the relevant premises are true, while the erroneous conclusions are false.",
+      "explanation": "p=0, q=1 refutes both affirming the consequent and denying the antecedent: the original implication and the relevant premises are true, while the erroneous conclusions are false.\n\nInvalidity does not mean the conclusion is false in every case; it means these premises do not guarantee it. A conclusion that happens to be true in reality may still come from an invalid argument.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-logic_reasoning__case_reasoning": {
+      "title": "Disjunction elimination and proof by cases: example practice",
+      "statement": "At least one of inventories A and B is available. If A is available the order can be completed, and the same holds if B is available. Prove that the order can be completed.",
+      "answer_text": "From ‘at least one of stock A or stock B is available’ and the fact that either available stock allows the order to be fulfilled, proof by cases gives that the order can be fulfilled.",
+      "explanation": "From ‘at least one of stock A or stock B is available’ and the fact that either available stock allows the order to be fulfilled, proof by cases gives that the order can be fulfilled.\n\nCases may overlap; coverage is the key to preserving truth. A branch being merely ‘possibly true’ does not suffice to guarantee the common conclusion. Temporary assumptions within a branch must be discharged before the final conclusion.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_domain": {
+      "title": "Predicates and domains: example practice",
+      "statement": "On D={1,2,3}, let R(x,y) mean that x divides y. Evaluate R(1,3) and R(3,1), and list all tuples for which R is true.",
+      "answer_text": "On D={1,2,3}, let R(x,y) mean x divides y. Then R(1,3) is true and R(3,1) is false. The true tuples are (1,1),(1,2),(1,3),(2,2),(3,3).",
+      "explanation": "On D={1,2,3}, let R(x,y) mean x divides y. Then R(1,3) is true and R(3,1) is false. The true tuples are (1,1),(1,2),(1,3),(2,2),(3,3).\n\nInterpret a symbolic expression together with its domain, predicate meanings, and any required variable assignment. Changing the domain from integers to rationals may change the truth of a universal assertion. A binary predicate corresponds to a relation on D×D; do not confuse the two positions of an ordered pair. For example, x<y is generally not symmetric. Unless stated otherwise, this content pack uses nonempty domains.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_domain__predicate_arity": {
+      "title": "Predicate arity and argument positions: example practice",
+      "statement": "If R(x,y) means “x is the father of y”, state the predicate’s arity and the role of each argument. Does R(x,y) alone imply R(y,x)?",
+      "answer_text": "If R(x,y) means x is the father of y, the arguments have the roles of father and child respectively; R(x,y) and R(y,x) cannot be assumed to be true together.",
+      "explanation": "If R(x,y) means x is the father of y, the arguments have the roles of father and child respectively; R(x,y) and R(y,x) cannot be assumed to be true together.\n\nFor R(x,y), exchanging arguments to obtain R(y,x) need not preserve truth. Specify each position's role when defining a predicate, and do not treat an ordered tuple as an unordered set.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_domain__domain_interpretation": {
+      "title": "Domains, predicate interpretations, and assignments: example practice",
+      "statement": "Determine whether “Every x satisfies x²≥x” is true over the integers and over the rationals. Give a counterexample in any domain where it is false.",
+      "answer_text": "‘Every x satisfies x²≥x’ is true over the integers but is refuted by x=1/2 over the rationals, showing that the domain forms part of the assertion.",
+      "explanation": "‘Every x satisfies x²≥x’ is true over the integers but is refuted by x=1/2 over the rationals, showing that the domain forms part of the assertion.\n\nNonempty domains are the default first-order logic convention in this pack. When the domain changes, witnesses from the original domain cannot simply be reused. When a predicate's interpretation changes, recheck every instance.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_domain__relation_extension": {
+      "title": "Predicate truth sets and relation extensions: example practice",
+      "statement": "On D={0,1,2}, let P(x) mean “x is even”. Find the extension of P.",
+      "answer_text": "On D={0,1,2}, let P(x) mean x is even. Its extension is {0,2}, rather than {2}, because 0 is also 2 times the integer 0.",
+      "explanation": "On D={0,1,2}, let P(x) mean x is even. Its extension is {0,2}, rather than {2}, because 0 is also 2 times the integer 0.\n\nAn extension contains only true objects; every legal tuple absent from the list is false. A binary relation's extension is a set of ordered pairs. Listing only the objects that participate in the relation loses the pairing information.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_variable": {
+      "title": "Variables and scope: example practice",
+      "statement": "In ∀x(P(x,y)→∃y Q(x,y,z)), classify each occurrence of a variable in P and Q as free or bound, and give the set of free variables.",
+      "answer_text": "In ∀x(P(x,y)→∃y Q(x,y,z)), y in P and z in Q are free. All occurrences of x are bound by the outer ∀x, while y in Q is bound by the inner ∃y. Thus FV={y,z}; not every y is bound.",
+      "explanation": "In ∀x(P(x,y)→∃y Q(x,y,z)), y in P and z in Q are free. All occurrences of x are bound by the outer ∀x, while y in Q is bound by the inner ∃y. Thus FV={y,z}; not every y is bound.\n\nDetermine quantifier scopes from parentheses, then classify each occurrence by its binding, rather than merely checking whether a quantifier for that letter appears somewhere in the formula. A nested quantifier of the same name shadows the outer binding. For safe substitution, first rename potentially conflicting bound variables to entirely fresh names, then replace only free occurrences of the target variable.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_variable__free_bound_scope": {
+      "title": "Free and bound variables: example practice",
+      "statement": "Identify the free occurrences of x in (∀xP(x))∨Q(x) and ∀x(P(x)∨Q(x)). Do both formulas have no free variables?",
+      "answer_text": "Q(x) in (∀xP(x))∨Q(x) has a free x, whereas ∀x(P(x)∨Q(x)) has no free x.",
+      "explanation": "Q(x) in (∀xP(x))∨Q(x) has a free x, whereas ∀x(P(x)∨Q(x)) has no free x.\n\nTraverse the formula's structure to calculate its free-variable set. A letter may have both free and bound occurrences. If even one free occurrence remains, it belongs to the free-variable set.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_variable__alpha_renaming": {
+      "title": "Bound-variable renaming and shadowing: example practice",
+      "statement": "In ∀x(P(x)∧∃xQ(x)), rename only the variable bound by the outer universal quantifier to u. Write the resulting formula.",
+      "answer_text": "Renaming the outer variable of ∀x(P(x)∧∃xQ(x)) gives ∀u(P(u)∧∃xQ(x)); x in Q still belongs to the inner quantifier.",
+      "explanation": "Renaming the outer variable of ∀x(P(x)∧∃xQ(x)) gives ∀u(P(u)∧∃xQ(x)); x in Q still belongs to the inner quantifier.\n\nRenaming is not a global replacement in the entire string. Identically named letters under nested quantifiers may belong to different bindings and must be treated separately according to syntax.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_variable__capture_avoidance": {
+      "title": "Capture-avoiding substitution: example practice",
+      "statement": "Let D={0,1}, let R(a,b) mean a≠b, and assign the free variable y the value 0. Evaluate ∃zR(y,z) and ∃yR(y,y). Can variable capture change the truth value?",
+      "answer_text": "If R means inequality, D={0,1}, and free y=0, then ∃zR(y,z) is true, whereas the captured formula ∃yR(y,y) is false.",
+      "explanation": "If R means inequality, D={0,1}, and free y=0, then ∃zR(y,z) is true, whereas the captured formula ∃yR(y,y) is false.\n\nVariable capture turns an externally fixed parameter into a quantified object, changing the truth conditions. A free-variable assignment in a finite model can clearly demonstrate the difference between correct and incorrect substitution.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_variable__quantifier_scope": {
+      "title": "Quantifier scope and parentheses: example practice",
+      "statement": "Let D={0,1}, and let P and Q each be true only at 0. Assign the free variable x the value 0. Evaluate F=(∀xP(x))∨Q(x) and G=∀x(P(x)∨Q(x)).",
+      "answer_text": "If P and Q hold only at 0, D={0,1}, and free x=0, the first formula is true and the second false.",
+      "explanation": "If P and Q hold only at 0, D={0,1}, and free x=0, the first formula is true and the second false.\n\nChanging a quantifier's scope differs from legal renaming. Extending a quantifier from one subformula to a whole compound formula requires checking free-variable conditions separately; writing convenience alone is insufficient.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_quantifier": {
+      "title": "Quantifiers: example practice",
+      "statement": "Over the integers, evaluate ∀x∃y(y>x) and ∃y∀x(y>x). For a true statement describe how to choose witnesses; for a false one explain how to construct a counterexample.",
+      "answer_text": "Over the integers, ∀x∃y(y>x) is true with witness y=x+1. ∃y∀x(y>x) is false because, for any chosen y, taking x=y makes y>x fail.",
+      "explanation": "Over the integers, ∀x∃y(y>x) is true with witness y=x+1. ∃y∀x(y>x) is false because, for any chosen y, taking x=y makes y>x fail.\n\nTo prove a universal assertion, handle an arbitrary object; one counterexample disproves it. To prove an existential assertion, provide and verify a witness; disproving it requires excluding every object. Quantifiers of the same kind may be exchanged, but ∀ and ∃ generally cannot be exchanged arbitrarily. Specify the domain. Restricted quantification commonly uses ∀x(S(x)→P(x)) or ∃x(S(x)∧P(x)); do not interchange their connectives.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_quantifier__quantifier_order": {
+      "title": "Alternating quantifiers and object dependencies: example practice",
+      "statement": "Over the integers, determine whether “For every x, one can choose a y greater than x” and “There is one fixed y greater than every x” hold. May y in the first statement depend on x?",
+      "answer_text": "Over the integers, every x has a larger y=x+1, but no fixed y exceeds every integer.",
+      "explanation": "Over the integers, every x has a larger y=x+1, but no fixed y exceeds every integer.\n\nWriting a witness as y=f(x) helps display its dependence. To show mixed quantifiers cannot be exchanged, give a complete interpretation of the relation that makes the two formulas differ in truth, rather than merely exchanging symbols and asserting a difference.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_quantifier__restricted_quantification": {
+      "title": "Restricted quantifiers and empty restriction sets: example practice",
+      "statement": "No student in a class is enrolled in a certain course. Evaluate “Every student enrolled in the course passes” and “Some student enrolled in the course passes”.",
+      "answer_text": "If nobody in a class takes the course, ‘all students taking the course pass’ is true, while ‘some student taking the course passes’ is false. The first sentence does not assert that anyone takes the course.",
+      "explanation": "If nobody in a class takes the course, ‘all students taking the course pass’ is true, while ‘some student taking the course passes’ is false. The first sentence does not assert that anyone takes the course.\n\nIf no object satisfies S, the restricted universal statement is true because no counterexample has S true and P false. The restricted existential statement is false because no witness satisfies the conjunction. This does not mean the overall domain is empty.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_quantifier__universal_quantifier": {
+      "title": "Universal quantification: example practice",
+      "statement": "Determine whether ∀x(x²≥0) holds over the integers. Would checking only x=0 and x=1 constitute a proof of this universal statement?",
+      "answer_text": "∀x(x²≥0) is true over the integers; checking only x=0 or 1 does not constitute a complete proof.",
+      "explanation": "∀x(x²≥0) is true over the integers; checking only x=0 or 1 does not constitute a complete proof.\n\nOn a finite domain, check every object individually; on an infinite domain, use a valid general argument. A restricted subset may be empty, making its restricted universal statement vacuously true.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_quantifier__existential_quantifier": {
+      "title": "Existential quantification: example practice",
+      "statement": "Over the integers, determine whether ∃x(x²=4) is true and give witnesses satisfying the equation.",
+      "answer_text": "∃x∈Z(x²=4) has two witnesses, 2 and −2, and the ordinary existential statement still holds.",
+      "explanation": "∃x∈Z(x²=4) has two witnesses, 2 and −2, and the ordinary existential statement still holds.\n\nOne failed candidate does not disprove existence, and two existential assertions need not have the same witness. Follow a specified proof method when required; a nonconstructive proof need not additionally construct a witness.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_quantifier__unique_existence": {
+      "title": "Expressing unique existence with quantifiers: example practice",
+      "statement": "Over the integers, determine whether each of x+3=8 and x²=4 has a unique solution. State the solution for any equation with a unique solution.",
+      "answer_text": "Over the integers, x+3=8 has the unique solution x=5, whereas x²=4 does not have a unique solution.",
+      "explanation": "Over the integers, x+3=8 has the unique solution x=5, whereas x²=4 does not have a unique solution.\n\nTo check uniqueness, take any two objects satisfying the condition and prove them equal, or prove every satisfying object equals a specified witness. Merely showing that one object satisfies the condition does not prove uniqueness.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_reasoning": {
+      "title": "Equivalence and inference in predicate logic: example practice",
+      "statement": "From ∀x(P(x)→Q(x)) and ∃xP(x), prove ∃xQ(x), ensuring that the conclusion does not depend on the name of a temporary witness.",
+      "answer_text": "Given ∀x(P(x)→Q(x)) and ∃xP(x), choose a temporary witness a satisfying P. Universal instantiation gives P(a)→Q(a), hence Q(a). Existential introduction then gives ∃xQ(x). The conclusion no longer depends on the temporary name a.",
+      "explanation": "Given ∀x(P(x)→Q(x)) and ∃xP(x), choose a temporary witness a satisfying P. Universal instantiation gives P(a)→Q(a), hence Q(a). Existential introduction then gives ∃xQ(x). The conclusion no longer depends on the temporary name a.\n\nFrom ∀xP(x), obtain P(t) for any suitable domain object t; from P(t), obtain ∃xP(x). Existential elimination introduces a fresh temporary witness; do not assume two existential assertions share one witness. Universal introduction requires a truly arbitrary object, rather than generalizing a result about one special constant to every object.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_reasoning__quantifier_negation": {
+      "title": "Negating quantifiers and quantifier chains: example practice",
+      "statement": "Rewrite “Not every account has permission” as an equivalent quantified statement with negation applied only to “has permission”. Is it equivalent to “Every account lacks permission”?",
+      "answer_text": "‘Not every account has permission’ means there is an account without permission, rather than all accounts lacking permission.",
+      "explanation": "‘Not every account has permission’ means there is an account without permission, rather than all accounts lacking permission.\n\nNegating ‘everyone has at least one partner’ means ‘someone has no partners’, rather than merely ‘someone has one unsuitable partner’. If the matrix contains implication or conjunction, continue pushing the negation inward using propositional equivalence laws.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_reasoning__quantifier_distribution": {
+      "title": "Quantifier distribution and moving independent conditions: example practice",
+      "statement": "Let D={0,1}, with P true only at 0 and Q true only at 1. Evaluate ∀x(P(x)∨Q(x)) and ∃x(P(x)∧Q(x)).",
+      "answer_text": "Let D={0,1}, with P true only at 0 and Q true only at 1. Every object satisfies P∨Q, but no object satisfies P∧Q.",
+      "explanation": "Let D={0,1}, with P true only at 0 and Q true only at 1. Every object satisfies P∨Q, but no object satisfies P∧Q.\n\nCounterexamples often use different objects satisfying different predicates. Independence concerns free occurrences, rather than the absence of a letter from a string; check quantifiers and variable bindings.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_reasoning__universal_instantiation": {
+      "title": "Universal instantiation: example practice",
+      "statement": "Given ∀x(P(x)→Q(x)), instantiate the universal formula at a temporary domain element a. Write the resulting formula.",
+      "answer_text": "From ∀x(P(x)→Q(x)), obtain P(a)→Q(a) for a temporary object a.",
+      "explanation": "From ∀x(P(x)→Q(x)), obtain P(a)→Q(a) for a temporary object a.\n\nThe same universal premise may be instantiated separately for multiple objects. If the target involves an existential witness, instantiate at that witness to connect the premises.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_reasoning__existential_instantiation": {
+      "title": "Existential elimination and fresh witnesses: example practice",
+      "statement": "On D={0,1}, let P be true only at 0 and Q only at 1. Can one choose the same object as a witness for both ∃xP(x) and ∃xQ(x)? Explain.",
+      "answer_text": "If P holds only at 0 and Q only at 1, both have witnesses but cannot share one.",
+      "explanation": "If P holds only at 0 and Q only at 1, both have witnesses but cannot share one.\n\nTwo existential premises generally require different temporary names unless other evidence establishes a common witness. Fresh names prevent existence from being silently replaced by an assertion about a specified object.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_reasoning__existential_generalization": {
+      "title": "Existential introduction: example practice",
+      "statement": "Given that the integer 4 satisfies 4²=16, use existential introduction to state an existence claim about x²=16. Does this step assert that 4 is the unique solution?",
+      "answer_text": "The integer 4 satisfies 4²=16, so there exists an integer x with x²=16. This does not assert that 4 is the only solution.",
+      "explanation": "The integer 4 satisfies 4²=16, so there exists an integer x with x²=16. This does not assert that 4 is the only solution.\n\nExistential introduction often ends a local witness derivation: first obtain Q(a), then infer ∃xQ(x), which omits the temporary name. The existential conclusion is weaker than the specific instance.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_reasoning__universal_generalization": {
+      "title": "Universal introduction and arbitrariness: example practice",
+      "statement": "From ∀x(P(x)∨Q(x)), ∀x(P(x)→R(x)), and ∀x(Q(x)→R(x)), prove ∀xR(x). Explain why the object a used before universal generalization must be arbitrary.",
+      "answer_text": "If every object satisfies P∨Q and each property guarantees R, use cases for arbitrary a to obtain R(a), then generalize to ∀xR(x).",
+      "explanation": "If every object satisfies P∨Q and each property guarantees R, use cases for arbitrary a to obtain R(a), then generalize to ∀xR(x).\n\nAn arbitrary object and an existential witness play different inferential roles. At the end, explain why a was not specially selected, allowing the conclusion to apply to every object.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_prenex": {
+      "title": "Prenex normal form: example practice",
+      "statement": "Over a nonempty domain, convert (∀xP(x))∨(∃xQ(x)) to prenex normal form, first renaming the bound variables to distinct fresh names.",
+      "answer_text": "On a nonempty domain, first rename (∀xP(x))∨(∃xQ(x)) to (∀uP(u))∨(∃vQ(v)). Since u is not free in Q(v) and v is not free in P(u), obtain ∀u∃v(P(u)∨Q(v)).",
+      "explanation": "On a nonempty domain, first rename (∀xP(x))∨(∃xQ(x)) to (∀uP(u))∨(∃vQ(v)). Since u is not free in Q(v) and v is not free in P(u), obtain ∀u∃v(P(u)∨Q(v)).\n\nThis discussion uses the nonempty-domain convention of classical first-order logic. To move Qx outward when combining (Qx A) with another formula B, x generally must not occur freely in B; otherwise an originally free variable may become incorrectly bound. Negation interchanges ∀ and ∃. For a quantifier in the antecedent of an implication, first eliminate the implication rather than copying the original quantifier mechanically. Different types of quantifiers generally cannot be reordered arbitrarily.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_prenex__prenex_structure": {
+      "title": "Quantifier prefixes and quantifier-free matrices: example practice",
+      "statement": "Determine which of ∀u∃v(R(u,v)∨S(z)) and ∀u(R(u,z)∨∃vS(v)) is already in prenex form. Identify the free parameter in the prenex formula.",
+      "answer_text": "∀u∃v(R(u,v)∨S(z)) is prenex, with z still a free parameter. ∀u(R(u,z)∨∃vS(v)) is not yet prenex.",
+      "explanation": "∀u∃v(R(u,v)∨S(z)) is prenex, with z still a free parameter. ∀u(R(u,z)∨∃vS(v)) is not yet prenex.\n\nEvery quantifier must appear at the beginning to satisfy prenex syntax. Prenex conversion and eliminating free variables are different tasks. Do not add quantifiers simply to bind every variable.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_prenex__standardizing_apart": {
+      "title": "Standardizing bound variables apart for prenex conversion: example practice",
+      "statement": "In (∃xP(x))→R(x), rename the variable bound in the antecedent to a fresh variable u. Write the result and determine whether the x in the consequent should also be renamed.",
+      "answer_text": "In (∃xP(x))→R(x), first rename the antecedent's x to u; the consequent's x continues to denote an externally specified object.",
+      "explanation": "In (∃xP(x))→R(x), first rename the antecedent's x to u; the consequent's x continues to denote an externally specified object.\n\nThe same x may be bound by ∃x in an antecedent but free in the consequent. Moving that ∃x directly to the beginning would alter the consequent. Rename the binding first, then use equivalence laws to avoid capture.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-predicate_prenex__quantifier_movement": {
+      "title": "Moving quantifiers outward and switching them under negation: example practice",
+      "statement": "Convert ¬∃x(P(x)∧Q(x)) to prenex normal form with negations in the matrix applied only to atomic predicates.",
+      "answer_text": "¬∃x(P(x)∧Q(x)) converts to ∀x(¬P(x)∨¬Q(x)), rather than ∃x(¬P(x)∨¬Q(x)).",
+      "explanation": "¬∃x(P(x)∧Q(x)) converts to ∀x(¬P(x)∨¬Q(x)), rather than ∃x(¬P(x)∨¬Q(x)).\n\nMeeting prenex syntax does not guarantee equivalence to the original formula; justify each transformation. The order of mixed quantifiers generally preserves conversion dependencies, and ∀ and ∃ cannot be exchanged merely for neatness.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-proof_direct_contradiction": {
+      "title": "Direct proof and proof by contradiction: example practice",
+      "statement": "Let n be an integer. Prove by contradiction that if n² is even, then n is even.",
+      "answer_text": "To prove that an integer n with even n² is even, suppose instead that n is odd and write n=2k+1. Then n²=2(2k²+2k)+1 is odd, contradicting that n² is even. Hence n is even.",
+      "explanation": "To prove that an integer n with even n² is even, suppose instead that n is odd and write n=2k+1. Then n²=2(2k²+2k)+1 is odd, contradicting that n² is even. Hence n is even.\n\nFirst specify the objects, all assumptions, and the target. Justify each integer parameter, parity representation, or contradiction assumption introduced. At the end of a contradiction proof, identify the fact contradicted rather than merely writing ‘clearly a contradiction’. A valid nonconstructive contradiction proof may establish existence without an explicit witness. Follow a specified method when the question requires one.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-proof_direct_contradiction__direct_proof": {
+      "title": "Direct proofs from definitions: example practice",
+      "statement": "Let a, b, and c be integers with a|b and b|c. Prove a|c directly from the definition of divisibility.",
+      "answer_text": "If a|b and b|c, write b=ar and c=bs for integers r,s. Then c=a(rs), and rs is an integer, so a|c.",
+      "explanation": "If a|b and b|c, write b=ar and c=bs for integers r,s. Then c=a(rs), and rs is an integer, so a|c.\n\nDiscrete topics such as divisibility and parity often use integer parameters to expand definitions and rewrite the target in the form of its definition. Finally verify that new parameters belong to the required set.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-proof_direct_contradiction__contradiction": {
+      "title": "Proof by contradiction with the exact negation of the target: example practice",
+      "statement": "In a contradiction proof of the infinitude of primes, suppose p₁,…,p_k lists all primes and put N=p₁⋯p_k+1. Explain how a prime divisor of N contradicts completeness of the list, without assuming that N itself is prime.",
+      "answer_text": "Suppose a finite list contains all primes. A prime divisor of the product of the listed primes plus 1 yields a prime absent from the list, contradicting the list's assumed completeness.",
+      "explanation": "Suppose a finite list contains all primes. A prime divisor of the product of the listed primes plus 1 yields a prime absent from the list, contradicting the list's assumed completeness.\n\nEnd the proof by identifying which two assertions cannot both be true. A nonconstructive contradiction proof of existence may establish an object's existence without explicitly constructing it, but still requires complete reasoning rather than an appeal to intuition.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-proof_direct_contradiction__contrapositive": {
+      "title": "Contrapositives and proof by contraposition: example practice",
+      "statement": "Let n be an integer. Prove by contraposition that if n² is odd, then n is odd.",
+      "answer_text": "To prove that odd n² implies odd n, prove the contrapositive: if n is even, write n=2k; then n²=4k² is even.",
+      "explanation": "To prove that odd n² implies odd n, prove the contrapositive: if n is even, write n=2k; then n²=4k² is even.\n\nWhen contraposition is required, state the current assumption and target explicitly rather than merely reversing the original statement. It can be related to proof by contradiction, but the proof structure should be clear.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-proof_induction": {
+      "title": "Mathematical induction: example practice",
+      "statement": "Prove by mathematical induction that 1+2+⋯+n=n(n+1)/2 for every integer n≥1.",
+      "answer_text": "For n≥1, prove 1+2+⋯+n=n(n+1)/2. It holds at n=1. If the first k terms sum to k(k+1)/2, adding k+1 gives (k+1)(k+2)/2. Therefore the formula holds for all positive integers.",
+      "explanation": "For n≥1, prove 1+2+⋯+n=n(n+1)/2. It holds at n=1. If the first k terms sum to k(k+1)/2, adding k+1 gives (k+1)(k+2)/2. Therefore the formula holds for all positive integers.\n\nState the starting index, base case, induction hypothesis, induction step, and final range. The starting point must match the original proposition. Checking a few values helps verification but cannot replace the successor proof. If a step depends on overlapping sets, division, or inequality conditions, check that those operations also work in the smallest induction step.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-proof_induction__induction_principle": {
+      "title": "The base case and successor step: example practice",
+      "statement": "An induction proof that 3^n−1 is even is to begin at n=0. State the required base case, compute its value, and determine whether it has the required property.",
+      "answer_text": "When proving from n=0 that 3^n−1 is even, check that the value 0 at n=0 is even. Induction need not start at 1.",
+      "explanation": "When proving from n=0 that 3^n−1 is even, check that the value 0 at n=0 is even. Induction need not start at 1.\n\nIf the successor argument works only over a certain range, the required earlier base cases must be covered separately. Checking many numerical examples cannot replace an argument for arbitrary k.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-proof_induction__induction_algebra_inequality": {
+      "title": "Algebraic recurrences and inequalities in induction: example practice",
+      "statement": "Let k≥0 and assume the induction hypothesis 2^k≥k+1. Give a chain of inequalities establishing 2^(k+1)≥k+2, indicating where k≥0 is used.",
+      "answer_text": "From 2^k≥k+1, obtain 2^(k+1)≥2k+2; then use k≥0 to obtain 2k+2≥k+2. Only then is the new target proved.",
+      "explanation": "From 2^k≥k+1, obtain 2^(k+1)≥2k+2; then use k≥0 to obtain 2k+2≥k+2. Only then is the new target proved.\n\nWriting the new expression is only the beginning: show exactly where the hypothesis is used and why the resulting bound reaches the new target. Too small a starting point may make the inequality itself false.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-proof_induction__induction_failure": {
+      "title": "Induction gaps and the smallest boundary case: example practice",
+      "statement": "Someone claims by induction that any n integers are equal: the case n=1 holds; among a₁,…,a_{k+1}, the first k are equal and the last k are equal by the induction hypothesis; since the two groups overlap, all are declared equal. Identify the smallest k where this step fails and explain why.",
+      "answer_text": "In the overlapping-groups false proof that “any n integers are equal,” the two groups at k=1 are disjoint and cannot connect a₁ to a₂.",
+      "explanation": "In the overlapping-groups false proof that “any n integers are equal,” the two groups at k=1 are disjoint and cannot connect a₁ to a₂.\n\nCheck the smallest k especially carefully: two subsets may not yet overlap, a denominator may be zero, or a recurrence may refer to an index not yet established. Apparently correct algebra for large k does not justify skipping the boundary.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-proof_strong_induction": {
+      "title": "Strong induction: example practice",
+      "statement": "Prove by strong induction that every integer n≥2 can be expressed as a product of primes.",
+      "answer_text": "To prove every n≥2 is a product of primes: the case n=2 holds; assume the claim holds from 2 through k. If k+1 is prime, it is done. If composite, write k+1=ab with 2≤a,b≤k. By the strong induction hypothesis, a and b are each products of primes; combine their factorizations.",
+      "explanation": "To prove every n≥2 is a product of primes: the case n=2 holds; assume the claim holds from 2 through k. If k+1 is prime, it is done. If composite, write k+1=ab with 2≤a,b≤k. By the strong induction hypothesis, a and b are each products of primes; combine their factorizations.\n\nStrong induction has the same proving power as ordinary mathematical induction, but is especially useful for prime factorizations, recursive objects, and recurrences depending on several earlier terms. Check that each object used in the step is smaller than the current one and still in the claim’s defined range; unproved boundary cases cannot be borrowed.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-proof_strong_induction__strong_hypothesis": {
+      "title": "The strong induction hypothesis and ordinary induction: example practice",
+      "statement": "A property P(n) is to be proved for n≥2 by strong induction. When proving P(k+1), which instances P(j) may be used? May P(1) be used without an additional argument?",
+      "answer_text": "For a property stated for n≥2, the proof for k+1 may use P(2), P(3), …, P(k), but may not use P(1) without justification.",
+      "explanation": "For a property stated for n≥2, the proof for k+1 may use P(2), P(3), …, P(k), but may not use P(1) without justification.\n\nStrong induction does not assume future cases or permit values before the starting point. It places several previously established smaller objects in the hypothesis together, making it suitable for decomposition and recursion.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-proof_strong_induction__recursive_decomposition": {
+      "title": "Strong induction by decomposition into smaller objects: example practice",
+      "statement": "Let n≥2 and n=2m+r with r∈{0,1}. Given the binary representation of the smaller integer m, explain how to adjust its powers of two and handle r to construct a binary representation of n.",
+      "answer_text": "Divide n by 2 to write n=2m+r, with r∈{0,1}. First handle the smaller m, then increase every exponent in its binary power representation by one and append r.",
+      "explanation": "Divide n by 2 to write n=2m+r, with r∈{0,1}. First handle the smaller m, then increase every exponent in its binary power representation by one and append r.\n\nPrime factorizations, binary representations, and recursive constructions can use this structure. A subobject equal to the original object or below the starting point cannot support a valid induction call.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-proof_strong_induction__multibase_induction": {
+      "title": "Multiple base cases and fixed-step recurrences: example practice",
+      "statement": "To represent every integer amount n≥8 using denominations 3 and 5, use a recurrence that adds one 3-unit ticket to a representation of n−3. Which consecutive base cases must be checked, and how does the induction step use the established range?",
+      "answer_text": "To represent all n≥8 using denominations 3 and 5, first verify 8, 9, and 10. Then, whenever n−3 is in the established range, add one denomination-3 ticket.",
+      "explanation": "To represent all n≥8 using denominations 3 and 5, first verify 8, 9, and 10. Then, whenever n−3 is in the established range, add one denomination-3 ticket.\n\nThe number of base cases depends on the actual recurrence structure; strong induction does not always require exactly two. Identifying the starting point reachable by each recurrence chain prevents omitted index classes.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-set_operation": {
+      "title": "Set operations: example practice",
+      "statement": "Let U={1,2,3,4,5}, A={1,3,5}, and B={2,3}. Find A∩B, A∪B, A∖B, A△B, and the complement of A in U.",
+      "answer_text": "In U={1,2,3,4,5}, let A={1,3,5} and B={2,3}. Then A∩B={3}, A∪B={1,2,3,5}, A\\B={1,5}, A△B={1,2,5}, and A^c={2,4}.",
+      "explanation": "In U={1,2,3,4,5}, let A={1,3,5} and B={2,3}. Then A∩B={3}, A∪B={1,2,3,5}, A\\B={1,5}, A△B={1,2,5}, and A^c={2,4}.\n\nTo prove two sets equal, show for arbitrary x that membership on the left is equivalent to membership on the right. Union and intersection satisfy commutative, associative, and distributive laws. De Morgan’s laws turn the complement of a union into an intersection of complements, and the complement of an intersection into a union of complements. Difference is generally not commutative. For finite sets, |A∪B|=|A|+|B|−|A∩B|; if |A|=n, then |P(A)|=2^n.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-set_operation__complement": {
+      "title": "Complements and De Morgan’s laws: example practice",
+      "statement": "First take U={1,2,3} and A={1}, and find the complement of A. Then replace the universe by U′={1,2,3,4} while keeping A fixed. How does the complement change?",
+      "answer_text": "If U={1,2,3} and A={1}, then A^c={2,3}. Changing the universal set to {1,2,3,4} also adds 4 to the complement.",
+      "explanation": "If U={1,2,3} and A={1}, then A^c={2,3}. Changing the universal set to {1,2,3,4} also adds 4 to the complement.\n\nElements of a complement must lie in U; enlarging U changes the complement of the same A. De Morgan’s laws can be proved by translating nonmembership in a union or intersection into logical negation and comparing membership element by element.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-set_operation__difference": {
+      "title": "Set difference: example practice",
+      "statement": "Let A={1,2,4} and B={2,3}. Find A∖B and B∖A.",
+      "answer_text": "For A={1,2,4} and B={2,3}, A\\B={1,4} and B\\A={3}.",
+      "explanation": "For A={1,2,4} and B={2,3}, A\\B={1,4} and B\\A={3}.\n\nDifference is generally not commutative. A\\B and B\\A are disjoint, and A splits into the disjoint sets A\\B and A∩B. With a fixed universal set, difference can also be written as the intersection of A with the complement of B, namely A∩B^c.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-set_operation__inclusion_exclusion": {
+      "title": "Inclusion-exclusion for finite sets: example practice",
+      "statement": "Let student sets A, B, and C satisfy |A|=10, |B|=9, |C|=8, |A∩B|=4, |A∩C|=3, |B∩C|=2, and |A∩B∩C|=1. The pairwise intersection counts include students in all three sets. Find the number belonging to at least one set and the number belonging to exactly two sets.",
+      "answer_text": "If the three individual sizes are 10, 9, and 8, the pairwise intersection sizes are 4, 3, and 2, and the triple intersection size is 1, then the union contains 19 people and 6 people belong to exactly two sets.",
+      "explanation": "If the three individual sizes are 10, 9, and 8, the pairwise intersection sizes are 4, 3, and 2, and the triple intersection size is 1, then the union contains 19 people and 6 people belong to exactly two sets.\n\nPairwise intersections include the triple intersection. Thus the three-set formula subtracts the three pairwise overlaps and adds the triple intersection back once. The number belonging to exactly two sets is the sum of the three pairwise intersection sizes minus three times the triple intersection size.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-set_operation__intersection": {
+      "title": "Intersection: example practice",
+      "statement": "Compute {1,2}∩{2,3} and {1}∩{2}. Does the nonemptiness of two sets guarantee that their intersection is nonempty?",
+      "answer_text": "{1,2}∩{2,3}={2}. Both {1} and {2} are nonempty, but their intersection is empty.",
+      "explanation": "{1,2}∩{2,3}={2}. Both {1} and {2} are nonempty, but their intersection is empty.\n\nIntersection is commutative, associative, and idempotent, and union and intersection distribute over one another. With a fixed universal set U, A∩U=A. An empty intersection does not mean that both sets themselves are empty.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-set_operation__membership": {
+      "title": "Elements and membership: example practice",
+      "statement": "Let A={∅,{1}}. Determine whether ∅∈A, {1}∈A, and 1∈A hold.",
+      "answer_text": "If A={∅,{1}}, then ∅∈A and {1}∈A, but 1∉A.",
+      "explanation": "If A={∅,{1}}, then ∅∈A and {1}∈A, but 1∉A.\n\nA set is determined by its elements; changing their written order or repeating an element does not change the set. If an element is itself a set, its internal members do not automatically become elements of the outer set. The empty set has no elements, but another set may contain it as an element.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-set_operation__power_set": {
+      "title": "Power sets and counting subsets: example practice",
+      "statement": "Let A={p,q}. List its power set and identify all nonempty proper subsets of A.",
+      "answer_text": "If A={p,q}, then P(A)={∅,{p},{q},{p,q}}. Its nonempty proper subsets are exactly {p} and {q}.",
+      "explanation": "If A={p,q}, then P(A)={∅,{p},{q},{p,q}}. Its nonempty proper subsets are exactly {p} and {q}.\n\nThe empty set and A itself always belong to P(A). A finite set has 2^n−1 nonempty subsets and 2^n−1 proper subsets; for n≥1, it has 2^n−2 nonempty proper subsets. P(A) and A are sets at different levels, so their element types must be distinguished.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-set_operation__subset": {
+      "title": "Subsets, proper subsets, and set equality: example practice",
+      "statement": "Let A={∅,{1}}. Determine whether {∅}⊆A, {∅}∈A, {1}∈A, and 1∈A hold.",
+      "answer_text": "For A={∅,{1}}, {∅}⊆A but {∅}∈A is false. The set {1} is an element of A, whereas 1 is not.",
+      "explanation": "For A={∅,{1}}, {∅}⊆A but {∅}∈A is false. The set {1} is an element of A, whereas 1 is not.\n\nThe empty set is a subset of every set because no element can violate the condition. Proving inclusion requires considering an arbitrary element, rather than finding just one common element. Mutual inclusion splits set equality into two explicit implications.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-set_operation__symmetric_difference": {
+      "title": "Symmetric difference: example practice",
+      "statement": "Let A={1,2,4} and B={2,3}. Find their symmetric difference A△B.",
+      "answer_text": "For A={1,2,4} and B={2,3}, A△B={1,3,4}.",
+      "explanation": "For A={1,2,4} and B={2,3}, A△B={1,3,4}.\n\nSymmetric difference is commutative and associative, and A△A=∅. For two finite sets, |A△B|=|A|+|B|−2|A∩B|; common elements must be removed completely.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-set_operation__union": {
+      "title": "Union: example practice",
+      "statement": "Find the union of {1,2} and {2,3}, and state how many times the common element 2 occurs in the union.",
+      "answer_text": "{1,2}∪{2,3}={1,2,3}; the element 2 appears only once.",
+      "explanation": "{1,2}∪{2,3}={1,2,3}; the element 2 appears only once.\n\nUnion is commutative, associative, and idempotent. Common elements must not be counted twice in a finite union; for two sets, |A∪B|=|A|+|B|−|A∩B|.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_cartesian": {
+      "title": "Cartesian products and relations: example practice",
+      "statement": "Let A={1,2}, B={x,y}, and R={(1,x),(1,y)}. Find |A×B| and determine whether R is a binary relation from A to B. Does 1 having two related elements while 2 has none prevent R from being a relation?",
+      "answer_text": "If A={1,2} and B={x,y}, then A×B has four ordered pairs. R={(1,x),(1,y)} is a relation from A to B even though 1 is related to two elements and 2 to none.",
+      "explanation": "If A={1,2} and B={x,y}, then A×B has four ordered pairs. R={(1,x),(1,y)} is a relation from A to B even though 1 is related to two elements and 2 to none.\n\nA relation may be represented by a set of ordered pairs, a 0–1 matrix, or a directed graph. The element orders corresponding to matrix rows and columns must be specified first; graph vertices and arrow directions represent ordered pairs. A relation need not use every left endpoint, and one left endpoint may be related to several right endpoints. Those additional restrictions concern functions. For finite sets, |A×B|=|A||B|, and there are 2^(|A||B|) relations from A to B.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_cartesian__binary_relation": {
+      "title": "Binary relations and their types: example practice",
+      "statement": "Let A={1,2} and B={a}. Determine whether ∅, {(1,a)}, and {(1,a),(2,a)} are each binary relations from A to B.",
+      "answer_text": "For A={1,2} and B={a}, ∅, {(1,a)}, and {(1,a),(2,a)} are all valid relations.",
+      "explanation": "For A={1,2} and B={a}, ∅, {(1,a)}, and {(1,a),(2,a)} are all valid relations.\n\nA relation need not associate each element of A with an element of B, nor need an associated element be unique. Pairs with the wrong component types cannot form a relation from the specified A to B, even if they are correctly written as ordered pairs.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_cartesian__cartesian_product": {
+      "title": "Cartesian product: example practice",
+      "statement": "Let A={0,1} and B={a,b}. List all elements of the Cartesian product A×B.",
+      "answer_text": "For A={0,1} and B={a,b}, A×B={(0,a),(0,b),(1,a),(1,b)}.",
+      "explanation": "For A={0,1} and B={a,b}, A×B={(0,a),(0,b),(1,a),(1,b)}.\n\nThe first component comes from A and the second from B, so the factor order determines the component types. If either factor is empty, the product is empty. Although A×B and B×A have equal numbers of elements, they need not be equal as sets.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_cartesian__ordered_pair": {
+      "title": "Ordered pairs and their equality: example practice",
+      "statement": "Determine whether (0,1) equals (1,0), and whether {0,1} equals {1,0}. Explain how order matters differently for ordered pairs and sets.",
+      "answer_text": "(0,1)≠(1,0), even though {0,1}={1,0}.",
+      "explanation": "(0,1)≠(1,0), even though {0,1}={1,0}.\n\nThe unordered set {a,b} records no order and removes repetitions; the ordered pair (a,b) always retains two positions. Relations use ordered pairs as their basic records, rather than unordered two-element sets.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_cartesian__relation_counting": {
+      "title": "Counting binary relations and constrained relations: example practice",
+      "statement": "Let |A|=|B|=2. How many binary relations from A to B are there? How many remain if one specified pair in A×B must be included and a different specified pair must be excluded?",
+      "answer_text": "If |A|=2 and |B|=2, there are 16 relations. Requiring one pair to be present and a different pair to be absent leaves only 2²=4 relations.",
+      "explanation": "If |A|=2 and |B|=2, there are 16 relations. Requiring one pair to be present and a different pair to be absent leaves only 2²=4 relations.\n\nIf some pairs must be included and others must be excluded, with no conflicting requirements, only the remaining pairs are free choices. If every element of A must relate to at least one element of B, choose a nonempty subset in each row; the general counting formula for unrestricted relations does not apply directly.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_cartesian__representations": {
+      "title": "Boolean matrix representation of a relation: example practice",
+      "statement": "Use the element orders A=(u,v) and B=(0,1). A relation has Boolean matrix rows (1,0) and (1,1). List all ordered pairs in the relation.",
+      "answer_text": "For A=(u,v) and B=(0,1), a matrix with rows (1,0) and (1,1) represents R={(u,0),(v,0),(v,1)}.",
+      "explanation": "For A=(u,v) and B=(0,1), a matrix with rows (1,0) and (1,1) represents R={(u,0),(v,0),(v,1)}.\n\nThe row and column orders are part of the representation: reordering changes the matrix without changing the abstract relation. Taking the inverse relation corresponds to transposition. Composition uses Boolean matrix multiplication, with AND for multiplication and OR for combining terms; multiple realizations of the same relation pair are recorded as just 1.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_operation": {
+      "title": "Operations on relations: example practice",
+      "statement": "On A={1,2,3}, let R={(1,2),(2,3)}. Find the relation powers R² and R³.",
+      "answer_text": "On A={1,2,3}, let R={(1,2),(2,3)}. Then R²={(1,3)}, since the only two-step chain is 1→2→3. R³=∅ because no edge continues from 3.",
+      "explanation": "On A={1,2,3}, let R={(1,2),(2,3)}. Then R²={(1,3)}, since the only two-step chain is 1→2→3. R³=∅ because no edge continues from 3.\n\nFor a relation R on A, define R⁰=I_A and R^(k+1)=R∘R^k, where I_A={(a,a)｜a∈A}. Membership (x,y)∈R^k means there exists a relation chain of length exactly k; elements may be revisited. It does not count such chains. Composition is associative and usually not commutative; relation matrices use Boolean multiplication for composition rather than ordinary counting multiplication.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-relation_operation__complement_relation": {
+      "title": "Complement of a relation: example practice",
+      "statement": "On A={1,2}, let R={(1,2)}. Find the complement of R relative to A×A.",
+      "answer_text": "For A={1,2} and R={(1,2)}, the complement relation on A is {(1,1),(2,1),(2,2)}.",
+      "explanation": "For A={1,2} and R={(1,2)}, the complement relation on A is {(1,1),(2,1),(2,2)}.\n\nThe inverse relation swaps components, whereas the complement changes whether each candidate ordered pair is selected. Complementing the matrix swaps every 0 and 1 while preserving its dimensions and the object orders of rows and columns.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
     }
   }
 }

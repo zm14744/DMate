@@ -13,6 +13,8 @@ on:
       - 'scripts/sync_offline_styles.py'
       - 'scripts/sync_offline_shell.py'
       - 'scripts/sync_offline_content.py'
+      - 'scripts/migrate_concept_examples.py'
+      - 'scripts/test_offline_example_migration.py'
       - 'scripts/offline_translations.py'
       - 'scripts/test_offline_translations.py'
       - 'scripts/test_offline_study_browser.cjs'
@@ -34,6 +36,7 @@ on:
       - 'scripts/test_scrollbar_visibility_browser.cjs'
       - 'scripts/test_select_controls_browser.cjs'
       - 'scripts/test_search_controls_browser.cjs'
+      - 'scripts/test_library_panels_browser.cjs'
       - 'scripts/test_drawing_panels_browser.cjs'
       - 'scripts/test_overlay_zoom_browser.cjs'
       - 'scripts/test_math_diagram_browser.cjs'
@@ -50,6 +53,8 @@ on:
       - 'scripts/sync_offline_styles.py'
       - 'scripts/sync_offline_shell.py'
       - 'scripts/sync_offline_content.py'
+      - 'scripts/migrate_concept_examples.py'
+      - 'scripts/test_offline_example_migration.py'
       - 'scripts/offline_translations.py'
       - 'scripts/test_offline_translations.py'
       - 'scripts/test_offline_study_browser.cjs'
@@ -71,6 +76,7 @@ on:
       - 'scripts/test_scrollbar_visibility_browser.cjs'
       - 'scripts/test_select_controls_browser.cjs'
       - 'scripts/test_search_controls_browser.cjs'
+      - 'scripts/test_library_panels_browser.cjs'
       - 'scripts/test_drawing_panels_browser.cjs'
       - 'scripts/test_overlay_zoom_browser.cjs'
       - 'scripts/test_math_diagram_browser.cjs'
@@ -97,7 +103,7 @@ jobs:
             requirements.txt
             requirements-agents.txt
       - name: Validate Python syntax
-        run: python -m py_compile app.py
+        run: python -m py_compile app.py scripts/migrate_concept_examples.py
       - name: Validate offline JavaScript syntax
         run: |
           node --check static/offline.js
@@ -130,6 +136,7 @@ jobs:
           node --check scripts/test_scrollbar_visibility_browser.cjs
           node --check scripts/test_select_controls_browser.cjs
           node --check scripts/test_search_controls_browser.cjs
+          node --check scripts/test_library_panels_browser.cjs
           node --check scripts/test_drawing_panels_browser.cjs
           node --check scripts/test_overlay_zoom_browser.cjs
           node --check scripts/test_math_diagram_browser.cjs
@@ -147,7 +154,9 @@ jobs:
       - name: Validate content references
         run: |
           python scripts/sync_offline_content.py --check
+          python scripts/migrate_concept_examples.py --check
           python scripts/test_offline_content.py
+          python scripts/test_offline_example_migration.py
           python scripts/test_offline_content_math.py
           python scripts/test_offline_translations.py
       - name: Verify service worker precache files exist
@@ -215,6 +224,7 @@ jobs:
           node scripts/test_scrollbar_visibility_browser.cjs
           node scripts/test_select_controls_browser.cjs
           node scripts/test_search_controls_browser.cjs
+          node scripts/test_library_panels_browser.cjs
           node scripts/test_mobile_drawers_browser.cjs
           node scripts/test_knowledge_graph_browser.cjs
           node scripts/test_offline_graph_browser.cjs

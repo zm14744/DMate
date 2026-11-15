@@ -59,6 +59,46 @@ body.offline-workspace .offline-main.center { position:relative; display:flex !i
 .question-item strong,.concept-item strong { display:block; margin-bottom:5px; color:var(--text-primary); font-size:14px; font-weight:500; }
 .question-item small,.concept-item small { color:var(--text-muted); font-size:12px; }
 .question-detail,.concept-detail { min-height:330px; padding:20px; }
+
+/* Library controls stay in place while the list and selected record scroll
+   independently. Other panels (graph and drawing) retain their own layouts. */
+body.offline-workspace :is(#questionsPanel,#conceptsPanel) {
+  display:flex;
+  flex-direction:column;
+  flex:1 1 0;
+  min-height:0;
+  overflow:hidden;
+}
+body.offline-workspace :is(#questionsPanel,#conceptsPanel) > .offline-toolbar {
+  flex:0 0 auto;
+}
+body.offline-workspace :is(#questionsPanel,#conceptsPanel) > :is(.question-layout,.concept-layout) {
+  flex:1 1 0;
+  min-width:0;
+  min-height:0;
+  grid-template-rows:minmax(0,1fr);
+  align-items:stretch;
+  overflow:hidden;
+}
+body.offline-workspace :is(#questionList,#conceptList,#questionDetail,#conceptDetail) {
+  min-width:0;
+  min-height:0;
+  max-height:none;
+  overflow:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+body.offline-workspace :is(#questionList,#conceptList) {
+  align-content:start;
+  grid-auto-rows:max-content;
+}
+body.offline-workspace :is(#questionList,#conceptList) > button { flex-shrink:0; }
+@media(max-width:1100px) {
+  body.offline-workspace :is(#questionsPanel,#conceptsPanel) > :is(.question-layout,.concept-layout) {
+    grid-template-rows:minmax(0,min(190px,26%)) minmax(0,1fr);
+  }
+}
+
 .detail-kicker { margin-bottom:9px; color:var(--text-muted); font-size:12px; }
 .detail-title { margin:0 0 16px; font-size:18px; font-weight:600; line-height:1.5; }
 .detail-section { margin-top:18px; }

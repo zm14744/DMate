@@ -1,5 +1,5 @@
 {
-  "version": 49,
+  "version": 57,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1073,42 +1073,42 @@
           "source_id": "sawfin_bilibili",
           "title": "Generating Functions",
           "sections": [
-            "Discrete Math II - 8.4.1 Readiness for Generating Functions: Model with Generating Functions",
-            "Discrete Math II - 8.4.2 Readiness for Generating Functions: Power Series and Fundamental Identity",
-            "Discrete Math II - 8.4.3 Readiness for Generating Functions: The Finite Geometric Series",
-            "Discrete Math II - 8.4.4 Readiness for Generating Functions: Binomial and Extended Binomial Theorem",
-            "Discrete Math II - 8.4.5 Solve Counting Problems with Generating Functions",
-            "Discrete Math II - 8.4.6 The Explicit Form of a Generating Function",
-            "Discrete Math II - 8.4.7 Solve Recurrence Relations with Generating Function"
+            "p29 Discrete Math II - 8.4.1 Readiness for Generating Functions: Model with Generating Functions",
+            "p30 Discrete Math II - 8.4.2 Readiness for Generating Functions: Power Series and Fundamental Identity",
+            "p31 Discrete Math II - 8.4.3 Readiness for Generating Functions: The Finite Geometric Series",
+            "p32 Discrete Math II - 8.4.4 Readiness for Generating Functions: Binomial and Extended Binomial Theorem",
+            "p33 Discrete Math II - 8.4.5 Solve Counting Problems with Generating Functions",
+            "p34 Discrete Math II - 8.4.6 The Explicit Form of a Generating Function",
+            "p35 Discrete Math II - 8.4.7 Solve Recurrence Relations with Generating Function"
           ],
           "lessons": [
             {
-              "title": "Discrete Math II - 8.4.1 Readiness for Generating Functions: Model with Generating Functions",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=110"
+              "title": "p29 Discrete Math II - 8.4.1 Readiness for Generating Functions: Model with Generating Functions",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=30"
             },
             {
-              "title": "Discrete Math II - 8.4.2 Readiness for Generating Functions: Power Series and Fundamental Identity",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=111"
+              "title": "p30 Discrete Math II - 8.4.2 Readiness for Generating Functions: Power Series and Fundamental Identity",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=31"
             },
             {
-              "title": "Discrete Math II - 8.4.3 Readiness for Generating Functions: The Finite Geometric Series",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=112"
+              "title": "p31 Discrete Math II - 8.4.3 Readiness for Generating Functions: The Finite Geometric Series",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=32"
             },
             {
-              "title": "Discrete Math II - 8.4.4 Readiness for Generating Functions: Binomial and Extended Binomial Theorem",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=113"
+              "title": "p32 Discrete Math II - 8.4.4 Readiness for Generating Functions: Binomial and Extended Binomial Theorem",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=33"
             },
             {
-              "title": "Discrete Math II - 8.4.5 Solve Counting Problems with Generating Functions",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=114"
+              "title": "p33 Discrete Math II - 8.4.5 Solve Counting Problems with Generating Functions",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=34"
             },
             {
-              "title": "Discrete Math II - 8.4.6 The Explicit Form of a Generating Function",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=115"
+              "title": "p34 Discrete Math II - 8.4.6 The Explicit Form of a Generating Function",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=35"
             },
             {
-              "title": "Discrete Math II - 8.4.7 Solve Recurrence Relations with Generating Function",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=116"
+              "title": "p35 Discrete Math II - 8.4.7 Solve Recurrence Relations with Generating Function",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=36"
             }
           ]
         }
@@ -1147,22 +1147,22 @@
           "source_id": "sawfin_bilibili",
           "title": "Linear Homogeneous Recurrence Relations",
           "sections": [
-            "Discrete Math II - 8.2.1 Solving First-Order Linear Homogeneous Recurrence Relations",
-            "Discrete Math II - 8.2.2 Solving Second-Order Linear Homogeneous Recurrence",
-            "Discrete Math II - 8.2.3 General Case Linear Homogeneous Recurrence Relation"
+            "p25 Discrete Math II - 8.2.1 Solving First-Order Linear Homogeneous Recurrence Relations",
+            "p26 Discrete Math II - 8.2.2 Solving Second-Order Linear Homogeneous Recurrence",
+            "p27 Discrete Math II - 8.2.3 General Case Linear Homogeneous Recurrence Relation"
           ],
           "lessons": [
             {
-              "title": "Discrete Math II - 8.2.1 Solving First-Order Linear Homogeneous Recurrence Relations",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=106"
+              "title": "p25 Discrete Math II - 8.2.1 Solving First-Order Linear Homogeneous Recurrence Relations",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=26"
             },
             {
-              "title": "Discrete Math II - 8.2.2 Solving Second-Order Linear Homogeneous Recurrence",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=107"
+              "title": "p26 Discrete Math II - 8.2.2 Solving Second-Order Linear Homogeneous Recurrence",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=27"
             },
             {
-              "title": "Discrete Math II - 8.2.3 General Case Linear Homogeneous Recurrence Relation",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=108"
+              "title": "p27 Discrete Math II - 8.2.3 General Case Linear Homogeneous Recurrence Relation",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=28"
             }
           ]
         }
@@ -1180,12 +1180,12 @@
           "source_id": "sawfin_bilibili",
           "title": "Non-Homogeneous Linear Recurrence Relations",
           "sections": [
-            "Discrete Math II - 8.2.4 Non-Homogeneous Linear Recurrence Relations"
+            "p28 Discrete Math II - 8.2.4 Non-Homogeneous Linear Recurrence Relations"
           ],
           "lessons": [
             {
-              "title": "Discrete Math II - 8.2.4 Non-Homogeneous Linear Recurrence Relations",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=109"
+              "title": "p28 Discrete Math II - 8.2.4 Non-Homogeneous Linear Recurrence Relations",
+              "url": "https://www.bilibili.com/video/BV1qZySYpE1e/?p=29"
             }
           ]
         }
@@ -1344,7 +1344,7 @@
           "lessons": [
             {
               "title": "2.1.1-连通和DFS-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=6"
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/"
             },
             {
               "title": "2.1.2-连通和DFS-算法",
@@ -1376,11 +1376,11 @@
           "lessons": [
             {
               "title": "2.2.1-割点和割边-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=8"
+              "url": "https://www.bilibili.com/video/BV13yHseiEGD/"
             },
             {
               "title": "2.2.2-割点和割边-算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=9"
+              "url": "https://www.bilibili.com/video/BV1JhHSeHEzA/"
             }
           ]
         }
@@ -1403,7 +1403,7 @@
           "lessons": [
             {
               "title": "6.1.1-赋权图和距离-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=27"
+              "url": "https://www.bilibili.com/video/BV1MU5yzbETy/"
             }
           ]
         }
@@ -1427,11 +1427,11 @@
           "lessons": [
             {
               "title": "3.3.1-欧拉图-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=16"
+              "url": "https://www.bilibili.com/video/BV1jWDmY8Ej7/"
             },
             {
               "title": "3.3.2-欧拉图-算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=17"
+              "url": "https://www.bilibili.com/video/BV111kTYCEHE/"
             }
           ]
         }
@@ -1454,7 +1454,7 @@
           "lessons": [
             {
               "title": "3.4-哈密尔顿图",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=18"
+              "url": "https://www.bilibili.com/video/BV1P1CwYAEZW/"
             }
           ]
         }
@@ -1482,23 +1482,23 @@
           "lessons": [
             {
               "title": "2.3.1-距离和BFS-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=10"
+              "url": "https://www.bilibili.com/video/BV1BC4neEE36/"
             },
             {
               "title": "2.3.2-距离和BFS-算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=11"
+              "url": "https://www.bilibili.com/video/BV1SRtVeDErF/"
             },
             {
               "title": "6.1.1-赋权图和距离-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=27"
+              "url": "https://www.bilibili.com/video/BV1MU5yzbETy/"
             },
             {
               "title": "6.1.2-赋权图和距离-算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=28"
+              "url": "https://www.bilibili.com/video/BV176Niz8E7A/"
             },
             {
               "title": "7.4-有向图的距离",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=42"
+              "url": "https://www.bilibili.com/video/BV11cuq6zEhK/"
             }
           ]
         }
@@ -1588,7 +1588,7 @@
           "lessons": [
             {
               "title": "3.2.1-二分图-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=14"
+              "url": "https://www.bilibili.com/video/BV1NPSEYoEY7/"
             }
           ]
         }
@@ -1672,15 +1672,15 @@
           "lessons": [
             {
               "title": "5.1.1-匹配和最大匹配-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=22"
+              "url": "https://www.bilibili.com/video/BV1njQdYcERV/"
             },
             {
               "title": "5.1.2.1-匹配和最大匹配-匈牙利算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=23"
+              "url": "https://www.bilibili.com/video/BV12SXrYNE58/"
             },
             {
               "title": "5.2-完美匹配",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=26"
+              "url": "https://www.bilibili.com/video/BV1SidZYfEQK/"
             }
           ]
         }
@@ -1727,12 +1727,22 @@
           "source_id": "uestc_discrete_lower",
           "title": "9.2.1 根树",
           "sections": [
-            "9.2.1 根树"
+            "9.2.1 根树",
+            "9.2.2 根树的遍历",
+            "9.2.3 最优树和哈夫曼算法"
           ],
           "lessons": [
             {
               "title": "9.2.1 根树",
               "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=23"
+            },
+            {
+              "title": "9.2.2 根树的遍历",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=24"
+            },
+            {
+              "title": "9.2.3 最优树和哈夫曼算法",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=25"
             }
           ]
         }
@@ -2389,10 +2399,27 @@
       "cmu_2021_parts_verified": 35,
       "cmu_2021_total_duration": "31:26:24",
       "cmu_2021_mapped_nodes": 18,
-      "last_audit_scope": "One selected course per node after final search. Count-generating-functions now uses BU Discrete Math II P110-P116 for a complete series naturally following BU recurrence relations; CMU P14-P17 retained in source pool but not active because BU has tighter course continuity.",
+      "last_audit_scope": "Nanjing GTA: replaced the exact 2.1.1 connectivity-theory and 6.1.1 weighted-graph-theory lesson URLs with their independently verified single-video BVs. Other Nanjing lesson mappings remain unchanged pending individual BV confirmation. BU mappings remain unchanged pending verification of the separate Discrete Math II Bilibili video entry.",
       "unique_episode_urls": 141,
       "cross_node_reused_urls": 3,
-      "sources_with_selected_nodes": 13
+      "sources_with_selected_nodes": 13,
+      "nanjing_verified_direct_episode_links": 2,
+      "nanjing_pending_episode_titles": [
+        "2.1.2-连通和DFS-算法",
+        "2.2.1-割点和割边-理论",
+        "2.2.2-割点和割边-算法",
+        "2.3.1-距离和BFS-理论",
+        "2.3.2-距离和BFS-算法",
+        "3.2.1-二分图-理论",
+        "3.3.1-欧拉图-理论",
+        "3.3.2-欧拉图-算法",
+        "3.4-哈密尔顿图",
+        "5.1.1-匹配和最大匹配-理论",
+        "5.1.2.1-匹配和最大匹配-匈牙利算法",
+        "5.2-完美匹配",
+        "7.3.1-有向图的连通-理论",
+        "7.4-有向图的距离"
+      ]
     },
     "excluded_source_ids": [
       "scut_discrete_math",
@@ -2900,59 +2927,32 @@
       ],
       "scope_limitation": "Evaluated public syllabi, indexed video part names and available lecture descriptions/transcripts. These edits do not certify the teaching quality of every minute of every video; the live Bilibili playback status was not exhaustively checked.",
       "last_final_review": {
-        "date": "2026-11-13",
-        "scope": "rechecked current selected videos against mainland Bilibili part lists and original course syllabi",
+        "date": "2026-11-14",
+        "scope": "verified direct Bilibili episode links for the existing Nanjing course selections without changing course or node selections",
         "changes": [
           {
-            "node": "graph_planar",
-            "previous": "hit_set_graph_2017",
-            "selected": "dogeman_discrete",
-            "parts": [
-              39,
-              40,
-              41
-            ],
-            "reason": "three consecutive, directly titled lessons cover planar graph concepts, Euler formula and planarity tests, dual and outerplanar graphs; they lead naturally into the same course's graph-coloring P42-P44"
+            "node": "graph_connectivity",
+            "lesson": "2.1.1-连通和DFS-理论",
+            "previous": "BV1gnWVegEpQ/?p=6",
+            "selected": "BV1gnWVegEpQ",
+            "reason": "Independent episode page identifies itself as 2.1.1 theory, episode 6/42."
           },
           {
-            "node": "recurrence_homogeneous",
-            "previous": "CMU P12-P13",
-            "selected": "BU Discrete Math II P106-P108",
-            "parts": [
-              106,
-              107,
-              108
-            ],
-            "reason": "three precise lessons separately cover first-order, second-order and general linear homogeneous recurrences"
+            "node": "graph_weighted",
+            "lesson": "6.1.1-赋权图和距离-理论",
+            "previous": "BV1gnWVegEpQ/?p=27",
+            "selected": "BV1MU5yzbETy",
+            "reason": "Independent episode page identifies itself as 6.1.1 weighted graph and distance theory, episode 27/42."
           },
           {
-            "node": "recurrence_nonhomogeneous",
-            "previous": "MIT Lecture 15",
-            "selected": "BU Discrete Math II P109",
-            "parts": [
-              109
-            ],
-            "reason": "the lesson title directly names non-homogeneous linear recurrence relations"
-          },
-          {
-            "node": "count_generating",
-            "previous": "CMU P14-P17",
-            "selected": "BU Discrete Math II P110-P116",
-            "parts": [
-              110,
-              111,
-              112,
-              113,
-              114,
-              115,
-              116
-            ],
-            "reason": "the BU sequence forms a complete progression from generating-function modeling and power series through counting applications, explicit forms and solving recurrences; it follows the same teacher's BU recurrence-solution sequence, making the cross-topic transition more coherent than switching back to CMU for the GF block"
+            "node": "graph_shortest",
+            "lesson": "6.1.1-赋权图和距离-理论",
+            "previous": "BV1gnWVegEpQ/?p=27",
+            "selected": "BV1MU5yzbETy",
+            "reason": "Same verified episode is reused as the theory component of the shortest-path node."
           }
         ],
-        "new_candidate_discovery": "BU Discrete Math II also contains exact lessons on pigeonhole principle, permutations/combinations, binomial theorem, inclusion-exclusion, generating functions and graph theory; these were not bulk-added because current CMU/BUI selections already have strong direct matches and duplicate course links were intentionally minimized.",
-        "limitations": "BU Discrete Math II part indices are calculated from the displayed 80-part Discrete Math I sequence followed by 54 Discrete Math II parts; target P106-P109 have not been independently played back. All other active mappings are based on indexed part titles or user-supplied CMU screenshots, not complete minute-by-minute viewing.",
-        "note": "The BU Discrete Math II P81-P134 block is the continuation of the same Bilibili upload after Discrete Math I P1-P80. P106-P109 map to the explicit homogeneous/non-homogeneous recurrence lessons; P110-P116 map to the complete generating-functions sequence. These part numbers follow the combined 80+54-part list; live playback of each target P was not independently verified."
+        "limitations": "Only these two exact lesson mappings are updated. The other Nanjing titles still need their own BV IDs; the 5.1.2.3, 6.3.1 and 6.4.1 direct videos found during research are not substituted for the selected ordinary matching/Euler/Hamilton lessons. BU Discrete Math II's separate Bilibili entry remains unresolved; no YouTube substitution or lesson deletion was made."
       }
     }
   },

@@ -148,7 +148,25 @@ async function packs(page) {
       const response = await fetch(url); if (!response.ok) throw new Error('Actual deployed pack failed: ' + url); return response.json();
     }));
     const require = (value, message) => { if (!value) throw new Error(message); };
-    require(concepts.concepts.length === 356 && questions.questions.length === 561, 'Expected complete 356-concept/561-exercise curriculum');
+    const examples = concepts.concepts.filter(row => typeof row.example === 'string' && row.example.trim());
+    const migrated = questions.questions.filter(row => row.source?.migrated_from?.kind === 'concept_example');
+    require(concepts.concepts.length === 356 && questions.questions.length - migrated.length === 561,
+      'The complete original curriculum is retained alongside migrated examples');
+    require(migrated.length === examples.length && new Set(migrated.map(row => row.source.migrated_from.concept_id)).size === examples.length,
+      'Every nonempty concept example has exactly one migrated exercise');
+    const digest = async value => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))))
+      .map(byte => byte.toString(16).padStart(2, '0')).join('');
+    for (const concept of examples) {
+      const question = migrated.find(row => row.source.migrated_from.concept_id === concept.id);
+      require(question && concept.related_questions.includes(question.id), concept.id + ': migrated exercise is associated');
+      require(question.answer_text === concept.example, concept.id + ': original worked example remains the exact answer');
+      require(en.questions[question.id]?.answer_text === en.concepts[concept.id]?.example,
+        concept.id + ': original English worked example remains the exact answer');
+      require(question.source.migrated_from.example_sha256 === await digest(concept.example), concept.id + ': migration source hash matches');
+      if (question.source.migrated_from.english_example_sha256) require(question.source.migrated_from.english_example_sha256
+        === await digest(en.concepts[concept.id].example), concept.id + ': English migration source hash matches');
+      require(['简单', '中等', '困难'].includes(question.difficulty), question.id + ': migrated exercise has an explicit difficulty');
+    }
     for (const [kind, fields] of [['concepts', ['title', 'summary', 'definition', 'explanation', 'notation', 'example', 'common_mistakes']],
       ['questions', ['title', 'statement', 'answer_text', 'explanation', 'grading_criteria']]]) {
       const rows = (kind === 'concepts' ? concepts : questions)[kind];
@@ -170,11 +188,14 @@ async function packs(page) {
     }
     window.studyPacks = { concepts: concepts.concepts, questions: questions.questions, en };
     const math = value => DMateMathMarkdown.protectMathForMarkdown(DMateMathMarkdown.prepareStudyText(value)).mathSegments.length;
-    const concept = concepts.concepts.find(row => math(row.example) && math(en.concepts[row.id].example));
+    const concept = examples.find(row => math(row.example) && math(en.concepts[row.id].example)
+      && ['summary', 'definition', 'explanation', 'notation'].some(field => math(row[field]) && math(en.concepts[row.id][field])));
     const choice = questions.questions.find(row => row.options?.length && row.options.some(option => math(option.text)));
     const proof = questions.questions.find(row => row.type === '证明' && math(row.explanation) && math(en.questions[row.id].explanation));
     require(concept && choice && proof, 'Actual packs must provide mathematical concept, options, and proof examples');
-    return { concept: { id: concept.id, query: en.concepts[concept.id].title },
+    const example = migrated.find(row => row.source.migrated_from.concept_id === concept.id);
+    return { concept: { id: concept.id, query: en.concepts[concept.id].title }, example: {id:example.id, conceptId:concept.id},
+      counts: {concepts:concepts.concepts.length, questions:questions.questions.length, examples:migrated.length},
       questions: [choice, proof].map(row => ({ id: row.id, category: row.category,
         difficulty: row.difficulty === '基础' ? '简单' : ['进阶', '提高'].includes(row.difficulty) ? '困难' : row.difficulty })) };
   }, [conceptsURL, questionsURL, translationsURL]);
@@ -185,7 +206,7 @@ async function assertContent(page, kind, id, language, reference) {
     const row = studyPacks[kind].find(row => row.id === id), value = language === 'en' ? { ...row, ...studyPacks.en[kind][id] } : row;
     const detail = document.getElementById(kind === 'concepts' ? 'conceptDetail' : 'questionDetail');
     const expected = kind === 'concepts'
-      ? [value.summary, value.definition, value.explanation, value.notation, value.example, value.common_mistakes]
+      ? [value.summary, value.definition, value.explanation, value.notation, value.common_mistakes]
       : [value.statement, ...(value.options || []).map(option => option.text), value.answer_text || row.answer.join('、'), value.explanation, value.grading_criteria];
     const nodes = kind === 'concepts' ? [detail.querySelector('.concept-summary'), ...detail.querySelectorAll('.concept-detail-text')]
       : [detail.querySelector('.wrong-question'), ...detail.querySelectorAll('.question-option-text'), detail.querySelector('.wrong-answer-inner'), detail.querySelector('.wrong-analysis-body'), detail.querySelector('.wrong-feedback-body')];
@@ -312,6 +333,8 @@ async function run(browser, width) {
     await languageChoice(page, 'zh-CN'); await setTheme(page, 'light'); await navigation(page, 'concepts');
     await page.locator('#conceptSearch').fill(data.concept.query);
     await page.locator('#conceptList [data-concept-id="' + data.concept.id + '"]').click();
+    assert.equal(await page.locator('#conceptDetail').getByRole('heading', {name:/^(典型例题|Worked example)$/}).count(), 0,
+      'Worked examples are now exercises rather than an embedded concept section');
     let checkedChineseProbe = false;
     for (const language of ['zh-CN', 'en', 'zh-CN']) {
       await languageChoice(page, language); await setTheme(page, 'light');
@@ -327,6 +350,22 @@ async function run(browser, width) {
         await setTheme(page, theme); await formatProbe(page, references[language + '/' + theme]);
       }
       if (language === 'zh-CN') checkedChineseProbe = true;
+    }
+    // Follow the migrated association instead of dropping coverage of the
+    // former concept example: its complete CN/EN source must still be typeset.
+    await page.locator('#conceptDetail .concept-related-exercises [data-question-id="' + data.example.id + '"]').click();
+    await page.locator('#questionsPanel').waitFor({state:'visible'});
+    assert.equal(await page.locator('#questionList .question-item.active').getAttribute('data-question-id'), data.example.id);
+    await page.locator('#questionDetail .question-actions button').click();
+    for (const language of ['en', 'zh-CN']) {
+      await languageChoice(page, language); await setTheme(page, 'light');
+      await assertContent(page, 'questions', data.example.id, language, references[language + '/light']);
+      assert.equal(await page.evaluate(({conceptId, language}) => {
+        const concept = studyPacks.concepts.find(row => row.id === conceptId);
+        const source = language === 'en' ? studyPacks.en.concepts[conceptId].example : concept.example;
+        return studyInputs.get(document.querySelector('#questionDetail .wrong-answer-inner'))
+          === DMateMathMarkdown.prepareStudyText(source);
+      }, {conceptId:data.example.conceptId, language}), true, 'The original worked example is rendered in the exercise answer');
     }
     await setTheme(page, 'light'); await navigation(page, 'questions');
     for (const [index, question] of data.questions.entries()) {
@@ -368,7 +407,8 @@ async function run(browser, width) {
     assert.equal(await page.locator('html').getAttribute('data-ui-language'), 'en', 'The English preference survives a true offline reload');
     if (width === 1440) { await packs(page); await corpusPreflight(page); }
     assert.equal(page.modelCalls, 0); assert.deepEqual(page.studyErrors, []);
-    console.log('PASS offline study ' + width + ': 356/561 complete bilingual records; actual online typography/Markdown/MathJax; plain options; preserved selection/search/filters/open answers; fresh ' + cache.name + ' offline reload and language persistence');
+    console.log('PASS offline study ' + width + ': ' + data.counts.concepts + ' concepts/' + data.counts.questions
+      + ' exercises including ' + data.counts.examples + ' migrated examples; complete bilingual source/Markdown/MathJax; plain options; preserved selection/search/filters/open answers; fresh ' + cache.name + ' offline reload and language persistence');
   } finally { await context.close(); if (workerProtocol) await workerProtocol.detach().catch(() => {}); }
 }
 

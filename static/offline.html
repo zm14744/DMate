@@ -45,7 +45,7 @@
 <link rel="stylesheet" href="/static/search-controls.css?v=27">
 <link rel="stylesheet" href="/static/button-themes.css?v=23">
 <link rel="stylesheet" href="/static/offline-knowledge-graph.css?v=17">
-<link rel="stylesheet" href="/static/offline.css?v=27">
+<link rel="stylesheet" href="/static/offline.css?v=28">
 <link rel="stylesheet" href="/static/select-controls.css?v=26">
 <link rel="stylesheet" href="/static/scrollbars.css?v=25">
 <script defer src="/static/mobile-select.js?v=26"></script>
@@ -73,9 +73,9 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/offline-appearance.js?v=8"></script>
 <script defer src="/static/offline-shell.js?v=8"></script>
 <script defer src="/static/knowledge-graph-labels.js?v=17"></script>
-<script defer src="/static/offline-knowledge-graph.js?v=27"></script>
+<script defer src="/static/offline-knowledge-graph.js?v=28"></script>
 <script defer src="/static/offline-entry.js?v=17"></script>
-<script defer src="/static/offline.js?v=27"></script>
+<script defer src="/static/offline.js?v=28"></script>
 </head>
 <body class="offline-workspace">
 <script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"light";</script>
@@ -191,8 +191,8 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
         </div>
       </div>
       <div class="question-layout">
-        <div class="question-list" id="questionList"></div>
-        <article class="question-detail" id="questionDetail">
+        <div class="question-list" id="questionList" role="region" aria-label="练习列表" tabindex="0"></div>
+        <article class="question-detail" id="questionDetail" aria-label="练习详情" tabindex="0">
           <div class="offline-empty"><h2>选择一道题目</h2><p>从左侧题目列表中选择题目，开始练习。</p></div>
         </article>
       </div>
@@ -200,16 +200,16 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 
     <section class="offline-panel" id="conceptsPanel" hidden>
       <div class="offline-toolbar">
-        <div><strong id="conceptCount">概念库</strong><span class="toolbar-muted">定义、解释与例题</span></div>
+        <div><strong id="conceptCount">概念库</strong><span class="toolbar-muted">定义、解释与易错点</span></div>
         <div class="offline-filters">
           <select id="conceptCategory" aria-label="按章节筛选"><option value="">全部章节</option></select>
           <input type="search" id="conceptSearch" class="offline-search" placeholder="搜索" aria-label="搜索">
         </div>
       </div>
       <div class="concept-layout">
-        <div class="concept-list" id="conceptList"></div>
-        <article class="concept-detail" id="conceptDetail">
-          <div class="offline-empty"><h2>选择一个知识点</h2><p>查看定义、解释、公式、例题和易错点。</p></div>
+        <div class="concept-list" id="conceptList" role="region" aria-label="概念列表" tabindex="0"></div>
+        <article class="concept-detail" id="conceptDetail" aria-label="概念详情" tabindex="0">
+          <div class="offline-empty"><h2>选择一个知识点</h2><p>查看定义、解释、公式和易错点。</p></div>
         </article>
       </div>
     </section>

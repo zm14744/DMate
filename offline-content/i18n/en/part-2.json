@@ -2739,6 +2739,629 @@
       "answer_text": "No Euler circuit exists. An open Euler trail exists, for example a—b—c—d—a—c.",
       "explanation": "Vertices a,c have degree 3 and b,d degree 2, giving exactly two odd-degree vertices. Connectivity is given, and any open Euler trail must have endpoints a,c. The listed sequence uses ab,bc,cd,da,ac in order, each exactly once.",
       "grading_criteria": "20% for each existence decision, 25% for the degree test, and 35% for a valid open trail covering every edge. The reversed sequence is equally correct."
+    },
+    "q-example-number_rsa__modular_powers": {
+      "title": "Modular exponentiation for encryption and decryption in classroom RSA: example practice",
+      "statement": "For toy RSA let \\(n=55,e=3,d=27,m=7\\). Find the ciphertext and decrypt it by repeated squaring and multiplication, listing the residues of its second, fourth, eighth, and sixteenth powers modulo \\(55\\).",
+      "answer_text": "With toy parameters n=55, e=3, d=27, and m=7, c=13. The residues of 13², 13⁴, 13⁸, and 13¹⁶ modulo 55 are 4, 16, 36, and 31; combining them gives 13²⁷≡7.",
+      "explanation": "With toy parameters n=55, e=3, d=27, and m=7, c=13. The residues of 13², 13⁴, 13⁸, and 13¹⁶ modulo 55 are 4, 16, 36, and 31; combining them gives 13²⁷≡7.\n\nAll intermediate products may be reduced modulo n at any time, so there is no need to expand enormous integers first. Correct modular arithmetic and cryptographic security are separate matters; the small parameters and unpadded algorithm here are only for classroom verification.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-number_rsa__textbook_determinism": {
+      "title": "Determinism of textbook RSA: example practice",
+      "statement": "Textbook RSA uses no randomized padding and has \\(n=55,e=3\\). Encrypt the same message \\(m=7\\) directly twice. What are the two ciphertexts, and are they equal?",
+      "answer_text": "With toy parameters n=55 and e=3, two direct calculations for m=7 both give 13.",
+      "explanation": "With toy parameters n=55 and e=3, two direct calculations for m=7 both give 13.\n\nDeterminism and invertibility are different properties. Small classroom parameters are easily factored, and direct modular exponentiation lacks the standard encoding, randomization, and implementation protections involved in real schemes. This entry does not present toy examples as practical security advice.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_basic": {
+      "title": "Basic counting principles: example practice",
+      "statement": "A document is delivered either with one of 3 paper covers or with one of 2 electronic licenses, with the delivery modes mutually exclusive. Count the options. How many options are there if one cover and one license are instead selected together?",
+      "answer_text": "A resource is available either as a printed edition with one of 3 covers or an electronic edition with one of 2 licenses. These delivery methods are mutually exclusive, giving 5 choices. If a cover and a license are both selected, the objects become ordered pairs, giving 6 choices.",
+      "explanation": "A resource is available either as a printed edition with one of 3 covers or an electronic edition with one of 2 licenses. These delivery methods are mutually exclusive, giving 5 choices. If a cover and a license are both selected, the objects become ordered pairs, giving 6 choices.\n\nCase division asks which alternative applies; successive choices ask which parts determine an object. The product rule does not require probabilistic independence, but the number of later branches must match the count used. If different prefixes allow different numbers of completions, first classify by prefix or type, then add. If several constructions yield the same object, repeated counting must also be handled.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_basic__disjoint_sum": {
+      "title": "Disjoint cases and the sum rule: example practice",
+      "statement": "A task has 3 paper-submission methods and 2 electronic-submission methods. Exactly one method is chosen. How many submission choices are there?",
+      "answer_text": "A task may use one of 3 paper submission methods or one of 2 electronic methods, with exactly one method selected, giving 5 choices.",
+      "explanation": "A task may use one of 3 paper submission methods or one of 2 electronic methods, with exactly one method selected, giving 5 choices.\n\nEach object must belong to exactly one class so that it appears exactly once in the sum. Cases may be defined by type, last step, or whether a property holds. Complement counting follows directly: partition a finite universe into the target set and its complement, then subtract the number of nontarget objects from the total.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_basic__step_product": {
+      "title": "Successive choices and the product rule: example practice",
+      "statement": "Choose one of 4 colors as a background, then a different color from the remaining colors for the outline. How many color schemes are possible?",
+      "answer_text": "Choose one of 4 background colors and then one of the remaining 3 colors for an outline: there are 4×3=12 choices, not 4×4.",
+      "explanation": "Choose one of 4 background colors and then one of the remaining 3 colors for an outline: there are 4×3=12 choices, not 4×4.\n\nMultiplication depends on a unique construction and accurate choice counts at every step, not on probabilistic independence. Choosing one item and then a different item still permits multiplication, but the second count is one smaller. First specify order, restrictions, and whether repetition is allowed.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_basic__equal_fiber": {
+      "title": "Equal multiplicities and the division rule: example practice",
+      "statement": "Choose an unordered pair of partners from 8 distinct students. Count ordered selections first, determine how many times each partnership is counted, and find the number of partnerships.",
+      "answer_text": "Choosing two partners from 8 distinct students gives 8×7 ordered choices. Every pair is counted exactly twice, giving 28 pairs.",
+      "explanation": "Choosing two partners from 8 distinct students gives 8×7 ordered choices. Every pair is counted exactly twice, giving 28 pairs.\n\nAdding labels, directions, or order often makes constructions easy to count; then remove this auxiliary information. Division requires every result to have the same number of preimages. If symmetry gives some objects fewer distinct labeled representations, do not divide by a fixed number; classify or analyze them separately.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_perm_comb": {
+      "title": "Permutations and combinations: example practice",
+      "statement": "Choose 2 of 5 distinct students for an activity. How many choices are there without assigned roles? How many assignments are there if one is the host and the other the recorder?",
+      "answer_text": "Selecting 2 of 5 students for an activity gives 10 choices if no roles are assigned; assigning a host and a recorder gives 5×4=20 choices.",
+      "explanation": "Selecting 2 of 5 students for an activity gives 10 choices if no roles are assigned; assigning a host and a recorder gives 5×4=20 choices.\n\nEach k-element subset has exactly k! distinct orderings, so dividing the permutation count by k! gives the combination count. If members have different duties, exchanging duties usually produces a new assignment, so order counts. For symbols with multiplicities m1,…,mr, temporarily label each symbol and identify the mi! internal label permutations of each type, giving n!/(m1!…mr!). These divisions all require a constant multiplicity for every result.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_perm_comb__ordered_selection": {
+      "title": "Ordered selection and permutations: example practice",
+      "statement": "Choose two different students from 6, assigning one as host and the other as recorder. How many assignments are possible?",
+      "answer_text": "Selecting a host and a recorder from 6 people gives 6×5=30 assignments because the duties differ.",
+      "explanation": "Selecting a host and a recorder from 6 people gives 6×5=30 assignments because the duties differ.\n\nEach filled position leaves one fewer available object. With adjacency, endpoint, or forbidden-position restrictions, one may first treat objects that must be adjacent as a block and arrange both the blocks and their internal orders, or fill the restricted positions first.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_perm_comb__subset_selection": {
+      "title": "Unordered selection and combinations: example practice",
+      "statement": "Group A has 3 members and group B has 4, with no overlap. Choose one member from each to form a two-person team. How many teams are possible?",
+      "answer_text": "Selecting one member from a group of 3 and one from a group of 4 gives 3×4=12 two-person groups.",
+      "explanation": "Selecting one member from a group of 3 and one from a group of 4 gives 3×4=12 two-person groups.\n\nWith category or size constraints, divide into disjoint cases by the number chosen from each category; for fixed category sizes, multiply the combination counts. If selected people are divided into named teams, team names are part of the result, while order within each team may still be irrelevant.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_perm_comb__multiset_permutation": {
+      "title": "Multiset permutations with repeated objects: example practice",
+      "statement": "Arrange all the letters A,A,B,C into strings. Find the number of distinct strings and explain how the repeated A is accounted for.",
+      "answer_text": "A, A, B, C form 4!/2!=12 distinct strings; exchanging the two As does not change the result.",
+      "explanation": "A, A, B, C form 4!/2!=12 distinct strings; exchanging the two As does not change the result.\n\nTemporarily numbering equal symbols gives n! arrangements; every unnumbered result has m_1!…m_r! numbered representations. If restrictions such as no leading 0 arise, subtract invalid arrangements from the total. After fixing the first position, update the remaining multiplicities.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_binomial": {
+      "title": "The binomial theorem: example practice",
+      "statement": "Find the coefficient of x² in the expansion of (2+x)^4.",
+      "answer_text": "In $(2+x)^4$, the coefficient of $x^2$ is $\\binom42 2^2=24$: select 2 of the 4 factors to contribute x, while each remaining factor contributes 2.",
+      "explanation": "In $(2+x)^4$, the coefficient of $x^2$ is $\\binom42 2^2=24$: select 2 of the 4 factors to contribute x, while each remaining factor contributes 2.\n\nIn expansion, each factor contributes u or v. Producing u^(n−k)v^k requires selecting v in exactly k factors, so the coefficient is a combination count. When extracting a coefficient, include the binomial coefficient, powers of constants, and signs. Substituting particular values for u,v, or differentiating the polynomial before substitution, yields various summation formulas.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_binomial__coefficient": {
+      "title": "Binomial expansion and coefficient extraction: example practice",
+      "statement": "Find the coefficient of x in (3−2x)^4, keeping track of the sign.",
+      "answer_text": "The coefficient of x in $(3-2x)^4$ is $\\binom41 3^3(-2)=-216$.",
+      "explanation": "The coefficient of x in $(3-2x)^4$ is $\\binom41 3^3(-2)=-216$.\n\nFirst determine how many bx terms are needed for the target degree, then count ways to select those factors, and finally multiply by the powers of the constants in the two terms. The formula also applies with the variable in the first binomial term, but the index must be matched to the target degree again.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_binomial__binomial_sum": {
+      "title": "Binomial sums and parity selection: example practice",
+      "statement": "A set has 5 distinct elements. Find the total number of subsets and the numbers of subsets of even and odd cardinality.",
+      "answer_text": "A 5-element set has 32 subsets, with 16 of even size and 16 of odd size.",
+      "explanation": "A 5-element set has 32 subsets, with 16 of even size and 16 of odd size.\n\nLet E and O be the even-index and odd-index sums. Substitution of 1 gives E+O, and substitution of −1 gives E−O; solve the two equations for each sum. A weight k can mean designating one member of a k-element subset, or arise by differentiating a power of x. The parity sums for n=0 require separate treatment.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_binomial__vandermonde": {
+      "title": "Vandermonde's convolution and grouped selection: example practice",
+      "statement": "Two disjoint groups have 2 and 3 members. Choose 2 people from all 5. Classify by the number selected from the first group, write the counting sum, and evaluate it.",
+      "answer_text": "Selecting 2 people from a group of 2 and a disjoint group of 3 gives $\\binom20\\binom32+\\binom21\\binom31+\\binom22\\binom30=3+6+1=10$.",
+      "explanation": "Selecting 2 people from a group of 2 and a disjoint group of 3 gives $\\binom20\\binom32+\\binom21\\binom31+\\binom22\\binom30=3+6+1=10$.\n\nEvery m-element subset uniquely determines k members from the first group and m−k from the second, giving disjoint cases. Algebraically, the same result follows by comparing the coefficients of x^m in (1+x)^r(1+x)^s and (1+x)^(r+s). The sum-of-squares identity is the special case r=s=m.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_pigeonhole": {
+      "title": "The pigeonhole principle: example practice",
+      "statement": "Each of 10 samples receives one of 4 labels. Prove that some label occurs on at least 3 samples.",
+      "answer_text": "Classify 10 samples by 4 labels. If each label occurred at most twice, there would be at most 8 samples, a contradiction. Thus some label occurs at least 3 times.",
+      "explanation": "Classify 10 samples by 4 labels. If each label occurred at most twice, there would be at most 8 samples, a contradiction. Thus some label occurs at least 3 times.\n\nA proof usually argues by contradiction: if every box had at most r objects, the total would be at most mr. Applications hinge on choosing suitable boxes, such as remainders, coordinate parity types, pairs, or intervals. The principle guarantees existence but does not identify the box or objects, nor guarantee a uniform distribution. To establish a minimum guaranteed number, also give a configuration with one fewer object that avoids the target.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_pigeonhole__capacity": {
+      "title": "The generalized pigeonhole principle and minimum guarantees: example practice",
+      "statement": "Three boxes have capacities 1, 2, and 4. What is the minimum number of items that guarantees some box exceeds its own capacity? Explain how one fewer item can be placed without exceeding a capacity.",
+      "answer_text": "Three boxes allow 1, 2, and 4 objects respectively. With 8 objects some box must exceed its own limit; 7 can be distributed as 1, 2, and 4.",
+      "explanation": "Three boxes allow 1, 2, and 4 objects respectively. With 8 objects some box must exceed its own limit; 7 can be distributed as 1, 2, and 4.\n\nTo prove a number is the minimum guarantee, show both the contradiction above capacity and a valid distribution with one fewer object. Capacities may differ among boxes; an average cannot replace their given individual limits.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_pigeonhole__residue": {
+      "title": "Remainder classes and congruence collisions: example practice",
+      "statement": "Take any 4 integers, allowing repeated values. Classify them by their residues modulo 3 and prove that two distinct input positions contain congruent integers.",
+      "answer_text": "Four integers fall into three residue classes modulo 3, so two are congruent. Their values may coincide, but they still occupy distinct input positions.",
+      "explanation": "Four integers fall into three residue classes modulo 3, so two are congruent. Their values may coincide, but they still occupy distinct input positions.\n\nIntegers may be negative, and a difference of 0 is also divisible by m. For sums of consecutive terms, introduce prefix sums S_0=0 and S_j=x_1+…+x_j. The difference of two congruent prefix sums is the sum of a nonempty consecutive block. Their indices must be distinct and ordered.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_pigeonhole__structured_boxes": {
+      "title": "Structured boxes and geometric applications: example practice",
+      "statement": "Choose any 5 points in a square of side length 1. Prove that two of them are at distance at most √2/2.",
+      "answer_text": "Divide a unit square into 4 squares of side 1/2. Among 5 points, two lie in the same part and are at distance at most √2/2.",
+      "explanation": "Divide a unit square into 4 squares of side 1/2. Among 5 points, two lie in the same part and are at distance at most √2/2.\n\nThe classes must cover all objects, and each object needs a definite class. Assign geometric boundaries to one side to avoid counting a point twice. Derive the conclusion from the structure of a shared box; merely citing the pigeonhole principle does not replace verifying the property.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_inclusion": {
+      "title": "Inclusion–exclusion: example practice",
+      "statement": "Eighteen applications satisfy condition A, fifteen satisfy B, and seven satisfy both. How many satisfy at least one condition, and why is the intersection count subtracted?",
+      "answer_text": "Of the applications, 18 satisfy A, 15 satisfy B, and 7 satisfy both. Thus 18+15−7=26 satisfy at least one. The intersection was counted twice, so subtract it once.",
+      "explanation": "Of the applications, 18 satisfy A, 15 satisfy B, and 7 satisfy both. Thus 18+15−7=26 satisfy at least one. The intersection was counted twice, so subtract it once.\n\nAn element belonging to exactly r sets appears C(r,k) times in the sum of k-fold intersections. Its final weight is Σ(k=1 to r)(−1)^(k+1)C(r,k)=1, so nothing is omitted or counted repeatedly. To count objects with none of the properties, first count the union having at least one property and subtract from the finite universe. Pairwise intersections ordinarily include the triple intersection; they do not mean exactly those two properties.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_inclusion__two_set": {
+      "title": "Two-set inclusion–exclusion and complements: example practice",
+      "statement": "How many integers from 1 through 20 are divisible by 3 or by 4? Use inclusion–exclusion to account for those divisible by both.",
+      "answer_text": "From 1 to 20 there are 6 multiples of 3 and 5 multiples of 4, with 1 shared multiple of 12, so the union has 10 elements.",
+      "explanation": "From 1 to 20 there are 6 multiples of 3 and 5 multiples of 4, with 1 shared multiple of 12, so the union has 10 elements.\n\nEach intersection element appears twice in the individual terms, so subtract once to leave one contribution. In divisibility problems, the intersection usually consists of multiples of the least common multiple. The product of the two divisors is not always their least common multiple.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_inclusion__multiple_set": {
+      "title": "Multiple-set inclusion–exclusion and exact property counts: example practice",
+      "statement": "For finite sets A,B,C, define S₁=|A|+|B|+|C|, S₂=|A∩B|+|A∩C|+|B∩C|, S₃=|A∩B∩C|, and let N₁ count elements belonging to exactly one set. Use N₁=S₁−2S₂+3S₃. What does an element in all three sets contribute to S₁,S₂,S₃, and what is its net contribution to N₁?",
+      "answer_text": "An element in all three sets contributes 3 to S1, 3 to S2, and 1 to S3. Its net contribution to the N1 formula is 3−6+3=0.",
+      "explanation": "An element in all three sets contributes 3 to S1, 3 to S2, and 1 to S3. Its net contribution to the N1 formula is 3−6+3=0.\n\nThese equations follow by counting each element’s occurrences. Solve backward to obtain N3=S3, N2=S2−3S3, and N1=S1−2S2+3S3. The union is N1+N2+N3=S1−S2+S3. Pairwise intersections normally include the triple intersection, so distinguish “at least” from “exactly”.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_inclusion__forbidden_events": {
+      "title": "Forbidden-event inclusion–exclusion, surjections, and derangements: example practice",
+      "statement": "Place 3 distinct objects into 2 labeled boxes, putting each object in exactly one box and requiring both boxes to be nonempty. Count the placements by inclusion–exclusion on empty-box events.",
+      "answer_text": "Put 3 distinct objects into 2 labeled boxes, both nonempty. Of 8 assignments, subtract 1 with each box empty, giving 6.",
+      "explanation": "Put 3 distinct objects into 2 labeled boxes, both nonempty. Of 8 assignments, subtract 1 with each box empty, giving 6.\n\nFor surjections, a target box being empty is a bad event; for permutations with forbidden fixed points, an object remaining in its original place is a bad event. First count simultaneous occurrence of any specified k bad events, then multiply by the number of ways to choose them. If intersection size depends on which events are chosen, grouping only by k is invalid.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_generating": {
+      "title": "Generating functions: example practice",
+      "statement": "Choose either 0 or 1 red token and any nonnegative number of blue tokens, with tokens of the same color indistinguishable and choices independent. Let the power of x record the total number of tokens. Find the ordinary generating function, its constant coefficient, and its coefficient at any positive degree.",
+      "answer_text": "Choose 0 or 1 red token from one box and any nonnegative number of blue tokens from another. The generating function by total token count is $(1+x)/(1-x)$. Its constant term is 1 and every positive-degree coefficient is 2, corresponding to choosing no red token or one red token.",
+      "explanation": "Choose 0 or 1 red token from one box and any nonnegative number of blue tokens from another. The generating function by total token count is $(1+x)/(1-x)$. Its constant term is 1 and every positive-degree coefficient is 2, corresponding to choosing no red token or one red token.\n\nIf two classes of objects are chosen independently and their sizes add, multiply their generating functions; the coefficient of x^n counts combinations of total size n. Allowing sizes 0,d,2d,… with one choice of each gives 1/(1−x^d). To derive a generating function from a recurrence, start summing at the index where the recurrence actually applies, and handle initial terms from shifts separately. Interpreting x as a real or complex number requires a separate discussion of convergence, distinct from the formal identity.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_generating__formal_series": {
+      "title": "Formal power series and coefficient operations: example practice",
+      "statement": "For an integer n≥0, find the coefficient of x^n in the formal power series (1−x)⁻², explaining it as a product of two geometric series.",
+      "answer_text": "$[x^n](1-x)^{-2}=n+1$, because the degree-n coefficient in the product of two geometric series is a sum of n+1 ones.",
+      "explanation": "$[x^n](1-x)^{-2}=n+1$, because the degree-n coefficient in the product of two geometric series is a sum of n+1 ones.\n\nFor fixed n the convolution has only n+1 terms, so formal multiplication needs no convergence theory for infinite numerical sums. A rational expression represents the product of a formal inverse and a polynomial. Convergence conditions matter only when x is additionally interpreted as a number and evaluated.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_generating__counting_product": {
+      "title": "Counting generating functions and products: example practice",
+      "statement": "Choose 0 or 1 red token and 0, 1, or 2 blue tokens, with indistinguishable tokens of each color and independent choices. Write the generating polynomial for the total number of tokens; a factored form is sufficient.",
+      "answer_text": "If 0 or 1 red token and 0 through 2 blue tokens may be chosen, the polynomial by total count is (1+x)(1+x+x²).",
+      "explanation": "If 0 or 1 red token and 0 through 2 blue tokens may be chosen, the polynomial by total count is (1+x)(1+x+x²).\n\nExponents encode size rather than the order of choices. For indistinguishable objects of one size, each allowed quantity usually corresponds to one choice. If objects are distinguishable or ordered, adjust the factors; geometric series are not always appropriate.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-count_generating__recurrence_series": {
+      "title": "Solving recurrences with generating functions: example practice",
+      "statement": "Let a₀=0, a₁=1, and a_n=a_{n−1}+a_{n−2} for n≥2. Define A(x)=∑_{n≥0}a_nx^n. Find a rational expression for A(x).",
+      "answer_text": "If a_0=0, a_1=1, and a_n=a_(n−1)+a_(n−2), then $A=x/(1-x-x^2)$.",
+      "explanation": "If a_0=0, a_1=1, and a_n=a_(n−1)+a_(n−2), then $A=x/(1-x-x^2)$.\n\nDifferent summation lower bounds require different initial-term subtractions. For a second-order recurrence starting at n=2, the left side is A−a_0−a_1x, while a one-step lag may give x(A−a_0). Write these corrections term by term, then check the constant and linear coefficients.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-recurrence_model": {
+      "title": "Modeling with recurrences: example practice",
+      "statement": "Tile a one-dimensional strip of length n using tiles of lengths 1 and 2, and let a_n count the tilings for n≥0. Classify by the first tile to obtain a recurrence and the values a₀,a₁, explaining the empty-strip convention.",
+      "answer_text": "Let a_n count tilings of a length-n strip by tiles of lengths 1 and 2. Classifying by the first tile gives a_n=a_(n−1)+a_(n−2) for n≥2, with a_0=1 and a_1=1. The empty strip has one empty tiling, ensuring consistent counting after removing a final length-2 tile.",
+      "explanation": "Let a_n count tilings of a length-n strip by tiles of lengths 1 and 2. Classifying by the first tile gives a_n=a_(n−1)+a_(n−2) for n≥2, with a_0=1 and a_1=1. The empty strip has one empty tiling, ensuring consistent counting after removing a final length-2 tile.\n\nKeep the information needed to determine future choices. If the next step depends on the last symbol, a total count may be insufficient; add states for ending types. A counting recurrence needs a bijection between each class and smaller objects, not merely a resemblance to a sum of the previous two terms. Algorithmic recurrences must specify rounding of input sizes and whether additional work at each level is included.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-recurrence_model__state_partition": {
+      "title": "State definitions and disjoint decomposition: example practice",
+      "statement": "Tile a strip of length n≥2 with tiles of lengths 1 and 2. When classifying by the first tile, what are the two classes, and to tilings of what remaining lengths do they correspond bijectively?",
+      "answer_text": "A length-n strip splits into two classes according to whether its first tile has length 1 or 2, each bijective with tilings of the remaining length.",
+      "explanation": "A length-n strip splits into two classes according to whether its first tile has length 1 or 2, each bijective with tilings of the remaining length.\n\nCommon decompositions remove the first tile, last symbol, or final operation. Prove that removal reaches the specified state and that every smaller object has a unique reconstruction. For incremental models, also show that new objects do not duplicate existing ones.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-recurrence_model__memory_states": {
+      "title": "State recurrences with memory constraints: example practice",
+      "statement": "Consider nonempty strings over {0,1,2} that avoid the substring 22. Which two ending states suffice to decide whether another 2 may be appended, and which state permits it?",
+      "answer_text": "For ternary strings avoiding 22, distinguish strings ending in 2 from those not ending in 2; only the latter may be extended by 2.",
+      "explanation": "For ternary strings avoiding 22, distinguish strings ending in 2 from those not ending in 2; only the latter may be extended by 2.\n\nMemory must suffice but need not retain the entire history. First write each state transition and then obtain the total; eliminating auxiliary states sometimes gives a higher-order single-sequence recurrence. Specify the state assigned to the empty string so that the first transition works.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-recurrence_model__divide_conquer": {
+      "title": "Size recurrences for divide-and-conquer algorithms: example practice",
+      "statement": "Let n range over powers of 2, with T₁=0 and T_n=2T_{n/2}+1 for n≥2. Find a closed form for T_n.",
+      "answer_text": "For powers of two, if each equal split costs 1 to merge, T_1=0 and T_n=2T_(n/2)+1, giving T_n=n−1.",
+      "explanation": "For powers of two, if each equal split costs 1 to merge, T_1=0 and T_n=2T_(n/2)+1, giving T_n=n−1.\n\nOdd sizes require rounding. If only one subproblem executes, do not add the costs of two. Solve by summing costs over recursion-tree levels or using induction for special sizes such as powers of 2, then specify the applicable range.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-recurrence_homogeneous": {
+      "title": "Linear homogeneous recurrences: example practice",
+      "statement": "Find the general solution of a_n=3a_{n−1}−2a_{n−2} for n≥2, then determine the solution satisfying a₀=2 and a₁=3.",
+      "answer_text": "The characteristic equation of $a_n=3a_{n-1}-2a_{n-2}$ is $(r-1)(r-2)=0$, so the general solution is $C+D2^n$. If a_0=2 and a_1=3, then C=D=1.",
+      "explanation": "The characteristic equation of $a_n=3a_{n-1}-2a_{n-2}$ is $(r-1)(r-2)=0$, so the general solution is $C+D2^n$. If a_0=2 and a_1=3, then C=D=1.\n\nTrying a_n=r^n gives p(r)=0. Each distinct root produces an exponential solution. A root r of multiplicity m gives r^n,nr^n,…,n^(m−1)r^n. Linearly combine these solutions and use k independent initial conditions to determine the constants. For real coefficients, conjugate complex roots combine into real sine and cosine terms. Verify the formula against both the recurrence and all initial values, rather than fitting only the first few terms.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-recurrence_homogeneous__distinct_roots": {
+      "title": "Distinct characteristic roots and determining constants: example practice",
+      "statement": "A second-order real homogeneous linear recurrence has distinct characteristic roots 1 and −2. Write its real general solution and explain how the sign of the factor (−2)^n depends on the parity of n.",
+      "answer_text": "Roots 1 and −2 give $C+D(-2)^n$; the negative root produces alternating signs by parity.",
+      "explanation": "Roots 1 and −2 give $C+D(-2)^n$; the negative root produces alternating signs by parity.\n\nRearrange correctly to obtain the characteristic polynomial, then factor it to find roots. A negative root produces sign changes in its powers and cannot be replaced by its absolute value. After solving for constants, check all initial values and the recurrence rather than only the growth rate of one term.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-recurrence_homogeneous__repeated_roots": {
+      "title": "Repeated characteristic roots and polynomial factors: example practice",
+      "statement": "A third-order real homogeneous linear recurrence has characteristic polynomial (r−1)³. Write its general solution with arbitrary constants and no specified initial conditions.",
+      "answer_text": "For characteristic polynomial (r−1)³, the general solution is C+Dn+En², rather than just a constant.",
+      "explanation": "For characteristic polynomial (r−1)³, the general solution is C+Dn+En², rather than just a constant.\n\nA double root needs C+Dn, and a triple root needs C+Dn+En². The number of initial values corresponds to the recurrence order, not the number of distinct roots. Multiplicity of root 1 is closely related to finite differences; for example, a sequence with zero third difference is polynomial of degree at most two.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-recurrence_homogeneous__complex_roots": {
+      "title": "Complex conjugate roots and real periodic solutions: example practice",
+      "statement": "A second-order real homogeneous linear recurrence has characteristic roots ±2i. Consider a real solution that is not identically zero. Describe its exponential amplitude factor and the repeat interval of its trigonometric oscillation, then compare periodicity of the original sequence with that of the sequence normalized by 2^n.",
+      "answer_text": "Roots ±2i give four-step oscillation multiplied by 2^n. The normalized sequence may be periodic while the original amplitude grows.",
+      "explanation": "Roots ±2i give four-step oscillation multiplied by 2^n. The normalized sequence may be periodic while the original amplitude grows.\n\nThe angle θ controls oscillation; r^n controls growth or decay. Even if the sine and cosine factors repeat periodically, the full sequence is usually not periodic when r≠1. Proving a least period requires finding a period and ruling out every smaller positive integer period.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-recurrence_nonhomogeneous": {
+      "title": "Nonhomogeneous recurrences: example practice",
+      "statement": "For n≥1, let a_n=2a_{n−1}+1. Find a constant particular solution and the general solution, then determine the solution satisfying a₀=0.",
+      "answer_text": "For $a_n=2a_{n-1}+1$, a constant particular solution is −1, so the general solution is $C2^n-1$. If a_0=0, C=1 and a_n=2^n−1.",
+      "explanation": "For $a_n=2a_{n-1}+1$, a constant particular solution is −1, so the general solution is $C2^n-1$. If a_0=0, C=1 and a_n=2^n−1.\n\nA linear operator applied to p+h equals the sum of its actions, explaining this structure. Find a particular solution by rearrangement, iteration, or undetermined coefficients. For f(n)=P(n)λ^n with λ≠0, try a polynomial of the same degree times λ^n. If λ is a homogeneous characteristic root of multiplicity s, multiply the trial by n^s to avoid overlap with homogeneous solutions. A particular solution need not satisfy the initial values; apply those to the full homogeneous-plus-particular solution.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-recurrence_nonhomogeneous__superposition": {
+      "title": "Superposition of homogeneous and particular solutions: example practice",
+      "statement": "For a_n−2a_{n−1}=3 with n≥1, find a constant particular solution and write the general solution.",
+      "answer_text": "For a_n−2a_(n−1)=3, the constant sequence −3 is a particular solution, and all solutions are −3+C2^n.",
+      "explanation": "For a_n−2a_(n−1)=3, the constant sequence −3 is a particular solution, and all solutions are −3+C2^n.\n\nLinearity gives L(p+h)=L(p)+L(h). Conversely, set h=a−p. Subtracting two particular solutions of the same equation gives a homogeneous solution, but adding them generally produces 2f. Apply initial conditions to the complete solution p+h.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-recurrence_nonhomogeneous__nonresonant": {
+      "title": "Nonresonant forcing and undetermined coefficients: example practice",
+      "statement": "For a_n=3a_{n−1}+2^n with n≥1, what exponential form should be tried for a particular solution? Explain whether resonance occurs; do not determine the undetermined coefficient.",
+      "answer_text": "For a_n=3a_(n−1)+2^n, try A2^n because 2 is not the homogeneous characteristic root 3.",
+      "explanation": "For a_n=3a_(n−1)+2^n, try A2^n because 2 is not the homogeneous characteristic root 3.\n\nA constant forcing term has λ=1,d=0; exponential forcing has d=0. The recurrence itself determines the particular coefficients, independently of the initial values; the latter then determine the homogeneous part. If substitution yields identically 0 where a nonzero forcing term is needed, check for resonance.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-recurrence_nonhomogeneous__resonance": {
+      "title": "Resonance and adjusting particular solutions: example practice",
+      "statement": "For a_n−a_{n−1}=n² with n≥1, consider a polynomial particular solution. Using the homogeneous characteristic root and resonance rule, what polynomial degree must be considered? Do not compute its coefficients.",
+      "answer_text": "The homogeneous root of a_n−a_(n−1)=n² is 1, so quadratic polynomial forcing requires consideration of a cubic particular solution.",
+      "explanation": "The homogeneous root of a_n−a_(n−1)=n² is 1, so quadratic polynomial forcing requires consideration of a cubic particular solution.\n\nFor λ=1, resonance often appears as discrete summation increasing the polynomial degree. Substitute the trial to verify it, compare all polynomial coefficients, and use the homogeneous-plus-particular solution to satisfy the initial values.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-recurrence_initial": {
+      "title": "Initial conditions: example practice",
+      "statement": "Let a_n=a_{n−1}+a_{n−2} for n≥2. Is the sequence unique if only a₀=1 is given? If a₁=2 is also given, list the first five terms. Are the conditions compatible if a₂=9 is additionally required?",
+      "answer_text": "For $a_n=a_{n-1}+a_{n-2}$ (n≥2), a_0=1 alone leaves a_1 arbitrary. Adding a_1=2 uniquely gives 1,2,3,5,8,…. Requiring a_2=9 as well contradicts a_2=3, so there is no solution.",
+      "explanation": "For $a_n=a_{n-1}+a_{n-2}$ (n≥2), a_0=1 alone leaves a_1 arbitrary. Adding a_1=2 uniquely gives 1,2,3,5,8,…. Requiring a_2=9 as well contradicts a_2=3, so there is no solution.\n\nThe valid range matters: if a second-order formula starts only at n=3, it cannot compute a_2 without another condition. The number of written conditions is not necessarily the number of independent conditions; an equation already forced by the recurrence removes no further freedom. Inconsistent conditions give no solution. Recovering earlier terms backward also requires the relevant coefficient to be nonzero; forward computability does not guarantee unique recovery in every direction.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-recurrence_initial__forward_unique": {
+      "title": "Existence and uniqueness for forward recurrences: example practice",
+      "statement": "Suppose a_n=a_{n−1}+a_{n−2} for n≥2. Do given values a₀,a₁ uniquely determine the remaining terms? Explain the order in which a₂,a₃ and later terms are produced.",
+      "answer_text": "For the second-order recurrence a_n=a_(n−1)+a_(n−2), given a_0,a_1, the terms a_2,a_3,… are produced uniquely in turn.",
+      "explanation": "For the second-order recurrence a_n=a_(n−1)+a_(n−2), given a_0,a_1, the terms a_2,a_3,… are produced uniquely in turn.\n\nExistence means the rule actually allows continuation; uniqueness means a common start cannot branch. For a linear recurrence, take the difference of two solutions: the initial differences are 0, hence all later differences are 0. A general explicit functional recurrence can also be compared directly by induction.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-recurrence_initial__boundary_range": {
+      "title": "Valid indices and completing boundary data: example practice",
+      "statement": "The recurrence a_n=a_{n−1}+a_{n−2} is required only for n≥3. Can a₂ be determined from a₀,a₁ alone? Explain why the valid index range matters.",
+      "answer_text": "If a_n=a_(n−1)+a_(n−2) holds only for n≥3, a_2 does not follow from a_0,a_1.",
+      "explanation": "If a_n=a_(n−1)+a_(n−2) holds only for n≥3, a_2 does not follow from a_0,a_1.\n\nWriting n≥2 rather than n≥3 can produce a different solution family. Substitute the first valid index to see exactly which undetermined quantities the right side needs. If later values replace initial values, verify that they uniquely recover standard initial values.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-recurrence_initial__compatibility": {
+      "title": "Independence and compatibility of initial information: example practice",
+      "statement": "For a_n=a_{n−2} with n≥2, do a₀ and a₂ alone determine the odd-indexed terms? Explain the relationship between these two initial data and the behavior of the even- and odd-indexed subsequences.",
+      "answer_text": "The recurrence a_n=a_(n−2) makes even-index terms equal and odd-index terms equal. Giving a_0 and a_2 does not determine the odd-index terms.",
+      "explanation": "The recurrence a_n=a_(n−2) makes even-index terms equal and odd-index terms equal. Giving a_0 and a_2 does not determine the odd-index terms.\n\nTwo values on the same parity subsequence may provide only one piece of information. An equality already forced by the recurrence removes no freedom, while data contradicting it immediately give no solution. Retain the original valid index range when checking conditions.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_basic": {
+      "title": "Basic graph concepts: example practice",
+      "statement": "Let a simple undirected graph have V={a,b,c,d} and E={ab,ac,bc,cd}, where ab denotes the unordered pair {a,b}. Find each vertex degree and the degree sum, and check the handshaking identity.",
+      "answer_text": "For the simple undirected graph V={a,b,c,d}, E={ab,ac,bc,cd}, the degrees are 2,2,3,1. Their sum 8 is twice the 4 edges. Here ab denotes the unordered endpoint pair {a,b}.",
+      "explanation": "For the simple undirected graph V={a,b,c,d}, E={ab,ac,bc,cd}, the degrees are 2,2,3,1. Their sum 8 is twice the 4 edges. Here ab denotes the unordered endpoint pair {a,b}.\n\nSpecify the graph type before discussing edge counts and degrees. Each nonloop undirected edge contributes 1 at each endpoint; a loop contributes 2 at one vertex. Thus the handshake theorem also holds for finite undirected graphs with loops or parallel edges. In a simple n-vertex graph, each degree is at most n−1 and there are at most n(n−1)/2 edges. The number of odd-degree vertices is even. In a directed graph, total outdegree and total indegree both equal the number of arcs.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_basic__simple_graph": {
+      "title": "Simple graphs and complete graphs: example practice",
+      "statement": "Find the edge count and each vertex degree of the complete graph on 4 vertices. After deleting any one edge, is the result still simple, and is it still complete?",
+      "answer_text": "The complete graph on 4 vertices has 6 edges and degree 3 at every vertex. Removing any edge leaves a simple graph that is no longer complete.",
+      "explanation": "The complete graph on 4 vertices has 6 edges and degree 3 at every vertex. Removing any edge leaves a simple graph that is no longer complete.\n\nA simple graph has maximum degree n−1 and at most n(n−1)/2 edges; the complete graph attains both bounds. A general simple graph may omit edges or have isolated vertices, and need not be connected.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_basic__degree": {
+      "title": "Undirected degree and isolated vertices: example practice",
+      "statement": "An undirected multigraph consists only of vertices a,b and two parallel edges between them. How many distinct neighbors does a have, and what do these edges contribute to its degree?",
+      "answer_text": "If a and b have two parallel edges, a has just one distinct neighbor b but receives degree 2 from those edges.",
+      "explanation": "If a and b have two parallel edges, a has just one distinct neighbor b but receives degree 2 from those edges.\n\nDegree is a local statistic and does not directly determine whether the graph is connected or the vertex is a cut vertex. In a simple graph every distinct neighbor contributes exactly 1, so degree equals neighbor count. With loops or parallel edges these counts can differ.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_basic__directed_degree": {
+      "title": "Indegree and outdegree in directed graphs: example practice",
+      "statement": "A digraph has vertices a,b,c and exactly the arcs {a→b,b→c}. Find the in-degree and out-degree of each vertex, then separately sum all in-degrees and all out-degrees.",
+      "answer_text": "With only a→b and b→c, the (indegree,outdegree) pairs are (0,1) for a, (1,1) for b, and (1,0) for c. Both degree totals are 2.",
+      "explanation": "With only a→b and b→c, the (indegree,outdegree) pairs are (0,1) for a, (1,1) for b, and (1,0) for c. Both degree totals are 2.\n\nAn arc is counted once in the outdegree of its tail and once in the indegree of its head. A vertex of outdegree 0 cannot leave along an arc; a vertex of indegree 0 cannot be entered from other vertices along arcs, apart from allowing a length-0 stay.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_basic__undirected_graph": {
+      "title": "Undirected graphs and unordered endpoints: example practice",
+      "statement": "When mutual acquaintance is represented by an undirected graph, how many edges represent that a and b know each other? Should ab and ba count as different undirected edges?",
+      "answer_text": "If a and b know each other, record one undirected edge ab rather than counting ab and ba separately.",
+      "explanation": "If a and b know each other, record one undirected edge ab rather than counting ab and ba separately.\n\nMutual acquaintance and two-way roads can be modeled by undirected graphs. If only one direction is allowed or the two directions have different attributes, use a directed graph; written vertex order cannot implicitly supply a direction.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_basic__directed_graph": {
+      "title": "Directed graphs and arc directions: example practice",
+      "statement": "A digraph consists only of vertices a,b and the arc a→b. Determine reachability from a to b and from b to a. Does adding b→a add a new arc?",
+      "answer_text": "With only a→b, a reaches b but b cannot reach a. Adding b→a adds a new arc.",
+      "explanation": "With only a→b, a reaches b but b cannot reach a. Adding b→a adds a new arc.\n\nDirection determines allowable traversal, indegree and outdegree, and strong connectivity. Models of one-way roads or precedence dependencies must follow arrows; connectivity of the underlying undirected graph does not imply reachability in every direction.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_basic__parallel_edges": {
+      "title": "Parallel edges and multigraphs: example practice",
+      "statement": "An undirected multigraph has only vertices a,b and three parallel edges joining them. Find the edge count, each vertex degree, and the number of distinct unordered endpoint pairs.",
+      "answer_text": "Three parallel edges between a and b give 3 edges and degree 3 at each vertex, despite there being only one distinct endpoint pair.",
+      "explanation": "Three parallel edges between a and b give 3 edges and degree 3 at each vertex, despite there being only one distinct endpoint pair.\n\nEach parallel edge contributes separately to edge count and degrees and must be used separately in an Euler traversal. Storing edges only as a set of endpoint pairs incorrectly merges parallel edges.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_basic__loops": {
+      "title": "Loops and degree counting: example practice",
+      "statement": "An undirected graph consists of one vertex a and one loop. Find the edge count and deg(a), and check whether the degree sum is twice the edge count.",
+      "answer_text": "With only vertex a and one undirected loop, |E|=1 and deg(a)=2, consistent with the handshake theorem.",
+      "explanation": "With only vertex a and one undirected loop, |E|=1 and deg(a)=2, consistent with the handshake theorem.\n\nA loop still counts as only one edge. Undirected degree counts edge ends rather than edge objects, which explains its contribution of 2. Textbooks may use different adjacency-matrix conventions for loops, so state the convention before use.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_basic__handshake": {
+      "title": "The handshake theorem and parity of odd-degree vertices: example practice",
+      "statement": "A finite undirected graph has degree sum 18. Find its edge count. Separately, can a finite undirected graph have exactly 3 odd-degree vertices? Explain.",
+      "answer_text": "A degree sum of 18 gives 9 edges. Exactly three odd-degree vertices are impossible regardless of the other degrees.",
+      "explanation": "A degree sum of 18 gives 9 edges. Exactly three odd-degree vertices are impossible regardless of the other degrees.\n\nDouble-count the two endpoints of every edge. An even number of odd-degree vertices and an even degree sum are necessary constraints, but do not guarantee that an arbitrary list is realizable as a simple graph.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_isomorphism": {
+      "title": "Graph isomorphism: example practice",
+      "statement": "Determine whether the paths a—b—c—d and 1—3—4—2 are isomorphic. If so, give one vertex mapping. Does the position of vertices on the page affect the answer?",
+      "answer_text": "The paths a—b—c—d and 1—3—4—2 are isomorphic via f(a)=1,f(b)=3,f(c)=4,f(d)=2. Their positions on the page do not affect this conclusion.",
+      "explanation": "The paths a—b—c—d and 1—3—4—2 are isomorphic via f(a)=1,f(b)=3,f(c)=4,f(d)=2. Their positions on the page do not affect this conclusion.\n\nVerify both a bijection on vertices and correspondence of edges and nonedges. Vertex count, edge count, degree multiset, number of components, and cycle lengths are isomorphism invariants that can rule out isomorphism; agreement of these invariants usually does not prove it. An automorphism is an isomorphism from a graph to itself, describing structural symmetry regardless of visual symmetry in a drawing.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_isomorphism__mapping": {
+      "title": "Adjacency preservation and isomorphism maps: example practice",
+      "statement": "Give an isomorphism from the path a—b—c to the path 2—1—3, explaining where the middle vertex and endpoints must map.",
+      "answer_text": "Map a—b—c to 2—1—3 by f(a)=2,f(b)=1,f(c)=3: endpoints map to endpoints and the middle vertex to the middle.",
+      "explanation": "Map a—b—c to 2—1—3 by f(a)=2,f(b)=1,f(c)=3: endpoints map to endpoints and the middle vertex to the middle.\n\nFirst check that no vertex is omitted or repeated, then check each edge. For finite graphs with equal edge counts, a vertex bijection mapping every source edge to an edge automatically covers all target edges. These hypotheses cannot generally be omitted.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_isomorphism__invariants": {
+      "title": "Isomorphism invariants and detecting nonisomorphism: example practice",
+      "statement": "Compare K₃,₃ with the triangular prism graph, formed from two disjoint triangles and three edges joining corresponding vertices. Decide whether they are isomorphic, using triangle counts rather than degrees alone to justify the answer.",
+      "answer_text": "K₃,₃ and the triangular prism graph are both connected, have 6 vertices, and have degree 3 at every vertex. The former has no triangles and the latter has two, so they are nonisomorphic.",
+      "explanation": "K₃,₃ and the triangular prism graph are both connected, have 6 vertices, and have degree 3 at every vertex. The former has no triangles and the latter has two, so they are nonisomorphic.\n\nIsomorphisms map paths, cycles, and neighborhoods to corresponding structures, preserving their counts. The converse fails: equal degree lists and equal connectivity may coexist with different triangles or other structures.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_isomorphism__automorphism": {
+      "title": "Automorphisms and structural symmetry: example practice",
+      "statement": "Let the path P₅ have vertices v₁—v₂—v₃—v₄—v₅ in order. Find the number of its automorphisms and describe them. May an internal degree-2 vertex map to an endpoint?",
+      "answer_text": "A path with 5 vertices has only two automorphisms: identity and reversal. It cannot move an internal degree-2 vertex to an endpoint.",
+      "explanation": "A path with 5 vertices has only two automorphisms: identity and reversal. It cannot move an internal degree-2 vertex to an endpoint.\n\nUse invariants such as unique degrees to fix special vertices, then determine whether the others can be interchanged freely. An asymmetric drawing does not remove automorphisms; visually similar vertices need not be interchangeable.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_adjacency": {
+      "title": "Adjacency matrices: example practice",
+      "statement": "For the undirected path a—b—c, write the adjacency matrix A in vertex order (a,b,c), compute (A²)_{ac}, and interpret that entry in terms of walks.",
+      "answer_text": "For a—b—c ordered (a,b,c), A=[[0,1,0],[1,0,1],[0,1,0]]. (A²)ₐ𝚌=1 represents the unique two-step walk a—b—c.",
+      "explanation": "For a—b—c ordered (a,b,c), A=[[0,1,0],[1,0,1],[0,1,0]]. (A²)ₐ𝚌=1 represents the unique two-step walk a—b—c.\n\nThe matrix depends on vertex order; reordering vertices reorders rows and columns together. In an undirected simple graph, a row sum is the corresponding degree and the total sum is twice the edge count. Under ordinary integer matrix multiplication, (Aᵏ)ᵢⱼ counts length-k walks from vᵢ to vⱼ. Walks allow repeated vertices and edges and cannot always be interpreted as simple paths. If parallel edges or loops are allowed, separately state the matrix-counting convention.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_adjacency__construction": {
+      "title": "Constructing and validating adjacency matrices: example practice",
+      "statement": "Using the same vertex order (v₁,v₂), determine which of [[0,1],[1,0]] and [[0,1],[0,0]] can be adjacency matrices of simple undirected graphs. Describe the edges for any valid matrix.",
+      "answer_text": "[[0,1],[1,0]] represents one edge between two vertices; [[0,1],[0,0]] cannot represent an undirected graph in the same vertex order.",
+      "explanation": "[[0,1],[1,0]] represents one edge between two vertices; [[0,1],[0,0]] cannot represent an undirected graph in the same vertex order.\n\nSymmetry corresponds to undirected edges, the zero diagonal to no loops, and 0/1 entries to at most one edge per endpoint pair. An isolated vertex gives an all-zero row and column.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_adjacency__degree_sums": {
+      "title": "Row sums, column sums, and degrees: example practice",
+      "statement": "A digraph has adjacency matrix [[0,1],[0,0]] in vertex order (v₁,v₂). Find the out-degree and in-degree of v₁ and the sum of all matrix entries.",
+      "answer_text": "The directed matrix [[0,1],[0,0]] has only v₁→v₂. Vertex v₁ has outdegree 1 and indegree 0; the total matrix sum is 1.",
+      "explanation": "The directed matrix [[0,1],[0,0]] has only v₁→v₂. Vertex v₁ has outdegree 1 and indegree 0; the total matrix sum is 1.\n\nState the direction convention first. In a directed matrix, the sum of all entries directly equals the arc count, without division by 2. Each undirected edge occupies two symmetric positions.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_adjacency__walk_powers": {
+      "title": "Adjacency matrix powers and fixed-length walks: example practice",
+      "statement": "An undirected graph has only vertices a,b and edge ab, with adjacency matrix A=[[0,1],[1,0]]. Compute A², interpret its diagonal entries as walks, and determine whether those walks are paths with distinct vertices.",
+      "answer_text": "If the only edge is a—b, then A²=I, representing a—b—a and b—a—b. Both are valid walks but not paths with distinct vertices.",
+      "explanation": "If the only edge is a—b, then A²=I, representing a—b—a and b—a—b. Both are valid walks but not paths with distinct vertices.\n\nMultiplication classifies by the penultimate vertex, adjoining a final edge to a length-k walk; this also gives an induction proof. Boolean multiplication records only existence, while ordinary integer multiplication retains counts.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_adjacency__vertex_order": {
+      "title": "Vertex reordering and adjacency-matrix permutations: example practice",
+      "statement": "The adjacency matrix of the path a—b—c is initially ordered (a,b,c), then reordered as (b,a,c). Where does the degree-2 middle vertex’s row and column move? May one permute rows without applying the same permutation to columns?",
+      "answer_text": "Reordering a—b—c as (b,a,c) moves the degree-2 middle vertex’s row and column to the first position.",
+      "explanation": "Reordering a—b—c as (b,a,c) moves the degree-2 middle vertex’s row and column to the first position.\n\nA row and column jointly belong to one vertex. Permuting rows alone makes row and column orders inconsistent. Isomorphism of undirected simple graphs can be expressed as equality of adjacency matrices after a vertex reordering.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_matrix": {
+      "title": "Matrix representations of graphs: example practice",
+      "statement": "An undirected graph consists of the single edge a—b. Use row order (a,b), orient the edge a→b, and assign −1 at the tail and +1 at the head. Write the signed incidence matrix B, compute BBᵀ, and compare it with D−A for the undirected graph.",
+      "answer_text": "For a single edge a—b oriented a→b, B=[[-1],[1]], so BBᵀ=[[1,-1],[-1,1]], also the degree matrix I minus adjacency matrix [[0,1],[1,0]].",
+      "explanation": "For a single edge a—b oriented a→b, B=[[-1],[1]], so BBᵀ=[[1,-1],[-1,1]], also the degree matrix I minus adjacency matrix [[0,1],[1,0]].\n\nEvery column of M has two ones, and row sums give degrees. Every column of B has one −1 and one +1 and sums to 0. Reversing an edge’s chosen orientation negates that column without changing BBᵀ. For a loopless directed graph, Boolean unions of powers of A give reachability matrices; specify whether length-0 walks count. Reflexive reachability has ones on the diagonal. Matrix representations convert combinatorial properties into computable algebraic relations.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_matrix__unsigned_incidence": {
+      "title": "Unsigned vertex–edge incidence matrices: example practice",
+      "statement": "For the undirected path a—b—c, write the unsigned vertex–edge incidence matrix M using vertex order (a,b,c) and edge order (ab,bc).",
+      "answer_text": "For a—b—c with edges ordered ab,bc, M=[[1,0],[1,1],[0,1]].",
+      "explanation": "For a—b—c with edges ordered ab,bc, M=[[1,0],[1,1],[0,1]].\n\nEvery column has exactly two ones and row sums equal degrees. MMᵀ has degrees on its diagonal and common incident-edge counts off diagonal, so MMᵀ=D+A for simple graphs.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_matrix__laplacian": {
+      "title": "Laplacian matrices and edge energy: example practice",
+      "statement": "For the undirected path a—b—c, write L=D−A in vertex order (a,b,c), and explain the diagonal entry for the middle vertex.",
+      "answer_text": "For a—b—c, L=[[1,-1,0],[-1,2,-1],[0,-1,1]], with diagonal entry 2 at the middle vertex.",
+      "explanation": "For a—b—c, L=[[1,-1,0],[-1,2,-1],[0,-1,1]], with diagonal entry 2 at the middle vertex.\n\nThe diagonal of L records degrees, adjacent off-diagonal positions are −1, other entries are 0, and each row sums to 0. The quadratic form xᵀLx sums squared endpoint-value differences over edges. In a connected graph it vanishes exactly when all vertex values are equal.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_matrix__reachability": {
+      "title": "Reachability matrices and Boolean operations: example practice",
+      "statement": "A digraph has arcs s→a, s→b, a→t and b→t. Find the (s,t) entry of the ordinary adjacency-matrix square and of the Boolean square, and explain their meanings.",
+      "answer_text": "In the directed diamond s→a,s→b,a→t,b→t, ordinary (A²)ₛₜ=2, while the same entry in the Boolean square is 1.",
+      "explanation": "In the directed diamond s→a,s→b,a→t,b→t, ordinary (A²)ₛₜ=2, while the same entry in the Boolean square is 1.\n\nOrdinary Aᵏ counts walks; Boolean Aᵏ only tests existence of a length-k walk. In a finite graph, reflexive reachability is the Boolean union of I,A,…,Aⁿ⁻¹. Diagonal entries of nonreflexive R additionally require considering nonempty closed walks.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_matrix__signed_incidence": {
+      "title": "Oriented incidence matrices and sign conventions: example practice",
+      "statement": "Use −1 at an arc tail and +1 at its head. Write the incidence column for a→b in row order (a,b), and state how it changes when the arc is reversed.",
+      "answer_text": "The column for a→b is [-1,1]ᵀ; reversing it gives [1,-1]ᵀ.",
+      "explanation": "The column for a→b is [-1,1]ᵀ; reversing it gives [1,-1]ᵀ.\n\nReversing an arc or a chosen edge orientation negates its column, leaving BBᵀ unchanged. Since each column sums to 0, all row vectors sum to zero, and rank is at most n−1 for n≥1. The equality BBᵀ=D−A uses B obtained by orienting an undirected simple graph and D,A from that original undirected graph. Its D,A cannot be replaced directly by a directed outdegree matrix and directed adjacency matrix.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_connectivity": {
+      "title": "Paths and connectivity: example practice",
+      "statement": "For the undirected graph V={a,b,c,d,e,f}, E={ab,bc,de}, list all connected components and decide whether c is reachable from a.",
+      "answer_text": "The graph with vertices {a,b,c,d,e,f} and edges {ab,bc,de} has three components with vertex sets {a,b,c},{d,e},{f}. Although a and c are not adjacent, b connects them.",
+      "explanation": "The graph with vertices {a,b,c,d,e,f} and edges {ab,bc,de} has three components with vertex sets {a,b,c},{d,e},{f}. Although a and c are not adjacent, b connects them.\n\n“Maximal” means it cannot be extended by adding other vertices of the graph while staying in the same connected part, rather than having the largest vertex count. Undirected reachability uniquely partitions vertices into components. Breadth-first search visits layers and finds minimum edge-count distances from a source in an unweighted graph. Depth-first search also finds components, but its first path need not be shortest. Strong connectivity must respect arc directions; weak connectivity alone guarantees neither one-way nor mutual reachability.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_connectivity__simple_paths": {
+      "title": "Simple paths and reachability: example practice",
+      "statement": "Assume all consecutive edges in the listed sequences exist. Decide whether a—b—c—d and a—b—a—c are simple paths, and give the length of the first sequence.",
+      "answer_text": "a—b—c—d is a simple path of length 3; a—b—a—c is not, since a repeats.",
+      "explanation": "a—b—c—d is a simple path of length 3; a—b—a—c is not, since a repeats.\n\nIf a walk repeats a vertex, remove the closed segment between two occurrences without changing its endpoints. Repeated deletion produces a simple path. Thus reachability does not require repeated traversal, though counting and negative-weight optimization require separate distinctions.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_connectivity__components": {
+      "title": "Undirected reachability and connected components: example practice",
+      "statement": "An undirected graph has V={a,b,c,d,e} and E={ab,cd}. How many connected components are there before and after adding bc? Which component contains the isolated vertex e?",
+      "answer_text": "Edges {ab,cd} and isolated vertex e give 3 components. Adding bc leaves 2 components, with e still separate.",
+      "explanation": "Edges {ab,cd} and isolated vertex e give 3 components. Adding bc leaves 2 components, with e still separate.\n\nThere are no edges between different components, since such an edge would make them mutually reachable. Adding an edge between two components merges them and reduces the component count by 1. Adding an edge within one component does not change the count.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_connectivity__strong_components": {
+      "title": "Strong connectivity and strongly connected components: example practice",
+      "statement": "A digraph has arcs a→b, b→a and b→c. Find its strongly connected components and determine whether c can reach a or b.",
+      "answer_text": "If a↔b and b→c, the strong components are {a,b} and {c}; c cannot return to a or b.",
+      "explanation": "If a↔b and b→c, the strong components are {a,b} and {c}; c cannot return to a or b.\n\nAn arc going only from one side to another cannot merge those sides into a single strong component. Mutual reachability partitions vertices into disjoint strong components; degrees or drawing distances do not determine this grouping.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_connectivity__walks": {
+      "title": "Walks and repeated traversal: example practice",
+      "statement": "An undirected graph has only vertices a,b and edge ab. Classify the walk a—b—a, and give its length, number of distinct vertices and number of distinct edges.",
+      "answer_text": "With only edge ab, a—b—a is a closed walk of length 2 despite having only two distinct vertices and one distinct edge.",
+      "explanation": "With only edge ab, a—b—a is a closed walk of length 2 despite having only two distinct vertices and one distinct edge.\n\nAdjacency-matrix powers count walks rather than only simple paths. Traversing an undirected edge and returning is legal, but both traversals use the same edge. In negative-weight problems, allowing repetition can determine whether a minimum cost exists.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_connectivity__trails": {
+      "title": "Trails and the no-repeated-edge restriction: example practice",
+      "statement": "Triangles abc and cde share only vertex c. Is c—a—b—c—d—e—c a closed trail? Explain whether the repeated vertex prevents it from being a trail.",
+      "answer_text": "For two triangles sharing vertex c, c—a—b—c—d—e—c is a closed trail: c repeats but no edge does.",
+      "explanation": "For two triangles sharing vertex c, c—a—b—c—d—e—c is a closed trail: c repeats but no edge does.\n\nEvery simple path is a trail, but a trail need not be a simple path. An Euler trail covers all edges and may therefore revisit vertices where parts meet.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_connectivity__cycles": {
+      "title": "Simple cycles versus closed walks: example practice",
+      "statement": "In the undirected simple triangle abc, compare a—b—c—a with a—b—a. Are both closed walks? Are both simple cycles? Explain.",
+      "answer_text": "The triangle a—b—c—a is a simple cycle. Although a—b—a is closed, it repeats one edge and is not a simple cycle in an undirected simple graph.",
+      "explanation": "The triangle a—b—c—a is a simple cycle. Although a—b—a is closed, it repeats one edge and is not a simple cycle in an undirected simple graph.\n\nCycles supply alternative routes between vertices and underlie bridges, two-colorability, Hamiltonicity, and other concepts. A closed walk can traverse an edge back and forth or join several cycles, so it need not itself be a simple cycle.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_connectivity__connected_graph": {
+      "title": "Connected graphs and maximal connected subgraphs: example practice",
+      "statement": "Consider the path a—b—c. Is the whole graph connected? Is the subgraph consisting of a,b and edge ab connected, and is it a connected component of the original graph?",
+      "answer_text": "The path a—b—c is connected although a,c are not adjacent. Edge ab alone is a connected subgraph, but is not a component of the entire graph.",
+      "explanation": "The path a—b—c is connected although a,c are not adjacent. Edge ab alone is a connected subgraph, but is not a component of the entire graph.\n\nConnected does not mean complete: many pairs may connect through intermediate vertices. It does not mean a tree either, since cycles are allowed. A path connecting two vertices need not be shortest.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_connectivity__weak_connectivity": {
+      "title": "Weak connectivity and the underlying undirected graph: example practice",
+      "statement": "A digraph has only arcs a→b and b→c. Describe its underlying undirected graph and decide whether it is weakly connected and strongly connected.",
+      "answer_text": "With only a→b,b→c, the underlying graph is a—b—c. It is weakly connected, but c cannot reach a.",
+      "explanation": "With only a→b,b→c, the underlying graph is a—b—c. It is weakly connected, but c cannot reach a.\n\nStrong connectivity implies weak connectivity, but generally not conversely. Weak connectivity identifies whether a structure is separated, but does not directly determine whether directed transport or dependency routes are feasible.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_connectivity__condensation": {
+      "title": "Condensation of strongly connected components: example practice",
+      "statement": "A digraph has only a↔b, b→c and c↔d. Contract each strongly connected component to one vertex and give the vertices and arcs of the condensation graph.",
+      "answer_text": "a↔b,b→c,c↔d contracts to {a,b}→{c,d}.",
+      "explanation": "a↔b,b→c,c↔d contracts to {a,b}→{c,d}.\n\nThe condensation is a directed acyclic graph: a cycle between components would make their union mutually reachable, contradicting maximality. It can analyze precedence between strong components.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_cut": {
+      "title": "Cut vertices and bridges: example practice",
+      "statement": "Triangles abc and def are connected only by an additional edge cd. Find all bridges and articulation vertices, and explain the status of edges inside the triangles.",
+      "answer_text": "If triangles abc and def are joined only by cd, then cd is the unique bridge and c,d are cut vertices. Any triangle edge can be bypassed using its other two edges.",
+      "explanation": "If triangles abc and def are joined only by cd, then cd is the unique bridge and c,d are cut vertices. Any triangle edge can be bypassed using its other two edges.\n\nCompare component counts before and after deletion; degrees alone do not decide. Internal vertices of paths are usually cut vertices, while cycle edges have alternative routes and are not bridges. Two cycles sharing one vertex may have a cut vertex with no bridge. For a connected graph on at least two vertices, edge connectivity λ(G) is the minimum number of edges whose deletion disconnects it, measuring resistance to edge failures beyond single bridges.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_cut__articulation": {
+      "title": "Cut vertices and vertex deletion: example practice",
+      "statement": "Find all articulation vertices of the undirected path a—b—c—d, and decide whether either endpoint is an articulation vertex.",
+      "answer_text": "The cut vertices of a—b—c—d are b,c; endpoints a,d are not cut vertices.",
+      "explanation": "The cut vertices of a—b—c—d are b,c; endpoints a,d are not cut vertices.\n\nRemoving a leaf does not break routes among the other vertices. Removing a vertex from a cycle leaves a path. A shared connection vertex of several cycles may be a cut vertex even if none of its incident edges is a bridge.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_cut__bridges": {
+      "title": "Bridges and alternative routes: example practice",
+      "statement": "Add vertex d and edge cd to triangle abc. Find all bridges, and explain using alternative routes why the other edges are not bridges.",
+      "answer_text": "In triangle abc with added edge cd, cd is a bridge and the three triangle edges are not.",
+      "explanation": "In triangle abc with added edge cd, cd is a bridge and the three triangle edges are not.\n\nDeleting one cycle edge leaves its endpoints connected by the rest, so it is not a bridge. Every tree edge has no alternative route, so every tree edge is a bridge. The graph as a whole need not be connected to test for bridges.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_cut__edge_connectivity": {
+      "title": "Edge cuts and edge connectivity: example practice",
+      "statement": "Determine the edge connectivity of K₃ by considering deletion of one edge and deletion of the two edges incident with a common vertex.",
+      "answer_text": "Deleting any one triangle edge leaves it connected; deleting the two edges at one vertex disconnects it. Thus λ(K₃)=2.",
+      "explanation": "Deleting any one triangle edge leaves it connected; deleting the two edges at one vertex disconnects it. Thus λ(K₃)=2.\n\nTo prove λ(G)=k, show that k edges suffice and fewer than k cannot disconnect the graph. Deleting all edges incident to a vertex isolates it, so λ(G) is at most minimum degree, though this upper bound need not be attained.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_weighted": {
+      "title": "Weighted graphs: example practice",
+      "statement": "There is a direct edge st of weight 9, and a route s—a—b—t whose three edges each have weight 2. Compare the two routes by edge count and total cost.",
+      "answer_text": "If st has weight 9 and s—a—b—t has three edges of weight 2, the direct edge uses fewer edges but the three-edge path has lower cost, 6.",
+      "explanation": "If st has weight 9 and s—a—b—t has three edges of weight 2, the direct edge uses fewer edges but the three-edge path has lower cost, 6.\n\nA path with the fewest edges need not have minimum total weight. A zero-weight edge is still present and must be distinguished from a missing edge. Cost matrices usually use ∞ for missing edges and 0 for the cost of an empty walk at a vertex. Being weighted implies neither nonnegative weights nor the triangle inequality. With repeated traversal, negative closed walks may make cost unbounded below, so algorithmic assumptions matter.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_weighted__path_cost": {
+      "title": "Edge weights, path costs, and optimization objectives: example practice",
+      "statement": "Two routes have edge-weight sequences (1,8) and (2,2,2). Find their edge counts and total costs, and decide whether the two optimization objectives select the same route.",
+      "answer_text": "A route with weights 1 and 8 costs 9; a route with three edges of weight 2 costs 6. The latter has more edges but is cheaper.",
+      "explanation": "A route with weights 1 and 8 costs 9; a route with three edges of weight 2 costs 6. The latter has more edges but is cheaper.\n\nCosts may represent time, distance, or price, and different meanings of weights may give different optimal routes on the same graph. If a problem instead minimizes the maximum edge weight as a bottleneck objective, optimize that quantity rather than the sum.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_weighted__cost_matrix": {
+      "title": "Cost matrices and zero-weight edges: example practice",
+      "statement": "A digraph has only a→b of weight 0 and b→c of weight 2. What is c_ac in the direct-edge cost matrix, and what is the shortest total cost from a to c?",
+      "answer_text": "With only a→b of weight 0 and b→c of weight 2, cₐ𝚌=∞ although the minimum total cost from a to c is 2.",
+      "explanation": "With only a→b of weight 0 and b→c of weight 2, cₐ𝚌=∞ although the minimum total cost from a to c is 2.\n\nA cost matrix is not an all-pairs shortest-distance matrix: an indirect route must not fill a missing-edge entry. Special structures such as negative loops need separate diagonal conventions; this entry uses loopless models.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_weighted__negative_walks": {
+      "title": "Negative closed walks and repetition rules: example practice",
+      "statement": "A digraph contains an arc a→b of weight −2, but no route returns from b to a. Does this alone imply that all route costs are unbounded below? Distinguish a negative edge from a negative closed walk.",
+      "answer_text": "A directed edge a→b of weight −2, without any route back to a, does not by itself imply all costs are unbounded below.",
+      "explanation": "A directed edge a→b of weight −2, without any route back to a, does not by itself imply all costs are unbounded below.\n\nOne negative directed edge need not create a negative cycle. A directed acyclic graph has only finitely many simple paths even with negative edges. An undirected negative edge can be traversed back and forth to create a negative closed walk, but repetition is forbidden if only simple paths are allowed.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_weighted__optimization_objectives": {
+      "title": "Total cost, edge count, and bottleneck objectives: example practice",
+      "statement": "Two routes have edge weights (1,8) and (4,4,4). Find the total cost and largest edge weight for each, then identify which route each objective selects.",
+      "answer_text": "Weights 1,8 give total cost 9 and bottleneck 8; weights 4,4,4 give total cost 12 and bottleneck 4. The two objectives prefer opposite routes.",
+      "explanation": "Weights 1,8 give total cost 9 and bottleneck 8; weights 4,4,4 give total cost 12 and bottleneck 4. The two objectives prefer opposite routes.\n\nThe objectives may select different routes. Giving weights does not automatically specify an objective; both model and answer should state the quantity optimized. Fewest edges and minimum total cost naturally agree when all edges have the same positive weight.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_euler": {
+      "title": "Eulerian graphs: example practice",
+      "statement": "An undirected graph has edges ab,bc,cd,da,ac. Find the vertex degrees, construct a walk using every edge exactly once, and decide whether an Euler circuit exists.",
+      "answer_text": "Add diagonal ac to a—b—c—d—a. Vertices a,c have degree 3 and the others degree 2. The sequence a—b—c—d—a—c uses all five edges once, giving an Euler trail from a to c, but no Euler circuit exists.",
+      "explanation": "Add diagonal ac to a—b—c—d—a. Vertices a,c have degree 3 and the others degree 2. The sequence a—b—c—d—a—c uses all five edges once, giving an Euler trail from a to c, but no Euler circuit exists.\n\nMany textbooks call a connected undirected graph with an Euler circuit Eulerian. When asking only whether all edges can be traversed, isolated vertices can be ignored. Every visit to an internal vertex consumes one entering and one leaving edge, pairing its degree contributions; an open trail’s endpoints are exceptions. Directed graphs must respect arc directions: strong connectivity of the nonzero-degree part and equality of indegree and outdegree at each vertex guarantee an Euler circuit. Euler problems cover edges, rather than requiring each vertex to appear once.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_euler__undirected_circuit": {
+      "title": "The even-degree criterion for undirected Euler circuits: example practice",
+      "statement": "Compare a triangle together with one isolated vertex, and two disjoint triangles. Does each graph have an Euler circuit covering every edge? Explain how isolated vertices enter the criterion.",
+      "answer_text": "A triangle plus an isolated vertex still has an Euler circuit covering all edges; two disjoint triangles do not.",
+      "explanation": "A triangle plus an isolated vertex still has an Euler circuit covering all edges; two disjoint triangles do not.\n\nIsolated vertices have no edges to traverse and may be ignored in the existence test. Even degrees come from pairing each entry with an exit. Connectivity ensures no edges remain in an unreachable part.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_euler__directed_balance": {
+      "title": "Directed Euler circuits and degree balance: example practice",
+      "statement": "Decide whether the directed triangle a→b→c→a and two disjoint directed triangles have an Euler circuit covering every arc. Is in-degree/out-degree balance sufficient by itself?",
+      "answer_text": "In a→b→c→a, every indegree and outdegree is 1, giving a directed Euler circuit. Two disjoint directed cycles are balanced at every vertex but cannot form one circuit.",
+      "explanation": "In a→b→c→a, every indegree and outdegree is 1, giving a directed Euler circuit. Two disjoint directed cycles are balanced at every vertex but cannot form one circuit.\n\nEquality of total indegree and total outdegree holds in every directed graph and is far from sufficient. Check each vertex and exclude arcs scattered among parts that cannot all be visited together.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_euler__construction": {
+      "title": "Constructing Euler traversals and tracking edge identities: example practice",
+      "statement": "An undirected multigraph consists of vertices a,b and two parallel edges e₁,e₂. Give an Euler circuit using edge IDs and explain why no edge is repeated.",
+      "answer_text": "Two parallel edges e₁,e₂ between a,b give the Euler circuit a—e₁—b—e₂—a; this does not repeat the same edge.",
+      "explanation": "Two parallel edges e₁,e₂ between a,b give the Euler circuit a—e₁—b—e₂—a; this does not repeat the same edge.\n\nThis is construction by splicing closed trails. With two odd-degree vertices, first add an auxiliary edge to make all degrees even, then cut the Euler circuit at that edge. An algorithm should record unique edge identifiers rather than just endpoint pairs.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_euler__open_trail": {
+      "title": "Open Euler trails and two odd-degree vertices: example practice",
+      "statement": "Add one diagonal to an undirected four-cycle. Which vertices can be the endpoints of an open Euler trail? Explain using degree parity.",
+      "answer_text": "Adding a diagonal to a quadrilateral makes the diagonal’s endpoints odd; they can be the endpoints of an open Euler trail.",
+      "explanation": "Adding a diagonal to a quadrilateral makes the diagonal’s endpoints odd; they can be the endpoints of an open Euler trail.\n\nInternal entries and exits pair, leaving one unpaired incidence at each endpoint. Add an auxiliary edge between the odd vertices to obtain an even-degree Euler circuit, then cut it open to construct a trail in the original graph.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
     }
   }
 }

@@ -19,7 +19,8 @@ from offline_translations import compile_translations
 ROOT = Path(__file__).resolve().parents[1]
 PACKS = ("concepts.zh-CN.json", "questions.zh-CN.json", "references.zh-CN.json")
 TYPES = {"单项选择", "多项选择", "填空", "计算", "简答", "证明"}
-DIFFICULTIES = {"基础", "中等", "进阶"}
+DIFFICULTY_LEVELS = {"基础": "简单", "简单": "简单", "中等": "中等", "进阶": "困难", "困难": "困难"}
+DIFFICULTIES = set(DIFFICULTY_LEVELS)
 
 
 def require(condition, message):
@@ -132,8 +133,8 @@ def prepare(graph, concepts_pack, questions_pack, references_pack):
                         and concepts[ref]["graph_node_id"] == topic for ref in q["knowledge_points"])
                     for q in rows) >= 6, topic + ": expected at least six exercises on detailed concepts")
         require(len({q["type"] for q in rows}) >= 2, topic + ": insufficient exercise variety")
-        require("基础" in {q["difficulty"] for q in rows}
-                and len({q["difficulty"] for q in rows}) >= 2, topic + ": missing difficulty levels")
+        levels = {DIFFICULTY_LEVELS[q["difficulty"]] for q in rows}
+        require("简单" in levels and len(levels) >= 2, topic + ": missing difficulty levels")
     for item in [*cp["concepts"], *qp["questions"]]:
         refs = item.get("references", []) if "definition" in item else item["source"].get("references", [])
         require(refs and all(r.get("source_id") in sources and r.get("section")
@@ -199,12 +200,18 @@ def main():
         graph = json.loads((ROOT / "knowledge_graph.json").read_text(encoding="utf-8"))
         packs = [json.loads((ROOT / "offline-content" / name).read_text(encoding="utf-8")) for name in PACKS]
         concepts, questions = prepare(graph, *packs)
+        translations = compile_translations(ROOT, concepts, questions)
+        from migrate_concept_examples import MANIFEST, validate_example_migration
+        migration_manifest = ROOT / MANIFEST
+        if migration_manifest.exists():
+            validate_example_migration(concepts, questions, translations,
+                                       json.loads(migration_manifest.read_text(encoding="utf-8")))
         targets = {ROOT / "offline-content" / PACKS[0]: encoded(concepts),
                    ROOT / "offline-content" / PACKS[1]: encoded(questions)}
         for name, pack in zip(PACKS, (concepts, questions, packs[2])):
             targets[ROOT / "static/offline-content" / name] = encoded(pack)
         targets[ROOT / "static/offline-content/knowledge_graph.json"] = encoded(graph)
-        targets[ROOT / "static/offline-content/translations.en.json"] = encoded(compile_translations(ROOT, concepts, questions))
+        targets[ROOT / "static/offline-content/translations.en.json"] = encoded(translations)
         targets[ROOT / "offline-content/PREVIEW.zh-CN.md"] = coverage_markdown(graph, concepts, questions)
         changed = [path for path, content in targets.items()
                    if not path.exists() or path.read_text(encoding="utf-8") != content]

@@ -2771,6 +2771,629 @@
       "answer_text": "ν(P₅)=2, for example M={12,34}; 5 vertices cannot support 3 edges with disjoint endpoints. The graph has no isolated vertices, so ρ=5−2=3. Add 45 to M to get minimum edge cover F={12,34,45}, covering all 5 vertices. Two edges cover at most 4 vertices, directly confirming at least 3 are needed. After adding isolated z, no edge cover exists: no selectable edge has z as an endpoint.",
       "explanation": "The shared endpoint of 34,45 is allowed in an edge cover; it only prevents them from forming a matching. The formula requires no isolated vertices and cannot be mechanically applied to the new graph as 6−2.",
       "grading_criteria": "Maximum matching value and upper bound: 20%; edge-cover value and explicit edge set: 40%; verify minimality: 15%; isolated-vertex case and explanation: 25%."
+    },
+    "q-example-graph_hamilton": {
+      "title": "Hamiltonian graphs: example practice",
+      "statement": "The parts of K₂,₃ are {a,b} and {x,y,z}. Give a Hamilton path and decide whether a Hamilton cycle exists, explaining the role of the part sizes.",
+      "answer_text": "The parts of K₂,₃ are {a,b} and {x,y,z}. The path x—a—y—b—z is Hamiltonian, but the parts have different sizes, so no cycle can cover all five vertices exactly once. Thus the graph is not Hamiltonian.",
+      "explanation": "The parts of K₂,₃ are {a,b} and {x,y,z}. The path x—a—y—b—z is Hamiltonian, but the parts have different sizes, so no cycle can cover all five vertices exactly once. Thus the graph is not Hamiltonian.\n\nHamiltonian problems concern vertex coverage and allow many edges to be unused. A graph with a cut vertex cannot have a Hamiltonian cycle: deleting any vertex of the cycle would leave a connected path spanning the remaining vertices. Cycles in bipartite graphs alternate between the two parts, so a Hamiltonian cycle requires the parts to have equal sizes. Dirac’s theorem gives a sufficient condition: an undirected simple graph with n≥3 and minimum degree δ≥n/2 has a Hamiltonian cycle. Failure of this condition does not imply that no such cycle exists.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_hamilton__spanning_paths": {
+      "title": "Hamiltonian paths and spanning all vertices: example practice",
+      "statement": "Does the path graph P₅ have a Hamilton path? If so, describe how to traverse all vertices from an endpoint.",
+      "answer_text": "P₅ itself has a Hamiltonian path: follow the vertices in order from one end to the other.",
+      "explanation": "P₅ itself has a Hamiltonian path: follow the vertices in order from one end to the other.\n\nAn endpoint of a Hamiltonian path may have only one incident edge, so having such a path does not guarantee a Hamiltonian cycle. Check that every step uses an actual edge and that no vertex is omitted or repeated.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_hamilton__necessary": {
+      "title": "Necessary conditions for a Hamiltonian cycle: example practice",
+      "statement": "Two triangles share exactly one vertex. Determine connectedness, minimum degree and Hamiltonicity, explaining the restriction imposed by the articulation vertex.",
+      "answer_text": "Two triangles sharing one vertex form a connected graph with minimum degree 2. The shared vertex is a cut vertex, so the graph is not Hamiltonian.",
+      "explanation": "Two triangles sharing one vertex form a connected graph with minimum degree 2. The shared vertex is a cut vertex, so the graph is not Hamiltonian.\n\nDeleting any vertex from a Hamiltonian cycle leaves a connected path spanning the remaining vertices, so the graph cannot have a cut vertex. A bipartite cycle must alternate between parts and therefore uses equal numbers of vertices from each. These conditions are necessary; satisfying one alone does not guarantee a cycle.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_hamilton__dirac": {
+      "title": "Dirac’s sufficient degree condition: example practice",
+      "statement": "For the six-cycle C₆, find the minimum degree and test Dirac’s condition. Does it have a Hamilton cycle? What does this show about necessity of that condition?",
+      "answer_text": "C₆ has minimum degree 2, less than 6/2=3, yet it is itself a Hamiltonian cycle. Thus the condition is not necessary.",
+      "explanation": "C₆ has minimum degree 2, less than 6/2=3, yet it is itself a Hamiltonian cycle. Thus the condition is not necessary.\n\nFirst check that the graph is simple and undirected and that n≥3. Then compute every degree and take the minimum. If the condition holds, the conclusion follows directly. If it fails, this theorem cannot decide the question; it does not rule out Hamiltonicity.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_hamilton__spanning_cycle": {
+      "title": "Hamiltonian cycles and closure: example practice",
+      "statement": "Compare whether C₆ and P₆ have Hamilton cycles, and explain which endpoint connection P₆ lacks for closing its natural vertex order.",
+      "answer_text": "C₆ itself is a Hamiltonian cycle, whereas P₆ lacks an edge joining its endpoints and cannot be closed directly.",
+      "explanation": "C₆ itself is a Hamiltonian cycle, whereas P₆ lacks an edge joining its endpoints and cannot be closed directly.\n\nDeleting any edge of a Hamiltonian cycle yields a Hamiltonian path. In a complete graph, every ordering of the vertices can be closed, but in a general graph each edge must be checked; an ordering alone is not enough.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_shortest": {
+      "title": "Shortest paths: example practice",
+      "statement": "A weighted digraph has s→a:4, s→b:1, b→a:2, a→t:1 and b→t:7. Find a shortest s-to-t path and its cost, and compare it with s→a→t.",
+      "answer_text": "With directed edges s→a of weight 4, s→b of weight 1, b→a of weight 2, a→t of weight 1, and b→t of weight 7, the shortest path is s→b→a→t of total weight 4, better than the cost 5 via a directly.",
+      "explanation": "With directed edges s→a of weight 4, s→b of weight 1, b→a of weight 2, a→t of weight 1, and b→t of weight 7, the shortest path is s→b→a→t of total weight 4, better than the cost 5 via a directly.\n\nFor an unweighted graph, give every edge weight 1 and use breadth-first search. Dijkstra’s algorithm repeatedly settles the unsettled vertex with smallest tentative distance; its correctness requires all edge weights to be nonnegative, and zero-weight edges are allowed. Bellman–Ford handles negative edges and detects negative cycles reachable from the source. Shortest paths may be nonunique; listing all shortest simple paths requires more than one predecessor when applicable. For negative cycles, distinguish whether the cycle can reach the particular target.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_shortest__bfs": {
+      "title": "Unweighted shortest paths and breadth-first search: example practice",
+      "statement": "An undirected graph has edges sa,sb,at,bt. In breadth-first search from s, at which level is t, and which vertices can be shortest-path predecessors of t?",
+      "answer_text": "If s is adjacent to a and b, and both a and b connect to t, then t lies in layer 2 and can have both a and b as shortest-path predecessors.",
+      "explanation": "If s is adjacent to a and b, and both a and b connect to t, then t lies in layer 2 and can have both a and b as shortest-path predecessors.\n\nA queue processes earlier layers first. On first discovering a vertex, record its distance as the previous distance plus 1 and record a predecessor. To obtain all shortest paths, keep all valid predecessors from the preceding layer rather than selecting just one.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_shortest__dijkstra": {
+      "title": "Nonnegative shortest paths and Dijkstra’s settling rule: example practice",
+      "statement": "A digraph has s→a:4, s→b:1 and b→a:2. Starting Dijkstra at s, which of a,b must be settled first? Explain the resulting distance update for a.",
+      "answer_text": "For s→a of weight 4, s→b of weight 1, and b→a of weight 2, settle b first and improve a from 4 to 3. Settling a directly would miss the improvement.",
+      "explanation": "For s→a of weight 4, s→b of weight 1, and b→a of weight 2, settle b first and improve a from 4 to 3. Settling a directly would miss the improvement.\n\nNonnegativity ensures that a detour through a more distant unsettled vertex cannot improve the current minimum. Ties may be settled in any order without changing final shortest distances, although the resulting predecessor tree may differ.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_shortest__bellman_ford": {
+      "title": "Negative edges and Bellman–Ford relaxation: example practice",
+      "statement": "A digraph has s→a:1, s→b:2 and b→a:−3. What distance to a is obtained after relaxation, and why cannot the initial distance 1 be fixed permanently?",
+      "answer_text": "For s→a of weight 1, s→b of weight 2, and b→a of weight −3, a improves from 1 to −1; its initially smaller value cannot be fixed permanently.",
+      "explanation": "For s→a of weight 1, s→b of weight 2, and b→a of weight −3, a improves from 1 to −1; its initially smaller value cannot be fixed permanently.\n\nInitialize the source distance to 0 and every other distance to ∞. Relax only from tails currently reachable. A negative edge does not necessarily imply a negative cycle, so it is not a reason to reject every shortest-path problem.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_shortest__negative_cycles": {
+      "title": "Negative cycles and affected targets: example practice",
+      "statement": "A negative directed cycle lies in a separate component unreachable from s. Does it necessarily invalidate shortest paths within the part reachable from s? State the reachability conditions for a target to be affected.",
+      "answer_text": "If a negative cycle lies in a separate directed component that s cannot enter, ordinary shortest paths in the part reachable from s remain valid.",
+      "explanation": "If a negative cycle lies in a separate directed component that s cannot enter, ordinary shortest paths in the part reachable from s remain valid.\n\nAn unreachable target has distance ∞, which differs from a cost unbounded below. Even with a reachable negative cycle, some other targets may still have finite shortest costs; keep track of reachability to the target.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_shortest__optimality_certificate": {
+      "title": "Distance potentials and shortest-path certificates: example practice",
+      "statement": "A digraph has s→a:2, a→t:3 and s→t:7. Check h(s)=0,h(a)=2,h(t)=5 against h(v)≤h(u)+w(u,v) on every edge, and use it to certify that s→a→t is shortest.",
+      "answer_text": "With only s→a of weight 2, a→t of weight 3, and s→t of weight 7, the values h(s)=0, h(a)=2, h(t)=5 satisfy every edge constraint. The path s→a→t has cost 5 and attains the lower bound.",
+      "explanation": "With only s→a of weight 2, a→t of weight 3, and s→t of weight 7, the values h(s)=0, h(a)=2, h(t)=5 satisfy every edge constraint. The path s→a→t has cost 5 and attains the lower bound.\n\nA feasible path of cost exactly h(t) supplies matching, checkable lower and upper bounds and proves that the path is shortest. This verifies optimality without requiring the steps of a particular search algorithm.\n\nSumming h(v)−h(u)≤w(u,v) along any s-to-t path telescopes to h(t)−h(s)≤the path cost. Here h(s)=0 and s→a→t attains the lower bound 5, so it is optimal.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_coloring": {
+      "title": "Graph coloring: example practice",
+      "statement": "Find the chromatic numbers of the cycle 1—2—3—4—5—6—1 and of a five-cycle. Give a proper coloring of the six-cycle and explain the parity distinction.",
+      "answer_text": "For the 6-cycle 1—2—3—4—5—6—1, color {1,3,5} with one color and {2,4,6} with another, giving chromatic number 2. A 5-cycle requires 3 colors because alternating two colors causes a conflict.",
+      "explanation": "For the 6-cycle 1—2—3—4—5—6—1, color {1,3,5} with one color and {2,4,6} with another, giving chromatic number 2. A 5-cycle requires 3 colors because alternating two colors causes a conflict.\n\nTo establish the chromatic number, first obtain a lower bound using a clique, odd cycle, or similar obstruction, then construct a coloring with that many colors for an upper bound. An undirected simple graph is two-colorable exactly when it has no odd-length simple cycle. Sequential greedy coloring follows a specified vertex order, assigning each vertex the smallest color not used by its already colored neighbors. It always produces a proper coloring with at most Δ+1 colors, but need not be optimal, and its result depends on the order.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_coloring__chromatic_bounds": {
+      "title": "Proper vertex colorings and chromatic bounds: example practice",
+      "statement": "Attach one pendant vertex to a triangle. Find the chromatic number and justify both a lower bound and an achievable coloring.",
+      "answer_text": "A triangle with a pendant edge still needs only 3 colors. The triangle gives the lower bound 3, and the pendant vertex can reuse a color different from its neighbor’s.",
+      "explanation": "A triangle with a pendant edge still needs only 3 colors. The triangle gives the lower bound 3, and the pendant vertex can reuse a color different from its neighbor’s.\n\nDifferent components of a disconnected graph can reuse the same colors. Thus the graph’s chromatic number is the maximum of its component chromatic numbers, not their sum. A nonempty edgeless graph needs 1 color; a graph with an edge needs at least 2.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_coloring__bipartite": {
+      "title": "Two-coloring, bipartite graphs, and odd cycles: example practice",
+      "statement": "Decide whether C₄ and C₃ are two-colorable. Give a bipartition when possible and explain the conflict in the other case.",
+      "answer_text": "C₄ can be partitioned into two sets of alternating vertices. C₃ cannot be two-colored, because its third edge would join vertices of the same color.",
+      "explanation": "C₄ can be partitioned into two sets of alternating vertices. C₃ cannot be two-colored, because its third edge would join vertices of the same color.\n\nColors must alternate along edges. An even cycle closes consistently; an odd cycle creates a conflict at its ends. In a graph without odd cycles, partition each component by the parity of search-tree depth. An isolated vertex may go in either part.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_coloring__greedy": {
+      "title": "Sequential greedy coloring and the maximum-degree bound: example practice",
+      "statement": "For the path a—b—c—d, greedily use the smallest available positive-integer color, starting with color 1. Compare the numbers of colors in orders (a,d,b,c) and (a,b,c,d).",
+      "answer_text": "On the path a—b—c—d, processing a,d,b,c uses 3 colors, whereas processing a,b,c,d uses only 2.",
+      "explanation": "On the path a—b—c—d, processing a,d,b,c uses 3 colors, whereas processing a,b,c,d uses only 2.\n\nWhen a vertex is processed, it has at most Δ already colored neighbors, forbidding at most Δ colors. Thus one of the first Δ+1 colors is available. This bound does not imply that greedy coloring is always optimal or that every graph needs Δ+1 colors.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_coloring__disconnected": {
+      "title": "Disconnected graphs and color reuse: example practice",
+      "statement": "A graph is the disjoint union of a triangle and an edge. Find its chromatic number and explain why the two component chromatic numbers are not added.",
+      "answer_text": "A disjoint triangle and a single edge have chromatic number 3, not 3+2=5.",
+      "explanation": "A disjoint triangle and a single edge have chromatic number 3, not 3+2=5.\n\nAn isolated vertex can use any existing color. A component containing an edge or clique may determine the whole graph’s chromatic number. Reusing a color in multiple components is proper because there are no edges between them.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_planar": {
+      "title": "Planar graphs: example practice",
+      "statement": "Draw three vertices of K₄ as a triangle and put the fourth inside, joined to all three corners. Count vertices, edges and faces, including the outer face, and check Euler’s formula.",
+      "answer_text": "K₄ has 4 vertices and 6 edges. Draw three vertices as a triangle, place the fourth inside, and connect it to the three corners. This gives a crossing-free drawing with 3 inner faces and 1 outer face, so 4−6+4=2.",
+      "explanation": "K₄ has 4 vertices and 6 edges. Draw three vertices as a triangle, place the fourth inside, and connect it to the three corners. This gives a crossing-free drawing with 3 inner faces and 1 outer face, so 4−6+4=2.\n\nPlanarity asks whether a crossing-free drawing exists; crossings in one drawing alone do not decide it. A finite undirected simple planar graph with n≥3 satisfies m≤3n−6, or m≤2n−4 if it is also bipartite. To prove the bounds, sum face boundary lengths: each edge contributes twice, once for each side. A bridge is counted twice in the boundary walk of the same face. Meeting a bound does not guarantee planarity: K₃,₃ meets the general bound but violates the bipartite bound.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_planar__embedding": {
+      "title": "Plane embeddings and faces: example practice",
+      "statement": "Embed a four-vertex path in the plane without crossings. How many faces are there? Counting edge occurrences in a face-boundary walk, what is the boundary length of the outer face?",
+      "answer_text": "A path on 4 vertices has only its outer face. Its boundary walk traverses each of the 3 edges in both directions, so its length is 6, not 3.",
+      "explanation": "A path on 4 vertices has only its outer face. Its boundary walk traverses each of the 3 edges in both directions, so its length is 6, not 3.\n\nBeing planar is an existence property; an embedding is a particular realization. A face boundary may be a closed walk rather than a simple cycle. If both sides of a bridge belong to the same face, the bridge contributes 2 to that face’s boundary length. The unbounded outer region is also a face.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_planar__euler": {
+      "title": "Euler’s formula and the number of faces: example practice",
+      "statement": "Draw two disjoint, non-nested triangles side by side in the plane. Find n,m, the number c of components and the number f of faces. Explain how many outer faces are counted.",
+      "answer_text": "Two disjoint triangles have n=6,m=6,c=2, so f=3: two inner faces and one shared outer face.",
+      "explanation": "Two disjoint triangles have n=6,m=6,c=2, so f=3: two inner faces and one shared outer face.\n\nJoin distinct components with new noncrossing edges. Each such edge increases m by 1 and decreases c by 1, without changing f. Apply the connected formula, then undo the c−1 added edges to obtain the general formula.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_planar__edge_bounds": {
+      "title": "Planar edge bounds and proving nonplanarity: example practice",
+      "statement": "A simple bipartite planar graph with n≥3 vertices satisfies m≤2n−4. Use this inequality to decide whether K₃,₃ is planar, stating its vertex and edge counts.",
+      "answer_text": "K₃,₃ is bipartite with n=6,m=9. If planar, it would satisfy 9≤2·6−4=8, a contradiction. Thus it is nonplanar.",
+      "explanation": "K₃,₃ is bipartite with n=6,m=9. If planar, it would satisfy 9≤2·6−4=8, a contradiction. Thus it is nonplanar.\n\nIn the connected case, the sum of face lengths is 2m; combine this with Euler’s formula. Disconnected graphs satisfy the same bounds, but one cannot apply a formula requiring n≥3 indiscriminately to each small component. Check simplicity and vertex count before using the bounds.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_bipartite": {
+      "title": "Bipartite graphs: example practice",
+      "statement": "An undirected graph has edges ab,ad,bc,cd,ce. Give a bipartition. Does it remain bipartite after adding ac? Justify your answer.",
+      "answer_text": "For edge set {ab,ad,bc,cd,ce}, take L={a,c}, R={b,d,e}. The even cycle a−b−c−d−a does not prevent bipartiteness. Adding ac creates the triangle a−b−c−a, so the graph is no longer bipartite.",
+      "explanation": "For edge set {ab,ad,bc,cd,ce}, take L={a,c}, R={b,d,e}. The even cycle a−b−c−d−a does not prevent bipartiteness. Adding ac creates the triangle a−b−c−a, so the graph is no longer bipartite.\n\nStarting at a vertex, alternate two colors along edges to test its component. An edge with equally colored endpoints yields an odd cycle. If every component can be two-colored, the color classes form a bipartition. Thus a finite undirected graph is bipartite exactly when it has no odd cycle. Breadth-first search with adjacency lists must separately visit each unvisited component and takes O(|V|+|E|) time. Isolated vertices may go in either part.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_bipartite__bipartition": {
+      "title": "Bipartitions and complete bipartite graphs: example practice",
+      "statement": "For the complete bipartite graph K₂,₅, find the vertex count, edge count and degree of a vertex in each part.",
+      "answer_text": "K₂,₅ has 7 vertices and 10 edges. Each vertex in the part of size 2 has degree 5; each in the other part has degree 2.",
+      "explanation": "K₂,₅ has 7 vertices and 10 edges. Each vertex in the part of size 2 has degree 5; each in the other part has degree 2.\n\nThe parts of a bipartite graph need not have equal sizes. In Kₚ,ᵩ each vertex of L has degree q and each vertex of R has degree p. For a general bipartite graph these are only the corresponding degree upper bounds.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_bipartite__odd_cycle": {
+      "title": "Odd cycles and the bipartiteness criterion: example practice",
+      "statement": "Decide whether C₈ and C₇ are bipartite, and explain what happens at the final edge under alternating two-coloring.",
+      "answer_text": "C₈ can be split into alternating parts. C₇ cannot: after alternating colors around the cycle, the final edge joins equal colors.",
+      "explanation": "C₈ can be split into alternating parts. C₇ cannot: after alternating colors around the cycle, the final edge joins equal colors.\n\nEach edge of a bipartite graph switches parts, so a cycle returning to its starting point must have even length. Conversely, color each component by the parity of search-tree depth. An edge joining equal colors, together with the even-length tree path between its endpoints, would form an odd cycle, contradicting the assumption.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_bipartite__two_coloring": {
+      "title": "Two-coloring and testing bipartiteness: example practice",
+      "statement": "An undirected graph has edges ab,ad,bc,dc. Starting with color 0 at a, two-color the other vertices and give the resulting bipartition.",
+      "answer_text": "If a is adjacent to b,d, and both b,d are adjacent to c, color a with 0, b,d with 1, and c with 0. This gives a bipartition of the 4-cycle.",
+      "explanation": "If a is adjacent to b,d, and both b,d are adjacent to c, color a with 0, b,d with 1, and c with 0. This gives a bipartition of the 4-cycle.\n\nWith adjacency lists, each vertex is processed once and each undirected edge checked at most twice, for O(n+m) time. For a disconnected graph, restart at every unvisited vertex; completing one search does not complete the whole test.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_topological": {
+      "title": "Topological sorting: example practice",
+      "statement": "A digraph has arcs a→c,b→c,b→d,c→e,d→e. Test orders (a,b,c,d,e), (b,d,a,c,e) and (a,c,b,d,e), identifying a violated arc for any invalid order.",
+      "answer_text": "For arcs {a→c,b→c,b→d,c→e,d→e}, both a,b,c,d,e and b,d,a,c,e are topological orders. The order a,c,b,d,e is not, because b→c requires b before c.",
+      "explanation": "For arcs {a→c,b→c,b→d,c→e,d→e}, both a,b,c,d,e and b,d,a,c,e are topological orders. The order a,c,b,d,e is not, because b→c requires b before c.\n\nKahn’s algorithm repeatedly outputs a vertex of current indegree 0 and removes its outgoing arcs. If all vertices are output, the result is a topological order. If vertices remain but no zero-indegree candidate exists, the remainder contains a directed cycle. Multiple candidates usually allow different choices. The order is unique exactly when every step has only one candidate. Topological sorting expresses precedence constraints; it does not calculate task duration or require an arc between every pair of vertices.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_topological__dag": {
+      "title": "Directed acyclic graphs and dependencies: example practice",
+      "statement": "A digraph has arcs a→b,a→c,b→c. Give a topological order. Does adding c→a leave a DAG? Explain.",
+      "answer_text": "The arcs {a→b,a→c,b→c} allow a,b,c. Adding c→a creates the cycle a→b→c→a.",
+      "explanation": "The arcs {a→b,a→c,b→c} allow a,b,c. Adding c→a creates the cycle a→b→c→a.\n\nDirected acyclicity does not mean the underlying undirected graph is acyclic. For example, a→b,a→c,b→c is a DAG with an underlying triangle. Adding u→v to a DAG creates a directed cycle exactly when the original graph already has a directed path from v to u.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_topological__kahn": {
+      "title": "The zero-indegree deletion algorithm: example practice",
+      "statement": "Apply Kahn’s algorithm to the digraph with only a→c,b→c. Which vertices initially have zero in-degree? After outputting a, can c be output immediately, and what must happen next?",
+      "answer_text": "For a→c,b→c, the initial candidates are a,b. After a is taken, c still has the incoming arc from b; b must be taken before c becomes a candidate.",
+      "explanation": "For a→c,b→c, the initial candidates are a,b. After a is taken, c still has the incoming arc from b; b must be taken before c becomes a candidate.\n\nIndegrees must be updated dynamically as arcs are removed, rather than computed only initially. A queue, stack, or lexicographically smallest-candidate rule can implement the algorithm; they may yield different valid topological orders. Adjacency lists with an ordinary queue give O(n+m) time.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_topological__uniqueness": {
+      "title": "Enumerating topological orders and uniqueness: example practice",
+      "statement": "A digraph has only a→b,a→c. List every topological order and decide uniqueness, explaining why a unique first step alone is insufficient.",
+      "answer_text": "For a→b,a→c, a must be first, but b,c can then be swapped. The two orders are a,b,c and a,c,b.",
+      "explanation": "For a→b,a→c, a must be first, but b,c can then be swapped. The two orders are a,b,c and a,c,b.\n\nIf a step offers distinct candidates u,v, choose u first or v first and then complete a topological order of the remaining DAG, producing at least two orders. Conversely, if every step has only one candidate, the next entry of any valid order is forced.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_domination": {
+      "title": "Dominating sets, covers, and independent sets: example practice",
+      "statement": "For the path 1—2—3—4—5, give a minimum dominating set, minimum vertex cover and maximum independent set, and compare their sizes.",
+      "answer_text": "In the path 1−2−3−4−5, {2,4} is both a minimum dominating set of size 2 and a minimum vertex cover. The set {1,3,5} is a maximum independent set of size 3. Equality of the two minima is a feature of this example, not a general law.",
+      "explanation": "In the path 1−2−3−4−5, {2,4} is both a minimum dominating set of size 2 and a minimum vertex cover. The set {1,3,5} is a maximum independent set of size 3. Equality of the two minima is a feature of this example, not a general law.\n\nMinimum dominating sets and vertex covers minimize vertex count; maximum independent sets maximize it. C is a vertex cover exactly when V∖C is independent, so τ(G)+α(G)=|V|. Dominating sets have no such complement relation. Every inclusion-maximal independent set is dominating, but can be much smaller than a maximum independent set. An isolated vertex must belong to every dominating set but need not be chosen to cover edges. A graph with an isolated vertex has no edge cover; without isolated vertices, minimum edge-cover number ρ and maximum matching number ν satisfy ρ+ν=|V|.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_domination__dominating": {
+      "title": "Dominating sets and the domination number: example practice",
+      "statement": "Find the domination number of the star K₁,₄ and give a minimum dominating set. Must every leaf be selected?",
+      "answer_text": "In the star K₁,₄, the center alone dominates all 5 vertices, so γ=1; choosing all four leaves is unnecessary.",
+      "explanation": "In the star K₁,₄, the center alone dominates all 5 vertices, so γ=1; choosing all four leaves is unnecessary.\n\nEvery isolated vertex must be selected. For maximum degree Δ, one selected vertex and its neighbors cover at most Δ+1 vertices. Thus an n-vertex graph satisfies γ(G)≥⌈n/(Δ+1)⌉. Overlap may make this bound loose, so it generally does not determine the optimum alone.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_domination__vertex_cover": {
+      "title": "Vertex covers and the vertex-cover number: example practice",
+      "statement": "Find the vertex-cover number of K₃. Explain why one vertex is insufficient and why a suitable pair covers all edges.",
+      "answer_text": "In a triangle, selecting one vertex leaves the edge between the other two uncovered. Any two vertices cover all edges, so τ(K₃)=2.",
+      "explanation": "In a triangle, selecting one vertex leaves the edge between the other two uncovered. Any two vertices cover all edges, so τ(K₃)=2.\n\nEdges of a matching share no endpoints, so covering them requires a distinct selected vertex for each edge. Every matching size is therefore a lower bound on τ(G). An isolated vertex has no incident edges to cover and need not be selected.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_domination__independent": {
+      "title": "Independent sets and the independence number: example practice",
+      "statement": "In the star K₁,₄, compare the singleton containing its center with the set of all four leaves. Are they maximal independent sets, and which is maximum?",
+      "answer_text": "In K₁,₄, both the center alone and the set of four leaves are maximal independent sets. Only the latter is maximum.",
+      "explanation": "In K₁,₄, both the center alone and the set of four leaves are maximal independent sets. Only the latter is maximum.\n\nC is a vertex cover exactly when V∖C is independent, so τ(G)+α(G)=|V|. Every maximal independent set is dominating: otherwise an outside vertex with no neighbor in the set could be added. However, different maximal independent sets can have very different sizes.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_domination__edge_cover": {
+      "title": "Edge covers and minimum edge covers: example practice",
+      "statement": "For the path 1—2—3—4—5, give a maximum matching, extend it to a minimum edge cover and state its size. Distinguish it from the vertex cover {2,4}.",
+      "answer_text": "In 1−2−3−4−5, choose maximum matching {12,34}, then add 45 for vertex 5. The edge cover {12,34,45} has size 3. The vertex cover {2,4} has 2 vertices; these are different objects.",
+      "explanation": "In 1−2−3−4−5, choose maximum matching {12,34}, then add 45 for vertex 5. The edge cover {12,34,45} has size 3. The vertex cover {2,4} has 2 vertices; these are different objects.\n\nFor a finite undirected simple graph without isolated vertices, ρ(G)+ν(G)=|V|, where ν is maximum matching size. Starting from a maximum matching, add one incident edge for each unmatched vertex to construct an edge cover of size |V|−ν(G). No two unmatched vertices are adjacent, or the matching could be enlarged directly.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_matching": {
+      "title": "Graph matching: example practice",
+      "statement": "In the path 1—2—3—4, decide whether M={23} is maximal and maximum. Give an augmenting path relative to M, flip it, and determine whether the new matching is perfect.",
+      "answer_text": "In 1−2−3−4, {23} is maximal since each remaining edge touches 2 or 3, but it is not maximum. The whole path is augmenting relative to it. Flipping yields {12,34}, which is also perfect.",
+      "explanation": "In 1−2−3−4, {23} is maximal since each remaining edge touches 2 or 3, but it is not maximum. The whole path is augmenting relative to it. Flipping yields {12,34}, which is also perfect.\n\nRelative to M, an augmenting path is a simple path with both endpoints unmatched and edges alternating between nonmatching and matching edges. Flipping membership along it increases the matching size by 1. A matching in a finite graph is maximum exactly when it has no augmenting path. In a bipartite graph (L,R;E), a matching saturating all of L exists exactly when every S⊆L has |N(S)|≥|S|: Hall’s condition. Checking that individual vertices have neighbors is insufficient; subsets may share too few neighbors.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_matching__maximal_maximum": {
+      "title": "Maximal, maximum, and perfect matchings: example practice",
+      "statement": "For a four-vertex path, classify the matching consisting of its middle edge and the matching consisting of both end edges as maximal, maximum and perfect.",
+      "answer_text": "In a 4-vertex path, the middle edge is a maximal matching. The two end edges together are both maximum and perfect.",
+      "explanation": "In a 4-vertex path, the middle edge is a maximal matching. The two end edges together are both maximum and perfect.\n\nEvery maximum matching is maximal, but not conversely. A perfect matching has n/2 edges and is therefore maximum. An even vertex count is only necessary for a perfect matching; isolated vertices or other obstructions may prevent one.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_matching__augmenting": {
+      "title": "Alternating and augmenting paths: example practice",
+      "statement": "A bipartite graph has parts {a,b} and {1,2}, edges a2,b2,a1, and current matching M={a2}. Check that b—2—a—1 is an augmenting path and give the matching after flipping it.",
+      "answer_text": "If a bipartite graph has M={a2} and edges b2,a1, then b−2−a−1 is augmenting. Replace a2 by b2 and a1.",
+      "explanation": "If a bipartite graph has M={a2} and edges b2,a1, then b−2−a−1 is augmenting. Replace a2 by b2 and a1.\n\nAdd the nonmatching edges and remove the matching edges on an augmenting path to get a matching of size |M|+1. In a finite graph, no augmenting path is equivalent to maximum size; merely having no edge that can be added directly establishes only maximality.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_matching__hall": {
+      "title": "Hall’s condition and bipartite matching: example practice",
+      "statement": "In a bipartite graph the left part is {a,b}, and both vertices have only neighbor 1. Test Hall’s condition for S={a,b} and decide whether a matching can saturate the left part.",
+      "answer_text": "If a,b both have only neighbor 1, each has degree 1, but S={a,b} has |N(S)|=1<2. They cannot both be matched.",
+      "explanation": "If a,b both have only neighbor 1, each has degree 1, but S={a,b} has |N(S)|=1<2. They cannot both be matched.\n\nNecessity follows because a matching assigns a different neighbor to every vertex of S. Sufficiency is Hall’s theorem. If |L|=|R|, saturating L gives a perfect matching of the whole graph. For unequal part sizes, say only that the left side is saturated.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_basic": {
+      "title": "Basic properties of trees: example practice",
+      "statement": "A tree has 12 vertices, maximum degree at most 3, and exactly three vertices of degree 3. Find the numbers of leaves and degree-2 vertices, stating the equations used.",
+      "answer_text": "For a 12-vertex tree with all degrees at most 3 and exactly three degree-3 vertices, the handshake lemma gives n₁+2n₂+9=22. Together with n₁+n₂=9, this gives 5 leaves and 4 degree-2 vertices.",
+      "explanation": "For a 12-vertex tree with all degrees at most 3 and exactly three degree-3 vertices, the handshake lemma gives n₁+2n₂+9=22. Together with n₁+n₂=9, this gives 5 leaves and 4 degree-2 vertices.\n\nConnectivity guarantees reachability, and acyclicity makes simple paths unique. Removing any tree edge disconnects it. Adding a new edge between two existing distinct vertices creates exactly one cycle. A forest with n vertices and c components has n−c edges. A tree with n≥2 has at least two degree-1 vertices, called leaves. A one-vertex tree has degree 0, so leaf-counting conventions for it must be stated separately.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_basic__equivalent": {
+      "title": "Equivalent characterizations of trees: example practice",
+      "statement": "Take the disjoint union of a triangle and a three-vertex path. Count vertices and edges, and decide whether m=n−1 is sufficient to make this graph a tree.",
+      "answer_text": "A disjoint triangle and a 3-vertex path have 6 vertices and 5 edges, but the graph is disconnected and cyclic, so it is not a tree.",
+      "explanation": "A disjoint triangle and a 3-vertex path have 6 vertices and 5 edges, but the graph is disconnected and cyclic, so it is not a tree.\n\nAn edge count of n−1 alone is insufficient. A cyclic component and another component can together still have exactly n−1 edges. Keep the accompanying condition, such as connectivity or acyclicity, when using these characterizations.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_basic__forest": {
+      "title": "Forests and their edge formula: example practice",
+      "statement": "A forest has 14 vertices and four connected components. Find its edge count. If three edges successively join different components, is the result a tree, and how many edges does it have?",
+      "answer_text": "A forest with 14 vertices and 4 components has 10 edges. Add 3 edges, each joining different current components, to obtain a tree with 13 edges.",
+      "explanation": "A forest with 14 vertices and 4 components has 10 edges. Add 3 edges, each joining different current components, to obtain a tree with 13 edges.\n\nSumming the nᵢ−1 edges of the components gives Σ(nᵢ−1)=n−c. Removing one forest edge adds one component. A new edge joining distinct components reduces the component count by one while preserving acyclicity.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_basic__degree_leaves": {
+      "title": "Degrees and leaves of trees: example practice",
+      "statement": "A nontrivial tree has exactly two vertices of degree 4, while every other vertex has degree at most 2. Find its number of leaves and state the tree-degree relation used.",
+      "answer_text": "If a nontrivial tree has two degree-4 vertices and every other vertex has degree at most 2, it has 2+2·(4−2)=6 leaves.",
+      "explanation": "If a nontrivial tree has two degree-4 vertices and every other vertex has degree at most 2, it has 2+2·(4−2)=6 leaves.\n\nDegree-2 vertices contribute no “leaf surplus”; each branching vertex of degree k≥3 contributes k−2. Alternatively, take a longest simple path: an extra neighbor at either endpoint would extend the path or create a cycle, so both endpoints are leaves.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_rooted": {
+      "title": "Rooted trees: example practice",
+      "statement": "Measure height in edges. Root the path A—B—C—D—E first at A and then at C. Give each rooted tree’s height and leaves. Do the degree-1 vertices of the underlying undirected tree change?",
+      "answer_text": "For A−B−C−D−E rooted at A, height is 4 and the only rooted-tree leaf is E. Rooted at C, height is 2 and the leaves are A,E. The degree-1 vertices of the underlying undirected tree remain A,E.",
+      "explanation": "For A−B−C−D−E rooted at A, height is 4 and the only rooted-tree leaf is E. Rooted at C, height is 2 and the leaves are A,E. The degree-1 vertices of the underlying undirected tree remain A,E.\n\nThe subtree at v consists of v and all its descendants. Here ancestors and descendants exclude the vertex itself. The root’s child count equals its undirected degree; a nonroot vertex’s child count is its degree minus 1. Rerooting preserves the underlying edges but may change height and the leaf set. A full m-ary tree has exactly m children at every internal vertex. With i internal vertices and l leaves, n=mi+1 and l=(m−1)i+1. These equations do not follow from an upper bound of m children alone.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_rooted__hierarchy": {
+      "title": "Parents and ancestors in rooted trees: example practice",
+      "statement": "The root r has children a,b, and a has children c,d. Give the parent and all ancestors of c, and the vertex set of the subtree rooted at a.",
+      "answer_text": "If r has children a,b and a has children c,d, then c has parent a and ancestors a,r. The subtree at a has vertices {a,c,d}.",
+      "explanation": "If r has children a,b and a has children c,d, then c has parent a and ancestors a,r. The subtree at a has vertices {a,c,d}.\n\nParenthood spans only one level; ancestry may span several. Two subtrees may be disjoint or one may contain the other. Follow parent chains rather than relying on the drawing’s left and right positions.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_rooted__depth_height": {
+      "title": "Depth, height, and rerooting: example practice",
+      "statement": "Measure height in edges. For a five-vertex path, find the height when rooted at an endpoint and at the middle vertex. Does rerooting change the diameter of the underlying graph?",
+      "answer_text": "A 5-vertex path has height 4 when rooted at an endpoint and height 2 when rooted at the middle. Its underlying graph still has diameter 4.",
+      "explanation": "A 5-vertex path has height 4 when rooted at an endpoint and height 2 when rooted at the middle. Its underlying graph still has diameter 4.\n\nMeasurements here count edges, not vertices. Rerooting can change height, parent relations, and rooted-tree leaves, while undirected distances and degrees remain unchanged.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_rooted__full_mary": {
+      "title": "Counting full m-ary trees: example practice",
+      "statement": "A full ternary tree has seven internal vertices. Find its total number of vertices and leaves. Do these counts alone determine its height?",
+      "answer_text": "A full ternary tree with 7 internal vertices has 22 total vertices and 15 leaves. Its height still depends on its actual connections.",
+      "explanation": "A full ternary tree with 7 internal vertices has 22 total vertices and 15 leaves. Its height still depends on its actual connections.\n\nThe formulas require exactly m children per internal vertex, but do not require equal leaf depths or a balanced shape. A general m-ary tree with at most m children per vertex need not satisfy the same equalities.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_spanning": {
+      "title": "Spanning trees: example practice",
+      "statement": "Attach a new leaf by one edge to C₆. Which edge must every spanning tree keep, how many cycle edges must it delete, and how many distinct spanning trees result?",
+      "answer_text": "Attach a new leaf by one edge to C₆. The leaf edge is mandatory; delete exactly one of the 6 cycle edges to obtain a spanning tree. Thus the graph has 6 spanning trees.",
+      "explanation": "Attach a new leaf by one edge to C₆. The leaf edge is mandatory; delete exactly one of the 6 cycle edges to obtain a spanning tree. Thus the graph has 6 spanning trees.\n\nUse the edges that first discover new vertices in BFS or DFS, or repeatedly remove cycle edges from a connected graph. Every original bridge belongs to every spanning tree. Adding one nontree edge creates a unique fundamental cycle. Paths retained by a spanning tree may be long: only an unweighted BFS tree from a specified root guarantees shortest root-to-vertex paths. A spanning tree need not be induced, because an induced subgraph would keep all edges between its selected vertices.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_spanning__construction": {
+      "title": "Constructing spanning trees by search: example practice",
+      "statement": "Run BFS from a in triangle abc. Give the recorded parent edges. When bc is inspected later, can it also be added as a spanning-tree edge?",
+      "answer_text": "In a triangle, BFS from a records ab,ac and completes a spanning tree. Inspecting bc later must not add it as a parent edge.",
+      "explanation": "In a triangle, BFS from a records ab,ac and completes a spanning tree. Inspecting bc later must not add it as a parent edge.\n\nBFS discovers vertices by unweighted distance layers, so its root-to-vertex tree distances equal original shortest distances. DFS explores deeply and does not guarantee this property. In a disconnected graph, restarting searches produces only a spanning forest.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_spanning__exchange": {
+      "title": "Fundamental cycles and tree-edge exchanges: example practice",
+      "statement": "Start with the spanning-tree path a—b—c—d and add ad. Give the fundamental cycle. After deleting bc, list the remaining edges and decide whether they still form a spanning tree.",
+      "answer_text": "Adding ad to a−b−c−d forms a−b−c−d−a. Remove bc to leave ab,ad,cd, still a spanning tree.",
+      "explanation": "Adding ad to a−b−c−d forms a−b−c−d−a. Remove bc to leave ab,ad,cd, still a spanning tree.\n\nThere is just one cycle after adding e: T was acyclic and its u-to-v path was unique. Removing a cycle edge preserves connectivity and restores n−1 edges. Removing a tree edge outside the cycle can instead disconnect the graph while leaving the cycle.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_spanning__bridge_count": {
+      "title": "Bridge decomposition and spanning-tree counts: example practice",
+      "statement": "A triangle and a four-cycle are joined by one bridge. Use bridge decomposition to count the spanning trees and explain whether the bridge may be omitted.",
+      "answer_text": "Join a triangle and a 4-cycle by one bridge. Include the bridge and choose independently among 3 and 4 trees, giving 12 spanning trees.",
+      "explanation": "Join a triangle and a 4-cycle by one bridge. Include the bridge and choose independently among 3 and 4 trees, giving 12 spanning trees.\n\nOnce the mandatory bridge is fixed, choose spanning trees on the two sides independently. No cycle can cross between them, so the multiplication rule applies. A single cycle Cₖ has k spanning trees, because exactly one cycle edge must be removed.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_mst": {
+      "title": "Minimum spanning trees: example practice",
+      "statement": "A triangle has w(ab)=−3,w(ac)=1,w(bc)=4. Compute all spanning-tree weights, identify an MST, and explain whether negative edge weights make the problem meaningless.",
+      "answer_text": "For triangle weights w(ab)=−3,w(ac)=1,w(bc)=4, any two edges form a spanning tree. Their total weights are −2,1,5, so {ab,ac} is an MST. Negative edges do not invalidate this finite optimization problem.",
+      "explanation": "For triangle weights w(ab)=−3,w(ac)=1,w(bc)=4, any two edges form a spanning tree. Their total weights are −2,1,5, so {ab,ac} is an MST. Negative edges do not invalidate this finite optimization problem.\n\nKruskal considers edges in increasing weight order and adds those that do not create cycles. Prim grows a vertex set by repeatedly taking a lightest edge crossing its current cut. A unique lightest cut edge belongs to every MST; a unique heaviest cycle edge belongs to no MST. Distinct edge weights guarantee uniqueness but are not necessary for it. An MST minimizes total weight, not each individual source-to-vertex path.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_mst__greedy": {
+      "title": "Kruskal’s and Prim’s algorithms: example practice",
+      "statement": "A triangle has edge weights ab=1,bc=2,ac=7. Give the edge selections under Kruskal and under Prim starting at c, and compare the final trees.",
+      "answer_text": "For triangle weights ab=1,bc=2,ac=7, Kruskal chooses ab,bc. Prim from c first chooses cb, then ba, giving the same result.",
+      "explanation": "For triangle weights ab=1,bc=2,ac=7, Kruskal chooses ab,bc. Prim from c first chooses cb, then ba, giving the same result.\n\nKruskal often uses a disjoint-set structure to check whether endpoints are already connected. Prim maintains candidate edges of the current cut. Negative weights are allowed, and ties may be broken arbitrarily. Different tie choices can give different MSTs with the same total weight.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_mst__cut": {
+      "title": "The cut property and safe edges: example practice",
+      "statement": "In a connected weighted graph, all edges incident with vertex d have weights 2,5,8. Which edge occurs in every MST? Explain using the cut δ({d}).",
+      "answer_text": "If the edges incident to d have weights 2,5,8, the weight-2 edge is uniquely lightest in δ({d}) and belongs to every MST.",
+      "explanation": "If the edges incident to d have weights 2,5,8, the weight-2 edge is uniquely lightest in δ({d}) and belongs to every MST.\n\nUse an exchange proof: add the edge to an optimal tree omitting it, creating a cycle that contains another cut-crossing edge. Replacing that edge by the light edge does not increase total weight. If uniquely lightest, it strictly decreases weight, yielding a contradiction; this proves the required safety or necessity.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_mst__uniqueness": {
+      "title": "MST uniqueness and the cycle property: example practice",
+      "statement": "Consider triangles with edge-weight multisets (1,1,1) and (1,1,2). How many MSTs does each have? Compare uniqueness.",
+      "answer_text": "A triangle with all weights 1 has 3 MSTs. With weights 1,1,2, only the two weight-1 edges can be chosen, so the MST is unique.",
+      "explanation": "A triangle with all weights 1 has 3 MSTs. With weights 1,1,2, only the two weight-1 edges can be chosen, so the MST is unique.\n\nThe cycle property follows by exchange. If an optimal tree contains the unique heaviest edge, delete it to form a cut. Another, lighter edge of the original cycle crosses that cut and can replace it, reducing weight. Equal weights need not cause multiple optima: a triangle weighted 1,1,2 still has a unique MST.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_matrix_tree": {
+      "title": "The matrix-tree theorem: example practice",
+      "statement": "Write the Laplacian of K₃, delete its last row and column, and compute the resulting principal minor. Compare the matrix-tree count with direct edge-deletion counting.",
+      "answer_text": "For K₃, L=[[2,−1,−1],[−1,2,−1],[−1,−1,2]]. Delete the last row and column to obtain [[2,−1],[−1,2]], with determinant 4−1=3. These are exactly the 3 spanning trees obtained by deleting any one of the three edges.",
+      "explanation": "For K₃, L=[[2,−1,−1],[−1,2,−1],[−1,−1,2]]. Delete the last row and column to obtain [[2,−1],[−1,2]], with determinant 4−1=3. These are exactly the 3 spanning trees obtained by deleting any one of the three edges.\n\nDeleting the same-index row and column gives a principal minor with no additional sign. Every choice of i gives the same value. Since every row sum of L is 0, det L=0, so the full determinant cannot replace the principal minor. For n≥2, these minors vanish for a disconnected graph. A single-vertex graph has 1 spanning tree, corresponding to the 0×0 determinant convention 1. With edge variables in a weighted Laplacian, the cofactor instead gives the sum of products of edge weights over all spanning trees, not directly the MST weight.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_matrix_tree__laplacian": {
+      "title": "The Laplacian matrix of an undirected graph: example practice",
+      "statement": "Write the Laplacian of the path a—b—c in order (a,b,c), and check each row sum.",
+      "answer_text": "For a−b−c ordered a,b,c, L=[[1,−1,0],[−1,2,−1],[0,−1,1]], whose rows all sum to 0.",
+      "explanation": "For a−b−c ordered a,b,c, L=[[1,−1,0],[−1,2,−1],[0,−1,1]], whose rows all sum to 0.\n\nRelabeling vertices simultaneously permutes rows and columns and does not change graph-counting properties. An isolated vertex gives a zero row and column. When reordering, do not swap only rows without the corresponding columns.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_matrix_tree__cofactor": {
+      "title": "Principal cofactors and spanning-tree counts: example practice",
+      "statement": "Write the Laplacian of K₂. Compare a principal minor with the ordinary minor obtained by deleting row 1 and column 2, and explain the sign difference between that ordinary minor and its cofactor.",
+      "answer_text": "For K₂, L=[[1,−1],[−1,1]], and a principal minor is 1. But deleting row 1 and column 2 gives the ordinary minor −1, so the sign matters.",
+      "explanation": "For K₂, L=[[1,−1],[−1,1]], and a principal minor is 1. But deleting row 1 and column 2 gives the ordinary minor −1, so the sign matters.\n\nThe full determinant det L=0 does not give the tree count. Deleting different row and column indices may produce a signed ordinary minor; the cofactor includes the extra factor (−1)ⁱ⁺ʲ. Principal cofactors are the most direct way to count and avoid this sign ambiguity.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-tree_matrix_tree__decomposition": {
+      "title": "Decomposing spanning-tree counts: example practice",
+      "statement": "Two triangles share exactly one vertex. Delete the corresponding row and column of the Laplacian, describe the remaining block structure, and find the spanning-tree count.",
+      "answer_text": "For two triangles sharing exactly one vertex, delete that vertex’s row and column to get two [[2,−1],[−1,2]] blocks. The tree count is 3·3=9.",
+      "explanation": "For two triangles sharing exactly one vertex, delete that vertex’s row and column to get two [[2,−1],[−1,2]] blocks. The tree count is 3·3=9.\n\nA bijection choosing one spanning tree on each side gives the same decomposition. Adding a new leaf leaves the tree count unchanged because its edge is mandatory. Deleting the attachment vertex’s row and column adds just a diagonal block of value 1 to the new cofactor. Check that no extra edges join the blocks before applying the decomposition.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_system": {
+      "title": "Algebraic systems: example practice",
+      "statement": "On the integers define a*b=a+b+2. Check associativity and determine the two-sided identity.",
+      "answer_text": "On the integers, define a*b=a+b+2. Then (a*b)*c=a+b+c+4=a*(b*c), and the identity is −2. Although this is not ordinary addition, its algebraic properties can be checked directly.",
+      "explanation": "On the integers, define a*b=a+b+2. Then (a*b)*c=a+b+c+4=a*(b*c), and the identity is −2. Although this is not ordinary addition, its algebraic properties can be checked directly.\n\nThe same set with different operations gives different systems. First check that the rule is everywhere defined and closed, then examine properties such as associativity. A finite set can be described by a complete operation table. Failure in one row or one triple is enough to refute the corresponding universal property.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_system__associativity": {
+      "title": "Associativity of a binary operation: example practice",
+      "statement": "Treat integer subtraction as a binary operation. Compute (4−2)−1 and 4−(2−1), then decide whether it is associative.",
+      "answer_text": "For integer subtraction with 4,2,1, the left association gives 1 and the right gives 3, so subtraction is not associative.",
+      "explanation": "For integer subtraction with 4,2,1, the left association gives 1 and the right gives 3, so subtraction is not associative.\n\nProve it by expanding for arbitrary elements or using a known associative rule. One triple suffices to refute it. Associativity is essential to semigroups and groups but is not automatic for binary operations.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_system__binary_operations": {
+      "title": "Binary operations and closure: example practice",
+      "statement": "On A={0,1,2}, test closure of (a+b) mod3, max(a,b), and ordinary integer addition. Give a counterexample for any operation that is not closed.",
+      "answer_text": "On {0,1,2}, both (a+b) mod3 and max(a,b) are closed. Ordinary integer addition is not, since 2+2=4 lies outside the set.",
+      "explanation": "On {0,1,2}, both (a+b) mod3 and max(a,b) are closed. Ordinary integer addition is not, since 2+2=4 lies outside the set.\n\nOnly a closed, defined rule can be considered for associativity or identity elements. An output outside A, or an undefined input such as division by 0, means the rule is not a binary operation on A.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_system__commutativity": {
+      "title": "Commutativity of a binary operation: example practice",
+      "statement": "Decide whether max and integer subtraction are commutative; use 4 and 2 to test subtraction.",
+      "answer_text": "Since max(a,b)=max(b,a), maximum is commutative. Integer subtraction is not: 4−2≠2−4.",
+      "explanation": "Since max(a,b)=max(b,a), maximum is commutative. Integer subtraction is not: 4−2≠2−4.\n\nA finite operation table is commutative exactly when it is symmetric about the main diagonal. On infinite sets, a general verification is usually needed. A group need not be commutative; a commutative group is called abelian.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_system__identity_elements": {
+      "title": "Left, right, and two-sided identities: example practice",
+      "statement": "On A={0,1,2}, define a*b=a. Find all right identities and determine whether a left or two-sided identity exists.",
+      "answer_text": "On {0,1,2}, define a*b=a. Every b satisfies a*b=a, so all three elements are right identities. No fixed e can satisfy e*a=a for every a.",
+      "explanation": "On {0,1,2}, define a*b=a. Every b satisfies a*b=a, so all three elements are right identities. No fixed e can satisfy e*a=a for every a.\n\nUniqueness of a two-sided identity does not require associativity. One-sided identities can be nonunique: for a*b=a, every element is a right identity, but on a set with at least two elements there is no left identity.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_system__inverse_elements": {
+      "title": "Inverses relative to an identity: example practice",
+      "statement": "For a*b=a+b+2 on the integers, the identity is −2. Find the two-sided inverse of an arbitrary a relative to that identity, and check it.",
+      "answer_text": "For the integer operation a*b=a+b+2, the identity is −2 and the inverse of a is −a−4, rather than the ordinary additive inverse −a.",
+      "explanation": "For the integer operation a*b=a+b+2, the identity is −2 and the inverse of a is −a−4, rather than the ordinary additive inverse −a.\n\nInverses are relative to the same operation and identity. In an associative operation with identity, each two-sided inverse is unique. Noninvertible elements are allowed in a monoid, but prevent it from being a group.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_system__semigroups_monoids": {
+      "title": "Semigroups and monoids: example practice",
+      "statement": "Equip {0,1} with min. Is the result a commutative monoid? Identify its identity and decide whether it is a group.",
+      "answer_text": "The set {0,1} with min is a commutative monoid with identity 1. The element 0 has no inverse relative to 1, so it is not a group.",
+      "explanation": "The set {0,1} with min is a commutative monoid with identity 1. The element 0 has no inverse relative to 1, so it is not a group.\n\nThese structures add axioms successively. Compare them using the same set and operation. Positive integers under addition form a semigroup with no identity. Nonnegative integers under addition have identity 0 but no additive inverse for any nonzero element.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_homomorphism": {
+      "title": "Homomorphisms and isomorphisms: example practice",
+      "statement": "For the reduction map of additive groups φ:ℤ₆→ℤ₃, φ([x]₆)=[x]₃, determine surjectivity and the homomorphism property, find the kernel, and decide injectivity and isomorphism.",
+      "answer_text": "The map φ:ℤ₆→ℤ₃, φ([x]₆)=[x]₃, is surjective with kernel {[0]₆,[3]₆}, so it is neither injective nor an isomorphism.",
+      "explanation": "The map φ:ℤ₆→ℤ₃, φ([x]₆)=[x]₃, is surjective with kernel {[0]₆,[3]₆}, so it is neither injective nor an isomorphism.\n\nProving an isomorphism requires well-definedness, operation preservation, injectivity, and surjectivity. Equal cardinality is only one necessary condition for finite groups to be isomorphic. Element orders and commutativity can disprove isomorphism. The kernel is a subgroup of G, and a homomorphism is injective exactly when its kernel contains only the identity.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_homomorphism__images": {
+      "title": "Images and surjectivity of group homomorphisms: example practice",
+      "statement": "For the homomorphism φ(x)=2x modulo 8 on the additive group ℤ₈, find its image and decide whether it is surjective onto ℤ₈.",
+      "answer_text": "On ℤ₈, the doubling homomorphism φ(x)=2x has image {0,2,4,6}, so it is not surjective onto ℤ₈.",
+      "explanation": "On ℤ₈, the doubling homomorphism φ(x)=2x has image {0,2,4,6}, so it is not surjective onto ℤ₈.\n\nImage elements belong to the target group, while kernel elements belong to the domain. Compute the image by enumerating representatives or describing all possible outputs. For finite groups, counting fibers gives |G|=|kerφ|·|imφ|.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_homomorphism__isomorphism_invariants": {
+      "title": "Group isomorphisms: example practice",
+      "statement": "The map φ sends [x] in the additive group ℤ₄ to 2ˣ in the multiplicative unit group modulo 5. List the four images and decide whether φ is an isomorphism.",
+      "answer_text": "The map [x]↦2ˣ from ℤ₄ to the multiplicative unit group modulo 5 has successive images 1,2,4,3 and is an isomorphism.",
+      "explanation": "The map [x]↦2ˣ from ℤ₄ to the multiplicative unit group modulo 5 has successive images 1,2,4,3 and is an isomorphism.\n\nA bijection gives an element correspondence; operation preservation gives structural correspondence. The inverse of an isomorphism also preserves the operation, so structural properties translate both ways.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_homomorphism__kernels": {
+      "title": "Kernels and the trivial-kernel test: example practice",
+      "statement": "Find the kernel of the reduction homomorphism φ:ℤ₆→ℤ₃ and use it to decide whether φ is injective.",
+      "answer_text": "Reduction φ:ℤ₆→ℤ₃ has kernel {0,3}, so it is not injective.",
+      "explanation": "Reduction φ:ℤ₆→ℤ₃ has kernel {0,3}, so it is not injective.\n\nThe kernel describes what the map collapses. If φ(a)=φ(b), then ab⁻¹ is in the kernel; when the kernel consists only of the identity, this yields a=b. Kernel elements must be domain elements, not target elements.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_homomorphism__operation_preservation": {
+      "title": "Operation preservation and well-defined group homomorphisms: example practice",
+      "statement": "On the additive group of integers, decide whether g(x)=2x and f(x)=x+1 are homomorphisms, using operation preservation or identity preservation.",
+      "answer_text": "For the additive integers, g(x)=2x is a homomorphism, but f(x)=x+1 is not, since f(0)=1≠0.",
+      "explanation": "For the additive integers, g(x)=2x is a homomorphism, but f(x)=x+1 is not, since f(0)=1≠0.\n\nFirst check that the map is well-defined, then that it preserves operations. Even a bijective formula is not a homomorphism or isomorphism if it fails to preserve the identity or operation.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_homomorphism__structural_invariants": {
+      "title": "Isomorphism invariants and element orders: example practice",
+      "statement": "Both ℤ₄ and ℤ₂×ℤ₂ have four elements. Are they isomorphic? Explain by comparing element orders.",
+      "answer_text": "ℤ₄ has an element of order 4, whereas every nonidentity element of ℤ₂×ℤ₂ has order 2. Although both have 4 elements, they are not isomorphic.",
+      "explanation": "ℤ₄ has an element of order 4, whereas every nonidentity element of ℤ₂×ℤ₂ has order 2. Although both have 4 elements, they are not isomorphic.\n\nNecessary conditions cannot be reversed into sufficient ones. Comparing element-order distributions is particularly useful for small finite groups, but proving isomorphism still requires a construction or a complete structural argument.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_group": {
+      "title": "Groups and subgroups: example practice",
+      "statement": "In the additive group (ℤ₁₂,+), find the order of 4 and the subgroup it generates, listing the successive multiples that determine the order.",
+      "answer_text": "In (ℤ₁₂,+), 4 has order 3 because 4+4+4≡0, while 4 and 8 are nonzero. It generates {0,4,8}.",
+      "explanation": "In (ℤ₁₂,+), 4 has order 3 because 4+4+4≡0, while 4 and 8 are nonzero. It generates {0,4,8}.\n\nGroups need not be commutative; a commutative group is abelian. In a finite cyclic group, the order of an element is the smallest positive k with aᵏ=e. In additive notation, powers mean repeated addition, the identity is 0, and inverses are additive negatives. A subgroup must contain the original identity.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_group__axioms_inverses": {
+      "title": "Inverse formulas and cancellation in groups: example practice",
+      "statement": "Suppose every element g of a group satisfies g²=e. Identify each element’s inverse and use the inverse-of-a-product formula to prove the group is abelian.",
+      "answer_text": "If every g in a group satisfies g²=e, every element is self-inverse. Hence ab=(ab)⁻¹=b⁻¹a⁻¹=ba.",
+      "explanation": "If every g in a group satisfies g²=e, every element is self-inverse. Hence ab=(ab)⁻¹=b⁻¹a⁻¹=ba.\n\nCancel a common left factor by multiplying on the left by its inverse; cancel a common right factor on the right. The product-inverse formula reverses order because general groups do not commute; a⁻¹b⁻¹ cannot be used without further conditions.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_group__cyclic_subgroups": {
+      "title": "Cyclic subgroups generated by an element: example practice",
+      "statement": "Find ⟨4⟩ in the additive group ℤ₁₂, and explain why it is contained in every subgroup containing 4.",
+      "answer_text": "In the additive group ℤ₁₂, ⟨4⟩={0,4,8}, the smallest subgroup that every subgroup containing 4 must include.",
+      "explanation": "In the additive group ℤ₁₂, ⟨4⟩={0,4,8}, the smallest subgroup that every subgroup containing 4 must include.\n\nPositive, zero, and negative powers come from closure, the identity, and inverses respectively. For finite order, powers repeat periodically, and the generated subgroup size equals the element’s order.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_group__element_orders": {
+      "title": "Orders of group elements: example practice",
+      "statement": "Compute the order of 4 in the additive group ℤ₁₂, explaining why no smaller positive multiple gives 0.",
+      "answer_text": "The element 4 in ℤ₁₂ has order 3: 4 and 8 are nonzero, but 3·4≡0.",
+      "explanation": "The element 4 in ℤ₁₂ has order 3: 4 and 8 are nonzero, but 3·4≡0.\n\nIn an additive group, find the least positive k with ka=0. For a in ℤₙ this means n∣ka, so its order is n/gcd(n,a).",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_group__generators": {
+      "title": "Cyclic groups and generators: example practice",
+      "statement": "Find all generators of the additive group ℤ₁₀. What subgroup is generated by 2, and what is its order?",
+      "answer_text": "The generators of ℤ₁₀ are 1,3,7,9. The element 2 has order 5 and generates only the subgroup of even residue classes.",
+      "explanation": "The generators of ℤ₁₀ are 1,3,7,9. The element 2 has order 5 and generates only the subgroup of even residue classes.\n\nIn additive ℤₙ, generators are exactly the residue classes relatively prime to n. Not every nonidentity element of a cyclic group generates it; some generate only proper subgroups.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_group__group_axioms": {
+      "title": "Group axioms: example practice",
+      "statement": "Under multiplication modulo 8, does {1,3,5,7} form a group? If the set is all nonzero residue classes {1,…,7}, test closure.",
+      "answer_text": "The invertible residues {1,3,5,7} modulo 8 form a group under multiplication. All nonzero residues {1,…,7} do not even form a closed set under multiplication, since 2·4=0.",
+      "explanation": "The invertible residues {1,3,5,7} modulo 8 form a group under multiplication. All nonzero residues {1,…,7} do not even form a closed set under multiplication, since 2·4=0.\n\nFor a specific system, first check closure on the underlying set. The same identity must work for every element, and every inverse must also belong to the underlying set.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_group__subgroups": {
+      "title": "The subgroup test and the inherited operation: example practice",
+      "statement": "In the additive group ℤ₈, determine whether {0,2,4,6} is a subgroup by checking identity, closure and inverses.",
+      "answer_text": "The even residue classes {0,2,4,6} in additive ℤ₈ contain 0 and are closed under addition and additive inverses, so they are a subgroup.",
+      "explanation": "The even residue classes {0,2,4,6} in additive ℤ₈ contain 0 and are closed under addition and additive inverses, so they are a subgroup.\n\nNonemptiness lets us choose a∈H and obtain the identity aa⁻¹. Multiplicative closure alone generally fails for infinite groups: the positive integers within additive ℤ omit 0 and negative integers.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_ring_field": {
+      "title": "Rings and fields: example practice",
+      "statement": "List the units of ℤ₆ and use a nonzero zero divisor to decide whether it is a field. Also find the inverse of 3 in ℤ₇.",
+      "answer_text": "In ℤ₆, 1 and 5 are invertible, but 2·3=0 with both factors nonzero, so ℤ₆ is not a field. In ℤ₇, 3⁻¹=5 since 3·5≡1(mod7).",
+      "explanation": "In ℤ₆, 1 and 5 are invertible, but 2·3=0 with both factors nonzero, so ℤ₆ is not a field. In ℤ₇, 3⁻¹=5 since 3·5≡1(mod7).\n\nFor integers n≥2, the residue ring ℤₙ has multiplicative identity 1, and a is invertible exactly when gcd(a,n)=1. The ring ℤₙ is a field exactly when n is prime. Division in a ring is allowed only by a unit, using multiplication by its inverse. Every finite integral domain is a field; finiteness is essential.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_ring_field__finite_fields": {
+      "title": "Fields and finite fields: example practice",
+      "statement": "Decide whether ℤ₁₁ and ℤ₉ are fields. For any non-field case, exhibit nonzero elements whose product is 0.",
+      "answer_text": "ℤ₁₁ is a field. In ℤ₉, 3·3=0 with 3 nonzero, so it is not a field.",
+      "explanation": "ℤ₁₁ is a field. In ℤ₉, 3·3=0 with 3 nonzero, so it is not a field.\n\nIn a field, division by a nonzero element is defined and there are no nonzero zero divisors. A prime p gives the finite field ℤₚ. Finite integral domains are fields, but this does not imply every finite field has prime size; more general finite fields can have prime-power size.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_ring_field__integral_domains": {
+      "title": "Integral domains: example practice",
+      "statement": "Determine which of ℤ,ℤ₇,ℤ₉ are integral domains and which are fields, giving the key reason in each case.",
+      "answer_text": "ℤ is an infinite integral domain but not a field. ℤ₇ is a finite integral domain and a field. ℤ₉ is not an integral domain, since 3·3=0.",
+      "explanation": "ℤ is an infinite integral domain but not a field. ℤ₇ is a finite integral domain and a field. ℤ₉ is not an integral domain, since 3·3=0.\n\nThe integers ℤ form a standard integral domain. The element 2 has no multiplicative inverse there, so integral domains need not be fields. A finite integral domain is a field, because an injection of a finite set to itself is surjective.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_ring_field__ring_axioms": {
+      "title": "Axioms of rings with identity: example practice",
+      "statement": "With entrywise addition and matrix multiplication, do all 2×2 matrices over ℤ₂ form a finite ring? Must multiplication be commutative? Explain what this example shows about the ring axioms.",
+      "answer_text": "The 2×2 matrices over ℤ₂ form a finite ring under entrywise addition and matrix multiplication. Some matrices A,B have AB≠BA.",
+      "explanation": "The 2×2 matrices over ℤ₂ form a finite ring under entrywise addition and matrix multiplication. Some matrices A,B have AB≠BA.\n\nCheck both operations on the same set and the distributive laws connecting them. Additive inverses always exist; multiplicative inverses are not general ring axioms. State the convention about identity, which varies between textbooks.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_ring_field__units": {
+      "title": "Units and inverses in residue rings: example practice",
+      "statement": "Find all units in ℤ₁₂ and the multiplicative inverse of 5, checking the product modulo 12.",
+      "answer_text": "The units of ℤ₁₂ are 1,5,7,11. The inverse of 5 is 5, since 25≡1(mod12).",
+      "explanation": "The units of ℤ₁₂ are 1,5,7,11. The inverse of 5 is 5, since 25≡1(mod12).\n\nThe identity 1 is a specified neutral element, while a “unit” in ring theory is any invertible element; distinguish their roles by context. Division is defined only for invertible divisors.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_ring_field__zero_divisors": {
+      "title": "Nonzero zero divisors and multiplicative cancellation: example practice",
+      "statement": "In ℤ₆, use 2 and 3 to illustrate zero divisors and compare 2·1 with 2·4 to test cancellation of 2. Also check 2 and 4 in ℤ₈.",
+      "answer_text": "In ℤ₆, 2·3=0, and 2·1=2·4 although 1≠4. In ℤ₈, 2·4=0.",
+      "explanation": "In ℤ₆, 2·3=0, and 2·1=2·4 although 1≠4. In ℤ₈, 2·4=0.\n\nFrom ab=ac obtain a(b−c)=0. Only when a≠0 and zero divisors are absent can one conclude b=c. With zero divisors, the implication generally fails.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_lattice_bool": {
+      "title": "Lattices and Boolean algebras: example practice",
+      "statement": "Order the positive divisors of 12 by divisibility. Identify meet, join, least and greatest elements, and determine with justification whether 2 has a complement.",
+      "answer_text": "The positive divisors of 12 ordered by divisibility form a bounded lattice with meet gcd, join lcm, least element 1, and greatest element 12. The element 2 has no complement: the only divisors coprime to 2 are 1,3, and neither has lcm 12 with 2.",
+      "explanation": "The positive divisors of 12 ordered by divisibility form a bounded lattice with meet gcd, join lcm, least element 1, and greatest element 12. The element 2 has no complement: the only divisors coprime to 2 are 1,3, and neither has lcm 12 with 2.\n\nThe power set P(U), ordered by inclusion, is a standard Boolean algebra: meet is intersection, join is union, and complement is relative to fixed U. A general lattice need not be distributive; being bounded and distributive does not guarantee complements. Finite chains have meets and joins but no complements for internal elements, so finite chains with at least 3 elements are not Boolean algebras.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_lattice_bool__boolean_algebras": {
+      "title": "Distributive lattices and the set model of Boolean algebra: example practice",
+      "statement": "A finite set U has n elements. Does P(U), equipped with intersection, union and set complement, form a Boolean algebra? Determine the number of elements in its underlying set.",
+      "answer_text": "All subsets of a finite set U form a Boolean algebra. If U has n elements, the underlying set P(U) has 2ⁿ elements.",
+      "explanation": "All subsets of a finite set U form a Boolean algebra. If U has n elements, the underlying set P(U) has 2ⁿ elements.\n\nDistributivity permits systematic simplification; for example, (A∩B)∪(A∩B′)=A∩(B∪B′)=A. Complements must use the same fixed universal set. Boundedness and distributivity are insufficient without a complement for every element.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_lattice_bool__bounded_lattices": {
+      "title": "Bounded lattices and least and greatest elements: example practice",
+      "statement": "Identify the least and greatest elements of the positive-divisor lattice of 12 and of the three-element chain 0<a<1. Decide whether each is bounded.",
+      "answer_text": "The positive-divisor lattice of 12 has least element 1 and greatest element 12. The three-element chain 0<a<1 is also a bounded lattice.",
+      "explanation": "The positive-divisor lattice of 12 has least element 1 and greatest element 12. The three-element chain 0<a<1 is also a bounded lattice.\n\nBoundedness differs from existence of meets and joins for pairs, and does not guarantee complements. In the divisor lattice D(N), the least element is integer 1 and the greatest is integer N.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_lattice_bool__complements": {
+      "title": "Complements in bounded lattices: example practice",
+      "statement": "Find the complementary pairs in the divisor lattice of 6. Then decide whether a has a complement in the chain 0<a<1.",
+      "answer_text": "In the divisor lattice of 6, 1 and 6 are complements, as are 2 and 3. The middle element a of the chain 0<a<1 has no complement.",
+      "explanation": "In the divisor lattice of 6, 1 and 6 are complements, as are 2 and 3. The middle element a of the chain 0<a<1 has no complement.\n\nThe lattice symbols 0,1 describe roles, not necessarily the corresponding integers. A divisor lattice can have integer 1 as its least element and N as its greatest; there the complement conditions become gcd(a,b)=1 and lcm(a,b)=N.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_lattice_bool__distributive_lattices": {
+      "title": "Distributive lattices: example practice",
+      "statement": "Do set intersection and union satisfy the distributive laws? Does the bounded distributive chain 0<a<1 therefore form a Boolean algebra? Check the complement condition at its middle element.",
+      "answer_text": "Set intersection and union distribute. A three-element chain is distributive and bounded, yet the complement requirement fails at its middle element.",
+      "explanation": "Set intersection and union distribute. A three-element chain is distributive and bounded, yet the complement requirement fails at its middle element.\n\nA total chain with min as meet and max as join is distributive. A distributive lattice need not have complements: the middle element of a bounded three-element chain has none, so this is not a Boolean algebra.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-algebra_lattice_bool__meets_joins": {
+      "title": "Lattices, greatest lower bounds, and least upper bounds: example practice",
+      "statement": "Order {1,2,3} by divisibility. Do 2 and 3 have a common upper bound inside the set? Decide whether this is a lattice and whether the external element 6 may serve as their join.",
+      "answer_text": "In {1,2,3} ordered by divisibility, 2 and 3 have no common upper bound inside the set, so it is not a lattice. The external element 6 cannot serve as their join.",
+      "explanation": "In {1,2,3} ordered by divisibility, 2 and 3 have no common upper bound inside the set, so it is not a lattice. The external element 6 cannot serve as their join.\n\nIn a complete set of divisors ordered by divisibility, meet is gcd and join is lcm. Arbitrarily removing elements can remove a needed upper bound, so the remaining partial order may cease to be a lattice.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
     }
   }
 }

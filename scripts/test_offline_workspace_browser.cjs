@@ -225,12 +225,27 @@ async function noOverflow(page, panel) {
     return { viewport: innerWidth, document: document.documentElement.scrollWidth,
       mainLeft: main.left, mainRight: main.right, panelWidth: node.clientWidth, panelScroll: node.scrollWidth,
       panelTop: bounds.top - main.top, marginTop: parseFloat(getComputedStyle(node).marginTop),
-      top: bounds.top, bottom: bounds.bottom, viewportHeight: innerHeight };
+      top: bounds.top, bottom: bounds.bottom, viewportHeight: innerHeight,
+      outerOverflow: getComputedStyle(node).overflowY, outerHeight: node.clientHeight, outerScroll: node.scrollHeight,
+      panes: ['concepts', 'questions'].includes(id) ? [...node.querySelectorAll(id === 'concepts'
+        ? '#conceptList,#conceptDetail' : '#questionList,#questionDetail')].map(pane => ({
+          id: pane.id, overflow: getComputedStyle(pane).overflowY,
+          height: pane.clientHeight, top: pane.getBoundingClientRect().top, bottom: pane.getBoundingClientRect().bottom })) : [] };
   }, panel);
   assert.ok(state.document <= state.viewport + 1, panel + ': page overflows horizontally: ' + JSON.stringify(state));
   assert.ok(state.mainLeft >= -1 && state.mainRight <= state.viewport + 1, panel + ': workspace outside viewport');
   assert.ok(state.panelScroll <= state.panelWidth + 1, panel + ': panel overflows outside its own controls');
   assert.ok(Math.abs(state.panelTop - state.marginTop) <= 2, panel + ': no empty header row precedes the content: ' + JSON.stringify(state));
+  if (['concepts', 'questions'].includes(panel)) {
+    assert.ok(['hidden', 'clip'].includes(state.outerOverflow), panel + ': the outer panel is not a scroll owner');
+    assert.ok(state.outerScroll <= state.outerHeight + 1, panel + ': independent panes fit their outer panel');
+    assert.equal(state.panes.length, 2);
+    for (const pane of state.panes) {
+      assert.ok(['auto', 'scroll'].includes(pane.overflow) && pane.height > 0,
+        pane.id + ': list and detail each own a bounded scrolling viewport');
+      assert.ok(pane.top >= state.top - 1 && pane.bottom <= state.bottom + 1, pane.id + ': pane remains inside the panel');
+    }
+  }
 }
 
 async function sidebarControls(page, width) {
@@ -494,17 +509,45 @@ async function curriculum(page) {
     const child = concepts.find(item => item.id === overview.related_concepts[0]);
     await page.locator('#conceptDetail .concept-topic-links [data-concept-id="' + child.id + '"]').click();
     await studyOutput(page.locator('#conceptDetail .detail-title'), child.title);
-    await page.locator('#conceptDetail [data-question-id="' + child.related_questions[0] + '"]').click();
+    const related = page.locator('#conceptDetail .concept-related-exercises');
+    assert.equal(await related.getByRole('heading', {name:'关联练习', exact:true}).count(), 1);
+    assert.equal(await related.locator('[data-concept-id]').count(), 0, 'Related exercises contain only practice links');
+    const links = await related.locator('[data-question-id]').evaluateAll(nodes => nodes.map(node => ({
+      id: node.dataset.questionId, difficulty: node.dataset.difficulty
+    })));
+    assert.deepEqual(links.map(link => link.id).sort(), [...new Set(child.related_questions)].sort(),
+      'Every authored exercise association remains reachable');
+    const rank = value => ['简单', '中等', '困难'].indexOf(displayDifficulty(value));
+    assert.ok(links.every((link, index) => rank(link.difficulty) >= 0
+      && (!index || rank(link.difficulty) >= rank(links[index - 1].difficulty))),
+    'Related practice links ascend from simple to difficult');
+    const question = questions.find(item => item.source?.migrated_from?.kind === 'concept_example'
+      && item.source.migrated_from.concept_id === child.id);
+    assert.ok(question, 'The former concept example has a linked practice record');
+    assert.equal(question.answer_text, child.example, 'Migrating examples retains their complete authored solution');
+    await related.locator('[data-question-id="' + question.id + '"]').click();
     await page.locator('#questionsPanel').waitFor({ state: 'visible' });
-    const question = questions.find(item => item.id === child.related_questions[0]);
     await studyOutput(page.locator('#questionDetail .detail-title'), question.title);
     await page.locator('#questionDetail').getByRole('button', {name:'查看参考答案', exact:true}).click();
     assert.ok((await page.locator('#questionDetail .answer-panel').innerText()).includes('评分要点'));
+    await studyOutput(page.locator('#questionDetail .wrong-answer-inner').first(), child.example);
     await page.locator('#questionDetail .question-concept-links [data-concept-id="' + child.id + '"]').click();
     await page.locator('#conceptsPanel').waitFor({ state: 'visible' });
     await studyOutput(page.locator('#conceptDetail .detail-title'), child.title);
+    assert.equal(await page.locator('#conceptDetail .concept-topic-links').getByRole('heading', {name:'所属知识点', exact:true}).count(), 1);
     await page.locator('#conceptDetail .concept-topic-links [data-concept-id="' + topic.id + '"]').click();
     await studyOutput(page.locator('#conceptDetail .detail-title'), topic.name);
+    const module = page.locator('#conceptDetail .concept-graph-module');
+    assert.equal(await module.getByRole('heading', {name:'所属图谱模块', exact:true}).count(), 1);
+    const graphLink = module.locator('[data-graph-node-id="' + topic.id + '"]');
+    assert.equal(await graphLink.getAttribute('data-graph-category'), topic.category);
+    await graphLink.click();
+    await page.locator('#graphPanel').waitFor({state:'visible'});
+    await page.waitForFunction(id => document.querySelector('#knowledgeGraphModal .selected[data-node-id]')?.dataset.nodeId === id, topic.id);
+    assert.equal(await page.locator('#knowledgeGraphCategory').inputValue(), topic.category);
+    if (await page.locator('#knowledgeGraphModal').evaluate(node => node.classList.contains('graph-fullscreen-view'))) {
+      await page.locator('#knowledgeGraphModal .kg-mobile-expand').click();
+    }
   }
 }
 
@@ -512,6 +555,12 @@ async function graph(page) {
   await navigate(page, 'graph');
   const host = page.locator('#knowledgeGraphModal[data-ready="true"]');
   await host.waitFor();
+  if (await host.locator('#knowledgeGraphCategory').isVisible()) {
+    await host.locator('#knowledgeGraphCategory').selectOption('全部');
+  } else {
+    await host.locator('#knowledgeGraphCategoryTrigger').click();
+    await page.locator('#mobileChoiceModal').getByRole('radio', {name:'全部', exact:true}).click();
+  }
   const mobile = await page.evaluate(() => matchMedia('(max-width:760px)').matches);
   if (mobile) await host.locator('.kg-mobile-expand').click();
   const nodeSelector = mobile ? '.kg-mobile-node' : 'svg .kg-node-group';

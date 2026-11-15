@@ -241,6 +241,19 @@ function mount(host,options={}) {
    const rect=node.querySelector('rect');if(rect)rect.setAttribute('stroke-width',selected?'3':'2');
   }
   updateMobileGraphEdgeEmphasis(canvas,knowledgeGraphSelectedNodeId);renderDetail();
+  options.onSelectionChange?.(allNodes.find(node=>String(node.id)===knowledgeGraphSelectedNodeId));
+ }
+ function revealSelectedGraphNode(){
+  window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>{
+   if(destroyed)return;
+   const node=canvas.querySelector(`[data-node-id="${CSS.escape(knowledgeGraphSelectedNodeId)}"]`);
+   const viewport=canvas.querySelector('.kg-mobile-viewport,.kg-desktop-viewport');
+   if(!node||!viewport)return;
+   const rect=node.getBoundingClientRect(),view=viewport.getBoundingClientRect();
+   viewport.scrollLeft+=rect.left+rect.width/2-(view.left+viewport.clientLeft+viewport.clientWidth/2);
+   viewport.scrollTop+=rect.top+rect.height/2-(view.top+viewport.clientTop+viewport.clientHeight/2);
+   if(!isMobileAppShell())desktopFitted=false;
+  }));
  }
  function restoreInline(){
   host.classList.remove('graph-fullscreen-view');
@@ -316,7 +329,15 @@ function mount(host,options={}) {
  window.addEventListener('dmate:languagechange',renderKnowledgeGraph,{signal});
  const observer=new ResizeObserver(()=>{const size=canvas.clientWidth+':'+canvas.clientHeight;if(size===previousSize)return;previousSize=size;window.cancelAnimationFrame(resizeFrame);resizeFrame=window.requestAnimationFrame(()=>{if(!destroyed&&!isMobileAppShell()&&desktopFitted)fitKnowledgeGraphDesktop();});});observer.observe(canvas);
  host.classList.remove('graph-fullscreen-view');renderKnowledgeGraph();
- return {exportPNG,select(id){const node=canvas.querySelector(`[data-node-id="${CSS.escape(String(id))}"]`);selectKnowledgeGraphNode(id,node);},destroy(){destroyed=true;disposeViews();fontObserver.disconnect();controller.abort();observer.disconnect();window.cancelAnimationFrame(resizeFrame);closeChoice();restoreInline();canvas.replaceChildren();delete host.dataset.ready;}};
+ return {exportPNG,select(id,selectionOptions={}){
+  const record=allNodes.find(node=>String(node.id)===String(id));if(!record)return;
+  const reveal=Boolean(selectionOptions?.reveal);knowledgeGraphSelectedNodeId=String(record.id);
+  if(reveal&&!visibleNodes.some(node=>String(node.id)===knowledgeGraphSelectedNodeId))setCategory(record.category);
+  if(reveal&&isMobileAppShell()&&!host.classList.contains('graph-fullscreen-view'))toggleKnowledgeGraphFullscreenView();
+  const node=canvas.querySelector(`[data-node-id="${CSS.escape(knowledgeGraphSelectedNodeId)}"]`);
+  selectKnowledgeGraphNode(knowledgeGraphSelectedNodeId,node);
+  if(reveal)revealSelectedGraphNode();
+ },destroy(){destroyed=true;disposeViews();fontObserver.disconnect();controller.abort();observer.disconnect();window.cancelAnimationFrame(resizeFrame);closeChoice();restoreInline();canvas.replaceChildren();delete host.dataset.ready;}};
 function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     if (!viewport || !surface || !stage) return;
 
