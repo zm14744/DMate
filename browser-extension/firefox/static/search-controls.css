@@ -1,0 +1,83 @@
+/* Search fields share the offline concept library's quiet rounded surface.
+   The wrapper is only a positioning hook, never a second bordered control. */
+@layer dmate-search-controls {
+    body[data-appearance-theme] :is(.dmate-search-wrap,.wrong-search-wrap,.dcn-search-wrap) {
+        position:relative;
+        box-sizing:border-box;
+        min-width:0;
+        max-width:100%;
+        padding:0!important;
+        border:0!important;
+        background:transparent!important;
+        box-shadow:none!important;
+    }
+    body[data-appearance-theme] :is(.dmate-search-wrap,.wrong-search-wrap,.dcn-search-wrap) > input {
+        appearance:none!important;
+        -webkit-appearance:none!important;
+        box-sizing:border-box!important;
+        display:block;
+        width:100%!important;
+        min-width:0!important;
+        max-width:100%!important;
+        min-height:38px;
+        margin:0!important;
+        padding:9px 40px 9px 10px!important;
+        border:1px solid var(--border-strong)!important;
+        border-radius:9px!important;
+        background-color:var(--surface-1)!important;
+        background-image:none!important;
+        box-shadow:none!important;
+        color:var(--text-primary)!important;
+        -webkit-text-fill-color:currentColor!important;
+        font-family:var(--dmate-font-ui);
+        font-size:14px;
+    }
+    body[data-appearance-theme] :is(.dmate-search-wrap,.wrong-search-wrap,.dcn-search-wrap) > input::placeholder {
+        color:var(--text-muted);
+        opacity:1;
+    }
+    body[data-appearance-theme] :is(.dmate-search-wrap,.wrong-search-wrap,.dcn-search-wrap) > input:focus-visible {
+        border-color:var(--dm-selected-ring,var(--text-primary))!important;
+    }
+    body[data-appearance-theme] :is(.dmate-search-wrap,.wrong-search-wrap,.dcn-search-wrap) > input:disabled {
+        opacity:.55;
+    }
+    input[type="search"]::-webkit-search-cancel-button {
+        display:none;
+        -webkit-appearance:none;
+    }
+
+    body[data-appearance-theme] button.dmate-search-clear {
+        appearance:none!important;
+        -webkit-appearance:none!important;
+        position:absolute!important;
+        inset:auto 10px auto auto!important;
+        top:50%!important;
+        transform:translateY(-50%)!important;
+        display:block!important;
+        box-sizing:border-box!important;
+        flex:none!important;
+        width:18px!important;
+        min-width:18px!important;
+        max-width:18px!important;
+        height:18px!important;
+        min-height:18px!important;
+        max-height:18px!important;
+        margin:0!important;
+        padding:0!important;
+        border:0!important;
+        border-radius:50%!important;
+        background:#ef4444!important;
+        background-image:none!important;
+        box-shadow:none!important;
+        color:transparent!important;
+        -webkit-text-fill-color:transparent!important;
+        font-size:0!important;
+        line-height:0!important;
+        cursor:pointer;
+        touch-action:manipulation;
+    }
+    body[data-appearance-theme] button.dmate-search-clear:is([hidden],.hidden) {
+        display:none!important;
+    }
+}

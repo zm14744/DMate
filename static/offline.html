@@ -42,12 +42,14 @@
 <link rel="stylesheet" href="/static/ui-tooltip.css">
 <link rel="stylesheet" href="/static/appearance-panels.css">
 <link rel="stylesheet" href="/static/dmate-shared-overrides.css?v=23">
+<link rel="stylesheet" href="/static/search-controls.css?v=27">
 <link rel="stylesheet" href="/static/button-themes.css?v=23">
 <link rel="stylesheet" href="/static/offline-knowledge-graph.css?v=17">
-<link rel="stylesheet" href="/static/offline.css?v=26">
+<link rel="stylesheet" href="/static/offline.css?v=27">
 <link rel="stylesheet" href="/static/select-controls.css?v=26">
 <link rel="stylesheet" href="/static/scrollbars.css?v=25">
 <script defer src="/static/mobile-select.js?v=26"></script>
+<script defer src="/static/search-controls.js?v=27"></script>
 <script defer src="/static/scrollbars.js?v=25"></script>
 <script defer src="/static/graph-editor-model.js"></script>
 <script defer src="/static/graph-editor-format.js"></script>
@@ -71,9 +73,9 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/offline-appearance.js?v=8"></script>
 <script defer src="/static/offline-shell.js?v=8"></script>
 <script defer src="/static/knowledge-graph-labels.js?v=17"></script>
-<script defer src="/static/offline-knowledge-graph.js?v=26"></script>
+<script defer src="/static/offline-knowledge-graph.js?v=27"></script>
 <script defer src="/static/offline-entry.js?v=17"></script>
-<script defer src="/static/offline.js?v=26"></script>
+<script defer src="/static/offline.js?v=27"></script>
 </head>
 <body class="offline-workspace">
 <script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"light";</script>
@@ -167,9 +169,6 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
               <div id="knowledgeGraphCanvas" class="knowledge-graph-canvas"></div>
             </div>
             <div class="knowledge-graph-side">
-              <div class="graph-side-tabs">
-                <button id="knowledgeGraphDetailTab" type="button" class="graph-side-tab active">节点详情</button>
-              </div>
               <div id="knowledgeGraphDetailWrap" class="graph-side-page">
                 <div id="knowledgeGraphDetailTitle" class="graph-detail-title">节点详情</div>
                 <div id="knowledgeGraphDetail" class="graph-detail-body"></div>
@@ -188,6 +187,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
           <select id="questionDifficulty" aria-label="按难度筛选">
             <option value="">全部难度</option><option value="简单">简单</option><option value="中等">中等</option><option value="困难">困难</option>
           </select>
+          <input type="search" id="questionSearch" class="offline-search" placeholder="搜索" aria-label="搜索">
         </div>
       </div>
       <div class="question-layout">
@@ -203,7 +203,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
         <div><strong id="conceptCount">概念库</strong><span class="toolbar-muted">定义、解释与例题</span></div>
         <div class="offline-filters">
           <select id="conceptCategory" aria-label="按章节筛选"><option value="">全部章节</option></select>
-          <input type="search" id="conceptSearch" class="offline-search" placeholder="搜索概念" aria-label="搜索概念">
+          <input type="search" id="conceptSearch" class="offline-search" placeholder="搜索" aria-label="搜索">
         </div>
       </div>
       <div class="concept-layout">

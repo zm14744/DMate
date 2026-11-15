@@ -8,7 +8,7 @@
     panel: "graph", selectedQuestion: null, selectedConcept: null,
     revealed: false,
     drawingController: null, backgroundUrl: "", graphCategory: "", questionCategory: "",
-    questionDifficulty: "", conceptCategory: "", conceptQuery: "", graphQuery: "", graphController: null,
+    questionDifficulty: "", questionQuery: "", conceptCategory: "", conceptQuery: "", graphQuery: "", graphController: null,
     appearanceQueue: Promise.resolve()
   };
   const panelMeta = {
@@ -19,6 +19,10 @@
   };
   const tr = (value, english) => window.DMateI18n?.t?.(value, english) ?? String(value ?? "");
   const english = () => window.DMateI18n?.isEnglish?.() === true;
+  const questionTypeLabels = {
+    "单项选择":"Single choice", "多项选择":"Multiple choice", "填空":"Fill in the blank", "计算":"Calculation",
+    "简答":"Short answer", "证明":"Proof"
+  };
   function localized(value, collection) {
     return english() ? {...value, ...state.translations[collection]?.[value.id]} : value;
   }
@@ -253,11 +257,37 @@
     return value;
   }
 
+  function searchText(value) {
+    if (value === null || value === undefined) return "";
+    if (Array.isArray(value)) return value.map(searchText).join(" ");
+    if (typeof value === "object") return Object.values(value).map(searchText).join(" ");
+    return ["string", "number", "boolean"].includes(typeof value) ? String(value) : "";
+  }
+
+  function normalizedSearch(value) {
+    return String(value ?? "").normalize("NFKC").trim().toLocaleLowerCase();
+  }
+
+  function questionMatchesSearch(question, query) {
+    if (!query) return true;
+    const translated = state.translations.questions[question.id] || {};
+    const fields = ["id", "title", "statement", "options", "answer", "answer_text", "explanation", "grading_criteria", "category", "difficulty", "type", "knowledge_points"];
+    const searchable = [fields.map(key => question[key]), fields.map(key => translated[key]),
+      window.DMateKnowledgeLanguage?.labels?.[question.category],
+      difficultyName(question.difficulty), window.DMateLanguageCatalog?.exact?.[difficultyName(question.difficulty)],
+      questionTypeLabels[question.type], tr(question.category), tr(question.type)];
+    return normalizedSearch(searchText(searchable)).includes(query);
+  }
+
   function renderQuestions() {
     fillQuestionFilters();
+    state.questionQuery = $("questionSearch").value;
+    window.DMateSearchControls?.refresh?.($("questionSearch"));
+    const query = normalizedSearch(state.questionQuery);
     const filtered = state.questions.filter(q =>
       (!state.questionCategory || q.category === state.questionCategory) &&
-      (!state.questionDifficulty || difficultyName(q.difficulty) === state.questionDifficulty)
+      (!state.questionDifficulty || difficultyName(q.difficulty) === state.questionDifficulty) &&
+      questionMatchesSearch(q, query)
     );
     $("questionCount").textContent = tr(filtered.length + " 道题目", filtered.length + (filtered.length === 1 ? " exercise" : " exercises"));
     const list = $("questionList");
@@ -276,6 +306,7 @@
     } else if (filtered.length) selectQuestion(filtered[0]);
     else {
       state.selectedQuestion = null;
+      state.revealed = false;
       $("questionDetail").replaceChildren(el("div","offline-empty",tr("没有符合条件的题目。", "No matching exercises.")));
     }
   }
@@ -402,7 +433,10 @@
         const link = studyButton(tr("练习：", "Exercise: ") + localized(q, "questions").title, "", () => {
           state.questionCategory = ""; state.questionDifficulty = "";
           $("questionCategory").value = ""; $("questionDifficulty").value = "";
-          switchPanel("questions"); selectQuestion(q);
+          if (!questionMatchesSearch(q, normalizedSearch($("questionSearch").value))) $("questionSearch").value = "";
+          state.selectedQuestion = q;
+          state.revealed = false;
+          switchPanel("questions");
         });
         link.dataset.questionId = id; prereqs.append(link);
       }
@@ -415,6 +449,7 @@
     state.conceptCategory = fillChapterFilter($("conceptCategory"), state.conceptCategory);
     const query = $("conceptSearch").value.trim().toLocaleLowerCase();
     state.conceptQuery = $("conceptSearch").value;
+    window.DMateSearchControls?.refresh?.($("conceptSearch"));
     const rows = state.concepts.filter(c => {
       const translated = state.translations.concepts[c.id] || {};
       return (!state.conceptCategory || c.category === state.conceptCategory)
@@ -514,15 +549,15 @@
       "基本定义":"Definition", "理解与说明":"Explanation", "典型例题":"Worked example", "常见错误":"Common mistakes",
       "评分要点":"Marking criteria", "细分概念":"Detailed concepts", "所属图谱知识点":"Knowledge-map topic",
       "关联知识点":"Related knowledge", "暂无已关联条目":"No linked entries yet", "数学符号":"Mathematical notation",
-      "单项选择":"Single choice", "多项选择":"Multiple choice", "填空":"Fill in the blank", "计算":"Calculation",
-      "简答":"Short answer", "证明":"Proof", "简单":"Easy", "中等":"Medium", "困难":"Hard",
+      ...questionTypeLabels, "简单":"Easy", "中等":"Medium", "困难":"Hard",
       "按章节筛选":"Filter by topic", "按难度筛选":"Filter by difficulty", "全部章节":"All topics", "全部难度":"All difficulties",
       "题目、答案与解析":"Questions, answers and explanations", "定义、解释与例题":"Definitions, explanations and examples",
-      "搜索概念":"Search concepts", "没有符合条件的题目。":"No matching exercises.", "没有找到匹配的概念。":"No matching concepts."
+      "搜索":"Search", "搜索概念":"Search concepts", "没有符合条件的题目。":"No matching exercises.", "没有找到匹配的概念。":"No matching concepts."
     });
     document.querySelectorAll(".offline-nav-item").forEach(item => item.addEventListener("click", () => switchPanel(item.dataset.panel)));
     $("questionCategory").addEventListener("change", event => { state.questionCategory=event.target.value; renderQuestions(); });
     $("questionDifficulty").addEventListener("change", event => { state.questionDifficulty=event.target.value; renderQuestions(); });
+    $("questionSearch").addEventListener("input", renderQuestions);
     $("conceptCategory").addEventListener("change", event => { state.conceptCategory=event.target.value; renderConcepts(); });
     $("conceptSearch").addEventListener("input", renderConcepts);
     $("returnOnline").addEventListener("click", returnOnline);

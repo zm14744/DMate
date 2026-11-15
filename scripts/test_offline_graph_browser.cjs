@@ -24,7 +24,7 @@ const settle = page => page.evaluate(async () => {
 async function removeOnlineOnly(page) {
   await page.evaluate(() => {
     document.querySelectorAll('#knowledgeGraphFocusBtn,#knowledgeGraphScopeBtn,#knowledgeGraphHistoryTab,#knowledgeGraphHistoryWrap,'
-      + '#knowledgeGraphLegendRelated,.graph-legend,.kg-video-section').forEach(node => node.remove());
+      + '#knowledgeGraphLegendRelated,.graph-legend,.kg-video-section,.graph-side-tabs').forEach(node => node.remove());
   });
 }
 
@@ -76,8 +76,8 @@ async function visual(page, size) {
     const origin = card.getBoundingClientRect(), result = {};
     for (const selector of ['.graph-toolbar', '.graph-toolbar-left',
       '#knowledgeGraphCopyBtn', '.knowledge-graph-layout', '.knowledge-graph-main',
-      '.knowledge-graph-canvas', '.kg-section', '.knowledge-graph-side', '.graph-side-tabs',
-      '#knowledgeGraphDetailTab', '.graph-detail-title', '.graph-detail-body']) {
+      '.knowledge-graph-canvas', '.kg-section', '.knowledge-graph-side',
+      '.graph-detail-title', '.graph-detail-body']) {
       const node = selector === ':scope' ? card : card.querySelector(selector);
       if (!node) throw new Error('Missing graph comparison node: ' + selector);
       const rect = node.getBoundingClientRect(), css = getComputedStyle(node);
@@ -438,6 +438,10 @@ async function runCase(browser, width, theme) {
     assert.equal(await page.evaluate(() => navigator.onLine), false);
     assert.equal(await frame(page).locator('#knowledgeGraphFocusBtn').count(), 0,
       'The offline graph omits the redundant All knowledge button');
+    assert.equal(await frame(page).locator('.graph-side-tabs,#knowledgeGraphDetailTab').count(), 0,
+      'The offline graph omits the redundant single detail tab');
+    assert.ok(await frame(page).locator('#knowledgeGraphDetailTitle,#knowledgeGraphDetail').count() === 2,
+      'The node title and detail content remain available');
     assert.equal(await frame(page).locator('#knowledgeGraphScopeBtn,#knowledgeGraphHistoryTab,#knowledgeGraphHistoryWrap,'
       + '#knowledgeGraphLegendRelated,.graph-legend,.kg-video-section,iframe,a[href*="bilibili"],a[href*="youtube"]').count(), 0,
     'Question association, history, videos and the purple legend are absent');
