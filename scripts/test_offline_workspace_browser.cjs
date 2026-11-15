@@ -18,12 +18,11 @@ async function navigate(page, panel) {
   // Its accessibility state, rather than animation timing, determines whether
   // the user needs to open navigation before selecting the next panel.
   if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
-  const title = (await item.innerText()).trim();
   await item.click();
   await page.locator('#' + panel + 'Panel').waitFor({ state: 'visible' });
-  if (page.viewportSize().width <= 1100) {
-    await page.waitForFunction(expected => document.getElementById('offlineMobileTitle').textContent.trim() === expected, title);
-  }
+  await page.waitForFunction(expected => document.querySelector('.offline-nav-item[aria-current="page"]')?.dataset.panel === expected, panel);
+  assert.equal(await page.locator('.offline-nav-item[aria-current="page"]').count(), 1,
+    'The selected learning tool remains available to assistive navigation');
 }
 
 async function ready(page) {
@@ -47,7 +46,9 @@ async function ready(page) {
   assert.ok(entries.onlineBottom <= entries.appearanceTop + 1, 'The online button is displayed above appearance');
   await page.locator('#graphPanel').waitFor({ state: 'visible' });
   assert.equal(await page.locator('.offline-nav-item.active').getAttribute('data-panel'), 'graph', 'The first module is the default');
-  if (page.viewportSize().width <= 1100) assert.equal(await page.locator('#offlineMobileTitle').innerText(), '知识图谱');
+  assert.equal(await page.locator('.offline-topbar .mobile-topbar-brand,.offline-topbar .mobile-dmate-mark,#offlineMobileTitle').count(), 0,
+    'The mobile header has no centered application logo or panel title');
+  assert.equal(await page.locator('.offline-nav-item[aria-current="page"]').getAttribute('data-panel'), 'graph');
   const schema = await page.evaluate(() => new Promise((resolve, reject) => {
     const request = indexedDB.open('dmate-offline-workspace', 2);
     request.onerror = () => reject(request.error);

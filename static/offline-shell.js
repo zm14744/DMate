@@ -74,12 +74,7 @@
   });
   mobile.addEventListener('change',() => closeDrawer(false));
   updateDrawer();
-  function syncPanelNavigation(event) {
-    const panel = event?.detail?.panel;
-    const active = [...document.querySelectorAll('.offline-nav-item[data-panel]')]
-      .find(button => panel ? button.dataset.panel === panel : button.classList.contains('active'));
-    const title = event?.detail?.title || active?.querySelector('span')?.textContent?.trim();
-    if (title) $('offlineMobileTitle').textContent = title;
+  function syncPanelNavigation() {
     document.querySelectorAll('.offline-nav-item[data-panel]').forEach(button => {
       button.setAttribute('aria-current',button.classList.contains('active') ? 'page' : 'false');
     });

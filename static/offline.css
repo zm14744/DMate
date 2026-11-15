@@ -175,9 +175,7 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
 }
 @media(max-width:1100px) {
   body.offline-workspace .offline-layout { display:block !important; grid-template-columns:1fr; padding-top:calc(56px + env(safe-area-inset-top)); }
-  body.offline-workspace .offline-topbar { position:absolute; display:grid !important; grid-template-columns:42px minmax(0,1fr) 42px; align-items:center; gap:8px; top:0; left:0; right:0; z-index:70; height:calc(56px + env(safe-area-inset-top)); padding:env(safe-area-inset-top) 10px 0; }
-  .offline-topbar .mobile-topbar-brand { display:flex; align-items:center; justify-content:center; gap:8px; min-width:0; }
-  .offline-topbar .mobile-dmate-mark { display:block; width:26px; height:26px; object-fit:contain; }
+  body.offline-workspace .offline-topbar { position:absolute; display:flex !important; align-items:center; top:0; left:0; right:0; z-index:70; height:calc(56px + env(safe-area-inset-top)); padding:env(safe-area-inset-top) 10px 0; }
   .offline-topbar .mobile-topbar-button { display:flex; align-items:center; justify-content:center; width:42px; height:42px; padding:8px; margin:0; border:0; background:transparent; }
   .offline-topbar .mobile-topbar-button svg { width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
   body.offline-workspace .offline-sidebar.left { position:fixed !important; z-index:200; top:0; bottom:0; left:0; display:flex !important; width:min(320px,88vw) !important; height:100dvh !important; max-height:100dvh !important; padding:12px !important; visibility:hidden; transform:translateX(-100%) !important; transition:transform .2s ease,visibility .2s ease; }

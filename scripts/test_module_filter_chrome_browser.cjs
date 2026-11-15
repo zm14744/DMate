@@ -126,19 +126,23 @@ async function offlineHeader(page, wallpaper = false) {
       }
       return 'rgba(0, 0, 0, 0)';
     };
-    const brand = header.querySelector('.mobile-topbar-brand'), items = [...brand.children].map(node => node.getBoundingClientRect());
+    const toggle = header.querySelector('#offlineNavToggle').getBoundingClientRect();
     return { border: [css.borderTopWidth, css.borderRightWidth, css.borderBottomWidth, css.borderLeftWidth],
       radius: css.borderRadius, shadow: css.boxShadow, blur: css.backdropFilter,
       ownBackground: css.backgroundColor, mainBackground: getComputedStyle(main).backgroundColor,
       background: background(header), main: background(main),
-      center: (Math.min(...items.map(rect => rect.left)) + Math.max(...items.map(rect => rect.right))) / 2,
-      viewportCenter: innerWidth / 2, buttons: header.querySelectorAll('button').length };
+      branding: header.querySelectorAll('.mobile-topbar-brand,.mobile-dmate-mark,.mobile-topbar-title').length,
+      text: header.textContent.trim(), toggle: { left: toggle.left, width: toggle.width, height: toggle.height },
+      buttons: [...header.querySelectorAll('button')].map(button => button.id) };
   });
   assert.deepEqual(result.border, ['0px', '0px', '0px', '0px']);
   assert.equal(parseFloat(result.radius), 0); assert.equal(result.shadow, 'none'); assert.equal(result.blur, 'none');
   assert.equal(result.background, result.main, 'Topbar and main share the background paint');
-  assert.ok(Math.abs(result.center - result.viewportCenter) <= 1.5, 'Brand remains centered with no right-side palette');
-  assert.equal(result.buttons, 1);
+  assert.equal(result.branding, 0, 'The centered logo and panel title are removed');
+  assert.equal(result.text, '', 'The header has no leftover branding text');
+  assert.deepEqual(result.buttons, ['offlineNavToggle'], 'The header retains only the learning-tool drawer button');
+  assert.ok(result.toggle.left >= 0 && result.toggle.left < 25, 'The drawer button stays at the left edge');
+  assert.ok(result.toggle.width >= 42 && result.toggle.height >= 42, 'The drawer button keeps its mobile touch target');
   if (wallpaper) assert.equal(result.ownBackground, result.mainBackground, 'Wallpaper uses the same transparent background through the header');
 }
 
@@ -211,6 +215,7 @@ async function runCase(browser, width, theme, offline) {
     if (offline) {
       await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
       await page.evaluate(mode => window.DMateOfflineAppearance.apply({ mode }, null), theme);
+      await settle(page);
       await offlineHeader(page);
     } else {
       await page.evaluate(mode => { appearanceSettings.mode = mode; applyAppearanceSettings({ save: false }); openKnowledgeGraph(); }, theme);
