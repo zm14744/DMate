@@ -176,8 +176,17 @@
 
 /* 统一使用低存在感滚动条，避免浏览器默认白色轨道/箭头。 */
 * {
-    scrollbar-width:thin;
-    scrollbar-color:rgba(148,163,184,.34) transparent;
+    scrollbar-width:var(--dmate-scrollbar-width,thin);
+    scrollbar-color:var(--dmate-scrollbar-color,rgba(148,163,184,.34) transparent);
+}
+
+/* Standard scrollbar styling overrides WebKit pseudo-elements in modern Chromium.
+   Use the custom track/thumb below where supported, keeping Firefox's thin fallback. */
+@supports selector(::-webkit-scrollbar) {
+    :root {
+        --dmate-scrollbar-width:auto;
+        --dmate-scrollbar-color:auto;
+    }
 }
 
 *::-webkit-scrollbar {
@@ -207,9 +216,9 @@
 }
 
 *::-webkit-scrollbar-button {
-    display:none;
-    width:0;
-    height:0;
+    display:none !important;
+    width:0 !important;
+    height:0 !important;
 }
 
 body {
@@ -1706,8 +1715,8 @@ input[type="search"]::-webkit-search-cancel-button {
     min-height:0;
     overflow:auto;
     overscroll-behavior:contain;
-    scrollbar-width:thin;
-    scrollbar-color:var(--border-mid) transparent;
+    scrollbar-width:var(--dmate-scrollbar-width,thin);
+    scrollbar-color:var(--dmate-scrollbar-color,var(--border-mid) transparent);
     padding:12px;
     background:var(--surface-0);
 }
@@ -1832,8 +1841,8 @@ input[type="search"]::-webkit-search-cancel-button {
     flex:1;
     overflow:auto;
     padding:12px;
-    scrollbar-width:thin;
-    scrollbar-color:var(--border-mid) transparent;
+    scrollbar-width:var(--dmate-scrollbar-width,thin);
+    scrollbar-color:var(--dmate-scrollbar-color,var(--border-mid) transparent);
 }
 
 .graph-history-list::-webkit-scrollbar {
@@ -1923,8 +1932,8 @@ input[type="search"]::-webkit-search-cancel-button {
     color:var(--text-secondary);
     font-size:var(--font-small);
     line-height:1.6;
-    scrollbar-width:thin;
-    scrollbar-color:var(--border-mid) transparent;
+    scrollbar-width:var(--dmate-scrollbar-width,thin);
+    scrollbar-color:var(--dmate-scrollbar-color,var(--border-mid) transparent);
 }
 
 .kg-history-preview::-webkit-scrollbar {
@@ -2000,8 +2009,8 @@ input[type="search"]::-webkit-search-cancel-button {
     min-height:0;
     padding:0 16px 16px;
     overflow:auto;
-    scrollbar-width:thin;
-    scrollbar-color:var(--border-mid) transparent;
+    scrollbar-width:var(--dmate-scrollbar-width,thin);
+    scrollbar-color:var(--dmate-scrollbar-color,var(--border-mid) transparent);
     color:var(--text-secondary);
     font-size:var(--font-small);
     line-height:1.6;
@@ -3968,7 +3977,7 @@ body[data-appearance-theme="light"] .msg-actions button {
         overflow-x:hidden !important;
         overflow-y:auto !important;
         padding-right:2px;
-        scrollbar-width:thin !important;
+        scrollbar-width:var(--dmate-scrollbar-width,thin) !important;
     }
 
     .session {
@@ -7207,8 +7216,8 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         min-height:0;
         overflow:auto;
         scrollbar-gutter:stable;
-        scrollbar-width:thin;
-        scrollbar-color:var(--border-mid) transparent;
+        scrollbar-width:var(--dmate-scrollbar-width,thin);
+        scrollbar-color:var(--dmate-scrollbar-color,var(--border-mid) transparent);
         overscroll-behavior:contain;
     }
     #knowledgeGraphModal .kg-desktop-zoom-surface {

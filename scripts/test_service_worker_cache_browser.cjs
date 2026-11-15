@@ -62,6 +62,12 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     const networkCSS = await reference.text();
     assert.ok(networkCSS.trim().length, 'The shared stylesheet must not be empty');
 
+    // Simulate the pinned stylesheet left by the previous offline shell.
+    await page.goto(new URL('/health', baseURL).href);
+    await page.evaluate(async () => {
+      const cache = await caches.open('dmate-offline-shell-v22');
+      await cache.put('/static/button-themes.css?v=21', new Response('/* obsolete framed controls */'));
+    });
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });
     await page.evaluate(async () => {
       await navigator.serviceWorker.register('/offline-service-worker.js', { scope: '/' });
@@ -77,6 +83,9 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       if (canonical.length !== 1) throw new Error('Expected exactly one precached shared stylesheet');
       return { name: names[0], canonical: canonical[0].url };
     }, assetPath);
+    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 23, 'Updated offline controls require the refreshed cache');
+    assert.equal((await fetchAsset(page, current.canonical)).text, networkCSS,
+      'The refreshed shell loads current frameless controls instead of the v22 stylesheet');
     const token = Date.now().toString(36);
     const revision = assetPath + '?v=online-cache-regression-' + token;
     const unseen = assetPath + '?v=unseen-cache-regression-' + token;

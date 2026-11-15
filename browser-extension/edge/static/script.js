@@ -21081,13 +21081,13 @@ function renderKnowledgeGraphDetail() {
     };
 
     addDetailField(
-        "图中前置知识",
+        "前置知识",
         visiblePrerequisites,
         "当前图中暂无前置"
     );
 
     addDetailField(
-        "图中直接后续",
+        "后续知识",
         nextNodes,
         "当前图中暂无后续"
     );

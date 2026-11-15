@@ -39,7 +39,7 @@ body.offline-workspace .offline-main.center { position:relative; display:flex !i
 .offline-card { display:block; width:100%; padding:16px; text-align:left; cursor:pointer; }
 .offline-card .card-meta { margin-top:10px; color:var(--text-muted); font-size:12px; }
 .offline-search,.offline-filters select { min-width:180px; min-height:38px; padding:9px 10px; border:1px solid var(--border-strong); border-radius:9px; background:var(--surface-1); color:var(--text-primary); font:inherit; font-size:14px; }
-.offline-chip-row { display:flex; gap:7px; overflow:auto; padding:1px 0 16px; scrollbar-width:thin; }
+.offline-chip-row { display:flex; gap:7px; overflow:auto; padding:1px 0 16px; scrollbar-width:var(--dmate-scrollbar-width,thin); }
 .offline-chip { flex:none; min-height:34px; padding:7px 11px; border:1px solid var(--border-strong); border-radius:9px; background:var(--surface-3); color:var(--text-secondary); font:inherit; font-size:13px; }
 .offline-chip.active { background:var(--dm-selected-bg,var(--surface-3)); color:var(--text-primary); }
 /* The drawing component uses the online dialog's header and spacing; only

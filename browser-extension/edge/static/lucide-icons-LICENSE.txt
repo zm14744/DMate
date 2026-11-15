@@ -1,7 +1,7 @@
 Lucide Icons — artwork embedded in DMate interface
 Project: https://github.com/lucide-icons/lucide
 Icons used: book-x, notebook-pen, network, pencil-ruler,
-chart-no-axes-combined, download, user-round, palette.
+chart-no-axes-combined, download, user-round, palette, image.
 Official license text (including MIT terms for Feather-derived download):
 
 ISC License

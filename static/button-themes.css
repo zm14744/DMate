@@ -636,4 +636,23 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         opacity:.45;
         cursor:not-allowed;
     }
+
+    /* Download destinations are quiet links with the same hover/focus feedback. */
+    body[data-appearance-theme] #downloadModal .download-actions > a {
+        border:0!important;
+        background:transparent!important;
+        background-image:none!important;
+        box-shadow:none!important;
+        color:var(--dm-icon-rest,var(--text-secondary))!important;
+        -webkit-text-fill-color:currentColor!important;
+        transition:var(--dm-control-transition);
+    }
+    body[data-appearance-theme] #downloadModal .download-actions > a:not([aria-disabled="true"]):not(:disabled):is(:hover,:focus-visible,:active) {
+        background:var(--dm-nav-hover,var(--dm-selected-hover))!important;
+        color:var(--dm-icon-emphasis,var(--text-primary))!important;
+    }
+    body[data-appearance-theme] #downloadModal .download-actions > a:focus-visible {
+        outline:2px solid var(--dm-selected-ring)!important;
+        outline-offset:2px!important;
+    }
 }

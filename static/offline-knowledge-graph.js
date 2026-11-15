@@ -304,7 +304,6 @@ function mount(host,options={}) {
  document.getElementById('mobileChoiceClose').addEventListener('click',closeChoice,{signal});
  choice.addEventListener('cancel',event=>{event.preventDefault();closeChoice();},{signal});
  choice.addEventListener('click',event=>{if(event.target===choice)closeChoice();},{signal});
- document.getElementById('knowledgeGraphFocusBtn').addEventListener('click',()=>setCategory('全部'),{signal});
  document.getElementById('knowledgeGraphDesktopZoomOut').addEventListener('click',()=>setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale/1.2),{signal});
  document.getElementById('knowledgeGraphDesktopZoomIn').addEventListener('click',()=>setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale*1.2),{signal});
  document.getElementById('knowledgeGraphDesktopZoomFit').addEventListener('click',fitKnowledgeGraphDesktop,{signal});

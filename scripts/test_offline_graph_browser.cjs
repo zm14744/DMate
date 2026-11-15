@@ -23,7 +23,7 @@ const settle = page => page.evaluate(async () => {
 
 async function removeOnlineOnly(page) {
   await page.evaluate(() => {
-    document.querySelectorAll('#knowledgeGraphScopeBtn,#knowledgeGraphHistoryTab,#knowledgeGraphHistoryWrap,'
+    document.querySelectorAll('#knowledgeGraphFocusBtn,#knowledgeGraphScopeBtn,#knowledgeGraphHistoryTab,#knowledgeGraphHistoryWrap,'
       + '#knowledgeGraphLegendRelated,.graph-legend,.kg-video-section').forEach(node => node.remove());
   });
 }
@@ -75,7 +75,7 @@ async function visual(page, size) {
     await Promise.all(card.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
     const origin = card.getBoundingClientRect(), result = {};
     for (const selector of ['.graph-toolbar', '.graph-toolbar-left',
-      '#knowledgeGraphFocusBtn', '#knowledgeGraphCopyBtn', '.knowledge-graph-layout', '.knowledge-graph-main',
+      '#knowledgeGraphCopyBtn', '.knowledge-graph-layout', '.knowledge-graph-main',
       '.knowledge-graph-canvas', '.kg-section', '.knowledge-graph-side', '.graph-side-tabs',
       '#knowledgeGraphDetailTab', '.graph-detail-title', '.graph-detail-body']) {
       const node = selector === ':scope' ? card : card.querySelector(selector);
@@ -360,15 +360,19 @@ async function liveLanguage(page) {
   const original = await frame(page).elementHandle();
   for (const language of ['en', 'zh-CN']) {
     await page.evaluate(value => DMateI18n.setLanguage(value, false), language);
-    await page.waitForFunction(() => document.getElementById('knowledgeGraphFocusBtn').textContent.trim() === DMateI18n.t('全部知识'));
+    await page.waitForFunction(() => {
+      const labels = document.querySelectorAll('#knowledgeGraphDetail .graph-detail-field-label');
+      return labels[0]?.textContent.trim() === DMateI18n.t('前置知识')
+        && labels[1]?.textContent.trim() === DMateI18n.t('后续知识');
+    });
     const text = await frame(page).evaluate(root => ({
       category: root.querySelector('#knowledgeGraphCategory option[value="初等数论"]').textContent.trim(),
       expectedCategory: DMateKnowledgeLanguage.label('初等数论'),
-      field: root.querySelector('.graph-detail-field-label').textContent.trim(),
-      expectedField: DMateI18n.t('图中前置知识'),
+      fields: [...root.querySelectorAll('.graph-detail-field-label')].slice(0, 2).map(field => field.textContent.trim()),
+      expectedFields: ['前置知识', '后续知识'].map(label => DMateI18n.t(label)),
       language: DMateI18n.getLanguage(), visible: !root.classList.contains('hidden') }));
     assert.equal(text.category, text.expectedCategory, 'The existing module selector changes language immediately');
-    assert.equal(text.field, text.expectedField, 'The existing node details change language immediately');
+    assert.deepEqual(text.fields, text.expectedFields, 'The existing node details change language immediately');
     assert.equal(text.language, language);
     assert.equal(text.visible, true);
     assert.equal(await original.evaluate(node => node === document.getElementById('knowledgeGraphModal')), true,
@@ -432,6 +436,8 @@ async function runCase(browser, width, theme) {
     await page.reload({ waitUntil: 'networkidle' });
     await openOfflineGraph(page);
     assert.equal(await page.evaluate(() => navigator.onLine), false);
+    assert.equal(await frame(page).locator('#knowledgeGraphFocusBtn').count(), 0,
+      'The offline graph omits the redundant All knowledge button');
     assert.equal(await frame(page).locator('#knowledgeGraphScopeBtn,#knowledgeGraphHistoryTab,#knowledgeGraphHistoryWrap,'
       + '#knowledgeGraphLegendRelated,.graph-legend,.kg-video-section,iframe,a[href*="bilibili"],a[href*="youtube"]').count(), 0,
     'Question association, history, videos and the purple legend are absent');
@@ -455,8 +461,8 @@ async function runCase(browser, width, theme) {
     await png(page);
     await liveLanguage(page);
     await inlineLifecycle(page);
-    await frame(page).locator('#knowledgeGraphFocusBtn').click();
-    assert.equal(await frame(page).locator('#knowledgeGraphCategory').inputValue(), '全部', 'All knowledge resets the module filter');
+    await category(page, '全部');
+    assert.equal(await frame(page).locator('#knowledgeGraphCategory').inputValue(), '全部', 'The module selector restores the complete graph');
     await page.reload({ waitUntil: 'networkidle' });
     await openOfflineGraph(page);
     await fullGraph(page);

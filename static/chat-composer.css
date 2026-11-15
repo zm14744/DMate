@@ -222,7 +222,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question
     color:var(--text-primary,#1e293b) !important; -webkit-text-fill-color:var(--text-primary,#1e293b) !important;
     font:inherit !important; font-size:16px !important; line-height:24px !important;
     resize:none !important; overflow-x:hidden !important; overflow-y:hidden; white-space:pre-wrap;
-    overscroll-behavior:contain; scrollbar-width:thin;
+    overscroll-behavior:contain; scrollbar-width:var(--dmate-scrollbar-width,thin);
 }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input-lock-hint {
     font:400 16px/24px var(--dmate-font-ui) !important;
@@ -598,7 +598,7 @@ body[data-appearance-theme] > .dmate-symbol-panel .dmate-symbol-tab:focus-visibl
     padding:4px 1px 2px;
     overflow-y:auto;
     overscroll-behavior:contain;
-    scrollbar-width:thin;
+    scrollbar-width:var(--dmate-scrollbar-width,thin);
 }
 body[data-appearance-theme] > .dmate-symbol-panel .dmate-symbol-key {
     display:flex !important;
