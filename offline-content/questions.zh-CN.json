@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "pack_id": "discrete-mathematics-core-zh-cn",
-  "pack_version": "0.4.0",
+  "pack_version": "0.5.0",
   "language": "zh-CN",
   "subject": "离散数学",
   "title": "离散数学题库",
@@ -13,7 +13,9 @@
       "title": "判断命题",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_truth"
+        "logic_truth__proposition_sentence",
+        "logic_truth__truth_semantics",
+        "logic_truth__open_statement"
       ],
       "difficulty": "基础",
       "type": "单项选择",
@@ -68,7 +70,7 @@
       "title": "蕴含命题的真值",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_connectives"
+        "logic_connectives__implication_conditions"
       ],
       "difficulty": "基础",
       "type": "单项选择",
@@ -123,8 +125,8 @@
       "title": "逻辑等价变形",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_connectives",
-        "logic_equivalence"
+        "logic_connectives__implication_conditions",
+        "logic_equivalence__implication_elimination"
       ],
       "difficulty": "基础",
       "type": "填空",
@@ -160,7 +162,8 @@
       "title": "否定全称命题",
       "category": "谓词逻辑",
       "knowledge_points": [
-        "predicate_quantifier"
+        "predicate_quantifier__universal_quantifier",
+        "predicate_quantifier__existential_quantifier"
       ],
       "difficulty": "基础",
       "type": "填空",
@@ -200,7 +203,10 @@
       "title": "集合运算",
       "category": "集合与关系",
       "knowledge_points": [
-        "set_operation"
+        "set_operation__union",
+        "set_operation__intersection",
+        "set_operation__difference",
+        "set_operation__complement"
       ],
       "difficulty": "基础",
       "type": "计算",
@@ -230,7 +236,10 @@
       "title": "判断关系性质",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_property"
+        "relation_property__reflexivity",
+        "relation_property__symmetry",
+        "relation_property__antisymmetry",
+        "relation_property__transitivity"
       ],
       "difficulty": "中等",
       "type": "多项选择",
@@ -287,7 +296,7 @@
       "title": "模同余的等价类",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_equivalence"
+        "relation_equivalence__classes"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -317,7 +326,8 @@
       "title": "单射与满射",
       "category": "函数",
       "knowledge_points": [
-        "function_injection"
+        "function_injection__injection",
+        "function_injection__surjection"
       ],
       "difficulty": "中等",
       "type": "证明",
@@ -352,7 +362,9 @@
       "title": "整除关系下的偏序",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_order"
+        "relation_order__least",
+        "relation_order__greatest",
+        "relation_order__total_order"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -387,7 +399,7 @@
       "title": "握手定理",
       "category": "图论",
       "knowledge_points": [
-        "graph_basic"
+        "graph_basic__handshake"
       ],
       "difficulty": "基础",
       "type": "计算",
@@ -417,7 +429,7 @@
       "title": "连通分量",
       "category": "图论",
       "knowledge_points": [
-        "graph_connectivity"
+        "graph_connectivity__components"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -447,7 +459,8 @@
       "title": "树的边数与删除边",
       "category": "图论",
       "knowledge_points": [
-        "tree_basic"
+        "tree_basic__equivalent",
+        "tree_basic__forest"
       ],
       "difficulty": "基础",
       "type": "简答",
@@ -477,7 +490,7 @@
       "title": "鸽巢原理的应用",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_pigeonhole"
+        "count_pigeonhole__capacity"
       ],
       "difficulty": "基础",
       "type": "证明",
@@ -507,7 +520,8 @@
       "title": "数学归纳法证明奇数和",
       "category": "证明与归纳",
       "knowledge_points": [
-        "proof_induction"
+        "proof_induction__induction_principle",
+        "proof_induction__induction_algebra_inequality"
       ],
       "difficulty": "中等",
       "type": "证明",
@@ -2937,7 +2951,8 @@
       "title": "区分命题资格与真假并作封闭",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_truth"
+        "logic_truth__proposition_sentence",
+        "logic_truth__open_statement"
       ],
       "graph_node_ids": [
         "logic_truth"
@@ -2972,7 +2987,7 @@
       "title": "同一命题在同一赋值内不能任意变值",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_truth"
+        "logic_truth__truth_semantics"
       ],
       "graph_node_ids": [
         "logic_truth"
@@ -3100,7 +3115,6 @@
       "title": "报名条件的单向与双向规定",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_connectives",
         "logic_connectives__biconditional",
         "logic_connectives__implication_conditions"
       ],
@@ -3137,9 +3151,9 @@
       "title": "三条件合取的可满足赋值",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_connectives",
         "logic_connectives__disjunction",
-        "logic_connectives__implication_conditions"
+        "logic_connectives__implication_conditions",
+        "logic_connectives__conjunction"
       ],
       "graph_node_ids": [
         "logic_connectives"
@@ -3264,7 +3278,8 @@
       "title": "用完整赋值计数辨别公式",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_truth_table"
+        "logic_truth_table__assignment_enumeration",
+        "logic_truth_table__satisfiability_classification"
       ],
       "graph_node_ids": [
         "logic_truth_table"
@@ -3299,7 +3314,8 @@
       "title": "用真值表核对一种分配律",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_truth_table"
+        "logic_truth_table__assignment_enumeration",
+        "logic_truth_table__semantic_counterexample"
       ],
       "graph_node_ids": [
         "logic_truth_table"
@@ -3404,7 +3420,6 @@
       "title": "共同项展开后的吸收化简",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_equivalence",
         "logic_equivalence__replacement_laws",
         "logic_equivalence__distribution_laws"
       ],
@@ -3441,7 +3456,7 @@
       "title": "区分逆命题与逆否命题",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_equivalence"
+        "logic_equivalence__implication_elimination"
       ],
       "graph_node_ids": [
         "logic_equivalence"
@@ -3570,7 +3585,6 @@
       "title": "把未出现变量补进主析取范式",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_normal_form",
         "logic_normal_form__minterms_pdnf",
         "logic_normal_form__principal_dnf"
       ],
@@ -3607,7 +3621,6 @@
       "title": "从主析取范式读出反公式",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_normal_form",
         "logic_normal_form__principal_dnf",
         "logic_normal_form__principal_cnf"
       ],
@@ -3714,7 +3727,8 @@
       "title": "没有肯定前件时不能保证后件",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_reasoning"
+        "logic_reasoning__basic_rules",
+        "logic_reasoning__invalid_inference"
       ],
       "graph_node_ids": [
         "logic_reasoning"
@@ -3770,7 +3784,8 @@
       "title": "不可同时成立的前提下的有效性",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_reasoning"
+        "logic_reasoning__basic_rules",
+        "logic_reasoning__invalid_inference"
       ],
       "graph_node_ids": [
         "logic_reasoning"
@@ -3885,7 +3900,7 @@
       "title": "由有限关系扩展核对量词",
       "category": "谓词逻辑",
       "knowledge_points": [
-        "predicate_domain"
+        "predicate_domain__relation_extension"
       ],
       "graph_node_ids": [
         "predicate_domain"
@@ -3925,7 +3940,7 @@
       "title": "同域不同谓词解释的比较",
       "category": "谓词逻辑",
       "knowledge_points": [
-        "predicate_domain"
+        "predicate_domain__domain_interpretation"
       ],
       "graph_node_ids": [
         "predicate_domain"
@@ -4066,7 +4081,7 @@
       "title": "逐个有关联却没有统一全关联者",
       "category": "谓词逻辑",
       "knowledge_points": [
-        "predicate_quantifier"
+        "predicate_quantifier__quantifier_order"
       ],
       "graph_node_ids": [
         "predicate_quantifier"
@@ -4106,7 +4121,6 @@
       "title": "恰有一个对象满足性质",
       "category": "谓词逻辑",
       "knowledge_points": [
-        "predicate_quantifier",
         "predicate_quantifier__unique_existence"
       ],
       "graph_node_ids": [
@@ -4248,7 +4262,8 @@
       "title": "空用外层量词与变量遮蔽",
       "category": "谓词逻辑",
       "knowledge_points": [
-        "predicate_variable"
+        "predicate_variable__alpha_renaming",
+        "predicate_variable__free_bound_scope"
       ],
       "graph_node_ids": [
         "predicate_variable"
@@ -4288,7 +4303,8 @@
       "title": "封闭操作不保留所有真值",
       "category": "谓词逻辑",
       "knowledge_points": [
-        "predicate_variable"
+        "predicate_variable__free_bound_scope",
+        "predicate_variable__quantifier_scope"
       ],
       "graph_node_ids": [
         "predicate_variable"
@@ -4408,7 +4424,6 @@
       "title": "从特定常元不能全称推广",
       "category": "谓词逻辑",
       "knowledge_points": [
-        "predicate_reasoning",
         "predicate_reasoning__universal_generalization"
       ],
       "graph_node_ids": [
@@ -4449,7 +4464,6 @@
       "title": "对任意对象分类再全称推广",
       "category": "谓词逻辑",
       "knowledge_points": [
-        "predicate_reasoning",
         "predicate_reasoning__universal_instantiation",
         "predicate_reasoning__universal_generalization"
       ],
@@ -4581,7 +4595,7 @@
       "title": "全称前件与存在后件的前束化",
       "category": "谓词逻辑",
       "knowledge_points": [
-        "predicate_prenex"
+        "predicate_prenex__quantifier_movement"
       ],
       "graph_node_ids": [
         "predicate_prenex"
@@ -4626,7 +4640,8 @@
       "title": "含双条件的量词前束化",
       "category": "谓词逻辑",
       "knowledge_points": [
-        "predicate_prenex"
+        "predicate_prenex__standardizing_apart",
+        "predicate_prenex__quantifier_movement"
       ],
       "graph_node_ids": [
         "predicate_prenex"
@@ -4741,7 +4756,7 @@
       "title": "和为奇数时的排他结论",
       "category": "证明与归纳",
       "knowledge_points": [
-        "proof_direct_contradiction"
+        "proof_direct_contradiction__contradiction"
       ],
       "graph_node_ids": [
         "proof_direct_contradiction"
@@ -4776,7 +4791,7 @@
       "title": "按奇数部分分类证明存在一对",
       "category": "证明与归纳",
       "knowledge_points": [
-        "proof_direct_contradiction"
+        "proof_direct_contradiction__contradiction"
       ],
       "graph_node_ids": [
         "proof_direct_contradiction"
@@ -4901,7 +4916,8 @@
       "title": "有限几何和的归纳证明",
       "category": "证明与归纳",
       "knowledge_points": [
-        "proof_induction"
+        "proof_induction__induction_principle",
+        "proof_induction__induction_algebra_inequality"
       ],
       "graph_node_ids": [
         "proof_induction"
@@ -4936,7 +4952,8 @@
       "title": "借助连续整数的偶性完成整除归纳",
       "category": "证明与归纳",
       "knowledge_points": [
-        "proof_induction"
+        "proof_induction__induction_principle",
+        "proof_induction__induction_algebra_inequality"
       ],
       "graph_node_ids": [
         "proof_induction"
@@ -5041,7 +5058,8 @@
       "title": "递推数列的上界与两个初值",
       "category": "证明与归纳",
       "knowledge_points": [
-        "proof_strong_induction"
+        "proof_strong_induction__strong_hypothesis",
+        "proof_strong_induction__multibase_induction"
       ],
       "graph_node_ids": [
         "proof_strong_induction"
@@ -5076,7 +5094,8 @@
       "title": "取一或取二的递归胜负分类",
       "category": "证明与归纳",
       "knowledge_points": [
-        "proof_strong_induction"
+        "proof_strong_induction__strong_hypothesis",
+        "proof_strong_induction__recursive_decomposition"
       ],
       "graph_node_ids": [
         "proof_strong_induction"
@@ -7019,7 +7038,6 @@
       "title": "用元素法证明德摩根律",
       "category": "集合与关系",
       "knowledge_points": [
-        "set_operation",
         "set_operation__complement",
         "set_operation__union",
         "set_operation__intersection"
@@ -7053,7 +7071,6 @@
       "title": "三类报名的重叠计数",
       "category": "集合与关系",
       "knowledge_points": [
-        "set_operation",
         "set_operation__inclusion_exclusion",
         "set_operation__intersection"
       ],
@@ -7149,7 +7166,6 @@
       "title": "相同乘积基数不等于集合相等",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_cartesian",
         "relation_cartesian__ordered_pair",
         "relation_cartesian__cartesian_product"
       ],
@@ -7182,7 +7198,6 @@
       "title": "每位成员至少参与一项任务",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_cartesian",
         "relation_cartesian__relation_counting",
         "relation_cartesian__binary_relation"
       ],
@@ -7287,7 +7302,6 @@
       "title": "复合对交集不总分配",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_operation",
         "relation_operation__set_operations",
         "relation_operation__composition"
       ],
@@ -7325,9 +7339,9 @@
       "title": "逆运算与并交复合",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_operation",
         "relation_operation__inverse_relation",
-        "relation_operation__set_operations"
+        "relation_operation__set_operations",
+        "relation_operation__composition"
       ],
       "difficulty": "中等",
       "type": "多项选择",
@@ -7385,7 +7399,6 @@
       "title": "综合判断有限关系的性质",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_property",
         "relation_property__reflexivity",
         "relation_property__symmetry",
         "relation_property__antisymmetry",
@@ -7498,7 +7511,6 @@
       "title": "自反对称与自反反对称的计数",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_property",
         "relation_property__reflexivity",
         "relation_property__symmetry",
         "relation_property__antisymmetry"
@@ -7601,7 +7613,6 @@
       "title": "等价关系的并不一定等价",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_equivalence",
         "relation_equivalence__classes",
         "relation_equivalence__partitions",
         "relation_property__transitivity"
@@ -7641,7 +7652,6 @@
       "title": "三元素集合恰有两个等价类",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_equivalence",
         "relation_equivalence__partitions",
         "relation_equivalence__quotient_set"
       ],
@@ -7767,7 +7777,6 @@
       "title": "界必须属于给定偏序集",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_order",
         "relation_order__upper_bound",
         "relation_order__lower_bound",
         "relation_order__supremum",
@@ -7807,7 +7816,6 @@
       "title": "偏序约束下的线性排列",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_order",
         "relation_order__linear_extension",
         "relation_order__partial_order"
       ],
@@ -7920,7 +7928,6 @@
       "title": "传递闭包的幂等性",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_closure",
         "relation_closure__transitive_closure"
       ],
       "difficulty": "进阶",
@@ -7957,7 +7964,6 @@
       "title": "环与孤立终点产生的闭包大小",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_closure",
         "relation_closure__transitive_closure",
         "relation_closure__reflexive_transitive_closure"
       ],
@@ -8068,7 +8074,6 @@
       "title": "部门登记表是否给出函数",
       "category": "函数",
       "knowledge_points": [
-        "function_mapping",
         "function_mapping__total_single_valued"
       ],
       "difficulty": "中等",
@@ -8105,7 +8110,6 @@
       "title": "取原像再取像会恢复什么",
       "category": "函数",
       "knowledge_points": [
-        "function_mapping",
         "function_mapping__image",
         "function_mapping__preimage"
       ],
@@ -8217,7 +8221,6 @@
       "title": "由复合的单满射能推出什么",
       "category": "函数",
       "knowledge_points": [
-        "function_injection",
         "function_injection__injection",
         "function_injection__surjection"
       ],
@@ -8255,7 +8258,6 @@
       "title": "单射与双射的有限计数",
       "category": "函数",
       "knowledge_points": [
-        "function_injection",
         "function_injection__injection",
         "function_injection__bijection"
       ],
@@ -8365,7 +8367,6 @@
       "title": "旋转与逐位取反的特定交换性",
       "category": "函数",
       "knowledge_points": [
-        "function_composition",
         "function_composition__noncommutativity"
       ],
       "difficulty": "中等",
@@ -8402,7 +8403,6 @@
       "title": "循环平移的迭代周期",
       "category": "函数",
       "knowledge_points": [
-        "function_composition",
         "function_composition__iteration",
         "function_composition__identity"
       ],
@@ -8513,7 +8513,6 @@
       "title": "模八上的自逆双射",
       "category": "函数",
       "knowledge_points": [
-        "function_inverse",
         "function_inverse__involution",
         "function_inverse__inverse_existence"
       ],
@@ -8551,7 +8550,6 @@
       "title": "原像集合与逆关系的区别",
       "category": "函数",
       "knowledge_points": [
-        "function_inverse",
         "function_inverse__inverse_existence",
         "function_mapping__preimage",
         "relation_operation__inverse_relation"
@@ -8724,7 +8722,6 @@
       "title": "封闭子集何时自动成为子群",
       "category": "代数结构",
       "knowledge_points": [
-        "algebra_group",
         "algebra_group__subgroups"
       ],
       "difficulty": "进阶",
@@ -8866,7 +8863,6 @@
       "title": "模8可逆元素群是否循环",
       "category": "代数结构",
       "knowledge_points": [
-        "algebra_group",
         "algebra_group__group_axioms",
         "algebra_group__element_orders",
         "algebra_group__generators"
@@ -8954,7 +8950,6 @@
       "title": "倍乘同态的核与像",
       "category": "代数结构",
       "knowledge_points": [
-        "algebra_homomorphism",
         "algebra_homomorphism__kernels",
         "algebra_homomorphism__images",
         "algebra_homomorphism__operation_preservation"
@@ -9158,7 +9153,6 @@
       "title": "有限满同态的纤维大小",
       "category": "代数结构",
       "knowledge_points": [
-        "algebra_homomorphism",
         "algebra_homomorphism__kernels",
         "algebra_homomorphism__images"
       ],
@@ -9241,10 +9235,10 @@
       "title": "因子格中的补元检查",
       "category": "代数结构",
       "knowledge_points": [
-        "algebra_lattice_bool",
         "algebra_lattice_bool__meets_joins",
         "algebra_lattice_bool__bounded_lattices",
-        "algebra_lattice_bool__complements"
+        "algebra_lattice_bool__complements",
+        "algebra_lattice_bool__boolean_algebras"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -9428,7 +9422,6 @@
       "title": "用元素法证明布尔德摩根律",
       "category": "代数结构",
       "knowledge_points": [
-        "algebra_lattice_bool",
         "algebra_lattice_bool__boolean_algebras"
       ],
       "difficulty": "进阶",
@@ -9509,7 +9502,6 @@
       "title": "有限域中的除法和方程",
       "category": "代数结构",
       "knowledge_points": [
-        "algebra_ring_field",
         "algebra_ring_field__units",
         "algebra_ring_field__finite_fields"
       ],
@@ -9713,7 +9705,6 @@
       "title": "有限矩阵环不是域的例子",
       "category": "代数结构",
       "knowledge_points": [
-        "algebra_ring_field",
         "algebra_ring_field__ring_axioms",
         "algebra_ring_field__zero_divisors",
         "algebra_ring_field__finite_fields"
@@ -9796,7 +9787,6 @@
       "title": "新定义运算的结合律与单位元",
       "category": "代数结构",
       "knowledge_points": [
-        "algebra_system",
         "algebra_system__associativity",
         "algebra_system__commutativity",
         "algebra_system__identity_elements",
@@ -10002,9 +9992,11 @@
       "title": "位与运算的结构性质",
       "category": "代数结构",
       "knowledge_points": [
-        "algebra_system",
         "algebra_system__semigroups_monoids",
-        "algebra_system__inverse_elements"
+        "algebra_system__inverse_elements",
+        "algebra_system__associativity",
+        "algebra_system__commutativity",
+        "algebra_system__identity_elements"
       ],
       "difficulty": "进阶",
       "type": "简答",
@@ -10180,7 +10172,6 @@
       "title": "证明乘法与同余相容",
       "category": "初等数论",
       "knowledge_points": [
-        "number_congruence",
         "number_congruence__arithmetic"
       ],
       "difficulty": "进阶",
@@ -10321,7 +10312,8 @@
       "title": "用平方剩余否定平方数",
       "category": "初等数论",
       "knowledge_points": [
-        "number_congruence"
+        "number_congruence__residue_classes",
+        "number_congruence__arithmetic"
       ],
       "difficulty": "进阶",
       "type": "简答",
@@ -10446,7 +10438,9 @@
       "title": "区分定理的条件与结论",
       "category": "初等数论",
       "knowledge_points": [
-        "number_euler_fermat"
+        "number_euler_fermat__euler_theorem",
+        "number_euler_fermat__fermat_theorem",
+        "number_euler_fermat__totient"
       ],
       "difficulty": "中等",
       "type": "多项选择",
@@ -10692,7 +10686,6 @@
       "title": "一个底数的检验不能证明素性",
       "category": "初等数论",
       "knowledge_points": [
-        "number_euler_fermat",
         "number_euler_fermat__pseudoprimes"
       ],
       "difficulty": "进阶",
@@ -10810,8 +10803,8 @@
       "title": "用整块正方形铺满长方形",
       "category": "初等数论",
       "knowledge_points": [
-        "number_gcd",
-        "number_gcd__gcd_definition"
+        "number_gcd__gcd_definition",
+        "number_gcd__euclidean"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -10846,7 +10839,8 @@
       "title": "欧几里得算法的公因数不变量",
       "category": "初等数论",
       "knowledge_points": [
-        "number_gcd"
+        "number_gcd__euclidean",
+        "number_gcd__gcd_definition"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -11163,7 +11157,8 @@
       "title": "证明二模数版本的存在唯一性",
       "category": "初等数论",
       "knowledge_points": [
-        "number_inverse_crt"
+        "number_inverse_crt__coprime_systems",
+        "number_inverse_crt__construction"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -11323,7 +11318,7 @@
       "title": "两种周期任务的共同执行日",
       "category": "初等数论",
       "knowledge_points": [
-        "number_inverse_crt"
+        "number_inverse_crt__coprime_systems"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -11488,7 +11483,8 @@
       "title": "可解条件与余数解个数",
       "category": "初等数论",
       "knowledge_points": [
-        "number_linear_congruence"
+        "number_linear_congruence__solvability",
+        "number_linear_congruence__lifting"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -11649,7 +11645,8 @@
       "title": "同余解与有限范围结合",
       "category": "初等数论",
       "knowledge_points": [
-        "number_linear_congruence"
+        "number_linear_congruence__solvability",
+        "number_linear_congruence__inverses"
       ],
       "difficulty": "进阶",
       "type": "计算",
@@ -11810,7 +11807,8 @@
       "title": "素数为何不会列完",
       "category": "初等数论",
       "knowledge_points": [
-        "number_prime"
+        "number_prime__factorization",
+        "number_prime__divisibility"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -11950,7 +11948,7 @@
       "title": "反驳永远产生素数的断言",
       "category": "初等数论",
       "knowledge_points": [
-        "number_prime"
+        "number_prime__primality"
       ],
       "difficulty": "进阶",
       "type": "简答",
@@ -12215,7 +12213,6 @@
       "title": "区分代数演示与真实加密安全",
       "category": "初等数论",
       "knowledge_points": [
-        "number_rsa",
         "number_rsa__textbook_determinism"
       ],
       "difficulty": "基础",
@@ -12271,8 +12268,8 @@
       "title": "教学无填充过程的确定性",
       "category": "初等数论",
       "knowledge_points": [
-        "number_rsa",
-        "number_rsa__textbook_determinism"
+        "number_rsa__textbook_determinism",
+        "number_rsa__modular_powers"
       ],
       "difficulty": "进阶",
       "type": "简答",
@@ -12397,7 +12394,8 @@
       "title": "识别计数原理的条件",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_basic"
+        "count_basic__step_product",
+        "count_basic__disjoint_sum"
       ],
       "difficulty": "基础",
       "type": "多项选择",
@@ -12613,7 +12611,7 @@
       "title": "带召集人的小组恒等式",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_perm_comb"
+        "count_perm_comb__subset_selection"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -12900,7 +12898,7 @@
       "title": "整数点与整数中点",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_pigeonhole"
+        "count_pigeonhole__structured_boxes"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -13055,7 +13053,7 @@
       "title": "错位收件的容斥证明",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_inclusion"
+        "count_inclusion__forbidden_events"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -13195,7 +13193,7 @@
       "title": "形式等式是否需要代入收敛",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_generating"
+        "count_generating__formal_series"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -13355,7 +13353,8 @@
       "title": "不能连续跨两级的阶梯",
       "category": "递推关系",
       "knowledge_points": [
-        "recurrence_model"
+        "recurrence_model__memory_states",
+        "recurrence_model__state_partition"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -13390,7 +13389,7 @@
       "title": "识别常系数线性齐次",
       "category": "递推关系",
       "knowledge_points": [
-        "recurrence_homogeneous"
+        "recurrence_homogeneous__linear_structure"
       ],
       "difficulty": "基础",
       "type": "单项选择",
@@ -13675,7 +13674,8 @@
       "title": "常数外加项与二重根",
       "category": "递推关系",
       "knowledge_points": [
-        "recurrence_nonhomogeneous"
+        "recurrence_nonhomogeneous__resonance",
+        "recurrence_nonhomogeneous__superposition"
       ],
       "difficulty": "进阶",
       "type": "计算",
@@ -13975,7 +13975,7 @@
       "title": "辨别除法计数的适用性",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_basic"
+        "count_basic__equal_fiber"
       ],
       "difficulty": "进阶",
       "type": "简答",
@@ -14115,7 +14115,7 @@
       "title": "两支有名称但内部无序的队伍",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_perm_comb"
+        "count_perm_comb__subset_selection"
       ],
       "difficulty": "进阶",
       "type": "计算",
@@ -14210,7 +14210,7 @@
       "title": "帕斯卡恒等式的集合证明",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_binomial"
+        "count_binomial__vandermonde"
       ],
       "difficulty": "中等",
       "type": "证明",
@@ -14240,7 +14240,7 @@
       "title": "带符号的乘积系数",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_binomial"
+        "count_binomial__coefficient"
       ],
       "difficulty": "进阶",
       "type": "计算",
@@ -14360,7 +14360,7 @@
       "title": "认识人数为何少一类",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_pigeonhole"
+        "count_pigeonhole__structured_boxes"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -14495,7 +14495,7 @@
       "title": "容斥权重为什么等于一",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_inclusion"
+        "count_inclusion__multiple_set"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -14635,7 +14635,8 @@
       "title": "除法算法对应生成函数分解",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_generating"
+        "count_generating__formal_series",
+        "count_generating__counting_product"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -14775,7 +14776,7 @@
       "title": "不会下降到基例的伪模型",
       "category": "递推关系",
       "knowledge_points": [
-        "recurrence_model"
+        "recurrence_model__divide_conquer"
       ],
       "difficulty": "进阶",
       "type": "简答",
@@ -14915,7 +14916,7 @@
       "title": "齐次递推的线性叠加证明",
       "category": "递推关系",
       "knowledge_points": [
-        "recurrence_homogeneous"
+        "recurrence_homogeneous__linear_structure"
       ],
       "difficulty": "中等",
       "type": "证明",
@@ -15055,7 +15056,9 @@
       "title": "混合外加项的叠加",
       "category": "递推关系",
       "knowledge_points": [
-        "recurrence_nonhomogeneous"
+        "recurrence_nonhomogeneous__superposition",
+        "recurrence_nonhomogeneous__nonresonant",
+        "recurrence_nonhomogeneous__resonance"
       ],
       "difficulty": "进阶",
       "type": "计算",
@@ -15160,7 +15163,8 @@
       "title": "系数为零时反推失效",
       "category": "递推关系",
       "knowledge_points": [
-        "recurrence_initial"
+        "recurrence_initial__boundary_range",
+        "recurrence_initial__forward_unique"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -15195,7 +15199,8 @@
       "title": "变换序列时带上初值",
       "category": "递推关系",
       "knowledge_points": [
-        "recurrence_initial"
+        "recurrence_initial__boundary_range",
+        "recurrence_initial__forward_unique"
       ],
       "difficulty": "进阶",
       "type": "计算",
@@ -16977,7 +16982,8 @@
       "title": "抽象同构与保权同构",
       "category": "图论",
       "knowledge_points": [
-        "graph_isomorphism"
+        "graph_isomorphism__mapping",
+        "graph_isomorphism__invariants"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -17007,7 +17013,7 @@
       "title": "同构关系的传递性",
       "category": "图论",
       "knowledge_points": [
-        "graph_isomorphism"
+        "graph_isomorphism__mapping"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -17108,7 +17114,7 @@
       "title": "检查简单无向邻接矩阵",
       "category": "图论",
       "knowledge_points": [
-        "graph_adjacency"
+        "graph_adjacency__construction"
       ],
       "difficulty": "基础",
       "type": "多项选择",
@@ -17164,7 +17170,8 @@
       "title": "由矩阵读取整图结构",
       "category": "图论",
       "knowledge_points": [
-        "graph_adjacency"
+        "graph_adjacency__construction",
+        "graph_adjacency__walk_powers"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -17305,7 +17312,8 @@
       "title": "选择矩阵的尺寸",
       "category": "图论",
       "knowledge_points": [
-        "graph_matrix"
+        "graph_matrix__unsigned_incidence",
+        "graph_matrix__laplacian"
       ],
       "difficulty": "基础",
       "type": "单项选择",
@@ -17555,7 +17563,7 @@
       "title": "删一条桥恰增一个分量",
       "category": "图论",
       "knowledge_points": [
-        "graph_cut"
+        "graph_cut__bridges"
       ],
       "difficulty": "中等",
       "type": "证明",
@@ -17590,7 +17598,8 @@
       "title": "增加冗余边消除桥",
       "category": "图论",
       "knowledge_points": [
-        "graph_cut"
+        "graph_cut__bridges",
+        "graph_cut__articulation"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -17685,7 +17694,7 @@
       "title": "加权握手恒等式",
       "category": "图论",
       "knowledge_points": [
-        "graph_weighted"
+        "graph_weighted__vertex_strength"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -17715,7 +17724,6 @@
       "title": "总费用与瓶颈费用",
       "category": "图论",
       "knowledge_points": [
-        "graph_weighted",
         "graph_weighted__optimization_objectives"
       ],
       "difficulty": "中等",
@@ -17806,7 +17814,6 @@
       "title": "补边消除奇度点",
       "category": "图论",
       "knowledge_points": [
-        "graph_euler",
         "graph_euler__undirected_circuit"
       ],
       "difficulty": "进阶",
@@ -17837,7 +17844,6 @@
       "title": "用桥连接两个回路",
       "category": "图论",
       "knowledge_points": [
-        "graph_euler",
         "graph_euler__open_trail",
         "graph_euler__undirected_circuit"
       ],
@@ -17930,7 +17936,6 @@
       "title": "删点后的分量数限制",
       "category": "图论",
       "knowledge_points": [
-        "graph_hamilton",
         "graph_hamilton__necessary",
         "graph_hamilton__spanning_cycle"
       ],
@@ -17962,7 +17967,6 @@
       "title": "完全图中不同哈密顿回路的计数",
       "category": "图论",
       "knowledge_points": [
-        "graph_hamilton",
         "graph_hamilton__spanning_cycle"
       ],
       "difficulty": "进阶",
@@ -18053,7 +18057,6 @@
       "title": "源点不可达的负回路",
       "category": "图论",
       "knowledge_points": [
-        "graph_shortest",
         "graph_shortest__negative_cycles"
       ],
       "difficulty": "中等",
@@ -18084,7 +18087,6 @@
       "title": "验证最短距离证书",
       "category": "图论",
       "knowledge_points": [
-        "graph_shortest",
         "graph_shortest__optimality_certificate"
       ],
       "difficulty": "进阶",
@@ -18176,7 +18178,7 @@
       "title": "把时间冲突建模为着色",
       "category": "图论",
       "knowledge_points": [
-        "graph_coloring"
+        "graph_coloring__chromatic_bounds"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -18206,7 +18208,7 @@
       "title": "新增一条边的色数变化",
       "category": "图论",
       "knowledge_points": [
-        "graph_coloring"
+        "graph_coloring__chromatic_bounds"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -18401,7 +18403,8 @@
       "title": "从面长证明K₃,₃非平面",
       "category": "图论",
       "knowledge_points": [
-        "graph_planar"
+        "graph_planar__euler",
+        "graph_planar__edge_bounds"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -18521,7 +18524,7 @@
       "title": "诊断只检查一般边数界的错误",
       "category": "图论",
       "knowledge_points": [
-        "graph_planar"
+        "graph_planar__edge_bounds"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -18697,7 +18700,8 @@
       "title": "证明无奇圈判据",
       "category": "图论",
       "knowledge_points": [
-        "graph_bipartite"
+        "graph_bipartite__odd_cycle",
+        "graph_bipartite__two_coloring"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -18837,7 +18841,8 @@
       "title": "直接构造森林的二部划分",
       "category": "图论",
       "knowledge_points": [
-        "graph_bipartite"
+        "graph_bipartite__bipartition",
+        "graph_bipartite__two_coloring"
       ],
       "difficulty": "中等",
       "type": "证明",
@@ -19019,7 +19024,8 @@
       "title": "证明DAG存在拓扑序",
       "category": "图论",
       "knowledge_points": [
-        "graph_topological"
+        "graph_topological__dag",
+        "graph_topological__kahn"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -19159,7 +19165,7 @@
       "title": "两个独立任务链的安排数",
       "category": "图论",
       "knowledge_points": [
-        "graph_topological"
+        "graph_topological__uniqueness"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -19319,7 +19325,8 @@
       "title": "极大独立集为什么不一定最大",
       "category": "图论",
       "knowledge_points": [
-        "graph_domination"
+        "graph_domination__independent",
+        "graph_domination__dominating"
       ],
       "difficulty": "进阶",
       "type": "简答",
@@ -19480,7 +19487,9 @@
       "title": "带孤立顶点的四边形综合计算",
       "category": "图论",
       "knowledge_points": [
-        "graph_domination"
+        "graph_domination__independent",
+        "graph_domination__vertex_cover",
+        "graph_domination__dominating"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -19662,7 +19671,8 @@
       "title": "最大匹配与增广路判据",
       "category": "图论",
       "knowledge_points": [
-        "graph_matching"
+        "graph_matching__augmenting",
+        "graph_matching__maximal_maximum"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -19822,7 +19832,7 @@
       "title": "匹配给顶点覆盖提供下界",
       "category": "图论",
       "knowledge_points": [
-        "graph_matching"
+        "graph_matching__maximal_maximum"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -19967,7 +19977,7 @@
       "title": "最长路径的两端是叶子",
       "category": "图论",
       "knowledge_points": [
-        "tree_basic"
+        "tree_basic__degree_leaves"
       ],
       "difficulty": "中等",
       "type": "证明",
@@ -20087,7 +20097,7 @@
       "title": "连通加n−1边为何能保证树",
       "category": "图论",
       "knowledge_points": [
-        "tree_basic"
+        "tree_basic__equivalent"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -20207,7 +20217,8 @@
       "title": "父子边计数推出满二叉树公式",
       "category": "图论",
       "knowledge_points": [
-        "tree_rooted"
+        "tree_rooted__hierarchy",
+        "tree_rooted__full_mary"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -20327,7 +20338,8 @@
       "title": "深度和与祖先后代对",
       "category": "图论",
       "knowledge_points": [
-        "tree_rooted"
+        "tree_rooted__hierarchy",
+        "tree_rooted__depth_height"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -20488,7 +20500,8 @@
       "title": "生成树存在性及桥的必选性",
       "category": "图论",
       "knowledge_points": [
-        "tree_spanning"
+        "tree_spanning__construction",
+        "tree_spanning__bridge_count"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -20608,7 +20621,7 @@
       "title": "得到生成森林最少删多少边",
       "category": "图论",
       "knowledge_points": [
-        "tree_spanning"
+        "tree_spanning__construction"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -20784,7 +20797,7 @@
       "title": "证明唯一最轻跨割边必选",
       "category": "图论",
       "knowledge_points": [
-        "tree_mst"
+        "tree_mst__cut"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -20924,7 +20937,7 @@
       "title": "最小生成树不一定给最短路",
       "category": "图论",
       "knowledge_points": [
-        "tree_mst"
+        "tree_mst__greedy"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -21090,7 +21103,8 @@
       "title": "添加叶子不改变生成树数",
       "category": "图论",
       "knowledge_points": [
-        "tree_matrix_tree"
+        "tree_matrix_tree__cofactor",
+        "tree_matrix_tree__decomposition"
       ],
       "difficulty": "进阶",
       "type": "证明",
@@ -21210,7 +21224,8 @@
       "title": "完全图的树数公式",
       "category": "图论",
       "knowledge_points": [
-        "tree_matrix_tree"
+        "tree_matrix_tree__laplacian",
+        "tree_matrix_tree__cofactor"
       ],
       "difficulty": "进阶",
       "type": "计算",
@@ -21275,7 +21290,9 @@
       "title": "命题与真值：例题练习",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_truth"
+        "logic_truth__proposition_sentence",
+        "logic_truth__truth_semantics",
+        "logic_truth__open_statement"
       ],
       "difficulty": "简单",
       "type": "简答",
@@ -21443,7 +21460,8 @@
       "title": "逻辑联结词：例题练习",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_connectives"
+        "logic_connectives__implication_conditions",
+        "logic_connectives__conjunction"
       ],
       "difficulty": "简单",
       "type": "简答",
@@ -21737,7 +21755,9 @@
       "title": "真值表：例题练习",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_truth_table"
+        "logic_truth_table__assignment_enumeration",
+        "logic_truth_table__semantic_counterexample",
+        "logic_truth_table__satisfiability_classification"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -21905,7 +21925,8 @@
       "title": "逻辑等价：例题练习",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_equivalence"
+        "logic_equivalence__implication_elimination",
+        "logic_equivalence__distribution_laws"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -22157,7 +22178,8 @@
       "title": "范式：例题练习",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_normal_form"
+        "logic_normal_form__principal_dnf",
+        "logic_normal_form__principal_cnf"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -22493,7 +22515,7 @@
       "title": "命题推理：例题练习",
       "category": "命题逻辑",
       "knowledge_points": [
-        "logic_reasoning"
+        "logic_reasoning__case_reasoning"
       ],
       "difficulty": "中等",
       "type": "证明",
@@ -22661,7 +22683,8 @@
       "title": "谓词与个体域：例题练习",
       "category": "谓词逻辑",
       "knowledge_points": [
-        "predicate_domain"
+        "predicate_domain__predicate_arity",
+        "predicate_domain__relation_extension"
       ],
       "difficulty": "简单",
       "type": "计算",
@@ -22849,7 +22872,8 @@
       "title": "变元与辖域：例题练习",
       "category": "谓词逻辑",
       "knowledge_points": [
-        "predicate_variable"
+        "predicate_variable__free_bound_scope",
+        "predicate_variable__quantifier_scope"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -23084,7 +23108,7 @@
       "title": "量词：例题练习",
       "category": "谓词逻辑",
       "knowledge_points": [
-        "predicate_quantifier"
+        "predicate_quantifier__quantifier_order"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -23366,7 +23390,9 @@
       "title": "谓词逻辑等价与推理：例题练习",
       "category": "谓词逻辑",
       "knowledge_points": [
-        "predicate_reasoning"
+        "predicate_reasoning__existential_instantiation",
+        "predicate_reasoning__universal_instantiation",
+        "predicate_reasoning__existential_generalization"
       ],
       "difficulty": "中等",
       "type": "证明",
@@ -23695,7 +23721,8 @@
       "title": "前束范式：例题练习",
       "category": "谓词逻辑",
       "knowledge_points": [
-        "predicate_prenex"
+        "predicate_prenex__standardizing_apart",
+        "predicate_prenex__quantifier_movement"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -23903,7 +23930,7 @@
       "title": "直接证明与反证法：例题练习",
       "category": "证明与归纳",
       "knowledge_points": [
-        "proof_direct_contradiction"
+        "proof_direct_contradiction__contradiction"
       ],
       "difficulty": "中等",
       "type": "证明",
@@ -24071,7 +24098,8 @@
       "title": "数学归纳法：例题练习",
       "category": "证明与归纳",
       "knowledge_points": [
-        "proof_induction"
+        "proof_induction__induction_principle",
+        "proof_induction__induction_algebra_inequality"
       ],
       "difficulty": "中等",
       "type": "证明",
@@ -24239,7 +24267,8 @@
       "title": "强归纳法：例题练习",
       "category": "证明与归纳",
       "knowledge_points": [
-        "proof_strong_induction"
+        "proof_strong_induction__strong_hypothesis",
+        "proof_strong_induction__recursive_decomposition"
       ],
       "difficulty": "中等",
       "type": "证明",
@@ -24407,7 +24436,11 @@
       "title": "集合运算：例题练习",
       "category": "集合与关系",
       "knowledge_points": [
-        "set_operation"
+        "set_operation__intersection",
+        "set_operation__union",
+        "set_operation__difference",
+        "set_operation__symmetric_difference",
+        "set_operation__complement"
       ],
       "difficulty": "简单",
       "type": "计算",
@@ -24777,7 +24810,8 @@
       "title": "笛卡尔积与关系：例题练习",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_cartesian"
+        "relation_cartesian__cartesian_product",
+        "relation_cartesian__binary_relation"
       ],
       "difficulty": "简单",
       "type": "简答",
@@ -24999,7 +25033,8 @@
       "title": "关系运算：例题练习",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_operation"
+        "relation_operation__powers",
+        "relation_operation__composition"
       ],
       "difficulty": "简单",
       "type": "计算",
@@ -25251,7 +25286,10 @@
       "title": "关系性质：例题练习",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_property"
+        "relation_property__reflexivity",
+        "relation_property__symmetry",
+        "relation_property__antisymmetry",
+        "relation_property__transitivity"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -25503,7 +25541,8 @@
       "title": "等价关系与划分：例题练习",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_equivalence"
+        "relation_equivalence__classes",
+        "relation_equivalence__partitions"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -25688,7 +25727,10 @@
       "title": "偏序关系：例题练习",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_order"
+        "relation_order__least",
+        "relation_order__greatest",
+        "relation_order__total_order",
+        "relation_order__hasse_diagram"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -26234,7 +26276,8 @@
       "title": "关系闭包：例题练习",
       "category": "集合与关系",
       "knowledge_points": [
-        "relation_closure"
+        "relation_closure__transitive_closure",
+        "relation_closure__reflexive_transitive_closure"
       ],
       "difficulty": "简单",
       "type": "计算",
@@ -26486,7 +26529,10 @@
       "title": "函数与映射：例题练习",
       "category": "函数",
       "knowledge_points": [
-        "function_mapping"
+        "function_mapping__total_single_valued",
+        "function_mapping__domain_codomain",
+        "function_mapping__image",
+        "function_mapping__preimage"
       ],
       "difficulty": "简单",
       "type": "简答",
@@ -26738,7 +26784,9 @@
       "title": "单射满射双射：例题练习",
       "category": "函数",
       "knowledge_points": [
-        "function_injection"
+        "function_injection__injection",
+        "function_injection__surjection",
+        "function_injection__bijection"
       ],
       "difficulty": "简单",
       "type": "简答",
@@ -26906,7 +26954,8 @@
       "title": "复合函数：例题练习",
       "category": "函数",
       "knowledge_points": [
-        "function_composition"
+        "function_composition__typed_composition",
+        "function_composition__noncommutativity"
       ],
       "difficulty": "简单",
       "type": "计算",
@@ -27158,7 +27207,7 @@
       "title": "逆函数：例题练习",
       "category": "函数",
       "knowledge_points": [
-        "function_inverse"
+        "function_inverse__inverse_existence"
       ],
       "difficulty": "简单",
       "type": "简答",
@@ -27410,7 +27459,8 @@
       "title": "整除与素数：例题练习",
       "category": "初等数论",
       "knowledge_points": [
-        "number_prime"
+        "number_prime__factorization",
+        "number_prime__divisor_counting"
       ],
       "difficulty": "简单",
       "type": "计算",
@@ -27620,7 +27670,7 @@
       "title": "最大公因数与欧几里得算法：例题练习",
       "category": "初等数论",
       "knowledge_points": [
-        "number_gcd"
+        "number_gcd__euclidean"
       ],
       "difficulty": "简单",
       "type": "计算",
@@ -27914,7 +27964,7 @@
       "title": "同余与模运算：例题练习",
       "category": "初等数论",
       "knowledge_points": [
-        "number_congruence"
+        "number_congruence__cancellation"
       ],
       "difficulty": "简单",
       "type": "简答",
@@ -28124,7 +28174,8 @@
       "title": "线性同余方程：例题练习",
       "category": "初等数论",
       "knowledge_points": [
-        "number_linear_congruence"
+        "number_linear_congruence__lifting",
+        "number_linear_congruence__inverses"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -28292,7 +28343,7 @@
       "title": "中国剩余定理：例题练习",
       "category": "初等数论",
       "knowledge_points": [
-        "number_inverse_crt"
+        "number_inverse_crt__coprime_systems"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -28480,7 +28531,8 @@
       "title": "欧拉定理与费马小定理：例题练习",
       "category": "初等数论",
       "knowledge_points": [
-        "number_euler_fermat"
+        "number_euler_fermat__totient",
+        "number_euler_fermat__fermat_theorem"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -28740,7 +28792,8 @@
       "title": "RSA公钥密码：例题练习",
       "category": "初等数论",
       "knowledge_points": [
-        "number_rsa"
+        "number_rsa__key_generation",
+        "number_rsa__modular_powers"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -28950,7 +29003,8 @@
       "title": "基本计数原理：例题练习",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_basic"
+        "count_basic__disjoint_sum",
+        "count_basic__step_product"
       ],
       "difficulty": "简单",
       "type": "计算",
@@ -29118,7 +29172,8 @@
       "title": "排列与组合：例题练习",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_perm_comb"
+        "count_perm_comb__subset_selection",
+        "count_perm_comb__ordered_selection"
       ],
       "difficulty": "简单",
       "type": "计算",
@@ -29286,7 +29341,7 @@
       "title": "二项式定理：例题练习",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_binomial"
+        "count_binomial__coefficient"
       ],
       "difficulty": "简单",
       "type": "计算",
@@ -29434,7 +29489,7 @@
       "title": "鸽巢原理：例题练习",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_pigeonhole"
+        "count_pigeonhole__capacity"
       ],
       "difficulty": "简单",
       "type": "证明",
@@ -29582,7 +29637,7 @@
       "title": "容斥原理：例题练习",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_inclusion"
+        "count_inclusion__two_set"
       ],
       "difficulty": "简单",
       "type": "计算",
@@ -29750,7 +29805,7 @@
       "title": "生成函数：例题练习",
       "category": "计数与组合",
       "knowledge_points": [
-        "count_generating"
+        "count_generating__counting_product"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -29918,7 +29973,7 @@
       "title": "递推关系建模：例题练习",
       "category": "递推关系",
       "knowledge_points": [
-        "recurrence_model"
+        "recurrence_model__state_partition"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -30086,7 +30141,7 @@
       "title": "线性齐次递推：例题练习",
       "category": "递推关系",
       "knowledge_points": [
-        "recurrence_homogeneous"
+        "recurrence_homogeneous__distinct_roots"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -30250,11 +30305,54 @@
       ]
     },
     {
+      "id": "q-example-recurrence_homogeneous__linear_structure",
+      "title": "常系数线性齐次的定义与叠加：例题练习",
+      "category": "递推关系",
+      "knowledge_points": [
+        "recurrence_homogeneous__linear_structure"
+      ],
+      "difficulty": "简单",
+      "type": "简答",
+      "statement": "已知 u_n=2^n、v_n=3^n 都满足 a_n=5a_(n−1)−6a_(n−2)（n≥2）。令 w_n=2u_n−v_n。利用线性叠加说明 w 是否满足同一递推，求 w₀、w₁，再用递推计算 w₂ 并与定义核对。",
+      "answer_text": "u_n=2^n和v_n=3^n都满足a_n=5a_(n−1)−6a_(n−2)（n≥2）。所以w_n=2u_n−v_n也满足它；w_0=1、w_1=1，由递推得w_2=5−6=−1，与2·2²−3²=−1一致。",
+      "explanation": "u_n=2^n和v_n=3^n都满足a_n=5a_(n−1)−6a_(n−2)（n≥2）。所以w_n=2u_n−v_n也满足它；w_0=1、w_1=1，由递推得w_2=5−6=−1，与2·2²−3²=−1一致。\n\n将两列满足的等式分别乘α、β后相加，即得 w_n=Σc_jw_(n−j)。叠加保持递推方程，却未必保持一套原先指定的初始值：w_i=αu_i+βv_i（0≤i<k），必须随同组合。若加上非零外加项、把序列项相乘或平方，便不能直接套用齐次线性叠加；系数含n时虽可能仍线性齐次，却不再是常系数递推。",
+      "grading_criteria": "根据题面给定对象和条件作答，给出所问结论及必要的计算或判断依据。与参考解答数学等价的正确表述同样可得分。",
+      "source": {
+        "kind": "DMate独立编写",
+        "note": "从DMate自有概念例子改写为独立练习，保留原解答素材；未导入第三方题干。",
+        "authors": "DMate（AI辅助编写）",
+        "references": [
+          {
+            "source_id": "dmoi3",
+            "section": "递推关系求解",
+            "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_seq-recurrence.ptx"
+          },
+          {
+            "source_id": "appcomb",
+            "section": "常系数线性齐次与非齐次递推",
+            "url": "https://github.com/mitchkeller/applied-combinatorics/blob/e25b222aabf2f19d32910f5b8a96cdb7f6da97c3/source/s_recurrence_linear.ptx"
+          }
+        ],
+        "review_status": "题干、双语对应与原例条件经逐条核对，并有结构与有限算例检查；尚未经独立教师逐题终审。",
+        "difficulty_rationale": "直接应用同一齐次线性递推的叠加性质，组合两个初值并作一次代入核对，无需求特征根。",
+        "migrated_from": {
+          "kind": "concept_example",
+          "concept_id": "recurrence_homogeneous__linear_structure",
+          "example_sha256": "e43d1a692eb0ac50a8210c80243fd80a5a71d178045560a623fb430a0d470c1d",
+          "english_example_sha256": "39b9d1067a59f54f409b2b77aeff595ce05e36258041960949d78a8b5d3ae3ec"
+        }
+      },
+      "graph_node_ids": [
+        "recurrence_homogeneous"
+      ]
+    },
+    {
       "id": "q-example-recurrence_nonhomogeneous",
       "title": "非齐次递推：例题练习",
       "category": "递推关系",
       "knowledge_points": [
-        "recurrence_nonhomogeneous"
+        "recurrence_nonhomogeneous__nonresonant",
+        "recurrence_nonhomogeneous__superposition"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -30422,7 +30520,8 @@
       "title": "初始条件：例题练习",
       "category": "递推关系",
       "knowledge_points": [
-        "recurrence_initial"
+        "recurrence_initial__forward_unique",
+        "recurrence_initial__compatibility"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -30590,7 +30689,9 @@
       "title": "图的基本概念：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "graph_basic"
+        "graph_basic__undirected_graph",
+        "graph_basic__degree",
+        "graph_basic__handshake"
       ],
       "difficulty": "简单",
       "type": "计算",
@@ -30923,7 +31024,7 @@
       "title": "图同构：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "graph_isomorphism"
+        "graph_isomorphism__mapping"
       ],
       "difficulty": "简单",
       "type": "简答",
@@ -31071,7 +31172,8 @@
       "title": "邻接矩阵：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "graph_adjacency"
+        "graph_adjacency__construction",
+        "graph_adjacency__walk_powers"
       ],
       "difficulty": "简单",
       "type": "计算",
@@ -31281,7 +31383,8 @@
       "title": "图的矩阵表示：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "graph_matrix"
+        "graph_matrix__signed_incidence",
+        "graph_matrix__laplacian"
       ],
       "difficulty": "简单",
       "type": "计算",
@@ -31491,7 +31594,8 @@
       "title": "路径与连通性：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "graph_connectivity"
+        "graph_connectivity__components",
+        "graph_connectivity__simple_paths"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -31861,7 +31965,8 @@
       "title": "割点与割边：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "graph_cut"
+        "graph_cut__bridges",
+        "graph_cut__articulation"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -32029,7 +32134,8 @@
       "title": "带权图：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "graph_weighted"
+        "graph_weighted__path_cost",
+        "graph_weighted__optimization_objectives"
       ],
       "difficulty": "简单",
       "type": "计算",
@@ -32210,11 +32316,54 @@
       ]
     },
     {
+      "id": "q-example-graph_weighted__vertex_strength",
+      "title": "顶点强度与加权握手恒等式：例题练习",
+      "category": "图论",
+      "knowledge_points": [
+        "graph_weighted__vertex_strength"
+      ],
+      "difficulty": "简单",
+      "type": "计算",
+      "statement": "无向简单图的顶点为a、b、c，边为ab、bc、ac，权分别为2、−1、0。顶点强度定义为其关联边权之和。求三个顶点的强度，并计算全体顶点强度之和与边权总和的两倍，核对加权握手恒等式。",
+      "answer_text": "无向三角形的边权为w(ab)=2、w(bc)=−1、w(ac)=0。三个顶点的强度为s(a)=2+0=2、s(b)=2−1=1、s(c)=−1+0=−1。故强度总和为2+1−1=2，边权总和的两倍为2(2−1+0)=2，两者相等。",
+      "explanation": "无向三角形的边权为w(ab)=2、w(bc)=−1、w(ac)=0。三个顶点的强度为s(a)=2+0=2、s(b)=2−1=1、s(c)=−1+0=−1。故强度总和为2+1−1=2，边权总和的两倍为2(2−1+0)=2，两者相等。\n\n展开全部顶点强度的有限求和。每条无向边e=uv有两个不同端点，其权w(e)在s(u)与s(v)中各出现一次，因而合计贡献2w(e)。求和只按边的两个端点重复计数，不依赖边权为正，所以零权和负权均不破坏等式。若所有边权都为1，强度就是通常的顶点度数，该式退化为握手定理。",
+      "grading_criteria": "根据题面给定对象和条件作答，给出所问结论及必要的计算或判断依据。与参考解答数学等价的正确表述同样可得分。",
+      "source": {
+        "kind": "DMate独立编写",
+        "note": "从DMate自有概念例子改写为独立练习，保留原解答素材；未导入第三方题干。",
+        "authors": "DMate（AI辅助编写）",
+        "references": [
+          {
+            "source_id": "appcomb",
+            "section": "非负边权与迪杰斯特拉最短路算法",
+            "url": "https://github.com/mitchkeller/applied-combinatorics/blob/e25b222aabf2f19d32910f5b8a96cdb7f6da97c3/source/s_graphalgorithms_shortest-paths.ptx"
+          },
+          {
+            "source_id": "dmoi3",
+            "section": "图论：基本定义、同构与邻接",
+            "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-intro.ptx"
+          }
+        ],
+        "review_status": "题干、双语对应与原例条件经逐条核对，并有结构与有限算例检查；尚未经独立教师逐题终审。",
+        "difficulty_rationale": "对三个顶点分别作两项边权求和，再核对两种总和，仅需直接代入定义和有符号整数运算。",
+        "migrated_from": {
+          "kind": "concept_example",
+          "concept_id": "graph_weighted__vertex_strength",
+          "example_sha256": "1ac6b63d7c04bc9f19d1277d9b5a181cabeb41ab82eafa73d9a494095e99f720",
+          "english_example_sha256": "32f1a8fb7aeaa1d7290cbeaa94a886f992ddf39eb4ff39ef09d4677981fe5050"
+        }
+      },
+      "graph_node_ids": [
+        "graph_weighted"
+      ]
+    },
+    {
       "id": "q-example-graph_euler",
       "title": "欧拉图：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "graph_euler"
+        "graph_euler__open_trail",
+        "graph_euler__undirected_circuit"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -32399,7 +32548,8 @@
       "title": "哈密顿图：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "graph_hamilton"
+        "graph_hamilton__spanning_paths",
+        "graph_hamilton__necessary"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -32584,7 +32734,7 @@
       "title": "最短路：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "graph_shortest"
+        "graph_shortest__dijkstra"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -32806,7 +32956,8 @@
       "title": "图着色：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "graph_coloring"
+        "graph_coloring__bipartite",
+        "graph_coloring__chromatic_bounds"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -32991,7 +33142,8 @@
       "title": "平面图：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "graph_planar"
+        "graph_planar__embedding",
+        "graph_planar__euler"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -33139,7 +33291,8 @@
       "title": "二部图：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "graph_bipartite"
+        "graph_bipartite__bipartition",
+        "graph_bipartite__odd_cycle"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -33307,7 +33460,7 @@
       "title": "拓扑排序：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "graph_topological"
+        "graph_topological__dag"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -33475,7 +33628,9 @@
       "title": "支配集、覆盖集与独立集：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "graph_domination"
+        "graph_domination__dominating",
+        "graph_domination__vertex_cover",
+        "graph_domination__independent"
       ],
       "difficulty": "困难",
       "type": "简答",
@@ -33685,7 +33840,8 @@
       "title": "图匹配：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "graph_matching"
+        "graph_matching__maximal_maximum",
+        "graph_matching__augmenting"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -33853,7 +34009,7 @@
       "title": "树的基本性质：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "tree_basic"
+        "tree_basic__degree_leaves"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -34001,7 +34157,8 @@
       "title": "根树：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "tree_rooted"
+        "tree_rooted__depth_height",
+        "tree_rooted__hierarchy"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -34149,7 +34306,7 @@
       "title": "生成树：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "tree_spanning"
+        "tree_spanning__bridge_count"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -34297,7 +34454,7 @@
       "title": "最小生成树：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "tree_mst"
+        "tree_mst__greedy"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -34465,7 +34622,8 @@
       "title": "矩阵树定理：例题练习",
       "category": "图论",
       "knowledge_points": [
-        "tree_matrix_tree"
+        "tree_matrix_tree__laplacian",
+        "tree_matrix_tree__cofactor"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -34613,7 +34771,8 @@
       "title": "代数系统：例题练习",
       "category": "代数结构",
       "knowledge_points": [
-        "algebra_system"
+        "algebra_system__associativity",
+        "algebra_system__identity_elements"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -34872,7 +35031,9 @@
       "title": "同态与同构：例题练习",
       "category": "代数结构",
       "knowledge_points": [
-        "algebra_homomorphism"
+        "algebra_homomorphism__operation_preservation",
+        "algebra_homomorphism__images",
+        "algebra_homomorphism__kernels"
       ],
       "difficulty": "中等",
       "type": "简答",
@@ -35094,7 +35255,8 @@
       "title": "群与子群：例题练习",
       "category": "代数结构",
       "knowledge_points": [
-        "algebra_group"
+        "algebra_group__element_orders",
+        "algebra_group__cyclic_subgroups"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -35388,7 +35550,9 @@
       "title": "环与域：例题练习",
       "category": "代数结构",
       "knowledge_points": [
-        "algebra_ring_field"
+        "algebra_ring_field__units",
+        "algebra_ring_field__zero_divisors",
+        "algebra_ring_field__finite_fields"
       ],
       "difficulty": "中等",
       "type": "计算",
@@ -35610,7 +35774,9 @@
       "title": "格与布尔代数：例题练习",
       "category": "代数结构",
       "knowledge_points": [
-        "algebra_lattice_bool"
+        "algebra_lattice_bool__meets_joins",
+        "algebra_lattice_bool__bounded_lattices",
+        "algebra_lattice_bool__complements"
       ],
       "difficulty": "困难",
       "type": "简答",

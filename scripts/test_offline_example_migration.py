@@ -71,8 +71,8 @@ class ExamplePracticeMigration(unittest.TestCase):
 
     def test_reviewed_release_has_one_stable_question_per_concept(self):
         self.validate()
-        self.assertEqual(len(self.concepts["concepts"]), 356)
-        self.assertEqual(len(self.concepts_by_id), 356)
+        self.assertEqual(len(self.concepts["concepts"]), len(self.manifest["examples"]))
+        self.assertEqual(len(self.concepts_by_id), len(self.manifest["examples"]))
         self.assertEqual(set(self.manifest["examples"]), set(self.concepts_by_id))
         self.assertEqual(self.manifest["schema_version"], 1)
         for pack in (self.concepts, self.questions):
@@ -83,7 +83,7 @@ class ExamplePracticeMigration(unittest.TestCase):
         migrated = {qid for qid in ids if qid.startswith("q-example-")}
         self.assertEqual(migrated, {"q-example-" + cid for cid in self.concepts_by_id})
         self.assertEqual(set(ids), set(self.manifest["legacy_question_ids"]) | migrated)
-        self.assertEqual(len(ids), 561 + 356)
+        self.assertEqual(len(ids), 561 + len(self.concepts_by_id))
 
     def test_original_chinese_and_english_answers_are_preserved_verbatim(self):
         for cid, concept in self.concepts_by_id.items():
@@ -131,7 +131,13 @@ class ExamplePracticeMigration(unittest.TestCase):
                 self.assertIn(question["type"], {"计算", "简答", "证明"})
                 self.assertEqual(question["category"], concept["category"])
                 self.assertEqual(question["category"], node["category"])
-                self.assertEqual(question["knowledge_points"], [cid])
+                self.assertEqual(question["knowledge_points"],
+                                 self.manifest["examples"][cid].get("knowledge_points", [cid]))
+                for ref in question["knowledge_points"]:
+                    linked = self.concepts_by_id[ref]
+                    self.assertNotEqual(linked["id"], linked["graph_node_id"])
+                    self.assertEqual(linked["graph_node_id"], node["id"])
+                    self.assertIn(question["id"], linked["related_questions"])
                 self.assertEqual(question["graph_node_ids"], [node["id"]])
                 self.assertEqual(concept["related_questions"].count(question["id"]), 1)
                 self.assertEqual(question["source"]["references"], concept["references"])
@@ -211,6 +217,30 @@ class ExamplePracticeMigration(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "noncanonical migrated difficulty"):
                     self.validate(manifest=manifest)
 
+    def test_migrated_exercises_reject_invalid_concept_assignments(self):
+        cid = next(iter(self.concepts_by_id))
+        ref = self.questions_by_id["q-example-" + cid]["knowledge_points"][0]
+        for refs in ([], ref, [ref, ref], [None], [""]):
+            with self.subTest(references=refs):
+                manifest = deepcopy(self.manifest)
+                manifest["examples"][cid]["knowledge_points"] = refs
+                with self.assertRaisesRegex(ValueError, "invalid migrated concept references"):
+                    self.validate(manifest=manifest)
+
+    def test_migrated_exercises_reject_overview_or_unrelated_concepts(self):
+        cid = next(iter(self.concepts_by_id))
+        source = self.concepts_by_id[cid]
+        unrelated = next(c for c in self.concepts_by_id.values()
+                         if c["id"] != c["graph_node_id"] and c["graph_node_id"] != source["graph_node_id"])
+        for refs, message in (([source["graph_node_id"]], "must reference detailed concepts"),
+                              ([unrelated["id"]], "leave the source topic"),
+                              (["missing-concept"], "unknown migrated concept reference")):
+            with self.subTest(references=refs):
+                manifest = deepcopy(self.manifest)
+                manifest["examples"][cid]["knowledge_points"] = refs
+                with self.assertRaisesRegex(ValueError, message):
+                    self.validate(manifest=manifest)
+
     def test_changed_chinese_source_requires_a_new_migration_review(self):
         concepts = deepcopy(self.concepts)
         concepts["concepts"][0]["example"] += " 变更后的例子。"
@@ -271,7 +301,10 @@ class ExamplePracticeMigration(unittest.TestCase):
         self.assertEqual(file_snapshot(root), before, "--check must not repair its inputs")
         self.assertTrue(apply_migration(root))
         regenerated = file_snapshot(root)
-        self.assertEqual(regenerated, release, "legacy-only inputs must reproduce the reviewed release bytes")
+        self.assertEqual(regenerated.keys(), release.keys())
+        for path in release:
+            self.assertTrue(regenerated[path] == release[path],
+                            path + ": legacy-only inputs must reproduce the reviewed release bytes")
         self.assertEqual(apply_migration(root), [])
         self.assertEqual(apply_migration(root, check=True), [])
         self.assertEqual(file_snapshot(root), regenerated)

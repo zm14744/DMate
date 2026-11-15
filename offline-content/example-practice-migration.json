@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "target_pack_version": "0.4.0",
+  "target_pack_version": "0.5.0",
   "description": "将每条概念原例改写为独立练习；题面和双语要求按条目审核，原例保留于答案，来源字段保留兼容。",
   "difficulty_policy": {
     "简单": "直接定义应用、一个局部判断或少量直接运算。",
@@ -571,20 +571,20 @@
     "q_graph_domination_09"
   ],
   "legacy_question_sha256": {
-    "q01": "611d66763d3d3858d87cfc50963b93f27e33f47d4306e2bfba31982085b3f1a4",
-    "q02": "496466f2c53a27a9dbee20e30453d52e5d059cb2ee60a733e846d3388540a1b4",
-    "q03": "36d99b11abc6a73f8bbb46abb4f967f8896eeabf5ddaf249220acf75bfb01c6c",
-    "q04": "7612de3d7fef9a1d9a97516c0840ecfb005cdba9bc54285fae3523a2ddc438a8",
-    "q05": "7cf2f84dcd138546f7a9c64b1e1755638fd632905264f76cecdac7f786544ca6",
-    "q06": "55071b7773334481c404b730979010783e3f95cbdc7b00c5228025ce9295dec1",
-    "q07": "9767c8054791bcd7ff7cbc20fc505366e83ba4135e3fe7ce4433e13cc921b5bd",
-    "q08": "90f077175792d8a652f9b959c3722331a18b7d4d2ecd28fbbe7f4453ab4071b6",
-    "q09": "09768dc6b1568bb98401988afedff578c4eda8d713a86bbef9b0c5c692f1ea7e",
-    "q10": "7f6ad9a6d41a70874c22b372de0e38192be8b9bd2e925812474b815d3c99ec46",
-    "q11": "d31851a01742a05dc7c9faf6e0f30508b01d47727da4b4ed5723d5e7d549a528",
-    "q12": "5ff2a87a6b661e9adb7c4292f8eda5a0499a8e8e31bca2a6c570de1535481977",
-    "q13": "377077df45fead44afda897a79c2a1381a2266c2be2b2cdd9c98082b9026d50f",
-    "q14": "b972c683c67463b801adf722090bd4a00489c76a85f8a9ec082f90d445d0edfc",
+    "q01": "e453c6d32b2c3920e66100eebebf68ebb05f9a3da0fc558ed6b071792b70bc9d",
+    "q02": "db1654d927ec77f4d10bb2022699a01d7e46cf4c7a2c8c06a66509a11a4d9e85",
+    "q03": "4fddf1e8e9be805465d59d1851d3309c0cf6654c302b740d1407eba17091bd45",
+    "q04": "698a695fb475c1a789396e32f63b7b5a8bf50bb2058369d7a99cf6600c0a27e0",
+    "q05": "eb632947b240645e361f0cc2ff042c75c8459d537ef3577e3e6e89236df1e902",
+    "q06": "9bfa475f12d1423846f404d71aed9c8483fb67fec15dec100fbbc5e52f352ecc",
+    "q07": "dd25aa45e137d491abed492cb82a9ce04ebfdd8426b9ff8d24f79396ba1e03c5",
+    "q08": "e45ef68d12aaf1aeabfd1681dcf06798d175cbc2279610dc20f74d41f3f84fa9",
+    "q09": "6d1ec5cc9cfbc2a00a42f0c55a4d6ee599c5d79262315d26cbb2c7d6375c134f",
+    "q10": "654dd290fea8700b3aee13261409bc928f6b5da477dc399f2744c68837df3334",
+    "q11": "f9e1029ef360208e3216c5bdda73825d13a6e9a847b1d982054ee46afe6821f0",
+    "q12": "2f86b4c375510c5d1f4ebe0d80fe123968478470143046220da8d9b9b7df4cea",
+    "q13": "078609d2584fbd53088fadc6253a27e73e7b4f9ca1be82c8e9c8d68c665c58f4",
+    "q14": "f56855c659b16a7728b34eb39b4f2d700f7ed0633c401d5bd4039844318d78e5",
     "q_logic_truth_01": "f85be7a82eca54a5c6d56cb6b942bca42b08485cada4efcc54b46ef691bd8eaf",
     "q_logic_truth_02": "6309740ea6743cba7020a73987673e1c0a7c2f718e706cf0534b4e1ca28d8f9c",
     "q_logic_truth_03": "13b6be4827b30191413dc8bc6ec7b152b45933ec417f0caf52593f1cee2e5997",
@@ -643,60 +643,60 @@
     "q_proof_strong_induction_04": "7b59d579e0ec290e32b243c33123a5d9a966842e90b17c67455b2cb7bedff3d5",
     "q_logic_truth_05": "e868149e9668d6fecbdb506ce78dab7deda4244b42e46790ce992f907d452334",
     "q_logic_truth_06": "12580dc6311f3905620114f9ee4d68b045650c94b4f49028a94a08beac18251f",
-    "q_logic_truth_07": "3c0b46c3538114a284668be93d1e6f725cdd17bb94c9be7ca984220557ec4a30",
-    "q_logic_truth_08": "63f4f41856deb94bcd9cd96b2ee1a5a49e1035ec76c4907b3a74014dab62c2df",
+    "q_logic_truth_07": "9a5a0efe82209934ac5c43a92de99c54a3de5ea92be60c5a9a2530f1e37b1977",
+    "q_logic_truth_08": "2f88d10135b9bbab509da839715a36df9ea36d191a255568c0619f2354398a4b",
     "q_logic_connectives_05": "7e06fa0b83f89b025ac913bdf04ff3c2c8ed7f4c97809bdd45f89bd6b72d19e3",
     "q_logic_connectives_06": "41eb536e6f87ab70fc2a94c074334b79e3b06115338dfa1d824678908e6be25f",
-    "q_logic_connectives_07": "674efc37615a73e15d9507bac237b5498f110f6946b15e3508b94be98652ef5c",
-    "q_logic_connectives_08": "0459d3d961ef151d44ef03c3a0d1f83f7b578e8d5afaa088d421f1452ef6d87c",
+    "q_logic_connectives_07": "d4974ebbae21a407515f926e8b8f2a40da128e04be3f2ca31191add312c352b1",
+    "q_logic_connectives_08": "ef155d78f16ddd3e0864da2382d09a6cd311583f10590fc902da1214e0573775",
     "q_logic_truth_table_05": "b2bff5b2c1ff6b5777870e7c9b67aa178b5c9ead837dd35c72426c6ade19d14e",
     "q_logic_truth_table_06": "4c738808a312ef9649dd34a146f244992a9b0b4e491479de23188c587ebb3c12",
-    "q_logic_truth_table_07": "097dc4c90d2bcd64b7935d98d5e7505d2ac6b102f077578a34eaaab702b52c15",
-    "q_logic_truth_table_08": "eddadbee5980c04b6f67e377f9bdf9708995321988fa21521041af4652c97b4f",
+    "q_logic_truth_table_07": "b0d4d6cf51ebdfecbdfe19444ea209223e64c2812f44753c0dbe3f529359c720",
+    "q_logic_truth_table_08": "22f1960f28f0cbfb5b9e9ed0f90cd7f6c1e9d27e9ec518d11e331ff1f3619c4c",
     "q_logic_equivalence_05": "e1362ad84fe220b3f967f5eddebd27e279795169ca97362359f5a64230679aa9",
     "q_logic_equivalence_06": "a7dd0d3c8cc27617c8481e6e66cb2115b7b47eda08a4a3b819cef867ae807988",
-    "q_logic_equivalence_07": "53ce552b12124ec37195c52e350d19a644177c72b53241e6950bf443836ebd44",
-    "q_logic_equivalence_08": "be2fa48221a6f231dd6b0f42e1f5287b9722fdcc0f70322af28e5ce59364cec1",
+    "q_logic_equivalence_07": "3019aeedcdbc742dfaaf8b2dfef8cd193b2bbcf6093576fde0fe56bbecef52c2",
+    "q_logic_equivalence_08": "c8b9594c60e0a9ae71df34af505f6f4ef0db87a7fc0f86b92ccec7d08a0db271",
     "q_logic_normal_form_05": "59a4f81489bffdfe98b7b9e8537df0cfa68103c0fc898f51f76739967a7343f7",
     "q_logic_normal_form_06": "8c866c1a1b18b14596cd914ff1ca9b93d70c928b9f54f469f15f44c394d90340",
-    "q_logic_normal_form_07": "c95d31bc3aa3a9a0010bd03935b977fcec8d8d6de6590b77aa07406048b8629a",
-    "q_logic_normal_form_08": "141a04b69e61ad938a521bed77f284807cdc0500b5ff2f23c086be30e48eb898",
+    "q_logic_normal_form_07": "8ecbc0be3359a2e0ffe51fd7c429cc54aec089758bca7a20e6a64c86bde0bcd5",
+    "q_logic_normal_form_08": "1d2fe648392bb4eddd477eb67c09738460b73f97fa1edf5a951d645e5b978738",
     "q_logic_reasoning_05": "d801c3f7f7ca805c28b638c044ffd56eb8acd5105f77dd7767898bc8cc4bf136",
     "q_logic_reasoning_06": "00f5d1047107ab08dbe42b9a152e0a1a0de0c58452f908a6984579d134f54342",
-    "q_logic_reasoning_07": "b3bd4095391b28d11f6fd4881ff50e60dbd80d62504692840416e9190256eb1b",
-    "q_logic_reasoning_08": "efcefcd6be98c4d6ca670c40bb34e512f14a59cfb98bd38f92e51945006d942b",
+    "q_logic_reasoning_07": "6c38dba1c76d2625c4ba9a7dbfdc27af36041360f7e35152e224d75d909ee4da",
+    "q_logic_reasoning_08": "ef6b2d2b4d5f5825df5e6b392a308bd9037a8e06523b1e8b10d6980cff4e1852",
     "q_predicate_domain_05": "3ab3a9a7a0347f7021f62dfd9cb3eeaf9e8b24ebcf6ee93844a66dc97b9e113f",
     "q_predicate_domain_06": "4bbeab7e070fb82b395c7869a0669488ba3647c470cb190d5074527750e96d5e",
-    "q_predicate_domain_07": "8d8bb05b5b034a23c74ec384d4a28f79a0c5a8c1c882d0ae794ae5f00c247f56",
-    "q_predicate_domain_08": "4cad6bd731e4a0afdb7451ad2a201f57fec6539354c7b1d958b084ac5a078f38",
+    "q_predicate_domain_07": "b464ca3f4f4ac131f356e1bf817efad765f5df8b1c2951a958f9e207c3c09fa2",
+    "q_predicate_domain_08": "dcd8a3866f20ea76e083929f960b92174dbd262a76eb4508e030de5750ff59bd",
     "q_predicate_quantifier_05": "0926da32df806060231c4a49a15f257f098ef99846de544272b04f111623a2ae",
     "q_predicate_quantifier_06": "842ced2bd185201f6ab5eb10bbadf4ffc772642d931f67efaa41f293da520cba",
-    "q_predicate_quantifier_07": "9b5390a7bf56ff7e2a79d675d7b0cb746ff4e6fa6f212b9c9cf6ec666a8f86cb",
-    "q_predicate_quantifier_08": "4bad108207441ddb4c2fc8485fa090928ba2df42341aeeddeaa20e2d6a154b44",
+    "q_predicate_quantifier_07": "a795e8d72c60e0d91eb77249cad476c822ba30c598577fc58e4aee394bfb7dbf",
+    "q_predicate_quantifier_08": "c1f6d065ccfa2ecb3c63a4b3f455f8cbcd0a407dcb6aa2c2831f39390df3c57c",
     "q_predicate_variable_05": "ed053559d925698441b8a06b81e7dda61b33530cf21dfbf2f6189919aff3fc5e",
     "q_predicate_variable_06": "27ab146e3a31af0287beeee72076c85201b6e158365de9eb57e40a7251cc4522",
-    "q_predicate_variable_07": "ccb100b99ae1f578d381f12321a289b6eb983e999b0913eb2ec37abeac3e1219",
-    "q_predicate_variable_08": "652cb807dfab2fa8093e29c6fe92a6a5b4f68b097350b0fc7d19fee6e91b60b5",
+    "q_predicate_variable_07": "10df9d8e1ad0184a68bac8d3a865adbe38c8b67b627b5efb7269f45e59a2b46c",
+    "q_predicate_variable_08": "938624e355332c237055fcbb29824ca8acc4997f487cad2f00bb0ef7dc56d460",
     "q_predicate_reasoning_05": "8c9484fe06c29175be6d9a9c80735bc1d0e9d2dc438154a97d0e4987ae83ba37",
     "q_predicate_reasoning_06": "06c54a5a609637bcc275a9819d63997ccc687770f8ac3e3468c965551e83ad45",
-    "q_predicate_reasoning_07": "e7ff420c1f6d7ab9fea01e7711cb10d61d0dd6bdca68830d30feb5d9c58f68a5",
-    "q_predicate_reasoning_08": "3cb205406576f63ac57f5c2e9eb9687301c576c9a7c2493e010cda2cc26c51b4",
+    "q_predicate_reasoning_07": "143e05c705600138b5218fa189143c6dee86ee5edf798241c2940ca361c02fc5",
+    "q_predicate_reasoning_08": "442dfde84b4eacbafb2851a2e2c70169aef51238f4b42489eea12496524e289b",
     "q_predicate_prenex_05": "22537736ac7186f92237baadfebfa2d3cd061e2a26be9a2d29c8600edadeb77d",
     "q_predicate_prenex_06": "006e430197774c74d7f61a500bbe0cf29461be5fd1620ef3827476ae6d9234e2",
-    "q_predicate_prenex_07": "21ca5a36addc9550b5da57a6c685393df19bad610e81df48008550d410de1503",
-    "q_predicate_prenex_08": "d3e04bb72290a0fe1ae172ee3ded29dbf71e24ffdf4bc52a42c0b74a66a48153",
+    "q_predicate_prenex_07": "63e986f88640a076dca9292a063d6d67d5d77388e8d9130edf3d9d09eba68328",
+    "q_predicate_prenex_08": "df5ff8331bc5af93f3647eaf1abef165ced19ab79ba2f0a7d76deee7b2b5d928",
     "q_proof_direct_contradiction_05": "48d2b5cba3ed2a1c21ac1ac8f843be29dbe003c12867751f2e1b7991fe3deb08",
     "q_proof_direct_contradiction_06": "e0d673fce1b80d0163b3007e781633376b5cd469ab76299eaa9bd5a722b5f697",
-    "q_proof_direct_contradiction_07": "a4f7fe9867faf2446aae2297cf375690f33135f7e62d71ea8dc3f6108a18bc84",
-    "q_proof_direct_contradiction_08": "5e5e63ba27c0ab314a74718ad725c722e5ddf5adbbd73bd4aabdfb9900257e85",
+    "q_proof_direct_contradiction_07": "fdf9bf32dbda05bf24a30a5c317353de432f85a66f1be3b515f8a38056c15ee2",
+    "q_proof_direct_contradiction_08": "258af82e71aa8197e6b5a5f36f34bdff2fafef50be9f104b236c6360c9a86f57",
     "q_proof_induction_05": "c66ff856cee73289494a1ae4c8a3ca6f45f101ba6ecfe8797920daecc0a1c689",
     "q_proof_induction_06": "d49cbc2e6ff4648de8ba51f8c3f021c76703b20273c59a52360ac4aff38a6dd5",
-    "q_proof_induction_07": "6dd72b8ae2d022bb0d8f05d2a5adcb602878aa17924a0dc8a0c516dbcb2ac12e",
-    "q_proof_induction_08": "4fa5288419bdb62ffc13ad98661e46f49a90d137a49375c304252aafa29fd0af",
+    "q_proof_induction_07": "0553bd8e08fb2afd3dfc878c1bece34860c67494358f47ef87a2b7280caa4570",
+    "q_proof_induction_08": "b96ae9f5c266b6d37c4f5611b3dab8b26f4c142626a076e3e37d3e6c7c842452",
     "q_proof_strong_induction_05": "2cc49ff04f0d614c99a816cc3bb8a4cb347110b5e856b3f1a409da29b7f00c7d",
     "q_proof_strong_induction_06": "1d103dc40ae11b8a8bf47e64b6b7da07abd8e0899eca3b59eb204bba42b16752",
-    "q_proof_strong_induction_07": "9cd7a095da7dc788f912079bd3cfa20f3aa0b411d1c859c76f32600559874cd5",
-    "q_proof_strong_induction_08": "23f45348f411ddfe3995cc8adc8762d41aca5a3291486561baca446d49399a71",
+    "q_proof_strong_induction_07": "2728b2c5cdec2c971b0196bd71d8a103a4f839a8915e1312c90d86983ce8e82f",
+    "q_proof_strong_induction_08": "f175d534eccb986d4da42e803fc75f22324f8306f64c7ad63a8d07848510c394",
     "q_logic_equivalence_09": "791699fa4284fb1efd6f4691b28519019b27d5515b66ee5c048cb5fe0e42b6d1",
     "q_set_operation_01": "ecb4f5892bfcb8ba2ebf6311bb40056af408961afaa5baeb48c3e580f238e7c3",
     "q_set_operation_02": "1df63d51731585f0d90115cd581a4ae783230f08f5f95eaf9c591158385fef41",
@@ -744,108 +744,108 @@
     "q_function_inverse_04": "25f3645b02c0ebfa3006962ab65dc8d240c18792290fae59f7c58d398db0e055",
     "q_set_operation_05": "e439c097951830278d3e7057cc67142c3c8e08826bde5c8c05a3879ede6b134d",
     "q_set_operation_06": "c4c8a21be73d5470627b64835b1a2e914946695248bc9870f996199570b8e965",
-    "q_set_operation_07": "6bf8a3b22077ca1d95451ca4ac6ab4c633570a22956b35523afaa9fda6673d3f",
-    "q_set_operation_08": "3e5bb686a4fff0a37eb66f3bbc39172e92cad7628107619e4e8555893140449c",
+    "q_set_operation_07": "ba8c6fcb5abcf4fa781a668e3aa0b6129be20c704598f30943acb1bfe7989f3e",
+    "q_set_operation_08": "2c3e0b16b4bf06b13a47af467fcfd6363130daf7cbb46db4f611e96351d1439c",
     "q_relation_cartesian_05": "75da924819e7a8ce6153e1684c8faad43e566f359aa08d1f719a8e1e7aeb4a69",
     "q_relation_cartesian_06": "d05482b8da76618a8d70cd2915d5606c527399b9c23ca8edc3db169135e46d1b",
-    "q_relation_cartesian_07": "0c256b88b8b462e9d1f0856007e85d5834a97154d1518dcfd14c78a41a55ac7a",
-    "q_relation_cartesian_08": "376af9f785af8bf2244d846e2849abe8782e431df3e644bcafb3407816e24803",
+    "q_relation_cartesian_07": "6d494bf7ae15ed668c59806741dda9325fba39fdd4b5aeb47a41cf2df92b0d2b",
+    "q_relation_cartesian_08": "b9dc9089bf77ed487685802eb12a3c72bacf03d0e13fbcde3b24e809d69ef062",
     "q_relation_operation_05": "56a1a5477949d8992af4de87a4eb7571207ac58950d0f348e61613991f99637c",
     "q_relation_operation_06": "e831c404bcaa80377d102699a06b9972881670daf13653c0402224357aff683b",
-    "q_relation_operation_07": "d04e59ed9a7c6cb972cc15a049fa527b0e796de9e9c81aefcb9d2f70288951d6",
-    "q_relation_operation_08": "5668444917aad41ce501d0f28fbfbc202d2f13b27f8cfd4676d54d9087bea6c3",
-    "q_relation_property_07": "e4835542e506f858a9144aebc135e6a35acb8fed47c63527a3d441166eaff09b",
+    "q_relation_operation_07": "e5cf59607b66e2ad17e643510e9b88e80d6821b87882aab522d893282263191a",
+    "q_relation_operation_08": "42d9f815f1d0a2fc05fba0987a9f07f4e4b6660ac96cb49f47ade5e149308cd5",
+    "q_relation_property_07": "5653135402edff63a642316e9da52e95088eb2aa51bc82649494b0ad8f98b954",
     "q_relation_property_05": "e4ebdb33320458f57c639ddf612e7746ef1833685096aed3ce660bc607a2858a",
     "q_relation_property_06": "9f430058622b61659de867fc5b5f5615522923cd0118c9c8ce1c11c947516757",
-    "q_relation_property_08": "b5e944aca564a223ff77269cab463b308abfc067290fb2e3983f9ab3e5c9233e",
+    "q_relation_property_08": "78bcc86f02a2b2a9761aba9e995d25c7a3476c4774936e0caf8332c340edbae3",
     "q_relation_equivalence_05": "1fdb11176f2ac3adb2c7a3585e6bfa211352ec3e3b42d283200972f940a1171b",
     "q_relation_equivalence_06": "814c433cdb5f9e3cf2a61c0955987306c701879b2263d03cbc6a192cc47027d8",
-    "q_relation_equivalence_07": "7b43f2fa9fcdd5eda997665735d5297d43647ede25a15ba354b61c0577a4b391",
-    "q_relation_equivalence_08": "3b04b38a638633ed67aff6930c467a364170db85dce2768647b8220262298e9f",
+    "q_relation_equivalence_07": "4e615c4e9ae947827f71f3d2f529b84bde1494c8c7ca8bd271a5f5a87ea1066c",
+    "q_relation_equivalence_08": "8cea035a5d7646889522545722d2297068e062d83b63c68cbce41a7341efd686",
     "q_relation_order_05": "d4dc42defc4fed6c26d96c46beac828374ec07409ab4e5da3f0a2eb0bb8977ba",
     "q_relation_order_06": "d4b1b8ec057d57c95a194ee1f873a47513d022d0b564a4bfac4c1f66a01ef025",
-    "q_relation_order_07": "c3b818da68211af1010cfcada5d2c30eb9c98c4ce4738f4f5def24a06387d5be",
-    "q_relation_order_08": "7e5e827f0e849395b4587fcb3dfacfc595e79d557a1c0d65b15f6092394e6694",
+    "q_relation_order_07": "3790002968bd636a059c1aa27b4db1799cc5b5552a55f7d6c2b0a8ebab0211f9",
+    "q_relation_order_08": "b2d69772ebdaea6e85c8b5b9aab08c149b594a0d9397b6a033c580930b5996a7",
     "q_relation_closure_05": "38b1efc6f7de45ef95b34e5d990c1dca594fa62282958cc6c5de37525294d05f",
     "q_relation_closure_06": "e0f3a80d743363275ae766f054ed51d795de7c5a1481ff133689398263d854af",
-    "q_relation_closure_07": "d9992efbea0b84c6d31237cc9905dde3782a9749a12bb284ba6215bfde9ec4cb",
-    "q_relation_closure_08": "178b361e102e0730b063666161235e33555cb89722f2b6ad0290d96fb3eb815e",
+    "q_relation_closure_07": "285931f7e5f983e1b18bb92594067ae590142f34c00f6c4cb7ca87b337c05161",
+    "q_relation_closure_08": "23764fb1e27ed289a5b46b09743031037fde8d5ca09eb37b9ee72833af82de66",
     "q_function_mapping_05": "f121ccadfa64ef49208982bd7d3f39cfcc34c2234294aada80190a1c851eb3ad",
     "q_function_mapping_06": "ba45d7ab04e42490c5c27071cec2923d58b6049a1e5c00ec1c9172d92c90457a",
-    "q_function_mapping_07": "4300e263d6d84adc544e8697a515b62fcbac1daf25b3161393c732979905dbfa",
-    "q_function_mapping_08": "0208b0ded5ba9dc6d251d1a9af5bf4c66c7910dc013c6784c78731d488c85105",
+    "q_function_mapping_07": "73eb199113616dc48133e753789ada2e87221d1c860cf2f4ea465b7baf03ee5f",
+    "q_function_mapping_08": "85ce1a2c5235bb7423333e6a00ad72b5285bddab141a5325f2ee86a921988f5e",
     "q_function_injection_05": "04a827bcb309fc63df8830b80c0dc6e2bd80b5f325e5db890f75109043f540c7",
     "q_function_injection_06": "0b02ac98a2f7b88cfd5a2bc4bd61d1c9004b72836ce340b25204ea113d21f3c0",
-    "q_function_injection_07": "7b33e4ff922594c5ffb7231f16407dc29205ab82ea74f908c3d64bf94de5281e",
-    "q_function_injection_08": "4dc37cdb0790288ca0678613337385b938b832b04b21c479996aba9a68284e7b",
+    "q_function_injection_07": "a86f54d6038b69168d6294102a61ec7538a34ff8ba030ccd2bdc5b8bec619c52",
+    "q_function_injection_08": "9073c88840416c28bc379002ebc5217ff49e2fa9b7244c02b89ffad0a9ec075b",
     "q_function_composition_05": "1e574ed705a0586f4a808ee7a917d385d27f3ab2ad86e654c8d376a4ceb6e638",
     "q_function_composition_06": "72de756f5382ae9944b43803bbaa119e65754cc8bbaaabf1ded2724e918aba6a",
-    "q_function_composition_07": "4c67cde8251869431f6342e6e2da1e797decc0a693f60e84483f4162e20161ab",
-    "q_function_composition_08": "eebd628883f3ba344bed0cad4756f4474e4bddccd16eb6188f86505b5430aa87",
+    "q_function_composition_07": "85354e9b248202345b0b16dab819bd31d75a7dec8d36819202c1efdbddb57f64",
+    "q_function_composition_08": "1908471a4fca188e8f4ab3074a75b23e60f1cd5617dfc185eb77ff342d123d4b",
     "q_function_inverse_05": "19cbb31feaec8ea92d3577dd0fe124cf0c4e4484acf5090b553da79fe30c556d",
     "q_function_inverse_06": "a8bf512b1cae789abfff2168d09b72da41aa9740dd83c015153e745a80148183",
-    "q_function_inverse_07": "b21eca6f7625ff45383c137b07d1aecf401cc7ac5cf9bdbfb75d01c797e48bb7",
-    "q_function_inverse_08": "94c3e2d20b1d1e3df0ecec4b0e2ed9c0b385cd0b1f10fbbba0189d91c8dfb77a",
+    "q_function_inverse_07": "636beb8b954620df235c76eb0421f605ff886ec8c811903674ef6d458254c039",
+    "q_function_inverse_08": "e8f334d4c8b85e2e47eafccbe92ca4e9c1b394f548de8a2ce0dac1deb9b2f631",
     "q_algebra_group_01": "dd7f61421c9f3b76dfc741028e401a01d4420d5c783ef80a0c5763b43672fad6",
     "q_algebra_group_02": "b945317e3ee647581763883eee309911dac8f66c40d6dd4cb71233c1e2dbcc79",
     "q_algebra_group_03": "85e8a48608ef46c07e83087ed1248deb4dcc947ba1fea669fa5fc82e3080f1cc",
-    "q_algebra_group_04": "c6cba534afa5f56ebfcc2f57a746220f279de8f9abac34fe550e9e756f31b3c8",
+    "q_algebra_group_04": "430563320b5e0bb6d22901719ae7e8a717d84cccc63c4456a122bead4c9fd348",
     "q_algebra_group_05": "b06a08584312cd67027a68abe12354c415adf0f02b41a5b95f0d72db95b5e3b9",
     "q_algebra_group_06": "9c4d55927980072b777aebb22ad8715b3aae99f13c2667a5f977fc844f492f9f",
     "q_algebra_group_07": "33107e42f77ae6967211a78e4471bdc054d2895740a126648af99caf08b78eeb",
-    "q_algebra_group_08": "993cd0b82c967ed9bca3f72c6c62eb761d3411ff7c2aa4fb365344fdda23a1ba",
+    "q_algebra_group_08": "c4a90b8d77e18513d9370ae7071c25df0fd6ec3b461d092e72adc7c443debf20",
     "q_algebra_homomorphism_01": "fa8e5dfa66d7e9e5ae57ad0c4a4d137c21c33d1bdba4cfd9a781668edef6a351",
-    "q_algebra_homomorphism_02": "f8a0bef950a313623d864ab82d108eb4552ba6d37d266bcfce5930e8586e9b39",
+    "q_algebra_homomorphism_02": "2806d9ada6bba29031e24d66b7198278cdcf17603b03097948530541147fbb5d",
     "q_algebra_homomorphism_03": "132df5995974666961900ddb3b759d2a37407fb1551d50673fc134b54310e2f6",
     "q_algebra_homomorphism_04": "81c9de0ed5b6118301d5927ea3a4c7848ed8af9de239e4438591a6d0a4de3276",
     "q_algebra_homomorphism_05": "a6b1e50086450e41ac0c88129d18a3722554090d5076a17f92f66e2b7496077c",
     "q_algebra_homomorphism_06": "e2c92fd718d8ce4c8c11c453f256a1043ead2037ca2840bfdb61ecfbfd383311",
     "q_algebra_homomorphism_07": "1d0573b7b82057b5fd2e6ae2eef9ca79dcb4adb28397b8abed021f6abec7b7bd",
-    "q_algebra_homomorphism_08": "80ce5f082e1e4f0a93c4d7787a9cbff7599a56b8f535f82652d01376fbb6b09a",
+    "q_algebra_homomorphism_08": "20c0b385ee4b94b3e63a8ecb602c1bfef98841dddc5d7befd633f265168518cc",
     "q_algebra_lattice_bool_01": "9fe4254bf7d93e7729e5b33d2358ef97346bb1fee3132c1533bfc22057cb6734",
-    "q_algebra_lattice_bool_02": "582d7ceb436291cc87f2101f06790d99fe13677264d844713c181c3b8bf0806b",
+    "q_algebra_lattice_bool_02": "1b5aa06d98578329ba1b977d9c3da684c1a73cd8d5b59810bd197a2d170e265b",
     "q_algebra_lattice_bool_03": "57a80eddf35da719ca063a66598c64a55a3d81cb04d5c0ef32206a82e47bd62a",
     "q_algebra_lattice_bool_04": "445d534110fe8d6b7e62b50e985cd72119ee2b72cf43ad3d27760fd25ee28cb2",
     "q_algebra_lattice_bool_05": "aeabee5e4aedcad7f45275d82ade7d003631fb8161e4fc2b559777b0f2ef06d5",
     "q_algebra_lattice_bool_06": "9e370350d0ae574e5ecf79b341a29fac1f16028c7f8f1dcb32e9957b42696dc8",
     "q_algebra_lattice_bool_07": "3f83d7ea1a7a5c3a6248e89212cee2ab81ef5df3c7c23d376c2e77813d76d1d0",
-    "q_algebra_lattice_bool_08": "b768fba8d6ab99ed94925d5c9823de398f796f402f8faefa971f39a0f6a216df",
+    "q_algebra_lattice_bool_08": "78bfe2e2c5585b91c1983c3416f5740923f192d8bb3bd37b1169027288754205",
     "q_algebra_ring_field_01": "8eef904919549403fdec08d8d5e0ec73c48179571ddcd1457183e2b3df81f2e1",
-    "q_algebra_ring_field_02": "f6e84064ec5bf126a0494fceb084b6b219a29cc1821f429b4493ad79d7109f17",
+    "q_algebra_ring_field_02": "8f11ff7cf59bc5fa01e5751919ad203283c06df54ea9c19765762c7dd99f11cc",
     "q_algebra_ring_field_03": "a6f5efc495f62e7a104c6b87466e2fff2fe94de0afc3b48043655435fdb84085",
     "q_algebra_ring_field_04": "a646037157586920958ee294dd94b31a3f17640ba228a83b8d5bae6f2bfe5366",
     "q_algebra_ring_field_05": "c704f012e6380b39c022fb97efdc9b65494c573701bb0e82e4219861c8947beb",
     "q_algebra_ring_field_06": "cebc3b649e038fbc0fe98975493ae88d07419969355a7e210aab7dc837f4664f",
     "q_algebra_ring_field_07": "32678af3591e9128972d54ffba11a73459c79c36094fa65e1fe681ad2b04dab1",
-    "q_algebra_ring_field_08": "035bf98fcd8c5ef9df554038bee318db4f7a444f7e0c0fd75ac51e759f75dcbc",
+    "q_algebra_ring_field_08": "334879e92779974d0e8b311e0451785b19367da95aec80fe084abdcc93918de2",
     "q_algebra_system_01": "068b8ec7c7bbaf1ab3fd74bfdda5adacd44c02cb9bf76954ea12a2868166f5b3",
-    "q_algebra_system_02": "135693a5dae5a6a707485674843e7b8333f68433cf7290e3c0f65adf84f0e24f",
+    "q_algebra_system_02": "4f22d0e2fd3c235cefab66408b8aa7d95ec6840d04e848522f46fca1f5ab3e85",
     "q_algebra_system_03": "71e689dc1af337ba0b14da4e012fbf3a733461e8e86be255adcac05bee00f875",
     "q_algebra_system_04": "8ebe1e5c1a2b392412da912564f90dc7df7a8c9d8827559509b49f52254c55d4",
     "q_algebra_system_05": "747be73635f307471c4de21d90c87af91304e06a47eae33f555519ad0bf68875",
     "q_algebra_system_06": "be95c654840fcc935d6bd0aa0733c12a6a46231ef61f8f3d177801b049744542",
     "q_algebra_system_07": "9100ac0eae69bf6a6c8cedddab70c6b4a9467ace624f2a6e663c1d51658fc5c4",
-    "q_algebra_system_08": "65cf41c59b940c4a3b714e1aa44f1e93099f783134496d2795c97371fada3a90",
+    "q_algebra_system_08": "f8c464a0bd2e181d822d1773233e372e74749952236e55f9206adae6c06cb926",
     "q_number_congruence_01": "abd8352d38614bc69acec69db1d8127ebe8c474ee45f02b9c5bf93078247dae5",
     "q_number_congruence_02": "883b612927035f5ce994ca8228c31e7885f7c5e12a52c0fe3323b717cd763c8f",
     "q_number_congruence_03": "d40c2a8e4eb473732abf1e994184bfeb844585c53edbad31e1ff822502c39cd2",
-    "q_number_congruence_04": "999b4855eab5f4ab5b04f1ed698a04deeffa7cf646a1663a3db84690e376f93c",
+    "q_number_congruence_04": "fd2884a600a360acf58aa500c5f29a46ce117aa21df1fe9c67e2a02764ec8d01",
     "q_number_congruence_05": "8c058107f7c7b384429e81d3176eb6bd200b974a10fbceb234e85f17dddb2fd9",
     "q_number_congruence_06": "de86d18cfe8a5d3bc2c1a9fe0f35e1aab930f23101ee556da22bc1521fb45544",
     "q_number_congruence_07": "1ab395a4fd51a2509c28f2ca27439218417aae690e67eccc59c5eb5d5b845761",
-    "q_number_congruence_08": "e195b4a32f31e81e601b272e9833382a27daf252aef54f9c7df9d295267fcd97",
+    "q_number_congruence_08": "b863b7b9924ed60506d7fe94fd3e6dea2f95b69aaf09cf7c51afa47a2412374a",
     "q_number_euler_fermat_01": "a1e0717860e2a70101b65cb8769ce197dcfed637d573e0a0b52d033344d95dda",
     "q_number_euler_fermat_02": "f6be07573aa3cf01136299c1002b6d6ad11a571515d1538d87f4429088375590",
-    "q_number_euler_fermat_03": "b5d9067d67a536bed5f2f5de57f474138b8dd0448ad9b6d2151cc698f483d66d",
+    "q_number_euler_fermat_03": "e4e924c4c94a2536cf6108ecd16f6d64e99a73defbb71a5a4fec1877765a9f65",
     "q_number_euler_fermat_04": "9139a9d13bf522dbeca8f7512693c7238b64c1e5d7996812a70f1746d404388f",
     "q_number_euler_fermat_05": "3de86d576b10035ab02b8c7480501b4a083e6e4ca95d7ef00e25170b912af902",
     "q_number_euler_fermat_06": "27a5b06c00c827a5a4d84406afa25bacd68d1d36d89635129ac932ec24243ec0",
     "q_number_euler_fermat_07": "29773920eef0e611709f12ceb706963204a2b1e482f29ae6b2f0af4666b13d78",
-    "q_number_euler_fermat_08": "fdd148dd5389190ac66b75d384658206f79ef1f641c65e41a7b44d4b42dcad5a",
+    "q_number_euler_fermat_08": "b2087aa21400fc6cf57eb47bd68dbccebcd016c2b7ef36fffedf86dd531dfcf7",
     "q_number_gcd_01": "1aeb26b8286259f6aa5b30433a2d1646bff6205c54c837202eb7af7dc86322ea",
     "q_number_gcd_02": "3eb5c969170cc4eeda6077fe65ce4311ffccfba1c07402e367bce90814ec1d5d",
-    "q_number_gcd_03": "8e687c23c373805798287a3aeb8dd7998f0f0968f97424883eb2105890e6a2b7",
-    "q_number_gcd_04": "7c895e7660c94a19d2c168e4886a998aede16c28f8886f41b272addfff9adf43",
+    "q_number_gcd_03": "50d96925351f108a9947f65da5c2f81b79d5c00fde750644de101c943e3ee262",
+    "q_number_gcd_04": "20281a7a7908262a7e53489d1788e1588a8caa421a4bfd595aa65d65be4b4c7d",
     "q_number_gcd_05": "43d70fad5b61b4fdccc184fe1c2bcf04a08db917761518bbfc7ad2ad7ba5d09f",
     "q_number_gcd_06": "14665ad8ef58b331f04e4d62161c84e247c24668434b1f58d874e6ce0ae1add1",
     "q_number_gcd_07": "55f3ed968aceb4ac7791842223ee7ccd2696ad009f4b2bea1bdcffd3ab8fb9eb",
@@ -853,43 +853,43 @@
     "q_number_inverse_crt_01": "5a86ddd3d10849b82f6608a95b9948711d59429a8c3a2deef2b44270372ac89b",
     "q_number_inverse_crt_02": "d5805bf1a392aeb487568aa51cf1eb262a584c109e28a70578f98e9da2cabd2d",
     "q_number_inverse_crt_03": "45f120661a67c6aef9d406e7e190ccd0d6e73e4b74d93a644df59d0ee917d117",
-    "q_number_inverse_crt_04": "071aff66aef60eb77bbaffef01cc8c16e8ea552993981a5f14f6d26457971f74",
+    "q_number_inverse_crt_04": "7ba61fee3794cb335fd4d6b2ab5c856252b9d3d87e4042748295d650db4185a2",
     "q_number_inverse_crt_05": "76fb5cb450a76c1fc0d3570acf538f70a4ba5a92bd9f3812d82c7c7160503f92",
     "q_number_inverse_crt_06": "583bb2e2d3276084623ce17ace2c5d6cda9d1736defa7cf15272051a600b7d18",
     "q_number_inverse_crt_07": "187292e4b72a5a6b4b821f5578493c9df5832dadf9672063c875db6b4f2de88f",
-    "q_number_inverse_crt_08": "38b4b48f5e1f3a3ef73b37f6d25ad09b12f83962c218121a26bb611bc5e532d8",
+    "q_number_inverse_crt_08": "6a708c508c01960021aa8866532ec55e6374951404591ed08fb27f5071e1c8ee",
     "q_number_linear_congruence_01": "e5e3df92c0a913c027080bbd4872508fb08581419e6d811d0f48f086ca9da834",
     "q_number_linear_congruence_02": "c8f0cee86a922834d8e135812386c8231c6badd06ffcc7f1c4e988f756393f0a",
     "q_number_linear_congruence_03": "b2e71392cc3fa1e506a70e8394a6e23d3a86561d9c516bee0d72e7417de859e9",
-    "q_number_linear_congruence_04": "de20a2ccdac77e21d177ac0f0cad48bbbac230c45dff67c7589131d5f84234d7",
+    "q_number_linear_congruence_04": "3eb3d80bbcbfecc5ece1934661e18905e316b6677e8c82a324c1b3d1a6a669b0",
     "q_number_linear_congruence_05": "d61d6761870a1f445884ae93f32da6f00a8362a038549d62126b56f4ccf5baa2",
     "q_number_linear_congruence_06": "8bf2ac8f7656884d716791b98195ad127d7ae1922a8f344371869bff23e9a02c",
     "q_number_linear_congruence_07": "be2ebd29c3ad3143ad3b2a0c891bd747eb6ab18b47611298ac33890d2f71d379",
-    "q_number_linear_congruence_08": "38d83399773f31c01158ce96182e8c34c8ebcabf8af0811d69c7639ef21c0aca",
+    "q_number_linear_congruence_08": "dd9d7f51fba8a12807459e0e69e6b727a02f0eae28d181841f171d2220af7b7e",
     "q_number_prime_01": "a01407e0624f7ac05a7c0f672bbe89b88718b7d0ce2161e7a555a37eb4960840",
     "q_number_prime_02": "7eb8a08f53d6a9110dd35ce49cce41b06e53ac74ffd49ef6438ec541057a1311",
     "q_number_prime_03": "8b2b11b82fa4f45bb2f302f32d4f2db48d37e820c734176adeedd9e1290cb5ca",
-    "q_number_prime_04": "a15e7bb8a1757d04bbfacd0dcd9e5359e16684355979436caf5d4f98cabfc664",
+    "q_number_prime_04": "8e0191a8b0972bc3218bfc91a7fd39185692bb952888731a14a880091ebd9a8e",
     "q_number_prime_05": "80c8060d94c1a7ae080e6c8f0166526c18297dfabd61a21f909a6f9ef5f6bf47",
     "q_number_prime_06": "32a290d8e9a72ed172107db741b03769f7f69283c4b695f13f50b56f441a19ee",
     "q_number_prime_07": "e0ca5c7f94ae381d8a6d7a5e67150b49e86f6ae7101bce62f697b254e52a3205",
-    "q_number_prime_08": "48bba6599a3036aff74698499db3a1211aba6c039fa6b5ff10cca54af0ad2509",
+    "q_number_prime_08": "2485e6576e6c8faaa2a57cfd7f789c2130883b462a85857044d429d9d5b4bc9e",
     "q_number_rsa_01": "002f1f49bb13e1681e064ca0c84c3ccba06d659eb5c996f86dce554aff3f717a",
     "q_number_rsa_02": "c41e262d069d4a99b2a313524270075022da8ab41315dd1928cc9fcca278716b",
     "q_number_rsa_03": "f399435c5397c891203f37871d88a82141dfb96d496d51839dc3351d1e04a5dd",
     "q_number_rsa_04": "eddff8a22daa4013b6f9b0cf1ba53ba71e67642ffb8690ec7e4913b2e246f9fa",
     "q_number_rsa_05": "c8e6642e66dc7ac752fe7308905867aa5d35a305f2d2318fffaaa042de5fefdc",
     "q_number_rsa_06": "dcc044bf4adc8125b760ad5c02c84bbdc000ee7d5c2bfba2ba3c48596e99a232",
-    "q_number_rsa_07": "6f6f2128b0fc1643d8a2f42a8ac177cb7eb38571923b106cc291d2569a3be2f4",
-    "q_number_rsa_08": "369f733aa2b66aa2b65ef23d7cd69a98d07d46fca4d8a9fd16a8d2519c63b615",
+    "q_number_rsa_07": "d183f1fe6d45452227a0d2e2205766bbe8a4ace5ba71b59552c2798c1f812197",
+    "q_number_rsa_08": "a3c2e3cb1f56855e43fbdcc185b5f8b47ada73cc27dea35ec900d2c579611e10",
     "q_count_basic_01": "f4e48d87b14eb0fdaffdcf574910a1dbef817fa953adbdea35eaae0b5b9d1cd9",
     "q_count_basic_02": "a2b959c2b6911857105583e65db12eb64e7d2a6b6df61928abf8b8e02b3a6fa5",
-    "q_count_basic_03": "e087e0c28edbc739ad93771d672f3c15e466e4dbbd07bd982b37e5ab17cdd039",
+    "q_count_basic_03": "018b0f557d8eeb586ceadcbb9e844bbd797c2a8d0c855dd161f43c6b3499c1c2",
     "q_count_basic_04": "fe5e392d97ace18af2701ae86d81d007f802baa3a9b7df547de48cf318114716",
     "q_count_perm_comb_01": "98d798ce5ea2d28947c90e9a479c7533bb3223481a24b2168ac0b31a8a5f79a5",
     "q_count_perm_comb_02": "306e3e5c637b3de0053a7057dc29b40697165e33cc07459e3de964d1a7bdb77a",
     "q_count_perm_comb_03": "bdc36e52347294e0c0b9da23744cb6ab0b989d1eda4e6e5bfd2aaf5314a1b511",
-    "q_count_perm_comb_04": "ea3fddc54adc3b9798619bf8aaa35e4c7bd755a7856021cd2eeec315683e7e89",
+    "q_count_perm_comb_04": "4709dbc240d85dfc8278705c79660ef17775835f0daf29935831a1da9d5fb214",
     "q_count_binomial_01": "5574e77a64da12ddb0ab1d412654d578ce2007e08c8cc823de317e41754a7ac9",
     "q_count_binomial_02": "453ff15e7561ca1e5c7668959667f1ac8c934a0077cf60b82d2a0af827336708",
     "q_count_binomial_03": "3c2e8cda5f9eddb44094ebf6a9445cb9e8ecf346b758c6caa368718ff6a2b7bb",
@@ -897,27 +897,27 @@
     "q_count_pigeonhole_01": "872340b8835a477c9066b0f2ad36656f4b781346c12166aab2b501e5ee099e0d",
     "q_count_pigeonhole_02": "6e1a60af5a4505b719f2369f57ca34cf06fee3e07a10e81a1699d7fa854ba2c2",
     "q_count_pigeonhole_03": "4384eafa11ef51857dcc7f2e89153ced5becbc7e370989bd1fbb772549e94737",
-    "q_count_pigeonhole_04": "21df7bb8c5f9fc0a011f016b36c81e33867b2427e3e3b951ae5c05a24911220e",
+    "q_count_pigeonhole_04": "37e1d24b62204a36c8cbf7215797ed29c6e143c7cdc88b9d805c6c0c4f0b7ec3",
     "q_count_inclusion_01": "1cced91e46a81388a28da924462ee1ecf7700a1e6837e151512195dcdea531f3",
     "q_count_inclusion_02": "3e4fb9331ec48308112458089c2c3dde4aa62b5ac094f4e59bb4665d0cb7516d",
     "q_count_inclusion_03": "05ebdc4d8b99d3ee767f95687c1e905952797ebe6154facd820c50bbea53fb19",
-    "q_count_inclusion_04": "bf2462a023b36868712515b5994334daf4a87faa9b9071ec69b8d076bf0779b9",
+    "q_count_inclusion_04": "4355861e7a47a5d05897511166aa2997ca06938987a9e7b52f9b663648844f87",
     "q_count_generating_01": "634eac202bff9687c770e3906046398b9f31ca7731137abe877ce261293093dd",
     "q_count_generating_02": "adcb539d09e9b86f52c9c2b7f54ec98edbcceb455749b54fa56bc32712ed2443",
     "q_count_generating_03": "2bb349bda7cf66036c6e9d07d95354129781df4d37f28308875529b2ae606bef",
-    "q_count_generating_04": "f7e0e5a63986aa748582e33c3927a784d3e1906ca3cef88ca400447e4915b057",
+    "q_count_generating_04": "e87ea96c29efea3e68ba12a4b4b211bbb0b92a267b6ad25af380aa8037bdcbc6",
     "q_recurrence_model_01": "1e576c7f57c9166f1284416c0c8aec5cac786dd874b51bc3eb5ca9d03f11c17c",
     "q_recurrence_model_02": "76f2fa3086bab0d2dfc33eca68216f0d71d64e52a15285c5104de57abafdc7bc",
     "q_recurrence_model_03": "003cdc32ec77b4148991b2646b94db933012fa63d646f04c0cdade8e97e21161",
-    "q_recurrence_model_04": "126b3556fca67475ccb69fc3f76539a9d8c09a13fb29a0a976904d217255efbf",
-    "q_recurrence_homogeneous_01": "4b88829a0fa6697c5a167dcd89a7f33db75ec20c59e8efcb21a7228e7a0845f9",
+    "q_recurrence_model_04": "7f5c9e06a8db1c79066da2c514550c5f757259ddabaf9a132051819b5968c0b6",
+    "q_recurrence_homogeneous_01": "4e87cee04308120df2a29c4511bfc28051e450c22be71379eb186a47050255dd",
     "q_recurrence_homogeneous_02": "c4b402e0446fcadf8953f1a6ec55741a3b7d0b3793533691a875bb7a0d375da5",
     "q_recurrence_homogeneous_03": "d949e132db17e7c90b33b7b8e71895709b0dbfe175cc8f65c0088874fbace1ca",
     "q_recurrence_homogeneous_04": "56ecb24e1783237de1b7c539928f696094e866319891880a868ce353bf2f070d",
     "q_recurrence_nonhomogeneous_01": "bae1903f0abef8b0326187d4c5665718a489deba45b5cf076ba074f064a008a7",
     "q_recurrence_nonhomogeneous_02": "7dab7b147ec23b2e1d27b3b388ff4bf37c27a66604a931441ff9c3227c6b1c6f",
     "q_recurrence_nonhomogeneous_03": "7101bf798da34067115fda822b4ed227cfbd40720bbc40d676ba338b15765d93",
-    "q_recurrence_nonhomogeneous_04": "8ef8e015f375d630b497779c2ff42c0a5871a1f859b1a0de2f3db857a6047005",
+    "q_recurrence_nonhomogeneous_04": "a256990c2467cef12869e58cd84b8a1d16cde5b75eaeb5d6a4f9bbb29306b6b3",
     "q_recurrence_initial_01": "1c44b6c7b45db29916f7163ee2b0800ab3191243adda90ab985bf659549def2d",
     "q_recurrence_initial_02": "7888253db94f4752144620fa8d23a424e7b8760083b4e5f3d802de01e83e07cb",
     "q_recurrence_initial_03": "a8195f5145566712c2c08c13728963332f2f5ecb0fb43a7291b763cfbe476f21",
@@ -925,43 +925,43 @@
     "q_count_basic_05": "5f24f6ab2d8a2748dca7491c3c794860d8e8c0c967df7fe1ecc5749de7098689",
     "q_count_basic_06": "c5bcace20d0756ad401a369124e94e0403f41f919fd13d4fb89df589a4b2f246",
     "q_count_basic_07": "9117c44575cde9f81f0583633e728d7de5f865fb528043a39f8a0299948a6c7d",
-    "q_count_basic_08": "878d4a7ffd4ca5a4d097a630dd9d4bba30064d4f5bd742e689010d0bcf961515",
+    "q_count_basic_08": "770f2dff862003c759b4c1a73ac5851fb568465b4c7066565ad81b6f5926715c",
     "q_count_perm_comb_05": "543c8abe3b7f49e0ef0a1c576ae9d8415ddffe607f2f4b5478098d9acef95587",
     "q_count_perm_comb_06": "bc7e04944c2f14c1251a81c3cb52a61c89162d90c906150c67f525a828d1eaac",
     "q_count_perm_comb_07": "a171c2a71458e1074a630c4db0148d47e56ace3f7f49f36a0480a55f33dc5c91",
-    "q_count_perm_comb_08": "31665258d77a7dd98bf97be4af4e5e28fce9aa558ec303ee063f69b188768f49",
+    "q_count_perm_comb_08": "c3b538f4450b967216b48af9a583c8b67a2e583c9497315ec91a240c66e8fe17",
     "q_count_binomial_05": "455977df62d4d868d7a8e0d12a5146c3d41afb4e05925911a8e928d98466ebff",
     "q_count_binomial_06": "8fa676e38388ed9588d5c4888104d4ac49bf74a678a486d748a6bcd2e9f4231f",
-    "q_count_binomial_07": "ec636d6be6e2ff5f4793c1b059f46d6aed71a9589cdde2fc7374712696f09eff",
-    "q_count_binomial_08": "ee561de3e1a8061d3c1c0ca806485179a20ca0d9c8a2bc76c51daf6c14dacf3d",
+    "q_count_binomial_07": "de8e14339e17640aa517a423d775c85a76fbb13bb55e8d5aa9620faf6ea05edd",
+    "q_count_binomial_08": "ad0bf2c8e023399fb33d290d6e780441803a7337b9ef9fb0214ae98eb2a9c746",
     "q_count_pigeonhole_05": "3a765929abc7316a23e2855cc2ca3fcf972806f6e18da48c17cdd37f4abbf7fa",
     "q_count_pigeonhole_06": "87cfcc5d95eeac71759094ea46b5c03e4c15969502e2bd3f65e35e0a0c1abb86",
     "q_count_pigeonhole_07": "0efa83778aa3d2c0e28b54f2d5aac51cd99e9ccf2c407723dac7524693b2e8b3",
-    "q_count_pigeonhole_08": "88e016fa692dccb65f09c90e0e8a1947c75018c2ae71a5f0d689696b7ca91c21",
+    "q_count_pigeonhole_08": "56048a063da940d3b0416b49493a7a0daefbd52b312b4a9dc0c6333faac4dbf0",
     "q_count_inclusion_05": "7471fff6d0f4e688aad188b29348ccd57c365aa39bf835361471c400691f2205",
     "q_count_inclusion_06": "67b0930a2b9ee8ac081d7434eeddb8e1b5bf0fb5a8dc4a4531a0ae52f61515d5",
     "q_count_inclusion_07": "23892578b26616b69f01795cc23eb7daf1e91b1bef69e37fc4e7079566d473e7",
-    "q_count_inclusion_08": "6f32b2f080e09dbdbe7829ccd3428747c054efab7fe0cbd64229e3381cfd7f67",
+    "q_count_inclusion_08": "4105d9d5363e03c3f914b2bf33c3896a58b4b05727d5e76947d6a1e5e2c6aa84",
     "q_count_generating_05": "8f977b301ee34885d1c882213427a767238f843c8249098c64f40c27320c76ba",
     "q_count_generating_06": "51aa6e272a4ed6882e722b89ed17e91d9703ece9e0d55784c6b6f314d9873fe7",
     "q_count_generating_07": "91bc93b279ab06455cec7f85ddf7245af6587daa390abcd070ba98a7cb857444",
-    "q_count_generating_08": "ef2c043554fc1c10d52aeb5d6928e9cded371efc574b1f50fa34deebae87e12f",
+    "q_count_generating_08": "989b3b6818c19477c77b482f173bb260dd7dc301b6ba0206caf46c507f438ac3",
     "q_recurrence_model_05": "5c9052f8d30edecbff3496cb15fd254a496f3c574a7655a9c419e9f325dc129c",
     "q_recurrence_model_06": "ce1c8fa6ef97277e948373aba297aad92399adc893ae8a0fa5fdd0c3d9e35d23",
     "q_recurrence_model_07": "10d1aaf51b8a551164c40d8b9f6e50f1b91c478cbc7096bf6b503992ad10cd62",
-    "q_recurrence_model_08": "af48771ace7fc79c9c3839a7233f37efdd6ca289968fb887cc96a2d99ce247eb",
+    "q_recurrence_model_08": "ce11341f41fdec3172e0dbe24a3e7c27d03aeb60b976a7c631a67b75af6a7a6f",
     "q_recurrence_homogeneous_05": "0306416ef33587c1607ef592144551f222ad0d1a1803408d1f0f1f377e2f1b04",
     "q_recurrence_homogeneous_06": "6de781bf923f06ff41f235be5599e03e9c81d1096964aa76fbff05c0e8d26a70",
     "q_recurrence_homogeneous_07": "f208f987d7d8cada94f6c08ad3f71a62f1fc81238c9de6400b2b172650af1815",
-    "q_recurrence_homogeneous_08": "ab15fd69266f227ca758359c6f3e5204bd3bad68bc8dab78f6fd281f1f12a115",
+    "q_recurrence_homogeneous_08": "af360a4e4a99e3b18a609f475d826dd4c143a9cb42d7b8bd7e0253d8b97ec4aa",
     "q_recurrence_nonhomogeneous_05": "f125bd8e2835418ef7d55e05777e5a255d25003244a50737b1ba25efb2182184",
     "q_recurrence_nonhomogeneous_06": "ec01fc3a0953d62c84076a20ff2a7a0154d20acfcdbc9e7bea2c0460c4e9ecfe",
     "q_recurrence_nonhomogeneous_07": "3572f306472086292f901783aea4d6eb00c0da1c5a66e177198effc42ee9cd9e",
-    "q_recurrence_nonhomogeneous_08": "87119af8247ce0e8794e6984835d8f6a232e2e3b4d03fb983dcd1ff897508235",
+    "q_recurrence_nonhomogeneous_08": "6b5e1969da8afc60fc9c21c23b02b2b0ccfcd65a3ced164a877564d9e7d93002",
     "q_recurrence_initial_05": "b503247f8a80f2c0a00f29e461c3cca588ff1af21003f212e8ec0bce7cec915a",
     "q_recurrence_initial_06": "51c61c6bc9e2472e08fb341c7444d97e72d4e2fc102663130254a3dd95e891de",
-    "q_recurrence_initial_07": "27e1021a5e9edc4dbe3d3e82a40406bb705ab8625e4e5a6dd7e2423301a3c42a",
-    "q_recurrence_initial_08": "051fc4d608a9b1fa4347ba8ba3b9841eb851cc6d83fdd57a59f454314d2dee52",
+    "q_recurrence_initial_07": "ab082ca9bf79e602944a7ad8df0e4bcf748788cfaead1bbb0fadc9ff856053c0",
+    "q_recurrence_initial_08": "fc2c3bf3837ceeaedd869add1ef1b9138296dff8f29b673884d0bba1622d86d3",
     "q_graph_basic_01": "298e17f90092c2a2e3668eb14358a1afae4ae92e02471669f54aaaa986fe2b65",
     "q_graph_basic_02": "657c07c4db7b77f669e7bf535abd0937b6291465e4810bca415e5838c349e8f3",
     "q_graph_basic_03": "e55299c9c3b038c8d0cd34d1cf24c4ec4d2f6641a20a42f7522e8de9c5bcaa19",
@@ -1012,125 +1012,125 @@
     "q_graph_basic_08": "2d1faf65a243711600598fe46afe345f0424cbe2227f5e77626eb16cc7e7b151",
     "q_graph_isomorphism_05": "6b33b6ba7bb05c27f548cb2ef1570579b0d390de39f11cbcdf570fa31329edd7",
     "q_graph_isomorphism_06": "783ea6a48a4627f9a252ff9209a5421361d12ec236b66063ee5b4f7c7365f533",
-    "q_graph_isomorphism_07": "ba7ba3da6a1ed827e538d8cae1048bbc412827949cecd5f7262cbda1d0f6a730",
-    "q_graph_isomorphism_08": "78f7bc86e5dadd65d62013b36fb4fc1ab0a1a1e2c50dc7b4330ec994637f7a09",
+    "q_graph_isomorphism_07": "f3df97038e8c26e99897de90ae590eac354923e78728fbe9ed8af4238ed2fdcb",
+    "q_graph_isomorphism_08": "2b8cabb995bb04ba91f7c30ad099ae80d7e4aca9e2d10db995c6a1353df7c44c",
     "q_graph_adjacency_05": "9d58c3594ca41545ee561d2c405a4f0c4c43be378b641b45f97db37befdc22dc",
     "q_graph_adjacency_06": "e45b514fa9ba35617c34164dad1e4c15283344d4a3293af2c6e23fd133f26eb1",
-    "q_graph_adjacency_07": "0e5497368d9e6361eaace15c94a4646e4c024f778bd51746d55a10d4d1f9b98f",
-    "q_graph_adjacency_08": "248a76ee6400543420c3e05092294fa3d031a374346fc0963a505c93c037d202",
+    "q_graph_adjacency_07": "290be80f0fe72e242c2be6fad6db303a6bda12699a0a30f9f5a6927887dedab4",
+    "q_graph_adjacency_08": "a1b2192fb1b3d1c9bad97d019daeb986058c852f10b91b62aa7be249cc976c19",
     "q_graph_matrix_05": "9966ff3008540743e8cb941efd26b59e26bcd4ef882aedb5786da9c1c6351e2b",
     "q_graph_matrix_06": "bda902eaeebe0e50f7d4c214b977c25c4b16e02b0c1650bf81de47a32f8bdd07",
     "q_graph_matrix_07": "87e274bfe747b272905c61985a3dc90e7baaae37beb811e299c360e470f4fe03",
-    "q_graph_matrix_08": "8e2d291a749d781581fbc02ff71ddfb724bf2571f87305d10817d80123193b2e",
+    "q_graph_matrix_08": "c90402e379ebc62dca29946ca7eefed8247d670bd612e88e2f595bd3a162ac67",
     "q_graph_connectivity_05": "7346a9c94ceac566b528342fd6b51b897eed7f2654aaa72e355e85688f0bee47",
     "q_graph_connectivity_06": "11f8d92a59b86f104515b3829e76e28ebd31ad94cc377ee300fbcc88f3d6fe06",
     "q_graph_connectivity_07": "ec9969d8b050659f7964c65c7d1d76a644c8b90e70740c9ea29a950919285521",
     "q_graph_connectivity_08": "20a5dbf26163d83e324a9eb9b4c137888e1d928ca60b8a3125b718329d6ce5f2",
     "q_graph_cut_05": "0cc9df8c58b33b55441975b9939a23a14e3d5394b7478a5b01f3e0dc55752b57",
     "q_graph_cut_06": "853b60fbbedd5489f9a50b42d4581961e62cf30f9ea8c820732c023debf20aeb",
-    "q_graph_cut_07": "fdd84d6f8b2d2074cc944cf529bffb9b72e5a831fd25e228cb28e43861188a34",
-    "q_graph_cut_08": "d97e28cc86255602f3dc16f3069fbb1ce622c1c0b04de6cea541cf38ba7c2a7e",
+    "q_graph_cut_07": "a3ba151c1317b4fe7e36e8af0e2647a8d8d95d2a9270e56f0b4d0795bf994643",
+    "q_graph_cut_08": "a4412356221d02372d05cf1693f71ab4f53ae6311c0dae71d571e0f7d4bed5f6",
     "q_graph_weighted_05": "7a78c99952e6b8cd968d580fba9eb30d5e0070c80263a1e36c64f70933640905",
     "q_graph_weighted_06": "ae0f35c03feef5868f63764e36958d5708a37297e7594a4fd2e76d327060185f",
-    "q_graph_weighted_07": "5153e2bc90b5a68ffb2347e6623b27c0756b17dac7bda30cf53a27ada2b9dee9",
-    "q_graph_weighted_08": "2fe50c0737b0915eee0fab356d0afc4287a5b08ffbf57e8730d335f1e3544c3b",
+    "q_graph_weighted_07": "3943fce07f453397e2091b0f6ccb816734dcc0244e08d27d43080ce4499ea706",
+    "q_graph_weighted_08": "c00c3aa56c3e471fee14ae05d78d44206dacf14b06786d50704dadb24df7b1a8",
     "q_graph_euler_05": "80df7dcd733f1b1230a645c20c54d3deaa82d73d451afc36f8c5c6b8427e4002",
     "q_graph_euler_06": "154b7d2c8431a88aa09f5cde0244d40bbf82d10aaad623ecf0901e240bf4a6a3",
-    "q_graph_euler_07": "3b9f4aa7232351e36078e558dc8719b19b9aada65612ebbbfaf8fd31f087f16b",
-    "q_graph_euler_08": "855e1972737c4f8cd1b22c55b19db04f7037eea98bbef46b6b1e016b0d92dd8d",
+    "q_graph_euler_07": "a8b3ea1c3202840468515f17d10e744fec08fb52dfc1111d97edbd78b51140d6",
+    "q_graph_euler_08": "984b7f50f18ada5d2e5e3fecaa4f97a52d5e03568bb506018e919cc6265c5731",
     "q_graph_hamilton_05": "eaf8ce13352137d8ba026b7e7c96f2ba32ba8935957d7c97e753a16a20842751",
     "q_graph_hamilton_06": "8ee9cb11fedfe729b33d61a8c56f7b1bdae6bce4301e77fdcdb90ce3b4b77085",
-    "q_graph_hamilton_07": "d89dae23b2e797ba764d529adc513026b551039a9b8a73d767162304c66efb9b",
-    "q_graph_hamilton_08": "9502d7929ed56130de2f4ac997e05b8fa44ed81ba648885ca28c0bc97d96c4c8",
+    "q_graph_hamilton_07": "9c300e2b8688df86f287cc48bbd35531e25d95ab1c0ef404f5d8996ac52fabdf",
+    "q_graph_hamilton_08": "488406d31e535e10bf4df016bc8e68b798512009a505e48177ba746c2cf2b61b",
     "q_graph_shortest_05": "ef8b5cbb3e25631667b3e292d0d9ff89698a391e5d3d339bfdd74052cd25bd68",
     "q_graph_shortest_06": "a8ce66fc99be8c05038278f92a08b679763313668c9f9a7dfa444904e7e35708",
-    "q_graph_shortest_07": "7722b0e8ca7293b20802559a3e5526d63f5a96e6542a35ee6e463ccf35720542",
-    "q_graph_shortest_08": "4c8bdad72311bbc530383cd9b1824416ae95a66e68b697677b4b1470a0dbd535",
+    "q_graph_shortest_07": "98c9106c61c4c4bdaf21ed7601b29d93616d715db1a09110850fe6ef01dfacef",
+    "q_graph_shortest_08": "04706e21f01d8a23595ea9cc8807a3948ddd1c87eaffcbddfa8b68615ca76ce7",
     "q_graph_coloring_05": "c055549ae4a805d48b75efb878b4388092bcde770d8374e163d817bf3e691aab",
     "q_graph_coloring_06": "cab85e2d726288966f48d274cdc1fcbfe9b8cb9a6129a85c3ba2e7648b82cc71",
-    "q_graph_coloring_07": "0b93de9b544a2b05cdebb61ae20cdbda5841e8a1d4a1bc643b10b11111fb07ed",
-    "q_graph_coloring_08": "b5908f5bc761acd07bdd514968c155f7b8b65edebb207b9dfd9dbcc0a6a1e7dc",
+    "q_graph_coloring_07": "9b81df43e2f23e686339ae9e6048e45493c61371663daa4ec1fb8877fe6a3e7f",
+    "q_graph_coloring_08": "763d7e8e122ec54c21fb06f5e2230300fcd7d24da7a12f4010d69e602495822a",
     "q_graph_connectivity_09": "d338db9db170f680b588a3d99b08e9b56fb4bc16ed707bc564c4aa5a405ad9c0",
     "q_graph_planar_01": "ba5c0961d973925d24af38f72470f4fc7134b6a2339f8204dccf89a4c2d078df",
     "q_graph_planar_02": "589e41debc26c37cf3f857e4953f1675727a39164882e4afcb7b35afa6286551",
     "q_graph_planar_03": "f70d610f71a3b6b3f10b5a96c1c47366d376a13cd2d572279d3a77a881259cdb",
-    "q_graph_planar_04": "8dfea532c2c507d7f0c4638ba047da1fd2a21dc5f6036ebe8b5272992fa48f7b",
+    "q_graph_planar_04": "388b1b5e5dab328efc6a6be1b80311c3bbafc1dc15506b4d52dc718ceaa3ef19",
     "q_graph_planar_05": "620b77359a145a8b3aa56023aab5060805b813ed3f2f92210f8880b0f328bc6e",
     "q_graph_planar_06": "ab133147c59ce5e1bd5cc7145bc50abc9bed36481cc37c4db97f0143dc6a15e8",
     "q_graph_planar_07": "90e518459d1d1db35d331dd01da57c92bf72ce9a972ccfc4e7dbac184eb76826",
-    "q_graph_planar_08": "4bcffe9b3eedf9127d271d322491c32e6a4b5494002fde0de56ae0c9f3c33fd8",
+    "q_graph_planar_08": "23d33d52ff61504b8248d84b00cc119dc38e49722b156115ec9a68afd80c4c3c",
     "q_graph_bipartite_01": "d3969b18e3f5fc7b780adf0b1a57254786e5b17e5ac53f6c3a9dfc863036bc8c",
     "q_graph_bipartite_02": "cfe01469208e77d63e8963d41480c7286e13db1ac232c1ed8865f112f8a89677",
     "q_graph_bipartite_03": "c417f095ea8dcddc9d097902f257b09bd15421870b736bfbf5711f516f2d4cd2",
-    "q_graph_bipartite_04": "5a7d650d08628fb17729e8a3e1906991654ade00500bdde95fff7ba145a874f5",
+    "q_graph_bipartite_04": "4d1bbfc242f174dd4a0509f434c2a03aa9aa4c5909b16e9ee39d0858dca44369",
     "q_graph_bipartite_05": "44936b251c8d1e3273a05b44c94b7bffaef33f6fb75c111493c3fb103b4558e7",
     "q_graph_bipartite_06": "92879b72616f4772da8f4098c7775aa8f4afd3abb2cdff943b3f0cb7861121dc",
     "q_graph_bipartite_07": "75c247b944cc0d96ef29b4a0dd4ae59e77eabde4662cf3046b7caabff0557141",
-    "q_graph_bipartite_08": "5b0813b5b96ff156b2f3f0c356e1631cc83e8bf82ddeb3814bcef21f8913baa4",
+    "q_graph_bipartite_08": "62d20babaf28e7f7fae901b2e5e57037f3f568514aa782b7ab609c4609cfd4b8",
     "q_graph_topological_01": "b1b6a78cd721ee91fc68a21b96d89e6f9b306841d6bc0811f04295fa8430903f",
     "q_graph_topological_02": "d2e85f116f3cbc21c492979d6aef57cef785c61f4da558f7918a749a15ff5e7f",
     "q_graph_topological_03": "16e33657cace878b116cc97b0507fe7559c7bee6212883d89cd50155441ec4e5",
-    "q_graph_topological_04": "7daa8b9c16b7cf141cee81990854216364354fc6d669c9a12beb71f83a591978",
+    "q_graph_topological_04": "6630fc2d7dda303c4b869f2b1e81d51f3bc15728dae85e6bb87ef28eee1befcb",
     "q_graph_topological_05": "3d28b2173272124da289f4753edc18cb99c381ce2607402c8a31e50ed6b7a497",
     "q_graph_topological_06": "d48afd716497e7604338337f65ec6447e7021d6754037d77f958b06ae8e45832",
     "q_graph_topological_07": "798e2bfc3a3c5b57d9ab3ffe666eb4f724391679d2fc451e1933825d361ff8ba",
-    "q_graph_topological_08": "615e403d1e2140cfebb77dd24795216456c9624bfd29985f5cdd0b7d8cc818fc",
+    "q_graph_topological_08": "3e2de5012b131cdcda18b6b4c4f754fe6f8ea7dfc16fc6641cc3b463bfe3764a",
     "q_graph_domination_01": "375af0bb3fac70ed3cb8c19d7b5601495553dc3a1e2f6082a09da308b90282db",
     "q_graph_domination_02": "310c511eeb9aed4df8ae682a1f903324035ae0b5900b63c7f65f2e79344f41af",
     "q_graph_domination_03": "6c83d9aaa756506be078b2e4e6617fc219aa037e1bc61b08f83eacf6b1163d04",
-    "q_graph_domination_04": "41b8cd67b6e606375342e429b809150d2b7471c0c8c02eeb928dee4b0689aae5",
+    "q_graph_domination_04": "890ed98432a0984feaae6e6f5cc57bbd79d8df2f4431f16a76e2d33dc52b711a",
     "q_graph_domination_05": "2cbd5a46dfa5d0bd8dd5d077436a3908a914cf202f9c882a584aeb801515c000",
     "q_graph_domination_06": "a4d7e7d98a3794b1f819da124965aeead31c88cd781fcf30cbe1c7a8cb641c32",
     "q_graph_domination_07": "3fafcae9bcf5efb6590d7d6364ec9103aa69762ad9a9d9559978a8b3906869f8",
-    "q_graph_domination_08": "604724348c9abc5f49b84e31cc648104db107cbc87fce9a2b3090a5ab72a9d7b",
+    "q_graph_domination_08": "b8ce3445c2355f2623fb9d453e269a3536716f500d59efbae40466f178e509ec",
     "q_graph_matching_01": "e403bd4859e18b190f19586ca3be951d4dc09f690bc3e765edfe53b92da00cf7",
     "q_graph_matching_02": "cf223bd4abe6f14c439cfd54b506c4fb66b6c011aaf360e5221a3fa196be9f6f",
     "q_graph_matching_03": "82910b4d27f9e307d4a04287d48bdece726bf823fc642535707b653071ba6809",
-    "q_graph_matching_04": "dd106a471caf800021680656968ee34adea79ef2e7b0aeddf14ea1e9b2e4d8b6",
+    "q_graph_matching_04": "9bc9b2c573e3b41ff7f964392678939081664de3cf2a63af7ec8d78b54fe5b08",
     "q_graph_matching_05": "6207495530b535b96a5a3da1d98e546075c96688a987f6daf8fba6d6bfba5611",
     "q_graph_matching_06": "90a41c65d97bb00dd5eddc8017804928e201c48a90448a0bb0b86f3690978c0d",
     "q_graph_matching_07": "6a4fb70f57590d2b710696898c6e250599741a1321c6ad513705bb8c1359a56c",
-    "q_graph_matching_08": "eeddee66dd91a33e72482e59ee04df712841d544c2e20508ecb47f0f1d304fc5",
+    "q_graph_matching_08": "454603f567992d95d2de6c40e89888c2f119112f5808483a632557227cc35c56",
     "q_tree_basic_01": "08ab6d2216307044609a50b813c5c27a47699e3f319d35082d04543823029bcc",
     "q_tree_basic_02": "2bfb942da988eff3d9b65f56d738aa8ce8d47de88c982fba20d1dedd190be773",
     "q_tree_basic_03": "1ec5356fb9f390add2bbd5f7597ef3469f1142c732498f3f436f9acf277e8836",
-    "q_tree_basic_04": "b08093b391da58705857f0e7d7d9eff6b07ef4973d42678d235bcb099982a502",
+    "q_tree_basic_04": "b237a40a0762975cdbcd750c8723cab3bacb466933e6fb95279b3e3b83deed85",
     "q_tree_basic_05": "b04522b99a61b324c62e88f20c9a418b8f995afb7d982d707c9c9dba29925ad5",
     "q_tree_basic_06": "ba4fe47f38d48519673123ce300d926dc7618da10ec68a0f2299bfe6df24889d",
     "q_tree_basic_07": "3bc75c9d9f8e23a090eafaa7180f5106bd765d2de093fce5659cec01a5640bdb",
-    "q_tree_basic_08": "6eaea0887f2312563b879f77b9c75557c103b6d297aabce7ef92173ed1245e0e",
+    "q_tree_basic_08": "5cf8bf2a7962d089c50f149d657ac5969c007e58ca0cb0478177bb0d98194a8e",
     "q_tree_rooted_01": "78799f5b6433cc576a33c56ba9f0aeed532ba342c64819194fd6a674fb3067b6",
     "q_tree_rooted_02": "eca585e403280b4a0c73501f00845b7db9ece173ba6c8450376bbf72bb602ce4",
     "q_tree_rooted_03": "33c5457ad5ab9d82d4ec183dcf0009bdd9f72efaaac8c45ea17649982543bb88",
-    "q_tree_rooted_04": "2d011cce6d46180fe0033f4d9bb5c76c96845979f04bc7f9d66d1d811c34e8a7",
+    "q_tree_rooted_04": "7869752e7e547da264682b8075a1bc5f45326957cf7149f234c599d19ac2c326",
     "q_tree_rooted_05": "759f39bfb6870b666aeb4ca4ca994bd8b9566c02c4dfdfc8234144064ad8f5d7",
     "q_tree_rooted_06": "4d3937f3f6fd1b6cca56623fcdb57a5986225e79d19e637a219935948db6a607",
     "q_tree_rooted_07": "b8764f2c08dbbe2e6efc9fdf30bd9156c8a616efdf0adf291ec4ca0d732cb750",
-    "q_tree_rooted_08": "ae7a21cf5bcaf83b2430833bc5ee16c0c0bb4d766a6d0313d9950a5042ee429b",
+    "q_tree_rooted_08": "e3c79917ab06a05a4bba1f867802773b5f62fde3a96ca3160f37176c5b01ef71",
     "q_tree_spanning_01": "098f001442969d7d475d3b6e7e842c023106bb1ef1353616b41bc5ee78ad41f9",
     "q_tree_spanning_02": "1bf668822246a87e3bebdf12cd14329923188e9f06b3b2202c243f29d32cbc1e",
     "q_tree_spanning_03": "a38bc95d94b87af41705b915017799c9729cd2e085d37f2f4d05c8da5064d18c",
-    "q_tree_spanning_04": "f5a430cfec650757d1a728aba8d5f05eb0c99e22dc6d8c352a8340375291405b",
+    "q_tree_spanning_04": "4fcf58a7bdc9462c852cb34214e1b8a26a689c92f0b273f429bc79f82947a7b2",
     "q_tree_spanning_05": "62f138d037605436f421c394651e5b4b225d500b69227bf775b375a28594a7b6",
     "q_tree_spanning_06": "a6fe68f042d77ace698f2875ec1f184a46628a54212ec6547bee296764c663a4",
     "q_tree_spanning_07": "2ad810c78280165bafd54c594d8ece7e9431f3b0027744fa5f59051b96d87ff7",
-    "q_tree_spanning_08": "ff8cfce5606403762c67a0a29c160bed4870c308cfa5390a5e5f9c4ce53b41ff",
+    "q_tree_spanning_08": "a9b12f809cd28d3e8599bf4178e8a8227efac03873ba36412d6c023456446d5c",
     "q_tree_mst_01": "977f384046045f3014b89c877740d617f20ac36c04e3ffb518852e2505afda1e",
     "q_tree_mst_02": "775ce4c29f595b599ecc546e2ce259e4a8684da1ad7d71a61f5ce3407301519a",
     "q_tree_mst_03": "8e72610a5c588405d4910229706eca7cd7ff72d5ba3ee461e8f3d8c52f7ea014",
-    "q_tree_mst_04": "e86205d7979277fa160bba66cb24fdbcd6d12e3c4c866dd415fdbfa979392eae",
+    "q_tree_mst_04": "af7f2a045f8077ed0e46169059297655487a363657c406b0f6760c8842eefa04",
     "q_tree_mst_05": "a7347132538fb1f1200947617a8ef3242c82c01ceb5673e9b5f66c2f65db367b",
     "q_tree_mst_06": "a5d2fb631e71d4ba7f77d13b6d4a762b3d442ce5b3367d44c2a1f9eeb81a57e4",
     "q_tree_mst_07": "d124121eb572ceb25ed1c46a867a80feac1a0f6c1bd670b5a45a360c7021fd1e",
-    "q_tree_mst_08": "7ef5d127612697122d3cad337434b1c0ed0d6b9b6fb4f63260b814d56ed74d41",
+    "q_tree_mst_08": "681c3f826b94053d9dca47ca2112b164e10e21e959eb1047a75c57c4c11847c7",
     "q_tree_matrix_tree_01": "c9477479341fd3617e0650e865185fc3f3124fe20b2d6445fe304b0c98b8916e",
     "q_tree_matrix_tree_02": "19ebf933ff94183fb7bcd7323bd14c5d5d958a2b2215b54646cd07b37b2ee1f8",
     "q_tree_matrix_tree_03": "f10e4ea176343ccbe8ce4e45315298c2b70eed2aaf2ddbb7a76539c3c2bb1c02",
-    "q_tree_matrix_tree_04": "b706acc69e8823136485529862e5d822c288d7555b3ca6fe31816a6e5980eb80",
+    "q_tree_matrix_tree_04": "d1f48cf3eb55d6cf7d84eea4ac26ac55a9688b62602890ac3ca045bf183713bc",
     "q_tree_matrix_tree_05": "22d55d7fa1171000be0c1208d9cf9617d9d93582ac6ba3e4ec6e5134396b66f7",
     "q_tree_matrix_tree_06": "dae43663c96701c40275325c520cca47952dc2fe1008226c16d63da6c15344a8",
     "q_tree_matrix_tree_07": "49a49cdeadd9c61c54612867c4f4022fca14618690e5562af45bb3a746a8c1a6",
-    "q_tree_matrix_tree_08": "5059cc73143ac978370d678336a50cfec6082b728d4e41f225b85789d9993a10",
+    "q_tree_matrix_tree_08": "8585f10517f63cf29071dfa9585856cc094a7a285eb34ff6475584ba62003864",
     "q_graph_domination_09": "46cb92fc3189e4c9dc8a765ef6d4962a9dd261861363ccdc9944d530f99d14be"
   },
   "legacy_english_question_sha256": {
@@ -1705,7 +1705,12 @@
       "statement_en": "Over the integers, let P(n) mean “n²=4”. Determine whether P(2), P(3), P(n) with n unspecified, and the question “Is there an n such that n²=4?” are propositions. Give the truth value of each proposition.",
       "difficulty": "简单",
       "difficulty_reason_zh": "区分封闭陈述、开放句和问句，并作直接代入。",
-      "type": "简答"
+      "type": "简答",
+      "knowledge_points": [
+        "logic_truth__proposition_sentence",
+        "logic_truth__truth_semantics",
+        "logic_truth__open_statement"
+      ]
     },
     "logic_truth__proposition_sentence": {
       "question_id": "q-example-logic_truth__proposition_sentence",
@@ -1745,7 +1750,11 @@
       "statement_en": "Let s mean “submission succeeds”, l mean “the user is logged in”, and n mean “the network is available”. Formalize “Submission can succeed only if the user is logged in and the network is available”. Does this guarantee success whenever both conditions hold?",
       "difficulty": "简单",
       "difficulty_reason_zh": "识别“只有……才……”的必要条件方向。",
-      "type": "简答"
+      "type": "简答",
+      "knowledge_points": [
+        "logic_connectives__implication_conditions",
+        "logic_connectives__conjunction"
+      ]
     },
     "logic_connectives__implication_conditions": {
       "question_id": "q-example-logic_connectives__implication_conditions",
@@ -1815,7 +1824,12 @@
       "statement_en": "In the order (p,q)=(0,0),(0,1),(1,0),(1,1), list the truth-value columns of p→q and q→p. Determine whether they are equivalent and whether (p→q)∨(q→p) is a tautology.",
       "difficulty": "中等",
       "difficulty_reason_zh": "需比较两列真值并计算其析取列。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "logic_truth_table__assignment_enumeration",
+        "logic_truth_table__semantic_counterexample",
+        "logic_truth_table__satisfiability_classification"
+      ]
     },
     "logic_truth_table__assignment_enumeration": {
       "question_id": "q-example-logic_truth_table__assignment_enumeration",
@@ -1855,7 +1869,11 @@
       "statement_en": "Simplify (p→q)∧(p→¬q) using logical equivalences, and determine the restrictions on p and q for the original formula to hold.",
       "difficulty": "中等",
       "difficulty_reason_zh": "需消去两个蕴含，再分配并利用矛盾式化简。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "logic_equivalence__implication_elimination",
+        "logic_equivalence__distribution_laws"
+      ]
     },
     "logic_equivalence__de_morgan": {
       "question_id": "q-example-logic_equivalence__de_morgan",
@@ -1915,7 +1933,11 @@
       "statement_en": "With designated variables p and q, find the principal disjunctive and principal conjunctive normal forms of p⊕q.",
       "difficulty": "中等",
       "difficulty_reason_zh": "需按四种赋值分别提取真行极小项与假行极大项。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "logic_normal_form__principal_dnf",
+        "logic_normal_form__principal_cnf"
+      ]
     },
     "logic_normal_form__minterms_pdnf": {
       "question_id": "q-example-logic_normal_form__minterms_pdnf",
@@ -1995,7 +2017,10 @@
       "statement_en": "Prove that r follows from p∨q, p→r, and q→r, using cases on the truth value of p if desired.",
       "difficulty": "中等",
       "difficulty_reason_zh": "需穷尽两个分支并在各分支应用对应蕴含。",
-      "type": "证明"
+      "type": "证明",
+      "knowledge_points": [
+        "logic_reasoning__case_reasoning"
+      ]
     },
     "logic_reasoning__basic_rules": {
       "question_id": "q-example-logic_reasoning__basic_rules",
@@ -2035,7 +2060,11 @@
       "statement_en": "On D={1,2,3}, let R(x,y) mean that x divides y. Evaluate R(1,3) and R(3,1), and list all tuples for which R is true.",
       "difficulty": "简单",
       "difficulty_reason_zh": "对有限论域的九个有序对逐一检查整除。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "predicate_domain__predicate_arity",
+        "predicate_domain__relation_extension"
+      ]
     },
     "predicate_domain__predicate_arity": {
       "question_id": "q-example-predicate_domain__predicate_arity",
@@ -2075,7 +2104,11 @@
       "statement_en": "In ∀x(P(x,y)→∃y Q(x,y,z)), classify each occurrence of a variable in P and Q as free or bound, and give the set of free variables.",
       "difficulty": "中等",
       "difficulty_reason_zh": "需按嵌套量词辖域逐次区分同名变量的不同出现。",
-      "type": "简答"
+      "type": "简答",
+      "knowledge_points": [
+        "predicate_variable__free_bound_scope",
+        "predicate_variable__quantifier_scope"
+      ]
     },
     "predicate_variable__free_bound_scope": {
       "question_id": "q-example-predicate_variable__free_bound_scope",
@@ -2125,7 +2158,10 @@
       "statement_en": "Over the integers, evaluate ∀x∃y(y>x) and ∃y∀x(y>x). For a true statement describe how to choose witnesses; for a false one explain how to construct a counterexample.",
       "difficulty": "中等",
       "difficulty_reason_zh": "要区分依赖 x 的见证与对所有 x 固定的见证。",
-      "type": "简答"
+      "type": "简答",
+      "knowledge_points": [
+        "predicate_quantifier__quantifier_order"
+      ]
     },
     "predicate_quantifier__quantifier_order": {
       "question_id": "q-example-predicate_quantifier__quantifier_order",
@@ -2185,7 +2221,12 @@
       "statement_en": "From ∀x(P(x)→Q(x)) and ∃xP(x), prove ∃xQ(x), ensuring that the conclusion does not depend on the name of a temporary witness.",
       "difficulty": "中等",
       "difficulty_reason_zh": "需合法使用存在见证、全称实例化与存在引入。",
-      "type": "证明"
+      "type": "证明",
+      "knowledge_points": [
+        "predicate_reasoning__existential_instantiation",
+        "predicate_reasoning__universal_instantiation",
+        "predicate_reasoning__existential_generalization"
+      ]
     },
     "predicate_reasoning__quantifier_negation": {
       "question_id": "q-example-predicate_reasoning__quantifier_negation",
@@ -2255,7 +2296,11 @@
       "statement_en": "Over a nonempty domain, convert (∀xP(x))∨(∃xQ(x)) to prenex normal form, first renaming the bound variables to distinct fresh names.",
       "difficulty": "中等",
       "difficulty_reason_zh": "需要标准化两个绑定并核对外提时的自由变量条件。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "predicate_prenex__standardizing_apart",
+        "predicate_prenex__quantifier_movement"
+      ]
     },
     "predicate_prenex__prenex_structure": {
       "question_id": "q-example-predicate_prenex__prenex_structure",
@@ -2295,7 +2340,10 @@
       "statement_en": "Let n be an integer. Prove by contradiction that if n² is even, then n is even.",
       "difficulty": "中等",
       "difficulty_reason_zh": "需准确否定结论，并把奇数平方写为奇数形式制造矛盾。",
-      "type": "证明"
+      "type": "证明",
+      "knowledge_points": [
+        "proof_direct_contradiction__contradiction"
+      ]
     },
     "proof_direct_contradiction__direct_proof": {
       "question_id": "q-example-proof_direct_contradiction__direct_proof",
@@ -2335,7 +2383,11 @@
       "statement_en": "Prove by mathematical induction that 1+2+⋯+n=n(n+1)/2 for every integer n≥1.",
       "difficulty": "中等",
       "difficulty_reason_zh": "需完成归纳基础与将新增项并入旧和式的归纳步。",
-      "type": "证明"
+      "type": "证明",
+      "knowledge_points": [
+        "proof_induction__induction_principle",
+        "proof_induction__induction_algebra_inequality"
+      ]
     },
     "proof_induction__induction_principle": {
       "question_id": "q-example-proof_induction__induction_principle",
@@ -2375,7 +2427,11 @@
       "statement_en": "Prove by strong induction that every integer n≥2 can be expressed as a product of primes.",
       "difficulty": "中等",
       "difficulty_reason_zh": "合数情形需分解为两个较小因子，并分别调用强归纳假设。",
-      "type": "证明"
+      "type": "证明",
+      "knowledge_points": [
+        "proof_strong_induction__strong_hypothesis",
+        "proof_strong_induction__recursive_decomposition"
+      ]
     },
     "proof_strong_induction__strong_hypothesis": {
       "question_id": "q-example-proof_strong_induction__strong_hypothesis",
@@ -2415,7 +2471,14 @@
       "statement_en": "Let U={1,2,3,4,5}, A={1,3,5}, and B={2,3}. Find A∩B, A∪B, A∖B, A△B, and the complement of A in U.",
       "difficulty": "简单",
       "difficulty_reason_zh": "在五元素全集上逐项应用集合运算定义。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "set_operation__intersection",
+        "set_operation__union",
+        "set_operation__difference",
+        "set_operation__symmetric_difference",
+        "set_operation__complement"
+      ]
     },
     "set_operation__complement": {
       "question_id": "q-example-set_operation__complement",
@@ -2515,7 +2578,11 @@
       "statement_en": "Let A={1,2}, B={x,y}, and R={(1,x),(1,y)}. Find |A×B| and determine whether R is a binary relation from A to B. Does 1 having two related elements while 2 has none prevent R from being a relation?",
       "difficulty": "简单",
       "difficulty_reason_zh": "计算笛卡尔积大小并按关系是其子集的定义判断。",
-      "type": "简答"
+      "type": "简答",
+      "knowledge_points": [
+        "relation_cartesian__cartesian_product",
+        "relation_cartesian__binary_relation"
+      ]
     },
     "relation_cartesian__binary_relation": {
       "question_id": "q-example-relation_cartesian__binary_relation",
@@ -2575,7 +2642,11 @@
       "statement_en": "On A={1,2,3}, let R={(1,2),(2,3)}. Find the relation powers R² and R³.",
       "difficulty": "简单",
       "difficulty_reason_zh": "枚举长度为 2、3 的关系链。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "relation_operation__powers",
+        "relation_operation__composition"
+      ]
     },
     "relation_operation__complement_relation": {
       "question_id": "q-example-relation_operation__complement_relation",
@@ -2635,7 +2706,13 @@
       "statement_en": "On A={1,2,3}, let R={(1,1),(2,2),(3,3),(1,2),(2,1)}. Determine whether R is reflexive, symmetric, antisymmetric, and transitive. For any property that fails, identify the relevant ordered pairs.",
       "difficulty": "中等",
       "difficulty_reason_zh": "需分别检查四类性质，尤其区分对称与反对称。",
-      "type": "简答"
+      "type": "简答",
+      "knowledge_points": [
+        "relation_property__reflexivity",
+        "relation_property__symmetry",
+        "relation_property__antisymmetry",
+        "relation_property__transitivity"
+      ]
     },
     "relation_property__antisymmetry": {
       "question_id": "q-example-relation_property__antisymmetry",
@@ -2695,7 +2772,11 @@
       "statement_en": "On A={0,1,2,3,4,5}, define R by congruence modulo 3. List its equivalence classes and find the number of ordered pairs in R.",
       "difficulty": "中等",
       "difficulty_reason_zh": "先分类，再把各类大小的平方相加。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "relation_equivalence__classes",
+        "relation_equivalence__partitions"
+      ]
     },
     "relation_equivalence__classes": {
       "question_id": "q-example-relation_equivalence__classes",
@@ -2745,7 +2826,13 @@
       "statement_en": "Order {1,2,3,6} by divisibility. Find the least and greatest elements, determine whether 2 and 3 are comparable, and list all cover relations.",
       "difficulty": "中等",
       "difficulty_reason_zh": "需同时核对极端元素、可比性与无中间元素的覆盖条件。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "relation_order__least",
+        "relation_order__greatest",
+        "relation_order__total_order",
+        "relation_order__hasse_diagram"
+      ]
     },
     "relation_order__greatest": {
       "question_id": "q-example-relation_order__greatest",
@@ -2875,7 +2962,11 @@
       "statement_en": "Let A={1,2,3} and R={(1,2),(2,3)}. Find the transitive closure R⁺ and the reflexive-transitive closure R*.",
       "difficulty": "简单",
       "difficulty_reason_zh": "先补两步路径关联，再为自反传递闭包补齐三个自环。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "relation_closure__transitive_closure",
+        "relation_closure__reflexive_transitive_closure"
+      ]
     },
     "relation_closure__equivalence_closure": {
       "question_id": "q-example-relation_closure__equivalence_closure",
@@ -2935,7 +3026,13 @@
       "statement_en": "Let \\(A=\\{1,2,3\\}\\), \\(B=\\{a,b,c\\}\\), and \\(f(1)=a,f(2)=a,f(3)=b\\). Is this a function from \\(A\\) to \\(B\\)? State its image, codomain, and \\(f^{-1}[\\{a\\}]\\).",
       "difficulty": "简单",
       "difficulty_reason_zh": "直接检查有限映射并区分像与陪域。",
-      "type": "简答"
+      "type": "简答",
+      "knowledge_points": [
+        "function_mapping__total_single_valued",
+        "function_mapping__domain_codomain",
+        "function_mapping__image",
+        "function_mapping__preimage"
+      ]
     },
     "function_mapping__domain_codomain": {
       "question_id": "q-example-function_mapping__domain_codomain",
@@ -2995,7 +3092,12 @@
       "statement_en": "For \\(f:\\mathbb Z\\to\\mathbb Z\\), \\(f(n)=2n\\), determine injectivity and surjectivity. If only the codomain is changed to \\(2\\mathbb Z\\), is the same rule bijective?",
       "difficulty": "简单",
       "difficulty_reason_zh": "分别检查输入可区分性与偶数输出覆盖。",
-      "type": "简答"
+      "type": "简答",
+      "knowledge_points": [
+        "function_injection__injection",
+        "function_injection__surjection",
+        "function_injection__bijection"
+      ]
     },
     "function_injection__bijection": {
       "question_id": "q-example-function_injection__bijection",
@@ -3035,7 +3137,11 @@
       "statement_en": "On the integers, let \\(f(n)=n+2\\) and \\(g(n)=3n\\). Compute \\((g\\circ f)(n)\\) and \\((f\\circ g)(n)\\), and determine whether the composites are equal.",
       "difficulty": "简单",
       "difficulty_reason_zh": "按由内到外的顺序代入两个一次函数。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "function_composition__typed_composition",
+        "function_composition__noncommutativity"
+      ]
     },
     "function_composition__associativity": {
       "question_id": "q-example-function_composition__associativity",
@@ -3095,7 +3201,10 @@
       "statement_en": "Let \\(f:\\mathbb Z\\to2\\mathbb Z\\) satisfy \\(f(n)=2n\\). State its inverse and the inverse domain. If the codomain of \\(f\\) is changed to \\(\\mathbb Z\\), can an inverse be defined on the entire new codomain?",
       "difficulty": "简单",
       "difficulty_reason_zh": "用偶数输出的唯一原像检查逆函数定义域。",
-      "type": "简答"
+      "type": "简答",
+      "knowledge_points": [
+        "function_inverse__inverse_existence"
+      ]
     },
     "function_inverse__inverse_composition": {
       "question_id": "q-example-function_inverse__inverse_composition",
@@ -3157,7 +3266,11 @@
       "statement_en": "Find the prime factorization of \\(756\\), and use it to count its positive divisors.",
       "difficulty": "简单",
       "difficulty_reason_zh": "标准素因数分解后使用指数加一的乘积。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "number_prime__factorization",
+        "number_prime__divisor_counting"
+      ]
     },
     "number_prime__divisibility": {
       "question_id": "q-example-number_prime__divisibility",
@@ -3207,7 +3320,10 @@
       "statement_en": "Use the Euclidean algorithm to find \\(\\gcd(252,198)\\), showing the successive divisions.",
       "difficulty": "简单",
       "difficulty_reason_zh": "四次小整数带余除法即可确定最后非零余数。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "number_gcd__euclidean"
+      ]
     },
     "number_gcd__bezout": {
       "question_id": "q-example-number_gcd__bezout",
@@ -3277,7 +3393,10 @@
       "statement_en": "Check whether \\(2\\cdot1\\) and \\(2\\cdot5\\) are congruent modulo \\(8\\). If they are, may the factor \\(2\\) be canceled to conclude \\(1\\equiv5\\pmod8\\)? Explain.",
       "difficulty": "简单",
       "difficulty_reason_zh": "通过直接求余识别非互素因子的非法消去。",
-      "type": "简答"
+      "type": "简答",
+      "knowledge_points": [
+        "number_congruence__cancellation"
+      ]
     },
     "number_congruence__arithmetic": {
       "question_id": "q-example-number_congruence__arithmetic",
@@ -3327,7 +3446,11 @@
       "statement_en": "Solve \\(6x\\equiv8\\pmod{14}\\): first reduce the congruence appropriately, then list all residue solutions modulo the original modulus \\(14\\).",
       "difficulty": "中等",
       "difficulty_reason_zh": "需要公因子约简、求模逆和解的提升三个步骤。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "number_linear_congruence__lifting",
+        "number_linear_congruence__inverses"
+      ]
     },
     "number_linear_congruence__inverses": {
       "question_id": "q-example-number_linear_congruence__inverses",
@@ -3367,7 +3490,10 @@
       "statement_en": "Solve \\(x\\equiv2\\pmod3\\), \\(x\\equiv3\\pmod5\\), and explain why all solutions form one residue class modulo \\(15\\).",
       "difficulty": "中等",
       "difficulty_reason_zh": "求出公共解后还需用互素模数解释解的周期。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "number_inverse_crt__coprime_systems"
+      ]
     },
     "number_inverse_crt__compatibility": {
       "question_id": "q-example-number_inverse_crt__compatibility",
@@ -3407,7 +3533,11 @@
       "statement_en": "Compute \\(\\varphi(36)\\), and use an appropriate modular-power theorem to find the remainder of \\(3^{100}\\) modulo \\(7\\).",
       "difficulty": "中等",
       "difficulty_reason_zh": "分别使用素因数分解的欧拉函数公式与模幂指数约简。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "number_euler_fermat__totient",
+        "number_euler_fermat__fermat_theorem"
+      ]
     },
     "number_euler_fermat__euler_theorem": {
       "question_id": "q-example-number_euler_fermat__euler_theorem",
@@ -3457,7 +3587,11 @@
       "statement_en": "For a toy RSA system take \\(p=5,q=11,e=3\\) and message \\(m=7\\). Find \\(n\\), \\(\\varphi(n)\\), the least positive private exponent \\(d\\), and the encryption and decryption results.",
       "difficulty": "中等",
       "difficulty_reason_zh": "串联参数生成、模逆和两次模幂运算。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "number_rsa__key_generation",
+        "number_rsa__modular_powers"
+      ]
     },
     "number_rsa__crt_correctness": {
       "question_id": "q-example-number_rsa__crt_correctness",
@@ -3507,7 +3641,11 @@
       "statement_en": "A document is delivered either with one of 3 paper covers or with one of 2 electronic licenses, with the delivery modes mutually exclusive. Count the options. How many options are there if one cover and one license are instead selected together?",
       "difficulty": "简单",
       "difficulty_reason_zh": "分别识别互斥分类求和与独立分步相乘。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "count_basic__disjoint_sum",
+        "count_basic__step_product"
+      ]
     },
     "count_basic__disjoint_sum": {
       "question_id": "q-example-count_basic__disjoint_sum",
@@ -3547,7 +3685,11 @@
       "statement_en": "Choose 2 of 5 distinct students for an activity. How many choices are there without assigned roles? How many assignments are there if one is the host and the other the recorder?",
       "difficulty": "简单",
       "difficulty_reason_zh": "对同一对象分别使用无序组合与有序排列。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "count_perm_comb__subset_selection",
+        "count_perm_comb__ordered_selection"
+      ]
     },
     "count_perm_comb__ordered_selection": {
       "question_id": "q-example-count_perm_comb__ordered_selection",
@@ -3587,7 +3729,10 @@
       "statement_en": "Find the coefficient of x² in the expansion of (2+x)^4.",
       "difficulty": "简单",
       "difficulty_reason_zh": "选取贡献 x 的两个因子并计算其余常数因子的乘积。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "count_binomial__coefficient"
+      ]
     },
     "count_binomial__coefficient": {
       "question_id": "q-example-count_binomial__coefficient",
@@ -3627,7 +3772,10 @@
       "statement_en": "Each of 10 samples receives one of 4 labels. Prove that some label occurs on at least 3 samples.",
       "difficulty": "简单",
       "difficulty_reason_zh": "假定每类最多 2 件会与总样品数矛盾。",
-      "type": "证明"
+      "type": "证明",
+      "knowledge_points": [
+        "count_pigeonhole__capacity"
+      ]
     },
     "count_pigeonhole__capacity": {
       "question_id": "q-example-count_pigeonhole__capacity",
@@ -3667,7 +3815,10 @@
       "statement_en": "Eighteen applications satisfy condition A, fifteen satisfy B, and seven satisfy both. How many satisfy at least one condition, and why is the intersection count subtracted?",
       "difficulty": "简单",
       "difficulty_reason_zh": "应用两个集合的容斥公式并解释重复计数。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "count_inclusion__two_set"
+      ]
     },
     "count_inclusion__two_set": {
       "question_id": "q-example-count_inclusion__two_set",
@@ -3707,7 +3858,10 @@
       "statement_en": "Choose either 0 or 1 red token and any nonnegative number of blue tokens, with tokens of the same color indistinguishable and choices independent. Let the power of x record the total number of tokens. Find the ordinary generating function, its constant coefficient, and its coefficient at any positive degree.",
       "difficulty": "中等",
       "difficulty_reason_zh": "需把两种选择的级数相乘，并分别分析零次与正次系数。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "count_generating__counting_product"
+      ]
     },
     "count_generating__formal_series": {
       "question_id": "q-example-count_generating__formal_series",
@@ -3747,7 +3901,10 @@
       "statement_en": "Tile a one-dimensional strip of length n using tiles of lengths 1 and 2, and let a_n count the tilings for n≥0. Classify by the first tile to obtain a recurrence and the values a₀,a₁, explaining the empty-strip convention.",
       "difficulty": "中等",
       "difficulty_reason_zh": "需要互斥分类并使递推与空对象基础相容。",
-      "type": "简答"
+      "type": "简答",
+      "knowledge_points": [
+        "recurrence_model__state_partition"
+      ]
     },
     "recurrence_model__state_partition": {
       "question_id": "q-example-recurrence_model__state_partition",
@@ -3787,7 +3944,10 @@
       "statement_en": "Find the general solution of a_n=3a_{n−1}−2a_{n−2} for n≥2, then determine the solution satisfying a₀=2 and a₁=3.",
       "difficulty": "中等",
       "difficulty_reason_zh": "需分解特征方程并利用两个初值解常数。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "recurrence_homogeneous__distinct_roots"
+      ]
     },
     "recurrence_homogeneous__distinct_roots": {
       "question_id": "q-example-recurrence_homogeneous__distinct_roots",
@@ -3827,7 +3987,11 @@
       "statement_en": "For n≥1, let a_n=2a_{n−1}+1. Find a constant particular solution and the general solution, then determine the solution satisfying a₀=0.",
       "difficulty": "中等",
       "difficulty_reason_zh": "需将齐次解与特解叠加，再用初值确定常数。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "recurrence_nonhomogeneous__nonresonant",
+        "recurrence_nonhomogeneous__superposition"
+      ]
     },
     "recurrence_nonhomogeneous__superposition": {
       "question_id": "q-example-recurrence_nonhomogeneous__superposition",
@@ -3867,7 +4031,11 @@
       "statement_en": "Let a_n=a_{n−1}+a_{n−2} for n≥2. Is the sequence unique if only a₀=1 is given? If a₁=2 is also given, list the first five terms. Are the conditions compatible if a₂=9 is additionally required?",
       "difficulty": "中等",
       "difficulty_reason_zh": "需分别检查初值不足、正向递推及额外条件矛盾三种情形。",
-      "type": "简答"
+      "type": "简答",
+      "knowledge_points": [
+        "recurrence_initial__forward_unique",
+        "recurrence_initial__compatibility"
+      ]
     },
     "recurrence_initial__forward_unique": {
       "question_id": "q-example-recurrence_initial__forward_unique",
@@ -3907,7 +4075,12 @@
       "statement_en": "Let a simple undirected graph have V={a,b,c,d} and E={ab,ac,bc,cd}, where ab denotes the unordered pair {a,b}. Find each vertex degree and the degree sum, and check the handshaking identity.",
       "difficulty": "简单",
       "difficulty_reason_zh": "逐点数关联边，并将度数和与边数的两倍比较。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "graph_basic__undirected_graph",
+        "graph_basic__degree",
+        "graph_basic__handshake"
+      ]
     },
     "graph_basic__simple_graph": {
       "question_id": "q-example-graph_basic__simple_graph",
@@ -3997,7 +4170,10 @@
       "statement_en": "Determine whether the paths a—b—c—d and 1—3—4—2 are isomorphic. If so, give one vertex mapping. Does the position of vertices on the page affect the answer?",
       "difficulty": "简单",
       "difficulty_reason_zh": "沿路径顺序建立保邻接双射即可。",
-      "type": "简答"
+      "type": "简答",
+      "knowledge_points": [
+        "graph_isomorphism__mapping"
+      ]
     },
     "graph_isomorphism__mapping": {
       "question_id": "q-example-graph_isomorphism__mapping",
@@ -4037,7 +4213,11 @@
       "statement_en": "For the undirected path a—b—c, write the adjacency matrix A in vertex order (a,b,c), compute (A²)_{ac}, and interpret that entry in terms of walks.",
       "difficulty": "简单",
       "difficulty_reason_zh": "构造三阶矩阵并检查唯一的两步中间顶点。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "graph_adjacency__construction",
+        "graph_adjacency__walk_powers"
+      ]
     },
     "graph_adjacency__construction": {
       "question_id": "q-example-graph_adjacency__construction",
@@ -4087,7 +4267,11 @@
       "statement_en": "An undirected graph consists of the single edge a—b. Use row order (a,b), orient the edge a→b, and assign −1 at the tail and +1 at the head. Write the signed incidence matrix B, compute BBᵀ, and compare it with D−A for the undirected graph.",
       "difficulty": "简单",
       "difficulty_reason_zh": "需构造一列关联矩阵，再作矩阵乘法与拉普拉斯比较。",
-      "type": "计算"
+      "type": "计算",
+      "knowledge_points": [
+        "graph_matrix__signed_incidence",
+        "graph_matrix__laplacian"
+      ]
     },
     "graph_matrix__unsigned_incidence": {
       "question_id": "q-example-graph_matrix__unsigned_incidence",
@@ -4137,7 +4321,11 @@
       "statement_en": "For the undirected graph V={a,b,c,d,e,f}, E={ab,bc,de}, list all connected components and decide whether c is reachable from a.",
       "difficulty": "中等",
       "type": "简答",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "graph_connectivity__components",
+        "graph_connectivity__simple_paths"
+      ]
     },
     "graph_connectivity__simple_paths": {
       "question_id": "q-example-graph_connectivity__simple_paths",
@@ -4237,7 +4425,11 @@
       "statement_en": "Triangles abc and def are connected only by an additional edge cd. Find all bridges and articulation vertices, and explain the status of edges inside the triangles.",
       "difficulty": "中等",
       "type": "简答",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "graph_cut__bridges",
+        "graph_cut__articulation"
+      ]
     },
     "graph_cut__articulation": {
       "question_id": "q-example-graph_cut__articulation",
@@ -4277,7 +4469,11 @@
       "statement_en": "There is a direct edge st of weight 9, and a route s—a—b—t whose three edges each have weight 2. Compare the two routes by edge count and total cost.",
       "difficulty": "简单",
       "type": "计算",
-      "difficulty_reason_zh": "只需分别数边与相加边权。"
+      "difficulty_reason_zh": "只需分别数边与相加边权。",
+      "knowledge_points": [
+        "graph_weighted__path_cost",
+        "graph_weighted__optimization_objectives"
+      ]
     },
     "graph_weighted__path_cost": {
       "question_id": "q-example-graph_weighted__path_cost",
@@ -4327,7 +4523,11 @@
       "statement_en": "An undirected graph has edges ab,bc,cd,da,ac. Find the vertex degrees, construct a walk using every edge exactly once, and decide whether an Euler circuit exists.",
       "difficulty": "中等",
       "type": "简答",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "graph_euler__open_trail",
+        "graph_euler__undirected_circuit"
+      ]
     },
     "graph_euler__undirected_circuit": {
       "question_id": "q-example-graph_euler__undirected_circuit",
@@ -4377,7 +4577,11 @@
       "statement_en": "The parts of K₂,₃ are {a,b} and {x,y,z}. Give a Hamilton path and decide whether a Hamilton cycle exists, explaining the role of the part sizes.",
       "difficulty": "中等",
       "type": "简答",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "graph_hamilton__spanning_paths",
+        "graph_hamilton__necessary"
+      ]
     },
     "graph_hamilton__spanning_paths": {
       "question_id": "q-example-graph_hamilton__spanning_paths",
@@ -4427,7 +4631,10 @@
       "statement_en": "A weighted digraph has s→a:4, s→b:1, b→a:2, a→t:1 and b→t:7. Find a shortest s-to-t path and its cost, and compare it with s→a→t.",
       "difficulty": "中等",
       "type": "计算",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "graph_shortest__dijkstra"
+      ]
     },
     "graph_shortest__bfs": {
       "question_id": "q-example-graph_shortest__bfs",
@@ -4489,7 +4696,11 @@
       "statement_en": "Find the chromatic numbers of the cycle 1—2—3—4—5—6—1 and of a five-cycle. Give a proper coloring of the six-cycle and explain the parity distinction.",
       "difficulty": "中等",
       "type": "简答",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "graph_coloring__bipartite",
+        "graph_coloring__chromatic_bounds"
+      ]
     },
     "graph_coloring__chromatic_bounds": {
       "question_id": "q-example-graph_coloring__chromatic_bounds",
@@ -4539,7 +4750,11 @@
       "statement_en": "Draw three vertices of K₄ as a triangle and put the fourth inside, joined to all three corners. Count vertices, edges and faces, including the outer face, and check Euler’s formula.",
       "difficulty": "中等",
       "type": "计算",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "graph_planar__embedding",
+        "graph_planar__euler"
+      ]
     },
     "graph_planar__embedding": {
       "question_id": "q-example-graph_planar__embedding",
@@ -4579,7 +4794,11 @@
       "statement_en": "An undirected graph has edges ab,ad,bc,cd,ce. Give a bipartition. Does it remain bipartite after adding ac? Justify your answer.",
       "difficulty": "中等",
       "type": "简答",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "graph_bipartite__bipartition",
+        "graph_bipartite__odd_cycle"
+      ]
     },
     "graph_bipartite__bipartition": {
       "question_id": "q-example-graph_bipartite__bipartition",
@@ -4619,7 +4838,10 @@
       "statement_en": "A digraph has arcs a→c,b→c,b→d,c→e,d→e. Test orders (a,b,c,d,e), (b,d,a,c,e) and (a,c,b,d,e), identifying a violated arc for any invalid order.",
       "difficulty": "中等",
       "type": "简答",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "graph_topological__dag"
+      ]
     },
     "graph_topological__dag": {
       "question_id": "q-example-graph_topological__dag",
@@ -4659,7 +4881,12 @@
       "statement_en": "For the path 1—2—3—4—5, give a minimum dominating set, minimum vertex cover and maximum independent set, and compare their sizes.",
       "difficulty": "困难",
       "type": "简答",
-      "difficulty_reason_zh": "需区分三种全局优化定义并分别构造达到最优大小的集合。"
+      "difficulty_reason_zh": "需区分三种全局优化定义并分别构造达到最优大小的集合。",
+      "knowledge_points": [
+        "graph_domination__dominating",
+        "graph_domination__vertex_cover",
+        "graph_domination__independent"
+      ]
     },
     "graph_domination__dominating": {
       "question_id": "q-example-graph_domination__dominating",
@@ -4709,7 +4936,11 @@
       "statement_en": "In the path 1—2—3—4, decide whether M={23} is maximal and maximum. Give an augmenting path relative to M, flip it, and determine whether the new matching is perfect.",
       "difficulty": "中等",
       "type": "简答",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "graph_matching__maximal_maximum",
+        "graph_matching__augmenting"
+      ]
     },
     "graph_matching__maximal_maximum": {
       "question_id": "q-example-graph_matching__maximal_maximum",
@@ -4749,7 +4980,10 @@
       "statement_en": "A tree has 12 vertices, maximum degree at most 3, and exactly three vertices of degree 3. Find the numbers of leaves and degree-2 vertices, stating the equations used.",
       "difficulty": "中等",
       "type": "计算",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "tree_basic__degree_leaves"
+      ]
     },
     "tree_basic__equivalent": {
       "question_id": "q-example-tree_basic__equivalent",
@@ -4789,7 +5023,11 @@
       "statement_en": "Measure height in edges. Root the path A—B—C—D—E first at A and then at C. Give each rooted tree’s height and leaves. Do the degree-1 vertices of the underlying undirected tree change?",
       "difficulty": "中等",
       "type": "简答",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "tree_rooted__depth_height",
+        "tree_rooted__hierarchy"
+      ]
     },
     "tree_rooted__hierarchy": {
       "question_id": "q-example-tree_rooted__hierarchy",
@@ -4829,7 +5067,10 @@
       "statement_en": "Attach a new leaf by one edge to C₆. Which edge must every spanning tree keep, how many cycle edges must it delete, and how many distinct spanning trees result?",
       "difficulty": "中等",
       "type": "计算",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "tree_spanning__bridge_count"
+      ]
     },
     "tree_spanning__construction": {
       "question_id": "q-example-tree_spanning__construction",
@@ -4869,7 +5110,10 @@
       "statement_en": "A triangle has w(ab)=−3,w(ac)=1,w(bc)=4. Compute all spanning-tree weights, identify an MST, and explain whether negative edge weights make the problem meaningless.",
       "difficulty": "中等",
       "type": "计算",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "tree_mst__greedy"
+      ]
     },
     "tree_mst__greedy": {
       "question_id": "q-example-tree_mst__greedy",
@@ -4909,7 +5153,11 @@
       "statement_en": "Write the Laplacian of K₃, delete its last row and column, and compute the resulting principal minor. Compare the matrix-tree count with direct edge-deletion counting.",
       "difficulty": "中等",
       "type": "计算",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "tree_matrix_tree__laplacian",
+        "tree_matrix_tree__cofactor"
+      ]
     },
     "tree_matrix_tree__laplacian": {
       "question_id": "q-example-tree_matrix_tree__laplacian",
@@ -4949,7 +5197,11 @@
       "statement_en": "On the integers define a*b=a+b+2. Check associativity and determine the two-sided identity.",
       "difficulty": "中等",
       "type": "简答",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "algebra_system__associativity",
+        "algebra_system__identity_elements"
+      ]
     },
     "algebra_system__associativity": {
       "question_id": "q-example-algebra_system__associativity",
@@ -5019,7 +5271,12 @@
       "statement_en": "For the reduction map of additive groups φ:ℤ₆→ℤ₃, φ([x]₆)=[x]₃, determine surjectivity and the homomorphism property, find the kernel, and decide injectivity and isomorphism.",
       "difficulty": "中等",
       "type": "简答",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "algebra_homomorphism__operation_preservation",
+        "algebra_homomorphism__images",
+        "algebra_homomorphism__kernels"
+      ]
     },
     "algebra_homomorphism__images": {
       "question_id": "q-example-algebra_homomorphism__images",
@@ -5079,7 +5336,11 @@
       "statement_en": "In the additive group (ℤ₁₂,+), find the order of 4 and the subgroup it generates, listing the successive multiples that determine the order.",
       "difficulty": "中等",
       "type": "计算",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "algebra_group__element_orders",
+        "algebra_group__cyclic_subgroups"
+      ]
     },
     "algebra_group__axioms_inverses": {
       "question_id": "q-example-algebra_group__axioms_inverses",
@@ -5149,7 +5410,12 @@
       "statement_en": "List the units of ℤ₆ and use a nonzero zero divisor to decide whether it is a field. Also find the inverse of 3 in ℤ₇.",
       "difficulty": "中等",
       "type": "计算",
-      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+      "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。",
+      "knowledge_points": [
+        "algebra_ring_field__units",
+        "algebra_ring_field__zero_divisors",
+        "algebra_ring_field__finite_fields"
+      ]
     },
     "algebra_ring_field__finite_fields": {
       "question_id": "q-example-algebra_ring_field__finite_fields",
@@ -5209,7 +5475,12 @@
       "statement_en": "Order the positive divisors of 12 by divisibility. Identify meet, join, least and greatest elements, and determine with justification whether 2 has a complement.",
       "difficulty": "困难",
       "type": "简答",
-      "difficulty_reason_zh": "需把gcd/lcm与格的交并对应，并穷查补元所需的两个条件。"
+      "difficulty_reason_zh": "需把gcd/lcm与格的交并对应，并穷查补元所需的两个条件。",
+      "knowledge_points": [
+        "algebra_lattice_bool__meets_joins",
+        "algebra_lattice_bool__bounded_lattices",
+        "algebra_lattice_bool__complements"
+      ]
     },
     "algebra_lattice_bool__boolean_algebras": {
       "question_id": "q-example-algebra_lattice_bool__boolean_algebras",
@@ -5260,6 +5531,26 @@
       "difficulty": "中等",
       "type": "简答",
       "difficulty_reason_zh": "需结合定义逐项判断或完成相互关联的计算。"
+    },
+    "recurrence_homogeneous__linear_structure": {
+      "question_id": "q-example-recurrence_homogeneous__linear_structure",
+      "statement_zh": "已知 u_n=2^n、v_n=3^n 都满足 a_n=5a_(n−1)−6a_(n−2)（n≥2）。令 w_n=2u_n−v_n。利用线性叠加说明 w 是否满足同一递推，求 w₀、w₁，再用递推计算 w₂ 并与定义核对。",
+      "statement_en": "Both u_n=2^n and v_n=3^n satisfy a_n=5a_(n−1)−6a_(n−2) for n≥2. Define w_n=2u_n−v_n. Use linear superposition to decide whether w satisfies the same recurrence. Find w₀ and w₁, then compute w₂ from the recurrence and check it against the definition.",
+      "difficulty": "简单",
+      "type": "简答",
+      "difficulty_reason_zh": "直接应用同一齐次线性递推的叠加性质，组合两个初值并作一次代入核对，无需求特征根。",
+      "example_sha256": "e43d1a692eb0ac50a8210c80243fd80a5a71d178045560a623fb430a0d470c1d",
+      "english_example_sha256": "39b9d1067a59f54f409b2b77aeff595ce05e36258041960949d78a8b5d3ae3ec"
+    },
+    "graph_weighted__vertex_strength": {
+      "question_id": "q-example-graph_weighted__vertex_strength",
+      "statement_zh": "无向简单图的顶点为a、b、c，边为ab、bc、ac，权分别为2、−1、0。顶点强度定义为其关联边权之和。求三个顶点的强度，并计算全体顶点强度之和与边权总和的两倍，核对加权握手恒等式。",
+      "statement_en": "An undirected simple graph has vertices a, b and c, and edges ab, bc and ac with weights 2, −1 and 0, respectively. Define a vertex strength as the sum of its incident edge weights. Find all three strengths, then compute their sum and twice the total edge weight to check the weighted handshaking identity.",
+      "difficulty": "简单",
+      "type": "计算",
+      "difficulty_reason_zh": "对三个顶点分别作两项边权求和，再核对两种总和，仅需直接代入定义和有符号整数运算。",
+      "example_sha256": "1ac6b63d7c04bc9f19d1277d9b5a181cabeb41ab82eafa73d9a494095e99f720",
+      "english_example_sha256": "32f1a8fb7aeaa1d7290cbeaa94a886f992ddf39eb4ff39ef09d4677981fe5050"
     }
   }
 }

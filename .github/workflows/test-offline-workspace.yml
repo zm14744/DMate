@@ -13,6 +13,7 @@ on:
       - 'scripts/sync_offline_styles.py'
       - 'scripts/sync_offline_shell.py'
       - 'scripts/sync_offline_content.py'
+      - 'scripts/offline_question_classification.py'
       - 'scripts/migrate_concept_examples.py'
       - 'scripts/test_offline_example_migration.py'
       - 'scripts/offline_translations.py'
@@ -40,6 +41,7 @@ on:
       - 'scripts/test_drawing_controls_browser.cjs'
       - 'scripts/test_module_filter_chrome_browser.cjs'
       - 'scripts/test_learning_links_browser.cjs'
+      - 'scripts/test_library_selection_browser.cjs'
       - 'scripts/test_drawing_panels_browser.cjs'
       - 'scripts/test_overlay_zoom_browser.cjs'
       - 'scripts/test_math_diagram_browser.cjs'
@@ -56,6 +58,7 @@ on:
       - 'scripts/sync_offline_styles.py'
       - 'scripts/sync_offline_shell.py'
       - 'scripts/sync_offline_content.py'
+      - 'scripts/offline_question_classification.py'
       - 'scripts/migrate_concept_examples.py'
       - 'scripts/test_offline_example_migration.py'
       - 'scripts/offline_translations.py'
@@ -83,6 +86,7 @@ on:
       - 'scripts/test_drawing_controls_browser.cjs'
       - 'scripts/test_module_filter_chrome_browser.cjs'
       - 'scripts/test_learning_links_browser.cjs'
+      - 'scripts/test_library_selection_browser.cjs'
       - 'scripts/test_drawing_panels_browser.cjs'
       - 'scripts/test_overlay_zoom_browser.cjs'
       - 'scripts/test_math_diagram_browser.cjs'
@@ -109,7 +113,7 @@ jobs:
             requirements.txt
             requirements-agents.txt
       - name: Validate Python syntax
-        run: python -m py_compile app.py scripts/migrate_concept_examples.py
+        run: python -m py_compile app.py scripts/migrate_concept_examples.py scripts/offline_question_classification.py
       - name: Validate offline JavaScript syntax
         run: |
           node --check static/offline.js
@@ -146,6 +150,7 @@ jobs:
           node --check scripts/test_drawing_controls_browser.cjs
           node --check scripts/test_module_filter_chrome_browser.cjs
           node --check scripts/test_learning_links_browser.cjs
+          node --check scripts/test_library_selection_browser.cjs
           node --check scripts/test_drawing_panels_browser.cjs
           node --check scripts/test_overlay_zoom_browser.cjs
           node --check scripts/test_math_diagram_browser.cjs
@@ -237,6 +242,7 @@ jobs:
           node scripts/test_drawing_controls_browser.cjs
           node scripts/test_module_filter_chrome_browser.cjs
           node scripts/test_learning_links_browser.cjs
+          node scripts/test_library_selection_browser.cjs
           node scripts/test_mobile_drawers_browser.cjs
           node scripts/test_knowledge_graph_browser.cjs
           node scripts/test_offline_graph_browser.cjs

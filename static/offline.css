@@ -50,15 +50,23 @@ body.offline-workspace .offline-main.center { position:relative; display:flex !i
 .question-toolbar { align-items:flex-start; }
 /* Shared control widths keep both libraries identical without letting headings
    or the concept library's missing difficulty control stretch their fields. */
-.offline-filters { --offline-filter-select-width:153px; --offline-filter-search-width:218px; display:flex; align-items:stretch; gap:8px; flex:none; min-width:0; max-width:100%; }
-.offline-filters select { flex:0 0 var(--offline-filter-select-width); width:var(--offline-filter-select-width); min-width:0; max-width:100%; }
-.offline-filters > :is(.offline-search,.dmate-search-wrap) { flex:0 0 var(--offline-filter-search-width); width:var(--offline-filter-search-width); min-width:0; max-width:100%; }
-.offline-filters .dmate-search-wrap > .offline-search { width:100%; min-width:0; max-width:100%; }
+.offline-filters { --offline-filter-select-width:153px; --offline-filter-search-width:218px; --offline-filter-control-height:41px; display:flex; align-items:stretch; flex-wrap:wrap; gap:8px; flex:none; min-width:0; max-width:100%; }
+.offline-filters select { box-sizing:border-box; flex:0 0 var(--offline-filter-select-width); width:var(--offline-filter-select-width); height:var(--offline-filter-control-height); min-width:0; max-width:100%; }
+.offline-filters > :is(.offline-search,.dmate-search-wrap) { box-sizing:border-box; flex:0 0 var(--offline-filter-search-width); width:var(--offline-filter-search-width); height:var(--offline-filter-control-height); min-width:0; max-width:100%; }
+.offline-filters .dmate-search-wrap > .offline-search { width:100%; height:var(--offline-filter-control-height); min-width:0; max-width:100%; }
 .question-layout,.concept-layout { display:grid; grid-template-columns:minmax(220px,280px) minmax(0,1fr); gap:20px; align-items:start; }
 .question-list,.concept-list { display:flex; flex-direction:column; gap:7px; max-height:calc(100dvh - 260px); overflow:auto; padding-right:3px; }
 .question-item,.concept-item { display:block; width:100%; min-height:58px; padding:11px 12px; border:1px solid transparent; border-radius:9px; background:transparent; color:var(--text-primary); text-align:left; cursor:pointer; }
 .question-item strong,.concept-item strong { display:block; margin-bottom:5px; color:var(--text-primary); font-size:14px; font-weight:500; }
 .question-item small,.concept-item small { color:var(--text-muted); font-size:12px; }
+.offline-library-row { display:flex; align-items:center; flex:none; gap:0; box-sizing:border-box; min-width:0; width:100%; padding:3px 4px; border:1px solid transparent; border-radius:9px; }
+.offline-library-row:hover { background:var(--dm-nav-hover,var(--surface-3)); }
+.offline-library-row.active { background:var(--dm-selected-bg,var(--surface-3)); }
+.offline-library-select { display:flex; align-items:center; justify-content:center; flex:0 0 44px; width:44px; min-height:44px; margin:0; cursor:pointer; }
+.offline-library-select input[type="checkbox"] { appearance:none; -webkit-appearance:none; box-sizing:border-box; flex:0 0 25px; width:25px; min-width:25px; height:25px; min-height:25px; padding:0; margin:0; border:2px solid var(--text-subtle,var(--text-muted)); border-radius:50%; background:transparent; cursor:pointer; }
+.offline-library-select input[type="checkbox"]:checked { background:var(--accent); border-color:var(--accent); }
+.offline-library-select input[type="checkbox"]:focus-visible { outline:2px solid var(--accent); outline-offset:4px; }
+.offline-library-row > :is(.question-item,.concept-item) { flex:1 1 auto; min-width:0; width:0; padding:8px 6px; overflow-wrap:anywhere; }
 .question-detail,.concept-detail { min-height:330px; padding:20px; }
 
 /* Library controls stay in place while the list and selected record scroll
@@ -135,6 +143,8 @@ body.offline-workspace :is(.question-parent-concepts,.question-graph-modules,.of
 /* Tablet-width landscape keeps the two graph columns inside the short page.
    Their original minimum heights otherwise clip the detail's scrollport. */
 @media(min-width:761px) and (max-width:1100px) and (max-height:550px) {
+  /* Leave enough list space to reach each circular selection control. */
+  body.offline-workspace :is(#questionsPanel,#conceptsPanel) > :is(.question-layout,.concept-layout) { grid-template-rows:minmax(44px,min(190px,26%)) minmax(0,1fr); }
   body.offline-workspace #knowledgeGraphModal.offline-graph-inline:not(.graph-fullscreen-view) .knowledge-graph-layout { grid-template-rows:minmax(0,1fr); }
   body.offline-workspace #knowledgeGraphModal.offline-graph-inline:not(.graph-fullscreen-view) :is(.knowledge-graph-main,.knowledge-graph-side) { min-height:0!important; }
 }
@@ -165,6 +175,7 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
   body.offline-workspace[data-appearance-theme] :is(#offlineDesktopSidebarToggle,#offlineDesktopSidebarOpen,#offlineNavToggle):is(.offline-icon-button,.mobile-topbar-button) { border:0 !important; background:transparent !important; box-shadow:none !important; color:var(--text-primary) !important; }
   body.offline-workspace[data-appearance-theme] #offlineMain :is(.question-item,.concept-item) { background:transparent !important; border-color:transparent !important; box-shadow:none !important; color:var(--text-primary) !important; }
   body.offline-workspace[data-appearance-theme] #offlineMain :is(.question-item.active,.concept-item.active) { background:var(--dm-selected-bg,var(--surface-3)) !important; }
+  body.offline-workspace[data-appearance-theme] #offlineMain .offline-library-row > :is(.question-item,.concept-item) { background:transparent !important; }
 }
 /* The shared surface layer also paints navigation headers. Keep this header
    transparent so it follows the same canvas or wallpaper as the main area. */
@@ -197,9 +208,14 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
   .offline-filters select,.offline-filters > :is(.offline-search,.dmate-search-wrap) { width:100%; }
   .offline-filters > :is(.offline-search,.dmate-search-wrap) { grid-column:1 / -1; }
   .question-layout,.concept-layout { grid-template-columns:1fr; gap:14px; }
-  .question-list,.concept-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); max-height:190px; }
+  .question-list,.concept-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr)); max-height:190px; }
   .question-detail,.concept-detail { min-height:280px; padding:16px; }
   #drawingPanel.graph-editor-dialog { width:calc(100% - 16px); margin:8px auto; }
+}
+@media(min-width:680px) and (max-width:1100px) {
+  .offline-filters { display:flex; }
+  .offline-filters select { width:var(--offline-filter-select-width); }
+  .offline-filters > :is(.offline-search,.dmate-search-wrap) { width:var(--offline-filter-search-width); }
 }
 @media(max-width:760px) { #drawingPanel.graph-editor-dialog { padding:12px; border-radius:0; } }
 @media(max-width:680px) {

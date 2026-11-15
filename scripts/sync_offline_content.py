@@ -83,6 +83,8 @@ def prepare(graph, concepts_pack, questions_pack, references_pack):
         refs = question.get("knowledge_points", [])
         require(refs and len(refs) == len(set(refs)), question["id"] + ": invalid concept references")
         require(all(ref in concepts for ref in refs), question["id"] + ": unknown concept reference")
+        require(all(concepts[ref]["id"] != concepts[ref]["graph_node_id"] for ref in refs),
+                question["id"] + ": exercises must reference detailed concepts, not topic overviews")
         topics = list(dict.fromkeys(concepts[ref]["graph_node_id"] for ref in refs))
         question["graph_node_ids"] = topics
         require(question["category"] in {nodes[t]["category"] for t in topics},
@@ -200,6 +202,11 @@ def main():
         graph = json.loads((ROOT / "knowledge_graph.json").read_text(encoding="utf-8"))
         packs = [json.loads((ROOT / "offline-content" / name).read_text(encoding="utf-8")) for name in PACKS]
         concepts, questions = prepare(graph, *packs)
+        classification_path = ROOT / "offline-content/question-concept-classification.json"
+        if classification_path.exists():
+            from offline_question_classification import validate_classification_manifest
+            validate_classification_manifest(
+                concepts, questions, json.loads(classification_path.read_text(encoding="utf-8")))
         translations = compile_translations(ROOT, concepts, questions)
         from migrate_concept_examples import MANIFEST, validate_example_migration
         migration_manifest = ROOT / MANIFEST

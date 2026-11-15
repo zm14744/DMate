@@ -11189,7 +11189,7 @@ function createSmartCopyButton(onCopy, { iconOnly = false } = {}) {
     } else {
         button.textContent = "以图片形式复制";
     }
-    button.title = "电脑复制图片，Android 安装版保存到相册；手机网页可预览并保存";
+    button.title = "以图片形式复制";
     button.setAttribute("aria-label", "以图片形式复制");
     button.addEventListener("click", () => {
         Promise.resolve(onCopy()).catch(error => console.warn("复制失败：", error));

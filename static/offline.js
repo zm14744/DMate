@@ -8,7 +8,8 @@
     panel: "graph", selectedQuestion: null, selectedConcept: null,
     revealed: false,
     drawingController: null, backgroundUrl: "", graphCategory: "", graphSelectedNodeId: "", questionCategory: "",
-    questionDifficulty: "", questionQuery: "", conceptCategory: "", conceptQuery: "", graphQuery: "", graphController: null,
+    questionDifficulty: "", questionType: "", questionSelection: "", questionQuery: "", conceptCategory: "", conceptSelection: "", conceptQuery: "", graphQuery: "", graphController: null,
+    librarySelections: {concepts:new Set(), questions:new Set()}, selectionQueue: Promise.resolve(),
     appearanceQueue: Promise.resolve()
   };
   const panelMeta = {
@@ -138,6 +139,53 @@
     window.DMateOfflineAppearance?.apply(settings || {}, saved?.backgroundBlob || null);
   }
 
+  async function loadLibrarySelections() {
+    const saved = await transaction("settings", "readonly", os => os.get("library-selections"));
+    for (const kind of ["concepts", "questions"]) {
+      const ids = new Set(state[kind].map(item => item.id));
+      state.librarySelections[kind] = new Set((Array.isArray(saved?.[kind]) ? saved[kind] : [])
+        .filter(id => typeof id === "string" && ids.has(id)));
+    }
+  }
+
+  function saveLibrarySelections() {
+    const snapshot = {id:"library-selections", updatedAt:stamp(),
+      concepts:[...state.librarySelections.concepts], questions:[...state.librarySelections.questions]};
+    state.selectionQueue = state.selectionQueue.then(() => put("settings", snapshot))
+      .catch(() => toast(tr("选择状态暂时无法保存", "The selection could not be saved.")));
+  }
+
+  function matchesLibrarySelection(kind, id, filter) {
+    return !filter || state.librarySelections[kind].has(id) === (filter === "selected");
+  }
+
+  function libraryRow(kind, record, item) {
+    const selected = state.librarySelections[kind];
+    const row = el("div", "offline-library-row" + (item.classList.contains("active") ? " active" : ""));
+    const hit = el("label", "offline-library-select"), check = el("input", "offline-library-checkbox");
+    check.type = "checkbox"; check.checked = selected.has(record.id);
+    check.dataset.selectionId = record.id; check.dataset.selectionKind = kind;
+    const title = localized(record, kind).title;
+    check.setAttribute("aria-label", kind === "concepts" ? tr("选择概念：" + title, "Select concept: " + title)
+      : tr("选择题目：" + title, "Select exercise: " + title));
+    check.addEventListener("change", () => {
+      if (check.checked) selected.add(record.id); else selected.delete(record.id);
+      saveLibrarySelections();
+      // Keep the open detail and its revealed answer intact when the row stays.
+      // A selection-only view removes the toggled row and focuses its successor.
+      if (state[kind === "concepts" ? "conceptSelection" : "questionSelection"]) {
+        const list = $(kind === "concepts" ? "conceptList" : "questionList"), scrollTop = list.scrollTop;
+        const index = [...list.children].indexOf(row);
+        if (kind === "concepts") renderConcepts(); else renderQuestions();
+        list.scrollTop = scrollTop;
+        const checks = list.querySelectorAll(".offline-library-checkbox");
+        (checks[Math.min(index, checks.length - 1)] || $(kind === "concepts" ? "conceptSelection" : "questionSelection"))
+          .focus({preventScroll:true});
+      }
+    });
+    hit.append(check); row.append(hit, item); return row;
+  }
+
   const stamp = () => new Date().toISOString();
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : "local-" + Date.now() + "-" + Math.random().toString(36).slice(2));
 
@@ -169,10 +217,10 @@
 
   async function loadResources() {
     const [concepts, questions, graph, translations] = await Promise.all([
-      fetch("/static/offline-content/concepts.zh-CN.json?v=28", {cache:"no-store"}).then(r => { if(!r.ok) throw Error("概念库资源不可用"); return r.json(); }),
-      fetch("/static/offline-content/questions.zh-CN.json?v=28", {cache:"no-store"}).then(r => { if(!r.ok) throw Error("题库资源不可用"); return r.json(); }),
+      fetch("/static/offline-content/concepts.zh-CN.json?v=34", {cache:"no-store"}).then(r => { if(!r.ok) throw Error("概念库资源不可用"); return r.json(); }),
+      fetch("/static/offline-content/questions.zh-CN.json?v=34", {cache:"no-store"}).then(r => { if(!r.ok) throw Error("题库资源不可用"); return r.json(); }),
       fetch("/static/offline-content/knowledge_graph.json?v=28", {cache:"no-store"}).then(r => { if(!r.ok) throw Error("知识图谱资源不可用"); return r.json(); }),
-      fetch("/static/offline-content/translations.en.json?v=28", {cache:"no-store"}).then(r => { if(!r.ok) throw Error("英文学习内容资源不可用"); return r.json(); })
+      fetch("/static/offline-content/translations.en.json?v=34", {cache:"no-store"}).then(r => { if(!r.ok) throw Error("英文学习内容资源不可用"); return r.json(); })
     ]);
     state.concepts = Array.isArray(concepts.concepts) ? concepts.concepts : [];
     state.questions = Array.isArray(questions.questions) ? questions.questions : [];
@@ -237,6 +285,20 @@
 
   function fillQuestionFilters() {
     state.questionCategory = fillChapterFilter($("questionCategory"), state.questionCategory);
+    const type = $("questionType"), types = ["", ...Object.keys(questionTypeLabels).filter(value => state.questions.some(question => question.type === value))];
+    if (type.options.length !== types.length || types.some((value, index) => type.options[index]?.value !== value)) {
+      type.replaceChildren(...types.map(value => new Option(value ? tr(value) : tr("全部题型", "All question types"), value)));
+    } else for (const option of type.options) option.textContent = option.value ? tr(option.value) : tr("全部题型", "All question types");
+    type.value = types.includes(state.questionType) ? state.questionType : "";
+    state.questionType = type.value;
+    state.questionSelection = fillSelectionFilter($("questionSelection"), state.questionSelection);
+  }
+
+  function fillSelectionFilter(select, value) {
+    const labels = {"":tr("全部", "All"), selected:tr("已选择", "Selected"), unselected:tr("未选择", "Unselected")};
+    for (const option of select.options) option.textContent = labels[option.value];
+    select.value = Object.hasOwn(labels, value) ? value : "";
+    return select.value;
   }
 
   function openConcept(concept) {
@@ -248,6 +310,9 @@
     }
     state.conceptQuery = "";
     $("conceptSearch").value = "";
+    if (!matchesLibrarySelection("concepts", concept.id, state.conceptSelection)) {
+      state.conceptSelection = ""; $("conceptSelection").value = "";
+    }
     switchPanel("concepts");
     $("conceptDetail").scrollTop = 0;
   }
@@ -266,8 +331,11 @@
   }
 
   function openQuestion(question) {
-    state.questionCategory = ""; state.questionDifficulty = "";
-    $("questionCategory").value = ""; $("questionDifficulty").value = "";
+    state.questionCategory = ""; state.questionDifficulty = ""; state.questionType = "";
+    $("questionCategory").value = ""; $("questionDifficulty").value = ""; $("questionType").value = "";
+    if (!matchesLibrarySelection("questions", question.id, state.questionSelection)) {
+      state.questionSelection = ""; $("questionSelection").value = "";
+    }
     if (!questionMatchesSearch(question, normalizedSearch($("questionSearch").value))) $("questionSearch").value = "";
     state.selectedQuestion = question;
     state.revealed = false;
@@ -372,6 +440,8 @@
     const filtered = state.questions.filter(q =>
       (!state.questionCategory || q.category === state.questionCategory) &&
       (!state.questionDifficulty || difficultyName(q.difficulty) === state.questionDifficulty) &&
+      (!state.questionType || q.type === state.questionType) &&
+      matchesLibrarySelection("questions", q.id, state.questionSelection) &&
       questionMatchesSearch(q, query)
     );
     $("questionCount").textContent = tr(filtered.length + " 道题目", filtered.length + (filtered.length === 1 ? " exercise" : " exercises"));
@@ -384,7 +454,7 @@
       item.dataset.questionId = question.id;
       item.setAttribute("aria-current", String(state.selectedQuestion?.id === question.id));
       item.append(studyLabel("strong", "", display.title), el("small", "", [tr(question.category), tr(difficultyName(question.difficulty)), tr(question.type)].filter(Boolean).join(" ")));
-      list.append(item);
+      list.append(libraryRow("questions", question, item));
     }
     if (state.selectedQuestion && filtered.some(q => q.id === state.selectedQuestion.id)) {
       renderQuestionDetail(state.selectedQuestion);
@@ -402,6 +472,7 @@
     document.querySelectorAll(".question-item").forEach(node => {
       const selected = node.dataset.questionId === question.id;
       node.classList.toggle("active", selected); node.setAttribute("aria-current", String(selected));
+      node.closest(".offline-library-row")?.classList.toggle("active", selected);
     });
     renderQuestionDetail(question);
   }
@@ -455,7 +526,9 @@
     if (state.revealed) {
       const answer = el("section", "answer-panel wrong-answer-details");
       answer.append(el("h3", "", tr("参考答案", "Reference answer")));
-      answer.append(rich("wrong-answer-inner", display.answer_text || (question.answer || []).join("、")));
+      const choice = ["单项选择", "多项选择"].includes(question.type);
+      answer.append(choice ? contentText("div", "wrong-answer-inner", (question.answer || []).join("、"))
+        : rich("wrong-answer-inner", display.answer_text || ""));
       answer.append(el("h3", "", tr("解析", "Explanation")));
       answer.append(rich("wrong-analysis-body", display.explanation || tr("暂无解析。", "No explanation available.")));
       if (question.grading_criteria) {
@@ -493,6 +566,7 @@
     document.querySelectorAll(".concept-item").forEach(item => {
       const selected = item.dataset.conceptId === concept.id;
       item.classList.toggle("active", selected); item.setAttribute("aria-current", String(selected));
+      item.closest(".offline-library-row")?.classList.toggle("active", selected);
     });
     const section = (title, content) => {
       const box = el("section", "detail-section");
@@ -513,12 +587,14 @@
 
   function renderConcepts() {
     state.conceptCategory = fillChapterFilter($("conceptCategory"), state.conceptCategory);
+    state.conceptSelection = fillSelectionFilter($("conceptSelection"), state.conceptSelection);
     const query = $("conceptSearch").value.trim().toLocaleLowerCase();
     state.conceptQuery = $("conceptSearch").value;
     window.DMateSearchControls?.refresh?.($("conceptSearch"));
     const rows = state.concepts.filter(c => {
       const translated = state.translations.concepts[c.id] || {};
       return (!state.conceptCategory || c.category === state.conceptCategory)
+        && matchesLibrarySelection("concepts", c.id, state.conceptSelection)
         && (!query || [c.title,c.category,c.summary,c.definition,translated.title,translated.summary,translated.definition,tr(c.category)].join(" ").toLocaleLowerCase().includes(query));
     });
     $("conceptCount").textContent = tr(rows.length + " 个概念", rows.length + (rows.length === 1 ? " concept" : " concepts"));
@@ -532,7 +608,7 @@
       item.setAttribute("data-i18n-content", "");
       item.setAttribute("aria-current", String(state.selectedConcept?.id === concept.id));
       item.append(studyLabel("strong", "", display.title), el("small", "", tr(concept.category)));
-      list.append(item);
+      list.append(libraryRow("concepts", concept, item));
     }
     if (state.selectedConcept && rows.some(c => c.id === state.selectedConcept.id)) fillConceptDetail(state.selectedConcept);
     else if (rows.length) fillConceptDetail(rows[0]);
@@ -622,6 +698,8 @@
       "关联知识点":"Related knowledge", "暂无已关联条目":"No linked entries yet", "数学符号":"Mathematical notation",
       ...questionTypeLabels, "简单":"Easy", "中等":"Medium", "困难":"Hard",
       "按章节筛选":"Filter by topic", "按难度筛选":"Filter by difficulty", "全部章节":"All topics", "全部难度":"All difficulties",
+      "按题型筛选":"Filter by question type", "全部题型":"All question types", "按选择状态筛选":"Filter by selection",
+      "已选择":"Selected", "未选择":"Unselected", "全部":"All",
       "题目、答案与解析":"Questions, answers and explanations", "定义、解释与例题":"Definitions, explanations and examples",
       "定义、解释与易错点":"Definitions, explanations and common mistakes",
       "查看定义、解释、公式和易错点。":"View definitions, explanations, formulas and common mistakes.",
@@ -631,8 +709,11 @@
     document.querySelectorAll(".offline-nav-item").forEach(item => item.addEventListener("click", () => switchPanel(item.dataset.panel)));
     $("questionCategory").addEventListener("change", event => { state.questionCategory=event.target.value; renderQuestions(); });
     $("questionDifficulty").addEventListener("change", event => { state.questionDifficulty=event.target.value; renderQuestions(); });
+    $("questionType").addEventListener("change", event => { state.questionType=event.target.value; renderQuestions(); });
+    $("questionSelection").addEventListener("change", event => { state.questionSelection=event.target.value; renderQuestions(); });
     $("questionSearch").addEventListener("input", renderQuestions);
     $("conceptCategory").addEventListener("change", event => { state.conceptCategory=event.target.value; renderConcepts(); });
+    $("conceptSelection").addEventListener("change", event => { state.conceptSelection=event.target.value; renderConcepts(); });
     $("conceptSearch").addEventListener("input", renderConcepts);
     $("returnOnline").addEventListener("click", returnOnline);
     window.addEventListener("online", setNetworkStatus);
@@ -661,6 +742,7 @@
       configureRenderer();
       await migrateCurrentAccountData();
       await loadResources();
+      await loadLibrarySelections();
       bind();
       window.DMateI18n?.translate?.(document.body);
       await switchPanel("graph");

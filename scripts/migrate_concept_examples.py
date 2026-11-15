@@ -55,6 +55,11 @@ def migrated_question(concept, english_concept, entry):
     require(entry.get("type") in {"计算", "简答", "证明"}, cid + ": invalid migrated exercise type")
     require(entry["statement_zh"].strip() != concept["example"].strip(), cid + ": answer used as question")
     require(entry["statement_en"].strip() != english_concept["example"].strip(), cid + ": English answer used as question")
+    knowledge_points = entry.get("knowledge_points", [cid])
+    require(isinstance(knowledge_points, list) and knowledge_points
+            and all(isinstance(ref, str) and ref.strip() for ref in knowledge_points)
+            and len(knowledge_points) == len(set(knowledge_points)),
+            cid + ": invalid migrated concept references")
     explanation_zh = concept["example"] + "\n\n" + concept["explanation"]
     explanation_en = english_concept["example"] + "\n\n" + english_concept["explanation"]
     require(bool(entry.get("explanation_append_zh")) == bool(entry.get("explanation_append_en")),
@@ -64,7 +69,7 @@ def migrated_question(concept, english_concept, entry):
         explanation_en += "\n\n" + entry["explanation_append_en"]
     question = {
         "id": entry["question_id"], "title": concept["title"] + "：例题练习",
-        "category": concept["category"], "knowledge_points": [cid],
+        "category": concept["category"], "knowledge_points": list(knowledge_points),
         "difficulty": entry["difficulty"], "type": entry["type"],
         "statement": entry["statement_zh"], "answer_text": concept["example"],
         "explanation": explanation_zh, "grading_criteria": GRADE_ZH,
@@ -112,6 +117,14 @@ def validate_example_migration(concepts, questions, translations, manifest):
                     qid + ": legacy English question changed during example migration")
     for cid, concept in concepts_by_id.items():
         expected, english = migrated_question(concept, translations["concepts"][cid], entries[cid])
+        require(all(ref in concepts_by_id for ref in expected["knowledge_points"]),
+                cid + ": unknown migrated concept reference")
+        require(all(concepts_by_id[ref]["id"] != concepts_by_id[ref]["graph_node_id"]
+                    for ref in expected["knowledge_points"]),
+                cid + ": migrated exercises must reference detailed concepts")
+        require(all(concepts_by_id[ref]["graph_node_id"] == concept["graph_node_id"]
+                    for ref in expected["knowledge_points"]),
+                cid + ": migrated concept references leave the source topic")
         qid = expected["id"]
         require(questions_by_id.get(qid) == expected, cid + ": migrated exercise differs from reviewed manifest")
         require(translations["questions"].get(qid) == english, cid + ": English migrated exercise differs from review")
@@ -145,6 +158,12 @@ def migration_targets(root):
         shard = next(s for s in shards if concept["id"] in s["concepts"])
         shard["questions"][question["id"]] = english
     cp, qp = prepare(load(root / "knowledge_graph.json"), cp, qp, load(root / "offline-content/references.zh-CN.json"))
+    # Newly added concepts can sit between existing topic groups. Canonicalize
+    # translated question order as well so legacy-only inputs reproduce release
+    # files regardless of when those examples were first added to a shard.
+    for shard in shards:
+        shard["questions"] = {question["id"]: shard["questions"][question["id"]]
+                              for question in qp["questions"] if question["id"] in shard["questions"]}
     merged = {"concepts": translations["concepts"], "questions": {}}
     for shard in shards:
         merged["questions"].update(shard["questions"])

@@ -3,6 +3,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const migrationReview = require('../offline-content/example-practice-migration.json');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const conceptsURL = '/static/offline-content/concepts.zh-CN.json';
 const questionsURL = '/static/offline-content/questions.zh-CN.json';
@@ -141,22 +142,35 @@ async function hookRenderer(page) {
 }
 
 async function packs(page) {
-  return page.evaluate(async urls => {
+  return page.evaluate(async ({ urls, reviewedExamples }) => {
     const [concepts, questions, en] = await Promise.all(urls.map(async url => {
       const response = await fetch(url); if (!response.ok) throw new Error('Actual deployed pack failed: ' + url); return response.json();
     }));
     const require = (value, message) => { if (!value) throw new Error(message); };
     const examples = concepts.concepts.filter(row => typeof row.example === 'string' && row.example.trim());
     const migrated = questions.questions.filter(row => row.source?.migrated_from?.kind === 'concept_example');
-    require(concepts.concepts.length === 356 && questions.questions.length - migrated.length === 561,
+    require(concepts.concepts.length === Object.keys(reviewedExamples).length && questions.questions.length - migrated.length === 561,
       'The complete original curriculum is retained alongside migrated examples');
     require(migrated.length === examples.length && new Set(migrated.map(row => row.source.migrated_from.concept_id)).size === examples.length,
       'Every nonempty concept example has exactly one migrated exercise');
     const digest = async value => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))))
       .map(byte => byte.toString(16).padStart(2, '0')).join('');
+    const conceptMap = new Map(concepts.concepts.map(concept => [concept.id, concept]));
+    for (const question of questions.questions) {
+      require(question.knowledge_points?.length && question.knowledge_points.every(id => {
+        const concept = conceptMap.get(id); return concept && concept.id !== concept.graph_node_id;
+      }), question.id + ': every exercise belongs to detailed concepts instead of topic overviews');
+    }
     for (const concept of examples) {
       const question = migrated.find(row => row.source.migrated_from.concept_id === concept.id);
       require(question && concept.related_questions.includes(question.id), concept.id + ': migrated exercise is associated');
+      const reviewed = reviewedExamples[concept.id];
+      require(question.id === reviewed.question_id && JSON.stringify(question.knowledge_points)
+        === JSON.stringify(reviewed.knowledge_points || [concept.id]), concept.id + ': reviewed precise concept assignments match');
+      require(question.knowledge_points.every(id => {
+        const linked = conceptMap.get(id);
+        return linked.graph_node_id === concept.graph_node_id && linked.related_questions.includes(question.id);
+      }), concept.id + ': precise concept links preserve source topic and reverse navigation');
       require(question.answer_text === concept.example, concept.id + ': original worked example remains the exact answer');
       require(en.questions[question.id]?.answer_text === en.concepts[concept.id]?.example,
         concept.id + ': original English worked example remains the exact answer');
@@ -196,16 +210,17 @@ async function packs(page) {
       counts: {concepts:concepts.concepts.length, questions:questions.questions.length, examples:migrated.length},
       questions: [choice, proof].map(row => ({ id: row.id, category: row.category,
         difficulty: row.difficulty === '基础' ? '简单' : ['进阶', '提高'].includes(row.difficulty) ? '困难' : row.difficulty })) };
-  }, [conceptsURL, questionsURL, translationsURL]);
+  }, { urls: [conceptsURL, questionsURL, translationsURL], reviewedExamples: migrationReview.examples });
 }
 
 async function assertContent(page, kind, id, language, reference) {
   const result = await page.evaluate(async ({ kind, id, language }) => {
     const row = studyPacks[kind].find(row => row.id === id), value = language === 'en' ? { ...row, ...studyPacks.en[kind][id] } : row;
     const detail = document.getElementById(kind === 'concepts' ? 'conceptDetail' : 'questionDetail');
+    const choice = kind === 'questions' && ['单项选择', '多项选择'].includes(row.type);
     const expected = kind === 'concepts'
       ? [value.summary, value.definition, value.explanation, value.notation, value.common_mistakes]
-      : [value.statement, ...(value.options || []).map(option => option.text), value.answer_text || row.answer.join('、'), value.explanation, value.grading_criteria];
+      : [value.statement, ...(value.options || []).map(option => option.text), choice ? row.answer.join('、') : value.answer_text, value.explanation, value.grading_criteria];
     const nodes = kind === 'concepts' ? [detail.querySelector('.concept-summary'), ...detail.querySelectorAll('.concept-detail-text')]
       : [detail.querySelector('.wrong-question'), ...detail.querySelectorAll('.question-option-text'), detail.querySelector('.wrong-answer-inner'), detail.querySelector('.wrong-analysis-body'), detail.querySelector('.wrong-feedback-body')];
     if (nodes.length !== expected.length || nodes.some(node => !node)) throw new Error(id + ': complete content sections missing');
@@ -213,6 +228,12 @@ async function assertContent(page, kind, id, language, reference) {
     const styles = [], math = [];
     nodes.forEach((node, index) => {
       const text = Array.isArray(expected[index]) ? expected[index].map(item => '- ' + String(item).replace(/\n/g, '\n  ')).join('\n') : expected[index];
+      if (choice && node.classList.contains('wrong-answer-inner')) {
+        if (node.textContent !== text || node.querySelector('.msg-content,.ai-content,mjx-container') || studyInputs.has(node)) {
+          throw new Error(id + ': choice answer must contain only the original option letters');
+        }
+        return;
+      }
       if (studyInputs.get(node) !== DMateMathMarkdown.prepareStudyText(text)) throw new Error(id + ': author content changed or omitted at section ' + index);
       if (pending[index] !== true || node.dataset.dmateRenderState !== 'ready') throw new Error(id + ': shared renderer did not complete');
       const content = node.querySelector(':scope>.msg-content>.ai-content');

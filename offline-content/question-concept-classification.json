@@ -1,0 +1,2636 @@
+{
+  "schema_version": 1,
+  "from_pack_version": "0.4.0",
+  "target_pack_version": "0.5.0",
+  "assignments": {
+    "q01": {
+      "previous_concept_ids": [
+        "logic_truth"
+      ],
+      "concept_ids": [
+        "logic_truth__proposition_sentence",
+        "logic_truth__truth_semantics",
+        "logic_truth__open_statement"
+      ],
+      "reason_zh": "比较祈使句、开放句与可判真假的陈述，并识别其中的假命题。",
+      "original_record_sha256": "611d66763d3d3858d87cfc50963b93f27e33f47d4306e2bfba31982085b3f1a4",
+      "classified_record_sha256": "e453c6d32b2c3920e66100eebebf68ebb05f9a3da0fc558ed6b071792b70bc9d"
+    },
+    "q02": {
+      "previous_concept_ids": [
+        "logic_connectives"
+      ],
+      "concept_ids": [
+        "logic_connectives__implication_conditions"
+      ],
+      "reason_zh": "直接依据材料蕴含的前件、后件真值计算蕴含真值。",
+      "original_record_sha256": "496466f2c53a27a9dbee20e30453d52e5d059cb2ee60a733e846d3388540a1b4",
+      "classified_record_sha256": "db1654d927ec77f4d10bb2022699a01d7e46cf4c7a2c8c06a66509a11a4d9e85"
+    },
+    "q03": {
+      "previous_concept_ids": [
+        "logic_connectives",
+        "logic_equivalence"
+      ],
+      "concept_ids": [
+        "logic_connectives__implication_conditions",
+        "logic_equivalence__implication_elimination"
+      ],
+      "reason_zh": "将材料蕴含改写为否定与析取，分别对应联结词含义和蕴含消去。",
+      "original_record_sha256": "36d99b11abc6a73f8bbb46abb4f967f8896eeabf5ddaf249220acf75bfb01c6c",
+      "classified_record_sha256": "4fddf1e8e9be805465d59d1851d3309c0cf6654c302b740d1407eba17091bd45"
+    },
+    "q04": {
+      "previous_concept_ids": [
+        "predicate_quantifier"
+      ],
+      "concept_ids": [
+        "predicate_quantifier__universal_quantifier",
+        "predicate_quantifier__existential_quantifier"
+      ],
+      "reason_zh": "否定整数域上的全称断言，改写为存在反例的断言。",
+      "original_record_sha256": "7612de3d7fef9a1d9a97516c0840ecfb005cdba9bc54285fae3523a2ddc438a8",
+      "classified_record_sha256": "698a695fb475c1a789396e32f63b7b5a8bf50bb2058369d7a99cf6600c0a27e0"
+    },
+    "q05": {
+      "previous_concept_ids": [
+        "set_operation"
+      ],
+      "concept_ids": [
+        "set_operation__union",
+        "set_operation__intersection",
+        "set_operation__difference",
+        "set_operation__complement"
+      ],
+      "reason_zh": "题目分别要求计算并、交、差及相对给定全集的补集。",
+      "original_record_sha256": "7cf2f84dcd138546f7a9c64b1e1755638fd632905264f76cecdac7f786544ca6",
+      "classified_record_sha256": "eb632947b240645e361f0cc2ff042c75c8459d537ef3577e3e6e89236df1e902"
+    },
+    "q06": {
+      "previous_concept_ids": [
+        "relation_property"
+      ],
+      "concept_ids": [
+        "relation_property__reflexivity",
+        "relation_property__symmetry",
+        "relation_property__antisymmetry",
+        "relation_property__transitivity"
+      ],
+      "reason_zh": "逐项检验指定有限关系的自反、对称、反对称和传递性质。",
+      "original_record_sha256": "55071b7773334481c404b730979010783e3f95cbdc7b00c5228025ce9295dec1",
+      "classified_record_sha256": "9bfa475f12d1423846f404d71aed9c8483fb67fec15dec100fbbc5e52f352ecc"
+    },
+    "q07": {
+      "previous_concept_ids": [
+        "relation_equivalence"
+      ],
+      "concept_ids": [
+        "relation_equivalence__classes"
+      ],
+      "reason_zh": "列出模4同余的等价类，并判断两个代表元是否同类。",
+      "original_record_sha256": "9767c8054791bcd7ff7cbc20fc505366e83ba4135e3fe7ce4433e13cc921b5bd",
+      "classified_record_sha256": "dd25aa45e137d491abed492cb82a9ce04ebfdd8426b9ff8d24f79396ba1e03c5"
+    },
+    "q08": {
+      "previous_concept_ids": [
+        "function_injection"
+      ],
+      "concept_ids": [
+        "function_injection__injection",
+        "function_injection__surjection"
+      ],
+      "reason_zh": "分别证明整数映射的单射性并用无原像的偶整数否定满射性。",
+      "original_record_sha256": "90f077175792d8a652f9b959c3722331a18b7d4d2ecd28fbbe7f4453ab4071b6",
+      "classified_record_sha256": "e45ef68d12aaf1aeabfd1681dcf06798d175cbc2279610dc20f74d41f3f84fa9"
+    },
+    "q09": {
+      "previous_concept_ids": [
+        "relation_order"
+      ],
+      "concept_ids": [
+        "relation_order__least",
+        "relation_order__greatest",
+        "relation_order__total_order"
+      ],
+      "reason_zh": "在整除偏序中求最小元、最大元并寻找不可比较的元素。",
+      "original_record_sha256": "09768dc6b1568bb98401988afedff578c4eda8d713a86bbef9b0c5c692f1ea7e",
+      "classified_record_sha256": "6d1ec5cc9cfbc2a00a42f0c55a4d6ee599c5d79262315d26cbb2c7d6375c134f"
+    },
+    "q10": {
+      "previous_concept_ids": [
+        "graph_basic"
+      ],
+      "concept_ids": [
+        "graph_basic__handshake"
+      ],
+      "reason_zh": "由无向图顶点度数和等于边数两倍直接求边数。",
+      "original_record_sha256": "7f6ad9a6d41a70874c22b372de0e38192be8b9bd2e925812474b815d3c99ec46",
+      "classified_record_sha256": "654dd290fea8700b3aee13261409bc928f6b5da477dc399f2744c68837df3334"
+    },
+    "q11": {
+      "previous_concept_ids": [
+        "graph_connectivity"
+      ],
+      "concept_ids": [
+        "graph_connectivity__components"
+      ],
+      "reason_zh": "按无向可达关系划分连通分量，并单独列出孤立顶点。",
+      "original_record_sha256": "d31851a01742a05dc7c9faf6e0f30508b01d47727da4b4ed5723d5e7d549a528",
+      "classified_record_sha256": "f9e1029ef360208e3216c5bdda73825d13a6e9a847b1d982054ee46afe6821f0"
+    },
+    "q12": {
+      "previous_concept_ids": [
+        "tree_basic"
+      ],
+      "concept_ids": [
+        "tree_basic__equivalent",
+        "tree_basic__forest"
+      ],
+      "reason_zh": "使用树的n−1条边刻画及删边后森林的分量计数。",
+      "original_record_sha256": "5ff2a87a6b661e9adb7c4292f8eda5a0499a8e8e31bca2a6c570de1535481977",
+      "classified_record_sha256": "2f86b4c375510c5d1f4ebe0d80fe123968478470143046220da8d9b9b7df4cea"
+    },
+    "q13": {
+      "previous_concept_ids": [
+        "count_pigeonhole"
+      ],
+      "concept_ids": [
+        "count_pigeonhole__capacity"
+      ],
+      "reason_zh": "十三个对象分入十二个月份，以每盒最多一人的容量上限推出必有重复。",
+      "original_record_sha256": "377077df45fead44afda897a79c2a1381a2266c2be2b2cdd9c98082b9026d50f",
+      "classified_record_sha256": "078609d2584fbd53088fadc6253a27e73e7b4f9ca1be82c8e9c8d68c665c58f4"
+    },
+    "q14": {
+      "previous_concept_ids": [
+        "proof_induction"
+      ],
+      "concept_ids": [
+        "proof_induction__induction_principle",
+        "proof_induction__induction_algebra_inequality"
+      ],
+      "reason_zh": "按归纳基础与后继步骤，将前k个奇数之和递推至k+1。",
+      "original_record_sha256": "b972c683c67463b801adf722090bd4a00489c76a85f8a9ec082f90d445d0edfc",
+      "classified_record_sha256": "f56855c659b16a7728b34eb39b4f2d700f7ed0633c401d5bd4039844318d78e5"
+    },
+    "q_logic_truth_07": {
+      "previous_concept_ids": [
+        "logic_truth"
+      ],
+      "concept_ids": [
+        "logic_truth__proposition_sentence",
+        "logic_truth__open_statement"
+      ],
+      "reason_zh": "比较自由变量表达式、固定赋值和存在量化所形成的封闭命题。",
+      "original_record_sha256": "3c0b46c3538114a284668be93d1e6f725cdd17bb94c9be7ca984220557ec4a30",
+      "classified_record_sha256": "9a5a0efe82209934ac5c43a92de99c54a3de5ea92be60c5a9a2530f1e37b1977"
+    },
+    "q_logic_truth_08": {
+      "previous_concept_ids": [
+        "logic_truth"
+      ],
+      "concept_ids": [
+        "logic_truth__truth_semantics"
+      ],
+      "reason_zh": "固定同一解释和赋值时，同一命题字母的各次出现必须有相同真值。",
+      "original_record_sha256": "63f4f41856deb94bcd9cd96b2ee1a5a49e1035ec76c4907b3a74014dab62c2df",
+      "classified_record_sha256": "2f88d10135b9bbab509da839715a36df9ea36d191a255568c0619f2354398a4b"
+    },
+    "q_logic_connectives_07": {
+      "previous_concept_ids": [
+        "logic_connectives",
+        "logic_connectives__biconditional",
+        "logic_connectives__implication_conditions"
+      ],
+      "concept_ids": [
+        "logic_connectives__biconditional",
+        "logic_connectives__implication_conditions"
+      ],
+      "reason_zh": "对照必须与当且仅当的符号化，区分材料蕴含和双条件。",
+      "original_record_sha256": "674efc37615a73e15d9507bac237b5498f110f6946b15e3508b94be98652ef5c",
+      "classified_record_sha256": "d4974ebbae21a407515f926e8b8f2a40da128e04be3f2ca31191add312c352b1"
+    },
+    "q_logic_connectives_08": {
+      "previous_concept_ids": [
+        "logic_connectives",
+        "logic_connectives__disjunction",
+        "logic_connectives__implication_conditions"
+      ],
+      "concept_ids": [
+        "logic_connectives__disjunction",
+        "logic_connectives__implication_conditions",
+        "logic_connectives__conjunction"
+      ],
+      "reason_zh": "按析取和两个蕴含组成的合取条件筛选全部满足赋值。",
+      "original_record_sha256": "0459d3d961ef151d44ef03c3a0d1f83f7b578e8d5afaa088d421f1452ef6d87c",
+      "classified_record_sha256": "ef155d78f16ddd3e0864da2382d09a6cd311583f10590fc902da1214e0573775"
+    },
+    "q_logic_truth_table_07": {
+      "previous_concept_ids": [
+        "logic_truth_table"
+      ],
+      "concept_ids": [
+        "logic_truth_table__assignment_enumeration",
+        "logic_truth_table__satisfiability_classification"
+      ],
+      "reason_zh": "穷尽三个字母的赋值并根据真行数量判断可满足性与非重言性。",
+      "original_record_sha256": "097dc4c90d2bcd64b7935d98d5e7505d2ac6b102f077578a34eaaab702b52c15",
+      "classified_record_sha256": "b0d4d6cf51ebdfecbdfe19444ea209223e64c2812f44753c0dbe3f529359c720"
+    },
+    "q_logic_truth_table_08": {
+      "previous_concept_ids": [
+        "logic_truth_table"
+      ],
+      "concept_ids": [
+        "logic_truth_table__assignment_enumeration",
+        "logic_truth_table__semantic_counterexample"
+      ],
+      "reason_zh": "逐行列出两式真值并以全部行一致核对逻辑等价。",
+      "original_record_sha256": "eddadbee5980c04b6f67e377f9bdf9708995321988fa21521041af4652c97b4f",
+      "classified_record_sha256": "22f1960f28f0cbfb5b9e9ed0f90cd7f6c1e9d27e9ec518d11e331ff1f3619c4c"
+    },
+    "q_logic_equivalence_07": {
+      "previous_concept_ids": [
+        "logic_equivalence",
+        "logic_equivalence__replacement_laws",
+        "logic_equivalence__distribution_laws"
+      ],
+      "concept_ids": [
+        "logic_equivalence__replacement_laws",
+        "logic_equivalence__distribution_laws"
+      ],
+      "reason_zh": "利用分配与等价替换将含共同项的公式化简。",
+      "original_record_sha256": "53ce552b12124ec37195c52e350d19a644177c72b53241e6950bf443836ebd44",
+      "classified_record_sha256": "3019aeedcdbc742dfaaf8b2dfef8cd193b2bbcf6093576fde0fe56bbecef52c2"
+    },
+    "q_logic_equivalence_08": {
+      "previous_concept_ids": [
+        "logic_equivalence"
+      ],
+      "concept_ids": [
+        "logic_equivalence__implication_elimination"
+      ],
+      "reason_zh": "将原命题和逆否命题消去蕴含后比较，并以赋值区分逆命题。",
+      "original_record_sha256": "be2fa48221a6f231dd6b0f42e1f5287b9722fdcc0f70322af28e5ce59364cec1",
+      "classified_record_sha256": "c8b9594c60e0a9ae71df34af505f6f4ef0db87a7fc0f86b92ccec7d08a0db271"
+    },
+    "q_logic_normal_form_07": {
+      "previous_concept_ids": [
+        "logic_normal_form",
+        "logic_normal_form__minterms_pdnf",
+        "logic_normal_form__principal_dnf"
+      ],
+      "concept_ids": [
+        "logic_normal_form__minterms_pdnf",
+        "logic_normal_form__principal_dnf"
+      ],
+      "reason_zh": "为缺少的变量补全真赋值所对应极小项，组成主析取范式。",
+      "original_record_sha256": "c95d31bc3aa3a9a0010bd03935b977fcec8d8d6de6590b77aa07406048b8629a",
+      "classified_record_sha256": "8ecbc0be3359a2e0ffe51fd7c429cc54aec089758bca7a20e6a64c86bde0bcd5"
+    },
+    "q_logic_normal_form_08": {
+      "previous_concept_ids": [
+        "logic_normal_form",
+        "logic_normal_form__principal_dnf",
+        "logic_normal_form__principal_cnf"
+      ],
+      "concept_ids": [
+        "logic_normal_form__principal_dnf",
+        "logic_normal_form__principal_cnf"
+      ],
+      "reason_zh": "由原公式的真行推得否定公式的真、假行并构造两种主范式。",
+      "original_record_sha256": "141a04b69e61ad938a521bed77f284807cdc0500b5ff2f23c086be30e48eb898",
+      "classified_record_sha256": "1d2fe648392bb4eddd477eb67c09738460b73f97fa1edf5a951d645e5b978738"
+    },
+    "q_logic_reasoning_07": {
+      "previous_concept_ids": [
+        "logic_reasoning"
+      ],
+      "concept_ids": [
+        "logic_reasoning__basic_rules",
+        "logic_reasoning__invalid_inference"
+      ],
+      "reason_zh": "使用假言链推出保证成立的结论，并给反例赋值排除其余结论。",
+      "original_record_sha256": "b3bd4095391b28d11f6fd4881ff50e60dbd80d62504692840416e9190256eb1b",
+      "classified_record_sha256": "6c38dba1c76d2625c4ba9a7dbfdc27af36041360f7e35152e224d75d909ee4da"
+    },
+    "q_logic_reasoning_08": {
+      "previous_concept_ids": [
+        "logic_reasoning"
+      ],
+      "concept_ids": [
+        "logic_reasoning__basic_rules",
+        "logic_reasoning__invalid_inference"
+      ],
+      "reason_zh": "以不存在前提全真而结论假的反例判定形式有效性，区分有效形式与可靠前提。",
+      "original_record_sha256": "efcefcd6be98c4d6ca670c40bb34e512f14a59cfb98bd38f92e51945006d942b",
+      "classified_record_sha256": "ef6b2d2b4d5f5825df5e6b392a308bd9037a8e06523b1e8b10d6980cff4e1852"
+    },
+    "q_predicate_domain_07": {
+      "previous_concept_ids": [
+        "predicate_domain"
+      ],
+      "concept_ids": [
+        "predicate_domain__relation_extension"
+      ],
+      "reason_zh": "由有限关系中列出的真元组，核对个体断言与量化断言的见证。",
+      "original_record_sha256": "8d8bb05b5b034a23c74ec384d4a28f79a0c5a8c1c882d0ae794ae5f00c247f56",
+      "classified_record_sha256": "b464ca3f4f4ac131f356e1bf817efad765f5df8b1c2951a958f9e207c3c09fa2"
+    },
+    "q_predicate_domain_08": {
+      "previous_concept_ids": [
+        "predicate_domain"
+      ],
+      "concept_ids": [
+        "predicate_domain__domain_interpretation"
+      ],
+      "reason_zh": "保持论域不变而改变谓词解释，比较同一公式在两个模型中的真值。",
+      "original_record_sha256": "4cad6bd731e4a0afdb7451ad2a201f57fec6539354c7b1d958b084ac5a078f38",
+      "classified_record_sha256": "dcd8a3866f20ea76e083929f960b92174dbd262a76eb4508e030de5750ff59bd"
+    },
+    "q_predicate_quantifier_07": {
+      "previous_concept_ids": [
+        "predicate_quantifier"
+      ],
+      "concept_ids": [
+        "predicate_quantifier__quantifier_order"
+      ],
+      "reason_zh": "对比逐个对象可依赖的见证与某个统一全关联对象，表达不同量词次序。",
+      "original_record_sha256": "9b5390a7bf56ff7e2a79d675d7b0cb746ff4e6fa6f212b9c9cf6ec666a8f86cb",
+      "classified_record_sha256": "a795e8d72c60e0d91eb77249cad476c822ba30c598577fc58e4aee394bfb7dbf"
+    },
+    "q_predicate_quantifier_08": {
+      "previous_concept_ids": [
+        "predicate_quantifier",
+        "predicate_quantifier__unique_existence"
+      ],
+      "concept_ids": [
+        "predicate_quantifier__unique_existence"
+      ],
+      "reason_zh": "用至少一个与至多一个的组合完整表达唯一存在。",
+      "original_record_sha256": "4bad108207441ddb4c2fc8485fa090928ba2df42341aeeddeaa20e2d6a154b44",
+      "classified_record_sha256": "c1f6d065ccfa2ecb3c63a4b3f455f8cbcd0a407dcb6aa2c2831f39390df3c57c"
+    },
+    "q_predicate_variable_07": {
+      "previous_concept_ids": [
+        "predicate_variable"
+      ],
+      "concept_ids": [
+        "predicate_variable__alpha_renaming",
+        "predicate_variable__free_bound_scope"
+      ],
+      "reason_zh": "区分内外同名量词的遮蔽并改名，识别自由变量和空用外层量词。",
+      "original_record_sha256": "ccb100b99ae1f578d381f12321a289b6eb983e999b0913eb2ec37abeac3e1219",
+      "classified_record_sha256": "10df9d8e1ad0184a68bac8d3a865adbe38c8b67b627b5efb7269f45e59a2b46c"
+    },
+    "q_predicate_variable_08": {
+      "previous_concept_ids": [
+        "predicate_variable"
+      ],
+      "concept_ids": [
+        "predicate_variable__free_bound_scope",
+        "predicate_variable__quantifier_scope"
+      ],
+      "reason_zh": "辨认公式中自由的y与约束的x，并比较赋值和不同量化封闭的真值。",
+      "original_record_sha256": "652cb807dfab2fa8093e29c6fe92a6a5b4f68b097350b0fc7d19fee6e91b60b5",
+      "classified_record_sha256": "938624e355332c237055fcbb29824ca8acc4997f487cad2f00bb0ef7dc56d460"
+    },
+    "q_predicate_reasoning_07": {
+      "previous_concept_ids": [
+        "predicate_reasoning",
+        "predicate_reasoning__universal_generalization"
+      ],
+      "concept_ids": [
+        "predicate_reasoning__universal_generalization"
+      ],
+      "reason_zh": "检验由指定常元推得全称结论的任意性条件，并构造反例。",
+      "original_record_sha256": "e7ff420c1f6d7ab9fea01e7711cb10d61d0dd6bdca68830d30feb5d9c58f68a5",
+      "classified_record_sha256": "143e05c705600138b5218fa189143c6dee86ee5edf798241c2940ca361c02fc5"
+    },
+    "q_predicate_reasoning_08": {
+      "previous_concept_ids": [
+        "predicate_reasoning",
+        "predicate_reasoning__universal_instantiation",
+        "predicate_reasoning__universal_generalization"
+      ],
+      "concept_ids": [
+        "predicate_reasoning__universal_instantiation",
+        "predicate_reasoning__universal_generalization"
+      ],
+      "reason_zh": "对任意对象实例化全称前提，分类推出结论后合法全称推广。",
+      "original_record_sha256": "3cb205406576f63ac57f5c2e9eb9687301c576c9a7c2493e010cda2cc26c51b4",
+      "classified_record_sha256": "442dfde84b4eacbafb2851a2e2c70169aef51238f4b42489eea12496524e289b"
+    },
+    "q_predicate_prenex_07": {
+      "previous_concept_ids": [
+        "predicate_prenex"
+      ],
+      "concept_ids": [
+        "predicate_prenex__quantifier_movement"
+      ],
+      "reason_zh": "消去蕴含使前件全称量词经否定翻转，再检查变量条件外提量词。",
+      "original_record_sha256": "21ca5a36addc9550b5da57a6c685393df19bad610e81df48008550d410de1503",
+      "classified_record_sha256": "63e986f88640a076dca9292a063d6d67d5d77388e8d9130edf3d9d09eba68328"
+    },
+    "q_predicate_prenex_08": {
+      "previous_concept_ids": [
+        "predicate_prenex"
+      ],
+      "concept_ids": [
+        "predicate_prenex__standardizing_apart",
+        "predicate_prenex__quantifier_movement"
+      ],
+      "reason_zh": "拆开双条件两个方向的绑定变量，分别翻转或外提量词再组成前束式。",
+      "original_record_sha256": "d3e04bb72290a0fe1ae172ee3ded29dbf71e24ffdf4bc52a42c0b74a66a48153",
+      "classified_record_sha256": "df5ff8331bc5af93f3647eaf1abef165ced19ab79ba2f0a7d76deee7b2b5d928"
+    },
+    "q_proof_direct_contradiction_07": {
+      "previous_concept_ids": [
+        "proof_direct_contradiction"
+      ],
+      "concept_ids": [
+        "proof_direct_contradiction__contradiction"
+      ],
+      "reason_zh": "准确否定恰有一个奇数并排除两者皆偶和两者皆奇的两种情况。",
+      "original_record_sha256": "a4f7fe9867faf2446aae2297cf375690f33135f7e62d71ea8dc3f6108a18bc84",
+      "classified_record_sha256": "fdf9bf32dbda05bf24a30a5c317353de432f85a66f1be3b515f8a38056c15ee2"
+    },
+    "q_proof_direct_contradiction_08": {
+      "previous_concept_ids": [
+        "proof_direct_contradiction"
+      ],
+      "concept_ids": [
+        "proof_direct_contradiction__contradiction"
+      ],
+      "reason_zh": "反设不存在所需数对，按奇数部分分组推出至多选4个与题设5个矛盾。",
+      "original_record_sha256": "5e5e63ba27c0ab314a74718ad725c722e5ddf5adbbd73bd4aabdfb9900257e85",
+      "classified_record_sha256": "258af82e71aa8197e6b5a5f36f34bdff2fafef50be9f104b236c6360c9a86f57"
+    },
+    "q_proof_induction_07": {
+      "previous_concept_ids": [
+        "proof_induction"
+      ],
+      "concept_ids": [
+        "proof_induction__induction_principle",
+        "proof_induction__induction_algebra_inequality"
+      ],
+      "reason_zh": "以n=1为基础，在归纳步加入正确的几何级数末项并作代数整理。",
+      "original_record_sha256": "6dd72b8ae2d022bb0d8f05d2a5adcb602878aa17924a0dc8a0c516dbcb2ac12e",
+      "classified_record_sha256": "0553bd8e08fb2afd3dfc878c1bece34860c67494358f47ef87a2b7280caa4570"
+    },
+    "q_proof_induction_08": {
+      "previous_concept_ids": [
+        "proof_induction"
+      ],
+      "concept_ids": [
+        "proof_induction__induction_principle",
+        "proof_induction__induction_algebra_inequality"
+      ],
+      "reason_zh": "从n=0开始归纳，利用相邻整数偶性证明新增项仍被6整除。",
+      "original_record_sha256": "4fa5288419bdb62ffc13ad98661e46f49a90d137a49375c304252aafa29fd0af",
+      "classified_record_sha256": "b96ae9f5c266b6d37c4f5611b3dab8b26f4c142626a076e3e37d3e6c7c842452"
+    },
+    "q_proof_strong_induction_07": {
+      "previous_concept_ids": [
+        "proof_strong_induction"
+      ],
+      "concept_ids": [
+        "proof_strong_induction__strong_hypothesis",
+        "proof_strong_induction__multibase_induction"
+      ],
+      "reason_zh": "递推同时引用两个前项，需正确准备基础情形并限制强归纳假设的范围。",
+      "original_record_sha256": "9cd7a095da7dc788f912079bd3cfa20f3aa0b411d1c859c76f32600559874cd5",
+      "classified_record_sha256": "2728b2c5cdec2c971b0196bd71d8a103a4f839a8915e1312c90d86983ce8e82f"
+    },
+    "q_proof_strong_induction_08": {
+      "previous_concept_ids": [
+        "proof_strong_induction"
+      ],
+      "concept_ids": [
+        "proof_strong_induction__strong_hypothesis",
+        "proof_strong_induction__recursive_decomposition"
+      ],
+      "reason_zh": "按合法操作降到较小棋子数，用强归纳假设分类递归胜负。",
+      "original_record_sha256": "23f45348f411ddfe3995cc8adc8762d41aca5a3291486561baca446d49399a71",
+      "classified_record_sha256": "f175d534eccb986d4da42e803fc75f22324f8306f64c7ad63a8d07848510c394"
+    },
+    "q_set_operation_07": {
+      "previous_concept_ids": [
+        "set_operation",
+        "set_operation__complement",
+        "set_operation__union",
+        "set_operation__intersection"
+      ],
+      "concept_ids": [
+        "set_operation__complement",
+        "set_operation__union",
+        "set_operation__intersection"
+      ],
+      "reason_zh": "用元素法证明交集的补等于补集的并，核对补集全集。",
+      "original_record_sha256": "6bf8a3b22077ca1d95451ca4ac6ab4c633570a22956b35523afaa9fda6673d3f",
+      "classified_record_sha256": "ba8c6fcb5abcf4fa781a668e3aa0b6129be20c704598f30943acb1bfe7989f3e"
+    },
+    "q_set_operation_08": {
+      "previous_concept_ids": [
+        "set_operation",
+        "set_operation__inclusion_exclusion",
+        "set_operation__intersection"
+      ],
+      "concept_ids": [
+        "set_operation__inclusion_exclusion",
+        "set_operation__intersection"
+      ],
+      "reason_zh": "以三集合容斥和交集重数修正计算至少报名与恰好报名两项的人数。",
+      "original_record_sha256": "3e5bb686a4fff0a37eb66f3bbc39172e92cad7628107619e4e8555893140449c",
+      "classified_record_sha256": "2c3e0b16b4bf06b13a47af467fcfd6363130daf7cbb46db4f611e96351d1439c"
+    },
+    "q_relation_cartesian_07": {
+      "previous_concept_ids": [
+        "relation_cartesian",
+        "relation_cartesian__ordered_pair",
+        "relation_cartesian__cartesian_product"
+      ],
+      "concept_ids": [
+        "relation_cartesian__ordered_pair",
+        "relation_cartesian__cartesian_product"
+      ],
+      "reason_zh": "利用有序对的位置区分笛卡尔积相等和仅基数相等。",
+      "original_record_sha256": "0c256b88b8b462e9d1f0856007e85d5834a97154d1518dcfd14c78a41a55ac7a",
+      "classified_record_sha256": "6d494bf7ae15ed668c59806741dda9325fba39fdd4b5aeb47a41cf2df92b0d2b"
+    },
+    "q_relation_cartesian_08": {
+      "previous_concept_ids": [
+        "relation_cartesian",
+        "relation_cartesian__relation_counting",
+        "relation_cartesian__binary_relation"
+      ],
+      "concept_ids": [
+        "relation_cartesian__relation_counting",
+        "relation_cartesian__binary_relation"
+      ],
+      "reason_zh": "将成员参与任务建为二元关系，按各成员的非空任务子集独立计数。",
+      "original_record_sha256": "376af9f785af8bf2244d846e2849abe8782e431df3e644bcafb3407816e24803",
+      "classified_record_sha256": "b9dc9089bf77ed487685802eb12a3c72bacf03d0e13fbcde3b24e809d69ef062"
+    },
+    "q_relation_operation_07": {
+      "previous_concept_ids": [
+        "relation_operation",
+        "relation_operation__set_operations",
+        "relation_operation__composition"
+      ],
+      "concept_ids": [
+        "relation_operation__set_operations",
+        "relation_operation__composition"
+      ],
+      "reason_zh": "分别作关系交与复合，利用不同中间元素展示复合不对交普遍分配。",
+      "original_record_sha256": "d04e59ed9a7c6cb972cc15a049fa527b0e796de9e9c81aefcb9d2f70288951d6",
+      "classified_record_sha256": "e5cf59607b66e2ad17e643510e9b88e80d6821b87882aab522d893282263191a"
+    },
+    "q_relation_operation_08": {
+      "previous_concept_ids": [
+        "relation_operation",
+        "relation_operation__inverse_relation",
+        "relation_operation__set_operations"
+      ],
+      "concept_ids": [
+        "relation_operation__inverse_relation",
+        "relation_operation__set_operations",
+        "relation_operation__composition"
+      ],
+      "reason_zh": "判断逆关系对并交及复合的运算律，注意复合取逆须反转次序。",
+      "original_record_sha256": "5668444917aad41ce501d0f28fbfbc202d2f13b27f8cfd4676d54d9087bea6c3",
+      "classified_record_sha256": "42d9f815f1d0a2fc05fba0987a9f07f4e4b6660ac96cb49f47ade5e149308cd5"
+    },
+    "q_relation_property_07": {
+      "previous_concept_ids": [
+        "relation_property",
+        "relation_property__reflexivity",
+        "relation_property__symmetry",
+        "relation_property__antisymmetry",
+        "relation_property__transitivity"
+      ],
+      "concept_ids": [
+        "relation_property__reflexivity",
+        "relation_property__symmetry",
+        "relation_property__antisymmetry",
+        "relation_property__transitivity"
+      ],
+      "reason_zh": "根据对角对、反向对及两步链逐项判断四种关系性质。",
+      "original_record_sha256": "e4835542e506f858a9144aebc135e6a35acb8fed47c63527a3d441166eaff09b",
+      "classified_record_sha256": "5653135402edff63a642316e9da52e95088eb2aa51bc82649494b0ad8f98b954"
+    },
+    "q_relation_property_08": {
+      "previous_concept_ids": [
+        "relation_property",
+        "relation_property__reflexivity",
+        "relation_property__symmetry",
+        "relation_property__antisymmetry"
+      ],
+      "concept_ids": [
+        "relation_property__reflexivity",
+        "relation_property__symmetry",
+        "relation_property__antisymmetry"
+      ],
+      "reason_zh": "固定全部对角对后，分别按无序元素对统计对称与反对称关系。",
+      "original_record_sha256": "b5e944aca564a223ff77269cab463b308abfc067290fb2e3983f9ab3e5c9233e",
+      "classified_record_sha256": "78bcc86f02a2b2a9761aba9e995d25c7a3476c4774936e0caf8332c340edbae3"
+    },
+    "q_relation_equivalence_07": {
+      "previous_concept_ids": [
+        "relation_equivalence",
+        "relation_equivalence__classes",
+        "relation_equivalence__partitions",
+        "relation_property__transitivity"
+      ],
+      "concept_ids": [
+        "relation_equivalence__classes",
+        "relation_equivalence__partitions",
+        "relation_property__transitivity"
+      ],
+      "reason_zh": "把划分转回等价关系，并用缺少端点边的两步链反驳并关系的传递性。",
+      "original_record_sha256": "7b43f2fa9fcdd5eda997665735d5297d43647ede25a15ba354b61c0577a4b391",
+      "classified_record_sha256": "4e615c4e9ae947827f71f3d2f529b84bde1494c8c7ca8bd271a5f5a87ea1066c"
+    },
+    "q_relation_equivalence_08": {
+      "previous_concept_ids": [
+        "relation_equivalence",
+        "relation_equivalence__partitions",
+        "relation_equivalence__quotient_set"
+      ],
+      "concept_ids": [
+        "relation_equivalence__partitions",
+        "relation_equivalence__quotient_set"
+      ],
+      "reason_zh": "通过两个非空等价类的划分计数关系，并按块大小统计有序对数。",
+      "original_record_sha256": "3b04b38a638633ed67aff6930c467a364170db85dce2768647b8220262298e9f",
+      "classified_record_sha256": "8cea035a5d7646889522545722d2297068e062d83b63c68cbce41a7341efd686"
+    },
+    "q_relation_order_07": {
+      "previous_concept_ids": [
+        "relation_order",
+        "relation_order__upper_bound",
+        "relation_order__lower_bound",
+        "relation_order__supremum",
+        "relation_order__infimum"
+      ],
+      "concept_ids": [
+        "relation_order__upper_bound",
+        "relation_order__lower_bound",
+        "relation_order__supremum",
+        "relation_order__infimum"
+      ],
+      "reason_zh": "在指定环境偏序集内求子集上下界及上确界，判断下确界是否存在。",
+      "original_record_sha256": "c3b818da68211af1010cfcada5d2c30eb9c98c4ce4738f4f5def24a06387d5be",
+      "classified_record_sha256": "3790002968bd636a059c1aa27b4db1799cc5b5552a55f7d6c2b0a8ebab0211f9"
+    },
+    "q_relation_order_08": {
+      "previous_concept_ids": [
+        "relation_order",
+        "relation_order__linear_extension",
+        "relation_order__partial_order"
+      ],
+      "concept_ids": [
+        "relation_order__linear_extension",
+        "relation_order__partial_order"
+      ],
+      "reason_zh": "保持整除偏序的全部严格比较约束，列出其线性扩张。",
+      "original_record_sha256": "7e5e827f0e849395b4587fcb3dfacfc595e79d557a1c0d65b15f6092394e6694",
+      "classified_record_sha256": "b2d69772ebdaea6e85c8b5b9aab08c149b594a0d9397b6a033c580930b5996a7"
+    },
+    "q_relation_closure_07": {
+      "previous_concept_ids": [
+        "relation_closure",
+        "relation_closure__transitive_closure"
+      ],
+      "concept_ids": [
+        "relation_closure__transitive_closure"
+      ],
+      "reason_zh": "利用包含原关系的最小传递关系定义，证明传递闭包运算幂等。",
+      "original_record_sha256": "d9992efbea0b84c6d31237cc9905dde3782a9749a12bb284ba6215bfde9ec4cb",
+      "classified_record_sha256": "285931f7e5f983e1b18bb92594067ae590142f34c00f6c4cb7ca87b337c05161"
+    },
+    "q_relation_closure_08": {
+      "previous_concept_ids": [
+        "relation_closure",
+        "relation_closure__transitive_closure",
+        "relation_closure__reflexive_transitive_closure"
+      ],
+      "concept_ids": [
+        "relation_closure__transitive_closure",
+        "relation_closure__reflexive_transitive_closure"
+      ],
+      "reason_zh": "比较正长度可达与零步可达，计算有向环及终点下的两种闭包大小。",
+      "original_record_sha256": "178b361e102e0730b063666161235e33555cb89722f2b6ad0290d96fb3eb815e",
+      "classified_record_sha256": "23764fb1e27ed289a5b46b09743031037fde8d5ca09eb37b9ee72833af82de66"
+    },
+    "q_function_mapping_07": {
+      "previous_concept_ids": [
+        "function_mapping",
+        "function_mapping__total_single_valued"
+      ],
+      "concept_ids": [
+        "function_mapping__total_single_valued"
+      ],
+      "reason_zh": "检查每个输入是否恰有一个输出，新增同一输入的不同输出破坏单值性。",
+      "original_record_sha256": "4300e263d6d84adc544e8697a515b62fcbac1daf25b3161393c732979905dbfa",
+      "classified_record_sha256": "73eb199113616dc48133e753789ada2e87221d1c860cf2f4ea465b7baf03ee5f"
+    },
+    "q_function_mapping_08": {
+      "previous_concept_ids": [
+        "function_mapping",
+        "function_mapping__image",
+        "function_mapping__preimage"
+      ],
+      "concept_ids": [
+        "function_mapping__image",
+        "function_mapping__preimage"
+      ],
+      "reason_zh": "先求目标子集原像再取像，证明恰好得到目标集合与像集的交。",
+      "original_record_sha256": "0208b0ded5ba9dc6d251d1a9af5bf4c66c7910dc013c6784c78731d488c85105",
+      "classified_record_sha256": "85ce1a2c5235bb7423333e6a00ad72b5285bddab141a5325f2ee86a921988f5e"
+    },
+    "q_function_injection_07": {
+      "previous_concept_ids": [
+        "function_injection",
+        "function_injection__injection",
+        "function_injection__surjection"
+      ],
+      "concept_ids": [
+        "function_injection__injection",
+        "function_injection__surjection"
+      ],
+      "reason_zh": "证明复合单射、满射对组成映射的必要限制，并举有限反例。",
+      "original_record_sha256": "7b33e4ff922594c5ffb7231f16407dc29205ab82ea74f908c3d64bf94de5281e",
+      "classified_record_sha256": "a86f54d6038b69168d6294102a61ec7538a34ff8ba030ccd2bdc5b8bec619c52"
+    },
+    "q_function_injection_08": {
+      "previous_concept_ids": [
+        "function_injection",
+        "function_injection__injection",
+        "function_injection__bijection"
+      ],
+      "concept_ids": [
+        "function_injection__injection",
+        "function_injection__bijection"
+      ],
+      "reason_zh": "按互异输出的逐步选择，分别统计有限单射与双射。",
+      "original_record_sha256": "4dc37cdb0790288ca0678613337385b938b832b04b21c479996aba9a68284e7b",
+      "classified_record_sha256": "9073c88840416c28bc379002ebc5217ff49e2fa9b7244c02b89ffad0a9ec075b"
+    },
+    "q_function_composition_07": {
+      "previous_concept_ids": [
+        "function_composition",
+        "function_composition__noncommutativity"
+      ],
+      "concept_ids": [
+        "function_composition__noncommutativity"
+      ],
+      "reason_zh": "计算旋转和逐位取反两个执行顺序，验证这一特例的交换性。",
+      "original_record_sha256": "4c67cde8251869431f6342e6e2da1e797decc0a693f60e84483f4162e20161ab",
+      "classified_record_sha256": "85354e9b248202345b0b16dab819bd31d75a7dec8d36819202c1efdbddb57f64"
+    },
+    "q_function_composition_08": {
+      "previous_concept_ids": [
+        "function_composition",
+        "function_composition__iteration",
+        "function_composition__identity"
+      ],
+      "concept_ids": [
+        "function_composition__iteration",
+        "function_composition__identity"
+      ],
+      "reason_zh": "求循环平移的k次复合及返回恒等映射的最小正迭代次数。",
+      "original_record_sha256": "eebd628883f3ba344bed0cad4756f4474e4bddccd16eb6188f86505b5430aa87",
+      "classified_record_sha256": "1908471a4fca188e8f4ab3074a75b23e60f1cd5617dfc185eb77ff342d123d4b"
+    },
+    "q_function_inverse_07": {
+      "previous_concept_ids": [
+        "function_inverse",
+        "function_inverse__involution",
+        "function_inverse__inverse_existence"
+      ],
+      "concept_ids": [
+        "function_inverse__involution",
+        "function_inverse__inverse_existence"
+      ],
+      "reason_zh": "求模八仿射函数的逆并用二次复合为恒等验证自逆与双射。",
+      "original_record_sha256": "b21eca6f7625ff45383c137b07d1aecf401cc7ac5cf9bdbfb75d01c797e48bb7",
+      "classified_record_sha256": "636beb8b954620df235c76eb0421f605ff886ec8c811903674ef6d458254c039"
+    },
+    "q_function_inverse_08": {
+      "previous_concept_ids": [
+        "function_inverse",
+        "function_inverse__inverse_existence",
+        "function_mapping__preimage",
+        "relation_operation__inverse_relation"
+      ],
+      "concept_ids": [
+        "function_inverse__inverse_existence",
+        "function_mapping__preimage",
+        "relation_operation__inverse_relation"
+      ],
+      "reason_zh": "区分集合原像、反转函数图像所得逆关系和双侧逆函数的存在条件。",
+      "original_record_sha256": "94c3e2d20b1d1e3df0ecec4b0e2ed9c0b385cd0b1f10fbbba0189d91c8dfb77a",
+      "classified_record_sha256": "e8f334d4c8b85e2e47eafccbe92ca4e9c1b394f548de8a2ce0dac1deb9b2f631"
+    },
+    "q_algebra_group_04": {
+      "previous_concept_ids": [
+        "algebra_group",
+        "algebra_group__subgroups"
+      ],
+      "concept_ids": [
+        "algebra_group__subgroups"
+      ],
+      "reason_zh": "证明有限乘法封闭子集包含单位元和逆元，核对子群判定。",
+      "original_record_sha256": "c6cba534afa5f56ebfcc2f57a746220f279de8f9abac34fe550e9e756f31b3c8",
+      "classified_record_sha256": "430563320b5e0bb6d22901719ae7e8a717d84cccc63c4456a122bead4c9fd348"
+    },
+    "q_algebra_group_08": {
+      "previous_concept_ids": [
+        "algebra_group",
+        "algebra_group__group_axioms",
+        "algebra_group__element_orders",
+        "algebra_group__generators"
+      ],
+      "concept_ids": [
+        "algebra_group__group_axioms",
+        "algebra_group__element_orders",
+        "algebra_group__generators"
+      ],
+      "reason_zh": "核验模8单位群公理，比较元素阶与群阶以判断是否循环。",
+      "original_record_sha256": "993cd0b82c967ed9bca3f72c6c62eb761d3411ff7c2aa4fb365344fdda23a1ba",
+      "classified_record_sha256": "c4a90b8d77e18513d9370ae7071c25df0fd6ec3b461d092e72adc7c443debf20"
+    },
+    "q_algebra_homomorphism_02": {
+      "previous_concept_ids": [
+        "algebra_homomorphism",
+        "algebra_homomorphism__kernels",
+        "algebra_homomorphism__images",
+        "algebra_homomorphism__operation_preservation"
+      ],
+      "concept_ids": [
+        "algebra_homomorphism__kernels",
+        "algebra_homomorphism__images",
+        "algebra_homomorphism__operation_preservation"
+      ],
+      "reason_zh": "验证倍乘映射保持运算，并计算核与像以排除同构。",
+      "original_record_sha256": "f8a0bef950a313623d864ab82d108eb4552ba6d37d266bcfce5930e8586e9b39",
+      "classified_record_sha256": "2806d9ada6bba29031e24d66b7198278cdcf17603b03097948530541147fbb5d"
+    },
+    "q_algebra_homomorphism_08": {
+      "previous_concept_ids": [
+        "algebra_homomorphism",
+        "algebra_homomorphism__kernels",
+        "algebra_homomorphism__images"
+      ],
+      "concept_ids": [
+        "algebra_homomorphism__kernels",
+        "algebra_homomorphism__images"
+      ],
+      "reason_zh": "利用有限满同态中核与非空纤维等势，计算核和原像数量。",
+      "original_record_sha256": "80ce5f082e1e4f0a93c4d7787a9cbff7599a56b8f535f82652d01376fbb6b09a",
+      "classified_record_sha256": "20c0b385ee4b94b3e63a8ecb602c1bfef98841dddc5d7befd633f265168518cc"
+    },
+    "q_algebra_lattice_bool_02": {
+      "previous_concept_ids": [
+        "algebra_lattice_bool",
+        "algebra_lattice_bool__meets_joins",
+        "algebra_lattice_bool__bounded_lattices",
+        "algebra_lattice_bool__complements"
+      ],
+      "concept_ids": [
+        "algebra_lattice_bool__meets_joins",
+        "algebra_lattice_bool__bounded_lattices",
+        "algebra_lattice_bool__complements",
+        "algebra_lattice_bool__boolean_algebras"
+      ],
+      "reason_zh": "计算因子格的交并，利用界与补元条件判定是否布尔代数。",
+      "original_record_sha256": "582d7ceb436291cc87f2101f06790d99fe13677264d844713c181c3b8bf0806b",
+      "classified_record_sha256": "1b5aa06d98578329ba1b977d9c3da684c1a73cd8d5b59810bd197a2d170e265b"
+    },
+    "q_algebra_lattice_bool_08": {
+      "previous_concept_ids": [
+        "algebra_lattice_bool",
+        "algebra_lattice_bool__boolean_algebras"
+      ],
+      "concept_ids": [
+        "algebra_lattice_bool__boolean_algebras"
+      ],
+      "reason_zh": "在幂集布尔代数中用元素法证明并集补集的德摩根律。",
+      "original_record_sha256": "b768fba8d6ab99ed94925d5c9823de398f796f402f8faefa971f39a0f6a216df",
+      "classified_record_sha256": "78bfe2e2c5585b91c1983c3416f5740923f192d8bb3bd37b1169027288754205"
+    },
+    "q_algebra_ring_field_02": {
+      "previous_concept_ids": [
+        "algebra_ring_field",
+        "algebra_ring_field__units",
+        "algebra_ring_field__finite_fields"
+      ],
+      "concept_ids": [
+        "algebra_ring_field__units",
+        "algebra_ring_field__finite_fields"
+      ],
+      "reason_zh": "在素数模域中求乘法逆元、除法及平方方程的解。",
+      "original_record_sha256": "f6e84064ec5bf126a0494fceb084b6b219a29cc1821f429b4493ad79d7109f17",
+      "classified_record_sha256": "8f11ff7cf59bc5fa01e5751919ad203283c06df54ea9c19765762c7dd99f11cc"
+    },
+    "q_algebra_ring_field_08": {
+      "previous_concept_ids": [
+        "algebra_ring_field",
+        "algebra_ring_field__ring_axioms",
+        "algebra_ring_field__zero_divisors",
+        "algebra_ring_field__finite_fields"
+      ],
+      "concept_ids": [
+        "algebra_ring_field__ring_axioms",
+        "algebra_ring_field__zero_divisors",
+        "algebra_ring_field__finite_fields"
+      ],
+      "reason_zh": "通过矩阵乘法不交换及解析中的非零零因子，核对环与域的必要条件。",
+      "original_record_sha256": "035bf98fcd8c5ef9df554038bee318db4f7a444f7e0c0fd75ac51e759f75dcbc",
+      "classified_record_sha256": "334879e92779974d0e8b311e0451785b19367da95aec80fe084abdcc93918de2"
+    },
+    "q_algebra_system_02": {
+      "previous_concept_ids": [
+        "algebra_system",
+        "algebra_system__associativity",
+        "algebra_system__commutativity",
+        "algebra_system__identity_elements",
+        "algebra_system__inverse_elements"
+      ],
+      "concept_ids": [
+        "algebra_system__associativity",
+        "algebra_system__commutativity",
+        "algebra_system__identity_elements",
+        "algebra_system__inverse_elements"
+      ],
+      "reason_zh": "直接核验新运算的结合律、交换律、双侧单位元及相应逆元。",
+      "original_record_sha256": "135693a5dae5a6a707485674843e7b8333f68433cf7290e3c0f65adf84f0e24f",
+      "classified_record_sha256": "4f22d0e2fd3c235cefab66408b8aa7d95ec6840d04e848522f46fca1f5ab3e85"
+    },
+    "q_algebra_system_08": {
+      "previous_concept_ids": [
+        "algebra_system",
+        "algebra_system__semigroups_monoids",
+        "algebra_system__inverse_elements"
+      ],
+      "concept_ids": [
+        "algebra_system__semigroups_monoids",
+        "algebra_system__inverse_elements",
+        "algebra_system__associativity",
+        "algebra_system__commutativity",
+        "algebra_system__identity_elements"
+      ],
+      "reason_zh": "检查min运算的两条运算律与单位元、逆元，辨别交换幺半群。",
+      "original_record_sha256": "65cf41c59b940c4a3b714e1aa44f1e93099f783134496d2795c97371fada3a90",
+      "classified_record_sha256": "f8c464a0bd2e181d822d1773233e372e74749952236e55f9206adae6c06cb926"
+    },
+    "q_number_congruence_04": {
+      "previous_concept_ids": [
+        "number_congruence",
+        "number_congruence__arithmetic"
+      ],
+      "concept_ids": [
+        "number_congruence__arithmetic"
+      ],
+      "reason_zh": "用差为模数倍数的定义证明乘法保持同余。",
+      "original_record_sha256": "999b4855eab5f4ab5b04f1ed698a04deeffa7cf646a1663a3db84690e376f93c",
+      "classified_record_sha256": "fd2884a600a360acf58aa500c5f29a46ce117aa21df1fe9c67e2a02764ec8d01"
+    },
+    "q_number_congruence_08": {
+      "previous_concept_ids": [
+        "number_congruence"
+      ],
+      "concept_ids": [
+        "number_congruence__residue_classes",
+        "number_congruence__arithmetic"
+      ],
+      "reason_zh": "对模九剩余类逐一平方，列出平方余数并排除目标余数。",
+      "original_record_sha256": "e195b4a32f31e81e601b272e9833382a27daf252aef54f9c7df9d295267fcd97",
+      "classified_record_sha256": "b863b7b9924ed60506d7fe94fd3e6dea2f95b69aaf09cf7c51afa47a2412374a"
+    },
+    "q_number_euler_fermat_03": {
+      "previous_concept_ids": [
+        "number_euler_fermat"
+      ],
+      "concept_ids": [
+        "number_euler_fermat__euler_theorem",
+        "number_euler_fermat__fermat_theorem",
+        "number_euler_fermat__totient"
+      ],
+      "reason_zh": "选择题分别检验欧拉互素前提、费马普遍形式和欧拉函数的值。",
+      "original_record_sha256": "b5d9067d67a536bed5f2f5de57f474138b8dd0448ad9b6d2151cc698f483d66d",
+      "classified_record_sha256": "e4e924c4c94a2536cf6108ecd16f6d64e99a73defbb71a5a4fec1877765a9f65"
+    },
+    "q_number_euler_fermat_08": {
+      "previous_concept_ids": [
+        "number_euler_fermat",
+        "number_euler_fermat__pseudoprimes"
+      ],
+      "concept_ids": [
+        "number_euler_fermat__pseudoprimes"
+      ],
+      "reason_zh": "用合数341通过底数二的费马检验，反驳由单底数同余反推素数。",
+      "original_record_sha256": "fdd148dd5389190ac66b75d384658206f79ef1f641c65e41a7b44d4b42dcad5a",
+      "classified_record_sha256": "b2087aa21400fc6cf57eb47bd68dbccebcd016c2b7ef36fffedf86dd531dfcf7"
+    },
+    "q_number_gcd_03": {
+      "previous_concept_ids": [
+        "number_gcd",
+        "number_gcd__gcd_definition"
+      ],
+      "concept_ids": [
+        "number_gcd__gcd_definition",
+        "number_gcd__euclidean"
+      ],
+      "reason_zh": "正方形边长须为两边公因数，求最大公因数时实际使用余数递减算法。",
+      "original_record_sha256": "8e687c23c373805798287a3aeb8dd7998f0f0968f97424883eb2105890e6a2b7",
+      "classified_record_sha256": "50d96925351f108a9947f65da5c2f81b79d5c00fde750644de101c943e3ee262"
+    },
+    "q_number_gcd_04": {
+      "previous_concept_ids": [
+        "number_gcd"
+      ],
+      "concept_ids": [
+        "number_gcd__euclidean",
+        "number_gcd__gcd_definition"
+      ],
+      "reason_zh": "证明替换为余数形式后正公因数集合保持不变，从而证明欧几里得步骤正确。",
+      "original_record_sha256": "7c895e7660c94a19d2c168e4886a998aede16c28f8886f41b272addfff9adf43",
+      "classified_record_sha256": "20281a7a7908262a7e53489d1788e1588a8caa421a4bfd595aa65d65be4b4c7d"
+    },
+    "q_number_inverse_crt_04": {
+      "previous_concept_ids": [
+        "number_inverse_crt"
+      ],
+      "concept_ids": [
+        "number_inverse_crt__coprime_systems",
+        "number_inverse_crt__construction"
+      ],
+      "reason_zh": "用裴蜀系数构造满足两式的解，并证明互素模数乘积下唯一。",
+      "original_record_sha256": "071aff66aef60eb77bbaffef01cc8c16e8ea552993981a5f14f6d26457971f74",
+      "classified_record_sha256": "7ba61fee3794cb335fd4d6b2ab5c856252b9d3d87e4042748295d650db4185a2"
+    },
+    "q_number_inverse_crt_08": {
+      "previous_concept_ids": [
+        "number_inverse_crt"
+      ],
+      "concept_ids": [
+        "number_inverse_crt__coprime_systems"
+      ],
+      "reason_zh": "合并模四和模五的互素同余条件，以模二十的解类筛选共同执行日。",
+      "original_record_sha256": "38b4b48f5e1f3a3ef73b37f6d25ad09b12f83962c218121a26bb611bc5e532d8",
+      "classified_record_sha256": "6a708c508c01960021aa8866532ec55e6374951404591ed08fb27f5071e1c8ee"
+    },
+    "q_number_linear_congruence_04": {
+      "previous_concept_ids": [
+        "number_linear_congruence"
+      ],
+      "concept_ids": [
+        "number_linear_congruence__solvability",
+        "number_linear_congruence__lifting"
+      ],
+      "reason_zh": "证明最大公因数整除右项的可解条件及约简解提升后恰有g个余数类。",
+      "original_record_sha256": "de20a2ccdac77e21d177ac0f0cad48bbbac230c45dff67c7589131d5f84234d7",
+      "classified_record_sha256": "3eb3d80bbcbfecc5ece1934661e18905e316b6677e8c82a324c1b3d1a6a669b0"
+    },
+    "q_number_linear_congruence_08": {
+      "previous_concept_ids": [
+        "number_linear_congruence"
+      ],
+      "concept_ids": [
+        "number_linear_congruence__solvability",
+        "number_linear_congruence__inverses"
+      ],
+      "reason_zh": "检查可解条件、约简后用模逆元求解，再在给定有限范围列出整数解。",
+      "original_record_sha256": "38d83399773f31c01158ce96182e8c34c8ebcabf8af0811d69c7639ef21c0aca",
+      "classified_record_sha256": "dd9d7f51fba8a12807459e0e69e6b727a02f0eae28d181841f171d2220af7b7e"
+    },
+    "q_number_prime_04": {
+      "previous_concept_ids": [
+        "number_prime"
+      ],
+      "concept_ids": [
+        "number_prime__factorization",
+        "number_prime__divisibility"
+      ],
+      "reason_zh": "欧几里得证明利用大于一整数存在素因子及乘积加一不能被原素数整除。",
+      "original_record_sha256": "a15e7bb8a1757d04bbfacd0dcd9e5359e16684355979436caf5d4f98cabfc664",
+      "classified_record_sha256": "8e0191a8b0972bc3218bfc91a7fd39185692bb952888731a14a880091ebd9a8e"
+    },
+    "q_number_prime_08": {
+      "previous_concept_ids": [
+        "number_prime"
+      ],
+      "concept_ids": [
+        "number_prime__primality"
+      ],
+      "reason_zh": "构造有非平凡因子的合数反例，区别有限检验与全称素性断言。",
+      "original_record_sha256": "48bba6599a3036aff74698499db3a1211aba6c039fa6b5ff10cca54af0ad2509",
+      "classified_record_sha256": "2485e6576e6c8faaa2a57cfd7f789c2130883b462a85857044d429d9d5b4bc9e"
+    },
+    "q_number_rsa_07": {
+      "previous_concept_ids": [
+        "number_rsa",
+        "number_rsa__textbook_determinism"
+      ],
+      "concept_ids": [
+        "number_rsa__textbook_determinism"
+      ],
+      "reason_zh": "辨别无随机填充的教学RSA代数演示与真实加密安全要求。",
+      "original_record_sha256": "6f6f2128b0fc1643d8a2f42a8ac177cb7eb38571923b106cc291d2569a3be2f4",
+      "classified_record_sha256": "d183f1fe6d45452227a0d2e2205766bbe8a4ace5ba71b59552c2798c1f812197"
+    },
+    "q_number_rsa_08": {
+      "previous_concept_ids": [
+        "number_rsa",
+        "number_rsa__textbook_determinism"
+      ],
+      "concept_ids": [
+        "number_rsa__textbook_determinism",
+        "number_rsa__modular_powers"
+      ],
+      "reason_zh": "计算同一消息重复模幂所得密文，说明无填充过程具有确定性。",
+      "original_record_sha256": "369f733aa2b66aa2b65ef23d7cd69a98d07d46fca4d8a9fd16a8d2519c63b615",
+      "classified_record_sha256": "a3c2e3cb1f56855e43fbdcc185b5f8b47ada73cc27dea35ec900d2c579611e10"
+    },
+    "q_count_basic_03": {
+      "previous_concept_ids": [
+        "count_basic"
+      ],
+      "concept_ids": [
+        "count_basic__step_product",
+        "count_basic__disjoint_sum"
+      ],
+      "reason_zh": "辨别笛卡尔积的分步乘法和互斥完备分类的加法原理。",
+      "original_record_sha256": "e087e0c28edbc739ad93771d672f3c15e466e4dbbd07bd982b37e5ab17cdd039",
+      "classified_record_sha256": "018b0f557d8eeb586ceadcbb9e844bbd797c2a8d0c855dd161f43c6b3499c1c2"
+    },
+    "q_count_perm_comb_04": {
+      "previous_concept_ids": [
+        "count_perm_comb"
+      ],
+      "concept_ids": [
+        "count_perm_comb__subset_selection"
+      ],
+      "reason_zh": "以带召集人的k人子集作双重计数，证明组合数恒等式。",
+      "original_record_sha256": "ea3fddc54adc3b9798619bf8aaa35e4c7bd755a7856021cd2eeec315683e7e89",
+      "classified_record_sha256": "4709dbc240d85dfc8278705c79660ef17775835f0daf29935831a1da9d5fb214"
+    },
+    "q_count_pigeonhole_04": {
+      "previous_concept_ids": [
+        "count_pigeonhole"
+      ],
+      "concept_ids": [
+        "count_pigeonhole__structured_boxes"
+      ],
+      "reason_zh": "按横纵坐标的四种奇偶类型结构化分盒，使同类两点中点为整数点。",
+      "original_record_sha256": "21df7bb8c5f9fc0a011f016b36c81e33867b2427e3e3b951ae5c05a24911220e",
+      "classified_record_sha256": "37e1d24b62204a36c8cbf7215797ed29c6e143c7cdc88b9d805c6c0c4f0b7ec3"
+    },
+    "q_count_inclusion_04": {
+      "previous_concept_ids": [
+        "count_inclusion"
+      ],
+      "concept_ids": [
+        "count_inclusion__forbidden_events"
+      ],
+      "reason_zh": "将某封信进入同编号信封作为坏事件，用容斥排除所有坏事件得到错排数。",
+      "original_record_sha256": "bf2462a023b36868712515b5994334daf4a87faa9b9071ec69b8d076bf0779b9",
+      "classified_record_sha256": "4355861e7a47a5d05897511166aa2997ca06938987a9e7b52f9b663648844f87"
+    },
+    "q_count_generating_04": {
+      "previous_concept_ids": [
+        "count_generating"
+      ],
+      "concept_ids": [
+        "count_generating__formal_series"
+      ],
+      "reason_zh": "用逐系数形式乘法验证几何级数恒等式，并区分形式运算和数值收敛。",
+      "original_record_sha256": "f7e0e5a63986aa748582e33c3927a784d3e1906ca3cef88ca400447e4915b057",
+      "classified_record_sha256": "e87ea96c29efea3e68ba12a4b4b211bbb0b92a267b6ad25af380aa8037bdcbc6"
+    },
+    "q_recurrence_model_04": {
+      "previous_concept_ids": [
+        "recurrence_model"
+      ],
+      "concept_ids": [
+        "recurrence_model__memory_states",
+        "recurrence_model__state_partition"
+      ],
+      "reason_zh": "处理禁止连续二级步的后缀约束，按末尾一步或两步作互斥递推分解。",
+      "original_record_sha256": "126b3556fca67475ccb69fc3f76539a9d8c09a13fb29a0a976904d217255efbf",
+      "classified_record_sha256": "7f5c9e06a8db1c79066da2c514550c5f757259ddabaf9a132051819b5968c0b6"
+    },
+    "q_recurrence_homogeneous_01": {
+      "previous_concept_ids": [
+        "recurrence_homogeneous"
+      ],
+      "concept_ids": [
+        "recurrence_homogeneous__linear_structure"
+      ],
+      "reason_zh": "识别常系数、线性、齐次三个定义条件，不涉及任何特征根类型。",
+      "original_record_sha256": "4b88829a0fa6697c5a167dcd89a7f33db75ec20c59e8efcb21a7228e7a0845f9",
+      "classified_record_sha256": "4e87cee04308120df2a29c4511bfc28051e450c22be71379eb186a47050255dd"
+    },
+    "q_recurrence_nonhomogeneous_04": {
+      "previous_concept_ids": [
+        "recurrence_nonhomogeneous"
+      ],
+      "concept_ids": [
+        "recurrence_nonhomogeneous__resonance",
+        "recurrence_nonhomogeneous__superposition"
+      ],
+      "reason_zh": "外加常数底数一为二重特征根，需二次特解，再与齐次解叠加并代初值。",
+      "original_record_sha256": "8ef8e015f375d630b497779c2ff42c0a5871a1f859b1a0de2f3db857a6047005",
+      "classified_record_sha256": "a256990c2467cef12869e58cd84b8a1d16cde5b75eaeb5d6a4f9bbb29306b6b3"
+    },
+    "q_count_basic_08": {
+      "previous_concept_ids": [
+        "count_basic"
+      ],
+      "concept_ids": [
+        "count_basic__equal_fiber"
+      ],
+      "reason_zh": "指出各结果原像大小不等时不能统一相除，并给出等重满射的充分条件。",
+      "original_record_sha256": "878d4a7ffd4ca5a4d097a630dd9d4bba30064d4f5bd742e689010d0bcf961515",
+      "classified_record_sha256": "770f2dff862003c759b4c1a73ac5851fb568465b4c7066565ad81b6f5926715c"
+    },
+    "q_count_perm_comb_08": {
+      "previous_concept_ids": [
+        "count_perm_comb"
+      ],
+      "concept_ids": [
+        "count_perm_comb__subset_selection"
+      ],
+      "reason_zh": "依次选取有名称、互不相交且内部无序的两个成员子集。",
+      "original_record_sha256": "31665258d77a7dd98bf97be4af4e5e28fce9aa558ec303ee063f69b188768f49",
+      "classified_record_sha256": "c3b538f4450b967216b48af9a583c8b67a2e583c9497315ec91a240c66e8fe17"
+    },
+    "q_count_binomial_07": {
+      "previous_concept_ids": [
+        "count_binomial"
+      ],
+      "concept_ids": [
+        "count_binomial__vandermonde"
+      ],
+      "reason_zh": "帕斯卡恒等式是按一个单元素组是否选取分类的范德蒙德卷积特例。",
+      "original_record_sha256": "ec636d6be6e2ff5f4793c1b059f46d6aed71a9589cdde2fc7374712696f09eff",
+      "classified_record_sha256": "de8e14339e17640aa517a423d775c85a76fbb13bb55e8d5aa9620faf6ea05edd"
+    },
+    "q_count_binomial_08": {
+      "previous_concept_ids": [
+        "count_binomial"
+      ],
+      "concept_ids": [
+        "count_binomial__coefficient"
+      ],
+      "reason_zh": "求带正负二项式乘积的指定次幂系数，需追踪各因子的次数和符号。",
+      "original_record_sha256": "ee561de3e1a8061d3c1c0ca806485179a20ca0d9c8a2bc76c51daf6c14dacf3d",
+      "classified_record_sha256": "ad0bf2c8e023399fb33d290d6e780441803a7337b9ef9fb0214ae98eb2a9c746"
+    },
+    "q_count_pigeonhole_08": {
+      "previous_concept_ids": [
+        "count_pigeonhole"
+      ],
+      "concept_ids": [
+        "count_pigeonhole__structured_boxes"
+      ],
+      "reason_zh": "先排除认识零人与认识所有人的人数标签同时出现，再按剩余标签分盒。",
+      "original_record_sha256": "88e016fa692dccb65f09c90e0e8a1947c75018c2ae71a5f0d689696b7ca91c21",
+      "classified_record_sha256": "56048a063da940d3b0416b49493a7a0daefbd52b312b4a9dc0c6333faac4dbf0"
+    },
+    "q_count_inclusion_08": {
+      "previous_concept_ids": [
+        "count_inclusion"
+      ],
+      "concept_ids": [
+        "count_inclusion__multiple_set"
+      ],
+      "reason_zh": "逐元素计算多集合交集项的交错组合权重，证明一般容斥并集公式。",
+      "original_record_sha256": "6f32b2f080e09dbdbe7829ccd3428747c054efab7fe0cbd64229e3381cfd7f67",
+      "classified_record_sha256": "4105d9d5363e03c3f914b2bf33c3896a58b4b05727d5e76947d6a1e5e2c6aa84"
+    },
+    "q_count_generating_08": {
+      "previous_concept_ids": [
+        "count_generating"
+      ],
+      "concept_ids": [
+        "count_generating__formal_series",
+        "count_generating__counting_product"
+      ],
+      "reason_zh": "将乘积系数解释为商余唯一分解，验证形式级数恒等式。",
+      "original_record_sha256": "ef2c043554fc1c10d52aeb5d6928e9cded371efc574b1f50fa34deebae87e12f",
+      "classified_record_sha256": "989b3b6818c19477c77b482f173bb260dd7dc301b6ba0206caf46c507f438ac3"
+    },
+    "q_recurrence_model_08": {
+      "previous_concept_ids": [
+        "recurrence_model"
+      ],
+      "concept_ids": [
+        "recurrence_model__divide_conquer"
+      ],
+      "reason_zh": "检查取整子问题规模能否下降到可达基例，再按修正递推计算成本。",
+      "original_record_sha256": "af48771ace7fc79c9c3839a7233f37efdd6ca289968fb887cc96a2d99ce247eb",
+      "classified_record_sha256": "ce11341f41fdec3172e0dbe24a3e7c27d03aeb60b976a7c631a67b75af6a7a6f"
+    },
+    "q_recurrence_homogeneous_08": {
+      "previous_concept_ids": [
+        "recurrence_homogeneous"
+      ],
+      "concept_ids": [
+        "recurrence_homogeneous__linear_structure"
+      ],
+      "reason_zh": "利用齐次线性算子的线性性证明解的叠加，并组合对应初始值。",
+      "original_record_sha256": "ab15fd69266f227ca758359c6f3e5204bd3bad68bc8dab78f6fd281f1f12a115",
+      "classified_record_sha256": "af360a4e4a99e3b18a609f475d826dd4c143a9cb42d7b8bd7e0253d8b97ec4aa"
+    },
+    "q_recurrence_nonhomogeneous_08": {
+      "previous_concept_ids": [
+        "recurrence_nonhomogeneous"
+      ],
+      "concept_ids": [
+        "recurrence_nonhomogeneous__superposition",
+        "recurrence_nonhomogeneous__nonresonant",
+        "recurrence_nonhomogeneous__resonance"
+      ],
+      "reason_zh": "分别为非共振常数项和共振指数项找特解，叠加后统一处理初值。",
+      "original_record_sha256": "87119af8247ce0e8794e6984835d8f6a232e2e3b4d03fb983dcd1ff897508235",
+      "classified_record_sha256": "6b5e1969da8afc60fc9c21c23b02b2b0ccfcd65a3ced164a877564d9e7d93002"
+    },
+    "q_recurrence_initial_07": {
+      "previous_concept_ids": [
+        "recurrence_initial"
+      ],
+      "concept_ids": [
+        "recurrence_initial__boundary_range",
+        "recurrence_initial__forward_unique"
+      ],
+      "reason_zh": "系数为零时不能反向恢复早期项，但给定首项仍保证正向唯一。",
+      "original_record_sha256": "27e1021a5e9edc4dbe3d3e82a40406bb705ab8625e4e5a6dd7e2423301a3c42a",
+      "classified_record_sha256": "ab082ca9bf79e602944a7ad8df0e4bcf748788cfaead1bbb0fadc9ff856053c0"
+    },
+    "q_recurrence_initial_08": {
+      "previous_concept_ids": [
+        "recurrence_initial"
+      ],
+      "concept_ids": [
+        "recurrence_initial__boundary_range",
+        "recurrence_initial__forward_unique"
+      ],
+      "reason_zh": "变换后的递推须同步确定初值和有效指标，并由初始数据逐项唯一确定序列。",
+      "original_record_sha256": "051fc4d608a9b1fa4347ba8ba3b9841eb851cc6d83fdd57a59f454314d2dee52",
+      "classified_record_sha256": "fc2c3bf3837ceeaedd869add1ef1b9138296dff8f29b673884d0bba1622d86d3"
+    },
+    "q_graph_isomorphism_07": {
+      "previous_concept_ids": [
+        "graph_isomorphism"
+      ],
+      "concept_ids": [
+        "graph_isomorphism__mapping",
+        "graph_isomorphism__invariants"
+      ],
+      "reason_zh": "比较只保持邻接的抽象同构与还要求边权一致的同构，并用权多重集排除。",
+      "original_record_sha256": "ba7ba3da6a1ed827e538d8cae1048bbc412827949cecd5f7262cbda1d0f6a730",
+      "classified_record_sha256": "f3df97038e8c26e99897de90ae590eac354923e78728fbe9ed8af4238ed2fdcb"
+    },
+    "q_graph_isomorphism_08": {
+      "previous_concept_ids": [
+        "graph_isomorphism"
+      ],
+      "concept_ids": [
+        "graph_isomorphism__mapping"
+      ],
+      "reason_zh": "复合同构双射并逐对验证双向邻接保持，证明同构传递性。",
+      "original_record_sha256": "78f7bc86e5dadd65d62013b36fb4fc1ab0a1a1e2c50dc7b4330ec994637f7a09",
+      "classified_record_sha256": "2b8cabb995bb04ba91f7c30ad099ae80d7e4aca9e2d10db995c6a1353df7c44c"
+    },
+    "q_graph_adjacency_07": {
+      "previous_concept_ids": [
+        "graph_adjacency"
+      ],
+      "concept_ids": [
+        "graph_adjacency__construction"
+      ],
+      "reason_zh": "用对称、零对角和零一元素条件判别无向简单图邻接矩阵是否合法。",
+      "original_record_sha256": "0e5497368d9e6361eaace15c94a4646e4c024f778bd51746d55a10d4d1f9b98f",
+      "classified_record_sha256": "290be80f0fe72e242c2be6fad6db303a6bda12699a0a30f9f5a6927887dedab4"
+    },
+    "q_graph_adjacency_08": {
+      "previous_concept_ids": [
+        "graph_adjacency"
+      ],
+      "concept_ids": [
+        "graph_adjacency__construction",
+        "graph_adjacency__walk_powers"
+      ],
+      "reason_zh": "从邻接矩阵读取边和孤立点，再用平方矩阵解释指定两步游走数。",
+      "original_record_sha256": "248a76ee6400543420c3e05092294fa3d031a374346fc0963a505c93c037d202",
+      "classified_record_sha256": "a1b2192fb1b3d1c9bad97d019daeb986058c852f10b91b62aa7be249cc976c19"
+    },
+    "q_graph_matrix_08": {
+      "previous_concept_ids": [
+        "graph_matrix"
+      ],
+      "concept_ids": [
+        "graph_matrix__unsigned_incidence",
+        "graph_matrix__laplacian"
+      ],
+      "reason_zh": "辨别顶点边关联矩阵与顶点方阵的行列对象，比较关联及拉普拉斯尺寸。",
+      "original_record_sha256": "8e2d291a749d781581fbc02ff71ddfb724bf2571f87305d10817d80123193b2e",
+      "classified_record_sha256": "c90402e379ebc62dca29946ca7eefed8247d670bd612e88e2f595bd3a162ac67"
+    },
+    "q_graph_cut_07": {
+      "previous_concept_ids": [
+        "graph_cut"
+      ],
+      "concept_ids": [
+        "graph_cut__bridges"
+      ],
+      "reason_zh": "证明删除桥使其所在分量恰分成两个部分。",
+      "original_record_sha256": "fdd84d6f8b2d2074cc944cf529bffb9b72e5a831fd25e228cb28e43861188a34",
+      "classified_record_sha256": "a3ba151c1317b4fe7e36e8af0e2647a8d8d95d2a9270e56f0b4d0795bf994643"
+    },
+    "q_graph_cut_08": {
+      "previous_concept_ids": [
+        "graph_cut"
+      ],
+      "concept_ids": [
+        "graph_cut__bridges",
+        "graph_cut__articulation"
+      ],
+      "reason_zh": "加边构成替代通路后重新辨认桥与割点。",
+      "original_record_sha256": "d97e28cc86255602f3dc16f3069fbb1ce622c1c0b04de6cea541cf38ba7c2a7e",
+      "classified_record_sha256": "a4412356221d02372d05cf1693f71ab4f53ae6311c0dae71d571e0f7d4bed5f6"
+    },
+    "q_graph_weighted_07": {
+      "previous_concept_ids": [
+        "graph_weighted"
+      ],
+      "concept_ids": [
+        "graph_weighted__vertex_strength"
+      ],
+      "reason_zh": "按无向边两个端点重复计数，证明顶点强度总和等于两倍边权总和，且不要求边权为正。",
+      "original_record_sha256": "5153e2bc90b5a68ffb2347e6623b27c0756b17dac7bda30cf53a27ada2b9dee9",
+      "classified_record_sha256": "3943fce07f453397e2091b0f6ccb816734dcc0244e08d27d43080ce4499ea706"
+    },
+    "q_graph_weighted_08": {
+      "previous_concept_ids": [
+        "graph_weighted",
+        "graph_weighted__optimization_objectives"
+      ],
+      "concept_ids": [
+        "graph_weighted__optimization_objectives"
+      ],
+      "reason_zh": "分别比较路径总费用与最大单边费用，区分两种优化目标。",
+      "original_record_sha256": "2fe50c0737b0915eee0fab356d0afc4287a5b08ffbf57e8730d335f1e3544c3b",
+      "classified_record_sha256": "c00c3aa56c3e471fee14ae05d78d44206dacf14b06786d50704dadb24df7b1a8"
+    },
+    "q_graph_euler_07": {
+      "previous_concept_ids": [
+        "graph_euler",
+        "graph_euler__undirected_circuit"
+      ],
+      "concept_ids": [
+        "graph_euler__undirected_circuit"
+      ],
+      "reason_zh": "用奇度顶点配对补边及偶度判据确定欧拉回路存在性。",
+      "original_record_sha256": "3b9f4aa7232351e36078e558dc8719b19b9aada65612ebbbfaf8fd31f087f16b",
+      "classified_record_sha256": "a8b3ea1c3202840468515f17d10e744fec08fb52dfc1111d97edbd78b51140d6"
+    },
+    "q_graph_euler_08": {
+      "previous_concept_ids": [
+        "graph_euler",
+        "graph_euler__open_trail",
+        "graph_euler__undirected_circuit"
+      ],
+      "concept_ids": [
+        "graph_euler__open_trail",
+        "graph_euler__undirected_circuit"
+      ],
+      "reason_zh": "核对两个奇度端点及连通条件，区分开放欧拉通路与回路。",
+      "original_record_sha256": "855e1972737c4f8cd1b22c55b19db04f7037eea98bbef46b6b1e016b0d92dd8d",
+      "classified_record_sha256": "984b7f50f18ada5d2e5e3fecaa4f97a52d5e03568bb506018e919cc6265c5731"
+    },
+    "q_graph_hamilton_07": {
+      "previous_concept_ids": [
+        "graph_hamilton",
+        "graph_hamilton__necessary",
+        "graph_hamilton__spanning_cycle"
+      ],
+      "concept_ids": [
+        "graph_hamilton__necessary",
+        "graph_hamilton__spanning_cycle"
+      ],
+      "reason_zh": "从覆盖全顶点的回路删去顶点，推导删点后分量数必要上界。",
+      "original_record_sha256": "d89dae23b2e797ba764d529adc513026b551039a9b8a73d767162304c66efb9b",
+      "classified_record_sha256": "9c300e2b8688df86f287cc48bbd35531e25d95ab1c0ef404f5d8996ac52fabdf"
+    },
+    "q_graph_hamilton_08": {
+      "previous_concept_ids": [
+        "graph_hamilton",
+        "graph_hamilton__spanning_cycle"
+      ],
+      "concept_ids": [
+        "graph_hamilton__spanning_cycle"
+      ],
+      "reason_zh": "按循环移位和反向等价计数覆盖全部顶点的哈密顿回路。",
+      "original_record_sha256": "9502d7929ed56130de2f4ac997e05b8fa44ed81ba648885ca28c0bc97d96c4c8",
+      "classified_record_sha256": "488406d31e535e10bf4df016bc8e68b798512009a505e48177ba746c2cf2b61b"
+    },
+    "q_graph_shortest_07": {
+      "previous_concept_ids": [
+        "graph_shortest",
+        "graph_shortest__negative_cycles"
+      ],
+      "concept_ids": [
+        "graph_shortest__negative_cycles"
+      ],
+      "reason_zh": "检查负回路是否源点可达及是否影响指定目标的最短距离。",
+      "original_record_sha256": "7722b0e8ca7293b20802559a3e5526d63f5a96e6542a35ee6e463ccf35720542",
+      "classified_record_sha256": "98c9106c61c4c4bdaf21ed7601b29d93616d715db1a09110850fe6ef01dfacef"
+    },
+    "q_graph_shortest_08": {
+      "previous_concept_ids": [
+        "graph_shortest",
+        "graph_shortest__optimality_certificate"
+      ],
+      "concept_ids": [
+        "graph_shortest__optimality_certificate"
+      ],
+      "reason_zh": "累加距离势函数约束得到费用下界，并用达到下界的路径作证书。",
+      "original_record_sha256": "4c8bdad72311bbc530383cd9b1824416ae95a66e68b697677b4b1470a0dbd535",
+      "classified_record_sha256": "04706e21f01d8a23595ea9cc8807a3948ddd1c87eaffcbddfa8b68615ca76ce7"
+    },
+    "q_graph_coloring_07": {
+      "previous_concept_ids": [
+        "graph_coloring"
+      ],
+      "concept_ids": [
+        "graph_coloring__chromatic_bounds"
+      ],
+      "reason_zh": "把时间冲突转为相邻异色要求，用三角形下界与三色安排证明最优。",
+      "original_record_sha256": "0b93de9b544a2b05cdebb61ae20cdbda5841e8a1d4a1bc643b10b11111fb07ed",
+      "classified_record_sha256": "9b81df43e2f23e686339ae9e6048e45493c61371663daa4ec1fb8877fe6a3e7f"
+    },
+    "q_graph_coloring_08": {
+      "previous_concept_ids": [
+        "graph_coloring"
+      ],
+      "concept_ids": [
+        "graph_coloring__chromatic_bounds"
+      ],
+      "reason_zh": "通过保留原着色或为一个端点新增颜色证明色数上下界。",
+      "original_record_sha256": "b5908f5bc761acd07bdd514968c155f7b8b65edebb207b9dfd9dbcc0a6a1e7dc",
+      "classified_record_sha256": "763d7e8e122ec54c21fb06f5e2230300fcd7d24da7a12f4010d69e602495822a"
+    },
+    "q_graph_planar_04": {
+      "previous_concept_ids": [
+        "graph_planar"
+      ],
+      "concept_ids": [
+        "graph_planar__euler",
+        "graph_planar__edge_bounds"
+      ],
+      "reason_zh": "结合欧拉公式与二部平面图面长至少4的计数得到矛盾。",
+      "original_record_sha256": "8dfea532c2c507d7f0c4638ba047da1fd2a21dc5f6036ebe8b5272992fa48f7b",
+      "classified_record_sha256": "388b1b5e5dab328efc6a6be1b80311c3bbafc1dc15506b4d52dc718ceaa3ef19"
+    },
+    "q_graph_planar_08": {
+      "previous_concept_ids": [
+        "graph_planar"
+      ],
+      "concept_ids": [
+        "graph_planar__edge_bounds"
+      ],
+      "reason_zh": "区分平面图边数界的必要性和充分性，用二部图边数界排除平面性。",
+      "original_record_sha256": "4bcffe9b3eedf9127d271d322491c32e6a4b5494002fde0de56ae0c9f3c33fd8",
+      "classified_record_sha256": "23d33d52ff61504b8248d84b00cc119dc38e49722b156115ec9a68afd80c4c3c"
+    },
+    "q_graph_bipartite_04": {
+      "previous_concept_ids": [
+        "graph_bipartite"
+      ],
+      "concept_ids": [
+        "graph_bipartite__odd_cycle",
+        "graph_bipartite__two_coloring"
+      ],
+      "reason_zh": "证明无奇圈与二部性等价，并用搜索树距离奇偶构造二染色。",
+      "original_record_sha256": "5a7d650d08628fb17729e8a3e1906991654ade00500bdde95fff7ba145a874f5",
+      "classified_record_sha256": "4d1bbfc242f174dd4a0509f434c2a03aa9aa4c5909b16e9ee39d0858dca44369"
+    },
+    "q_graph_bipartite_08": {
+      "previous_concept_ids": [
+        "graph_bipartite"
+      ],
+      "concept_ids": [
+        "graph_bipartite__bipartition",
+        "graph_bipartite__two_coloring"
+      ],
+      "reason_zh": "按每个树分量到根距离的奇偶性直接构造二部划分。",
+      "original_record_sha256": "5b0813b5b96ff156b2f3f0c356e1631cc83e8bf82ddeb3814bcef21f8913baa4",
+      "classified_record_sha256": "62d20babaf28e7f7fae901b2e5e57037f3f568514aa782b7ab609c4609cfd4b8"
+    },
+    "q_graph_topological_04": {
+      "previous_concept_ids": [
+        "graph_topological"
+      ],
+      "concept_ids": [
+        "graph_topological__dag",
+        "graph_topological__kahn"
+      ],
+      "reason_zh": "证明非空DAG有零入度顶点，逐次删除并在前端输出以构造拓扑序。",
+      "original_record_sha256": "7daa8b9c16b7cf141cee81990854216364354fc6d669c9a12beb71f83a591978",
+      "classified_record_sha256": "6630fc2d7dda303c4b869f2b1e81d51f3bc15728dae85e6bb87ef28eee1befcb"
+    },
+    "q_graph_topological_08": {
+      "previous_concept_ids": [
+        "graph_topological"
+      ],
+      "concept_ids": [
+        "graph_topological__uniqueness"
+      ],
+      "reason_zh": "枚举两条独立依赖链的所有合法交错拓扑序。",
+      "original_record_sha256": "615e403d1e2140cfebb77dd24795216456c9624bfd29985f5cdd0b7d8cc818fc",
+      "classified_record_sha256": "3e2de5012b131cdcda18b6b4c4f754fe6f8ea7dfc16fc6641cc3b463bfe3764a"
+    },
+    "q_graph_domination_04": {
+      "previous_concept_ids": [
+        "graph_domination"
+      ],
+      "concept_ids": [
+        "graph_domination__independent",
+        "graph_domination__dominating"
+      ],
+      "reason_zh": "区分极大与最大独立集，并证明极大独立集支配全部外部顶点。",
+      "original_record_sha256": "41b8cd67b6e606375342e429b809150d2b7471c0c8c02eeb928dee4b0689aae5",
+      "classified_record_sha256": "890ed98432a0984feaae6e6f5cc57bbd79d8df2f4431f16a76e2d33dc52b711a"
+    },
+    "q_graph_domination_08": {
+      "previous_concept_ids": [
+        "graph_domination"
+      ],
+      "concept_ids": [
+        "graph_domination__independent",
+        "graph_domination__vertex_cover",
+        "graph_domination__dominating"
+      ],
+      "reason_zh": "在带孤立顶点的图上分别计算最大独立集、最小顶点覆盖和最小支配集。",
+      "original_record_sha256": "604724348c9abc5f49b84e31cc648104db107cbc87fce9a2b3090a5ab72a9d7b",
+      "classified_record_sha256": "b8ce3445c2355f2623fb9d453e269a3536716f500d59efbae40466f178e509ec"
+    },
+    "q_graph_matching_04": {
+      "previous_concept_ids": [
+        "graph_matching"
+      ],
+      "concept_ids": [
+        "graph_matching__augmenting",
+        "graph_matching__maximal_maximum"
+      ],
+      "reason_zh": "用增广路翻转及匹配对称差证明最大匹配的无增广路判据。",
+      "original_record_sha256": "dd106a471caf800021680656968ee34adea79ef2e7b0aeddf14ea1e9b2e4d8b6",
+      "classified_record_sha256": "9bc9b2c573e3b41ff7f964392678939081664de3cf2a63af7ec8d78b54fe5b08"
+    },
+    "q_graph_matching_08": {
+      "previous_concept_ids": [
+        "graph_matching"
+      ],
+      "concept_ids": [
+        "graph_matching__maximal_maximum"
+      ],
+      "reason_zh": "利用匹配边互不共端点，比较最大匹配大小与顶点覆盖下界。",
+      "original_record_sha256": "eeddee66dd91a33e72482e59ee04df712841d544c2e20508ecb47f0f1d304fc5",
+      "classified_record_sha256": "454603f567992d95d2de6c40e89888c2f119112f5808483a632557227cc35c56"
+    },
+    "q_tree_basic_04": {
+      "previous_concept_ids": [
+        "tree_basic"
+      ],
+      "concept_ids": [
+        "tree_basic__degree_leaves"
+      ],
+      "reason_zh": "用树中最长路径两端无法延伸且不能成圈，证明至少有两个叶子。",
+      "original_record_sha256": "b08093b391da58705857f0e7d7d9eff6b07ef4973d42678d235bcb099982a502",
+      "classified_record_sha256": "b237a40a0762975cdbcd750c8723cab3bacb466933e6fb95279b3e3b83deed85"
+    },
+    "q_tree_basic_08": {
+      "previous_concept_ids": [
+        "tree_basic"
+      ],
+      "concept_ids": [
+        "tree_basic__equivalent"
+      ],
+      "reason_zh": "用连通图边数下界和删圈边论证连通且n−1边等价于树。",
+      "original_record_sha256": "6eaea0887f2312563b879f77b9c75557c103b6d297aabce7ef92173ed1245e0e",
+      "classified_record_sha256": "5cf8bf2a7962d089c50f149d657ac5969c007e58ca0cb0478177bb0d98194a8e"
+    },
+    "q_tree_rooted_04": {
+      "previous_concept_ids": [
+        "tree_rooted"
+      ],
+      "concept_ids": [
+        "tree_rooted__hierarchy",
+        "tree_rooted__full_mary"
+      ],
+      "reason_zh": "按父子边计算孩子总数，并推出满二叉树的内部节点与叶子数量关系。",
+      "original_record_sha256": "2d011cce6d46180fe0033f4d9bb5c76c96845979f04bc7f9d66d1d811c34e8a7",
+      "classified_record_sha256": "7869752e7e547da264682b8075a1bc5f45326957cf7149f234c599d19ac2c326"
+    },
+    "q_tree_rooted_08": {
+      "previous_concept_ids": [
+        "tree_rooted"
+      ],
+      "concept_ids": [
+        "tree_rooted__hierarchy",
+        "tree_rooted__depth_height"
+      ],
+      "reason_zh": "把顶点深度解释为祖先数量，对祖先后代有序对作双计数。",
+      "original_record_sha256": "ae7a21cf5bcaf83b2430833bc5ee16c0c0bb4d766a6d0313d9950a5042ee429b",
+      "classified_record_sha256": "e3c79917ab06a05a4bba1f867802773b5f62fde3a96ca3160f37176c5b01ef71"
+    },
+    "q_tree_spanning_04": {
+      "previous_concept_ids": [
+        "tree_spanning"
+      ],
+      "concept_ids": [
+        "tree_spanning__construction",
+        "tree_spanning__bridge_count"
+      ],
+      "reason_zh": "通过删圈边构造生成树，并证明每条桥在所有生成树中必选。",
+      "original_record_sha256": "f5a430cfec650757d1a728aba8d5f05eb0c99e22dc6d8c352a8340375291405b",
+      "classified_record_sha256": "4fcf58a7bdc9462c852cb34214e1b8a26a689c92f0b273f429bc79f82947a7b2"
+    },
+    "q_tree_spanning_08": {
+      "previous_concept_ids": [
+        "tree_spanning"
+      ],
+      "concept_ids": [
+        "tree_spanning__construction"
+      ],
+      "reason_zh": "在各连通分量保留一棵生成树，利用生成森林边数计算最少删边数。",
+      "original_record_sha256": "ff8cfce5606403762c67a0a29c160bed4870c308cfa5390a5e5f9c4ce53b41ff",
+      "classified_record_sha256": "a9b12f809cd28d3e8599bf4178e8a8227efac03873ba36412d6c023456446d5c"
+    },
+    "q_tree_mst_04": {
+      "previous_concept_ids": [
+        "tree_mst"
+      ],
+      "concept_ids": [
+        "tree_mst__cut"
+      ],
+      "reason_zh": "用树边交换证明跨割唯一最轻边必选，并检查并列最轻时的例外。",
+      "original_record_sha256": "e86205d7979277fa160bba66cb24fdbcd6d12e3c4c866dd415fdbfa979392eae",
+      "classified_record_sha256": "af7f2a045f8077ed0e46169059297655487a363657c406b0f6760c8842eefa04"
+    },
+    "q_tree_mst_08": {
+      "previous_concept_ids": [
+        "tree_mst"
+      ],
+      "concept_ids": [
+        "tree_mst__greedy"
+      ],
+      "reason_zh": "计算最小总权生成树，与保持各源点距离的最短路径树作比较。",
+      "original_record_sha256": "7ef5d127612697122d3cad337434b1c0ed0d6b9b6fb4f63260b814d56ed74d41",
+      "classified_record_sha256": "681c3f826b94053d9dca47ca2112b164e10e21e959eb1047a75c57c4c11847c7"
+    },
+    "q_tree_matrix_tree_04": {
+      "previous_concept_ids": [
+        "tree_matrix_tree"
+      ],
+      "concept_ids": [
+        "tree_matrix_tree__cofactor",
+        "tree_matrix_tree__decomposition"
+      ],
+      "reason_zh": "通过主余子式中的独立1阶块与生成树对应，证明加叶子保持树数。",
+      "original_record_sha256": "b706acc69e8823136485529862e5d822c288d7555b3ca6fe31816a6e5980eb80",
+      "classified_record_sha256": "d1f48cf3eb55d6cf7d84eea4ac26ac55a9688b62602890ac3ca045bf183713bc"
+    },
+    "q_tree_matrix_tree_08": {
+      "previous_concept_ids": [
+        "tree_matrix_tree"
+      ],
+      "concept_ids": [
+        "tree_matrix_tree__laplacian",
+        "tree_matrix_tree__cofactor"
+      ],
+      "reason_zh": "写出完全图拉普拉斯矩阵并计算主余子式，推导Cayley树数公式。",
+      "original_record_sha256": "5059cc73143ac978370d678336a50cfec6082b728d4e41f225b85789d9993a10",
+      "classified_record_sha256": "8585f10517f63cf29071dfa9585856cc094a7a285eb34ff6475584ba62003864"
+    },
+    "q-example-logic_truth": {
+      "previous_concept_ids": [
+        "logic_truth"
+      ],
+      "concept_ids": [
+        "logic_truth__proposition_sentence",
+        "logic_truth__truth_semantics",
+        "logic_truth__open_statement"
+      ],
+      "reason_zh": "辨认固定赋值的真、假命题，自由变量开放句及疑问句。",
+      "original_record_sha256": "cac30f47af8a490ffeead1a8aa9dfd249d4a6fd1b9ab331362bbfe6bffa1cf04",
+      "classified_record_sha256": "6f786240a21f5a25f1b4ea7222ec314528b37b62ca948395974069eb1afc956a"
+    },
+    "q-example-logic_connectives": {
+      "previous_concept_ids": [
+        "logic_connectives"
+      ],
+      "concept_ids": [
+        "logic_connectives__implication_conditions",
+        "logic_connectives__conjunction"
+      ],
+      "reason_zh": "将只有登录且网络可用才提交成功表示为必要条件的合取蕴含。",
+      "original_record_sha256": "08e8ff9bd21f893f961f07137bb7c84dd17123ea0397ebbb31da8f5e4fc7eae6",
+      "classified_record_sha256": "a327fe0d81097345a526e4856f08e22d3a3afb93e2384eb925d042a03d3720a3"
+    },
+    "q-example-logic_truth_table": {
+      "previous_concept_ids": [
+        "logic_truth_table"
+      ],
+      "concept_ids": [
+        "logic_truth_table__assignment_enumeration",
+        "logic_truth_table__semantic_counterexample",
+        "logic_truth_table__satisfiability_classification"
+      ],
+      "reason_zh": "完整列出两个蕴含的真值列，判断不等价并核对其析取为重言式。",
+      "original_record_sha256": "490fb024f7e8bcaa6848f22b8b40aa5d64ed976c98dbf08981a629afc0e3e7e4",
+      "classified_record_sha256": "a666ee4a8ebb19f069fbc7228cc4e746a5f081e0208e7260033f36fa5412cbd5"
+    },
+    "q-example-logic_equivalence": {
+      "previous_concept_ids": [
+        "logic_equivalence"
+      ],
+      "concept_ids": [
+        "logic_equivalence__implication_elimination",
+        "logic_equivalence__distribution_laws"
+      ],
+      "reason_zh": "消去两个蕴含后作逆向分配，以矛盾项化简并得到变量限制。",
+      "original_record_sha256": "120644cd25f943371bfc319f14dd4952dc836c26853a7db889e3522eecc93da8",
+      "classified_record_sha256": "56cee885a667493bc4513fb444ae3fc9cc1eac91713bcef8b0c369b1262e6395"
+    },
+    "q-example-logic_normal_form": {
+      "previous_concept_ids": [
+        "logic_normal_form"
+      ],
+      "concept_ids": [
+        "logic_normal_form__principal_dnf",
+        "logic_normal_form__principal_cnf"
+      ],
+      "reason_zh": "由异或的真、假赋值分别构造主析取范式和主合取范式。",
+      "original_record_sha256": "47a7e1b4a34a2ce5d0856e67eece6b34fc73a69e1c8e264aaf30e79e886e2064",
+      "classified_record_sha256": "5de979ad97873661f394c59f5004b539356ea6cd7ba9a8ed56ba98f880990f93"
+    },
+    "q-example-logic_reasoning": {
+      "previous_concept_ids": [
+        "logic_reasoning"
+      ],
+      "concept_ids": [
+        "logic_reasoning__case_reasoning"
+      ],
+      "reason_zh": "按p真或假穷尽分类，用两分支共同推出r完成析取消去。",
+      "original_record_sha256": "3d710687fded4b5019e14d163701c48e5ae1b3f5aa26493ef5958afac9d82818",
+      "classified_record_sha256": "9e2b6fdf30ea70dc2a5abc3a4f15ca20347879edd4d773020436ad73638ecbf5"
+    },
+    "q-example-predicate_domain": {
+      "previous_concept_ids": [
+        "predicate_domain"
+      ],
+      "concept_ids": [
+        "predicate_domain__predicate_arity",
+        "predicate_domain__relation_extension"
+      ],
+      "reason_zh": "解释二元整除谓词的参数位置，并列举有限域全部真元组。",
+      "original_record_sha256": "652fec82e8416b2a183cb692dc00bcdcd3ae1b79037dd0bb9fde9b7ec569dbdb",
+      "classified_record_sha256": "3b76561565acadadcec3eb92875f31825b54af402d1e36eac2db493f7f4c6ba8"
+    },
+    "q-example-predicate_variable": {
+      "previous_concept_ids": [
+        "predicate_variable"
+      ],
+      "concept_ids": [
+        "predicate_variable__free_bound_scope",
+        "predicate_variable__quantifier_scope"
+      ],
+      "reason_zh": "按每次出现及对应量词辖域区分自由变量和约束变量。",
+      "original_record_sha256": "0c113e1932b63052ae8fa30dd1f31df51578964c971e3f31fe868a6284a87ae5",
+      "classified_record_sha256": "59432e0fb7d49b9a25e9951ef362a5d35d65faacde05e3f31101f155c0549c37"
+    },
+    "q-example-predicate_quantifier": {
+      "previous_concept_ids": [
+        "predicate_quantifier"
+      ],
+      "concept_ids": [
+        "predicate_quantifier__quantifier_order"
+      ],
+      "reason_zh": "比较逐个x选择y与预先固定统一y两种交替量词的对象依赖。",
+      "original_record_sha256": "1fe758f855d6ed36c889bf3dcc0364ed4f135a5745e6ddd293b52da798e39fe5",
+      "classified_record_sha256": "10b778d0caded28db906bbe8a8067b4c8811f56601b0783434f744760913808b"
+    },
+    "q-example-predicate_reasoning": {
+      "previous_concept_ids": [
+        "predicate_reasoning"
+      ],
+      "concept_ids": [
+        "predicate_reasoning__existential_instantiation",
+        "predicate_reasoning__universal_instantiation",
+        "predicate_reasoning__existential_generalization"
+      ],
+      "reason_zh": "引入新存在见证，实例化全称条件，再用存在引入消去临时名字。",
+      "original_record_sha256": "117dd273394f201f10c5ca47bcad8ffde2c0ade849bb362c5c591c17c73d4168",
+      "classified_record_sha256": "f5de96fbc2982f15a5a2c9da8ed8e7ce623c63bca0d2f542f7908956cdd221f8"
+    },
+    "q-example-predicate_prenex": {
+      "previous_concept_ids": [
+        "predicate_prenex"
+      ],
+      "concept_ids": [
+        "predicate_prenex__standardizing_apart",
+        "predicate_prenex__quantifier_movement"
+      ],
+      "reason_zh": "先将两处同名绑定标准化，再在自由变量条件下外提量词。",
+      "original_record_sha256": "0741343798221c0edc0e3adf6145065a8e82b01dba57ddabf80c889b5bb35f62",
+      "classified_record_sha256": "1a7e90fd8f16c9c04171d61158cf160dd3355ea91a5ec4755beb5efe0cfee609"
+    },
+    "q-example-proof_direct_contradiction": {
+      "previous_concept_ids": [
+        "proof_direct_contradiction"
+      ],
+      "concept_ids": [
+        "proof_direct_contradiction__contradiction"
+      ],
+      "reason_zh": "保留平方为偶数的前提，反设原整数为奇数并推出奇偶矛盾。",
+      "original_record_sha256": "357ca1a5ad944dfcef83351f99a795a68dcc69c7f9f63b48a5a846bbda4ac19b",
+      "classified_record_sha256": "bcb8edce2f8b77932740857077e41671f3e7a328231dba9aef55a4537f7c9920"
+    },
+    "q-example-proof_induction": {
+      "previous_concept_ids": [
+        "proof_induction"
+      ],
+      "concept_ids": [
+        "proof_induction__induction_principle",
+        "proof_induction__induction_algebra_inequality"
+      ],
+      "reason_zh": "验证首项并由前k项和加上k+1，完成求和式的后继证明。",
+      "original_record_sha256": "9cc71bd14614b1a84d3e7920a5a96454e6578249e9efe445d34d836e019672a5",
+      "classified_record_sha256": "d5c147e0b6ccd0282d065fb8dceeb3989442fd431628de5d60653f38da77dec8"
+    },
+    "q-example-proof_strong_induction": {
+      "previous_concept_ids": [
+        "proof_strong_induction"
+      ],
+      "concept_ids": [
+        "proof_strong_induction__strong_hypothesis",
+        "proof_strong_induction__recursive_decomposition"
+      ],
+      "reason_zh": "把合数分为两个严格较小因子，分别应用强归纳假设后组合素因子分解。",
+      "original_record_sha256": "7d107fe6262e999ccad9a01f8306d36d6feaa2f457031207fe2b85dc59ba9a18",
+      "classified_record_sha256": "fcc1ca5496ab2d55a45ea41b2a4b11774751de064e1e9b8bc818b7e957ae43d8"
+    },
+    "q-example-set_operation": {
+      "previous_concept_ids": [
+        "set_operation"
+      ],
+      "concept_ids": [
+        "set_operation__intersection",
+        "set_operation__union",
+        "set_operation__difference",
+        "set_operation__symmetric_difference",
+        "set_operation__complement"
+      ],
+      "reason_zh": "分别计算交、并、差、对称差及相对于指定全集的补。",
+      "original_record_sha256": "b056d2b3749115c4b2314173854f07bddd2822c110f5c41576564ba9cb0ab1e5",
+      "classified_record_sha256": "8f05e6dd64fbdac5c5df5f42858f7dd4ff6e16b071f369c1dbf3fc91be6fe2d7"
+    },
+    "q-example-relation_cartesian": {
+      "previous_concept_ids": [
+        "relation_cartesian"
+      ],
+      "concept_ids": [
+        "relation_cartesian__cartesian_product",
+        "relation_cartesian__binary_relation"
+      ],
+      "reason_zh": "计算笛卡尔积并按其子集定义确认多值或未全覆盖的规则仍是二元关系。",
+      "original_record_sha256": "b0c17137e8da193ae8b8659105336fa7ce4f3e56445cf14874c6253e509d595c",
+      "classified_record_sha256": "48f31634b2f4c69e7164c90dea1e54ae999021eabcd23a0694be90bbecd298d0"
+    },
+    "q-example-relation_operation": {
+      "previous_concept_ids": [
+        "relation_operation"
+      ],
+      "concept_ids": [
+        "relation_operation__powers",
+        "relation_operation__composition"
+      ],
+      "reason_zh": "沿关系链按复合定义计算二次幂和三次幂。",
+      "original_record_sha256": "3b18b26006fe9388059436f622e733a9f62da3213a0d7b73a61d2a2893943571",
+      "classified_record_sha256": "482c519e5a4a2ac1b780b088d4d6543d560ff0f3799357896e6548dd93553ac6"
+    },
+    "q-example-relation_property": {
+      "previous_concept_ids": [
+        "relation_property"
+      ],
+      "concept_ids": [
+        "relation_property__reflexivity",
+        "relation_property__symmetry",
+        "relation_property__antisymmetry",
+        "relation_property__transitivity"
+      ],
+      "reason_zh": "逐项判断有限关系的自反、对称、反对称与传递，并给出反驳有序对。",
+      "original_record_sha256": "a835d8f2f716a5b9ccabb46b8351c2ea659b866fb3107439e2979e88e24bc405",
+      "classified_record_sha256": "cc757b92cc77d588b08a518c79a7527fd6410da847c0edff9ba57d0ff31b8289"
+    },
+    "q-example-relation_equivalence": {
+      "previous_concept_ids": [
+        "relation_equivalence"
+      ],
+      "concept_ids": [
+        "relation_equivalence__classes",
+        "relation_equivalence__partitions"
+      ],
+      "reason_zh": "按模3同余列出等价类，再按划分块大小的平方和计算有序对总数。",
+      "original_record_sha256": "b7b9c697f29f800b7d41fcae1ef5740e54b99e82db0276952e1d808db6200781",
+      "classified_record_sha256": "11f45b541b14710cb5843ffa6ed471e1f9a2b7f2fe7f8f8b72403a6c71468e75"
+    },
+    "q-example-relation_order": {
+      "previous_concept_ids": [
+        "relation_order"
+      ],
+      "concept_ids": [
+        "relation_order__least",
+        "relation_order__greatest",
+        "relation_order__total_order",
+        "relation_order__hasse_diagram"
+      ],
+      "reason_zh": "在整除偏序中求最小与最大元素，辨认可比较性并列出覆盖关系。",
+      "original_record_sha256": "e0e943eaccc5a67721358cc70feff48948bee2cf39ccf269adb5dbec85d48d8a",
+      "classified_record_sha256": "3d0fded1ab2449d4a0671aee7e03a606c30594fe4966e1aa4df31468b0110fa8"
+    },
+    "q-example-relation_closure": {
+      "previous_concept_ids": [
+        "relation_closure"
+      ],
+      "concept_ids": [
+        "relation_closure__transitive_closure",
+        "relation_closure__reflexive_transitive_closure"
+      ],
+      "reason_zh": "按正长度链求传递闭包，再补齐零步自关联得到自反传递闭包。",
+      "original_record_sha256": "86c625c283f1579d54b69525af857ca070e59ad110f39268822c5b5b70bb8030",
+      "classified_record_sha256": "fbe46e3e83abbf7e49177654da63c4f80298ee03a43cc6c5b8e05c4a030cfef7"
+    },
+    "q-example-function_mapping": {
+      "previous_concept_ids": [
+        "function_mapping"
+      ],
+      "concept_ids": [
+        "function_mapping__total_single_valued",
+        "function_mapping__domain_codomain",
+        "function_mapping__image",
+        "function_mapping__preimage"
+      ],
+      "reason_zh": "检查全定义单值性，并区分陪域、实际像集及指定输出集合的原像。",
+      "original_record_sha256": "43b5b5ccf2e818e7c2e25a327e1aeb55fbb568cb79fa598445a87f13fc825f2f",
+      "classified_record_sha256": "9cdf91a448cb2612af60dddadfd1a728bb4744a8d10bd89582d30c3eaf514193"
+    },
+    "q-example-function_injection": {
+      "previous_concept_ids": [
+        "function_injection"
+      ],
+      "concept_ids": [
+        "function_injection__injection",
+        "function_injection__surjection",
+        "function_injection__bijection"
+      ],
+      "reason_zh": "判断倍增映射的单射与满射，并通过调整陪域得到双射。",
+      "original_record_sha256": "56c377fbe7fab4a993cd795608187e57b8a75d7d00e4fa41376b3b79cb14efac",
+      "classified_record_sha256": "b7b970f40300567143db10592d10457a52497f7b31ba3060006e23312c2257b2"
+    },
+    "q-example-function_composition": {
+      "previous_concept_ids": [
+        "function_composition"
+      ],
+      "concept_ids": [
+        "function_composition__typed_composition",
+        "function_composition__noncommutativity"
+      ],
+      "reason_zh": "分别按先后执行顺序求两个复合式，并比较复合是否交换。",
+      "original_record_sha256": "bb069ca99c2e6c28fe32b9d6d7bcae48d334acfbd4e3e870c8acba7c7b7bce38",
+      "classified_record_sha256": "a39805d9e7ededd3c8eb6dd3a44d97370976ac78d4a4730aa3d49d450a973c97"
+    },
+    "q-example-function_inverse": {
+      "previous_concept_ids": [
+        "function_inverse"
+      ],
+      "concept_ids": [
+        "function_inverse__inverse_existence"
+      ],
+      "reason_zh": "比较陪域为偶整数和全部整数时的双射性与逆函数定义域。",
+      "original_record_sha256": "8a288526026d123d66e7e043976e04ec43d88994d3027bac9241583f7786a625",
+      "classified_record_sha256": "3ad7efca115a361a209762b2d4846aebf74a5b635150fab2976305264926aa16"
+    },
+    "q-example-number_prime": {
+      "previous_concept_ids": [
+        "number_prime"
+      ],
+      "concept_ids": [
+        "number_prime__factorization",
+        "number_prime__divisor_counting"
+      ],
+      "reason_zh": "先作唯一素因数分解，再按各素数指数选择计算正因数个数。",
+      "original_record_sha256": "fc3411c9a5cff53cc940b626dc64cc6300bcec913db6c8814951575b606adb4b",
+      "classified_record_sha256": "6fac0ff5d7fb42dad91740f324149fe5acb2db87170938b0c4cd0c3caca32ef5"
+    },
+    "q-example-number_gcd": {
+      "previous_concept_ids": [
+        "number_gcd"
+      ],
+      "concept_ids": [
+        "number_gcd__euclidean"
+      ],
+      "reason_zh": "逐项写出余数递减除法链并读取最后一个非零余数。",
+      "original_record_sha256": "9a61a9d39fe2ee72c815697158e51f56a4e1371eddaab820e3c6098ffd0a5168",
+      "classified_record_sha256": "3193bc27f07019111509fa107419a6d95a3f6980c4ece8771623d0bf4a40eca7"
+    },
+    "q-example-number_congruence": {
+      "previous_concept_ids": [
+        "number_congruence"
+      ],
+      "concept_ids": [
+        "number_congruence__cancellation"
+      ],
+      "reason_zh": "检验同余后指出公因子与模数不互素，因此不能保持模数直接消去。",
+      "original_record_sha256": "af598362710be004bc7c0b4f91e96560a913ec87ee5d945e2d2067a204eca0a1",
+      "classified_record_sha256": "96e00686894a808d522c2ea63fb65238deebd03a0243c1f18e0f9b85134ceb58"
+    },
+    "q-example-number_linear_congruence": {
+      "previous_concept_ids": [
+        "number_linear_congruence"
+      ],
+      "concept_ids": [
+        "number_linear_congruence__lifting",
+        "number_linear_congruence__inverses"
+      ],
+      "reason_zh": "连同模数约简后用逆元求解，并提升为原模数下全部余数解。",
+      "original_record_sha256": "afd1b2f66d8f8e5df5976eb27ee532a8b17bde63062cba2f5ce236328a6ea553",
+      "classified_record_sha256": "7a39afd2823cef8672c3d668f999f4be38808d5e007f7ce2dd02d7ac1af94f56"
+    },
+    "q-example-number_inverse_crt": {
+      "previous_concept_ids": [
+        "number_inverse_crt"
+      ],
+      "concept_ids": [
+        "number_inverse_crt__coprime_systems"
+      ],
+      "reason_zh": "求互素模数三、五的同余组，并证明全部解模乘积十五唯一。",
+      "original_record_sha256": "bec7ea8c966d7ac1eaa6655933e1b96c5a4bfe3b6052b21607eb568cf9f4bad0",
+      "classified_record_sha256": "89bc9938c0c3daffbbe0c16cfbf8ad4277b753bf72828c3d4d8346322f6e2523"
+    },
+    "q-example-number_euler_fermat": {
+      "previous_concept_ids": [
+        "number_euler_fermat"
+      ],
+      "concept_ids": [
+        "number_euler_fermat__totient",
+        "number_euler_fermat__fermat_theorem"
+      ],
+      "reason_zh": "先计算欧拉函数，再用素数模七的费马周期约简大指数。",
+      "original_record_sha256": "41c11d0b749859d765eef32ddb2858086623410bf58b866f80ca8b11a1ab5bcf",
+      "classified_record_sha256": "6d3b2908b191d1fefab539ae7bf7231cf052b4fe1e24a830aeffceec84ce5c9f"
+    },
+    "q-example-number_rsa": {
+      "previous_concept_ids": [
+        "number_rsa"
+      ],
+      "concept_ids": [
+        "number_rsa__key_generation",
+        "number_rsa__modular_powers"
+      ],
+      "reason_zh": "由素数和公钥指数生成私钥指数，再实际计算加密和解密模幂。",
+      "original_record_sha256": "e702cc06e3a93e5803f706b5701ccd57d3caf61bae64edd9d288423a1c99210e",
+      "classified_record_sha256": "4a53a36664fca22f6f545d3e18f6fac3514e3aa56d687f795bfef5e98720d40f"
+    },
+    "q-example-count_basic": {
+      "previous_concept_ids": [
+        "count_basic"
+      ],
+      "concept_ids": [
+        "count_basic__disjoint_sum",
+        "count_basic__step_product"
+      ],
+      "reason_zh": "分别计数互斥交付选择与同时完成两步选择，比较加法和乘法。",
+      "original_record_sha256": "e401b3e5242a681208865eccb652c2c04df93c699ffae2e7755f0b0ebcc34d9e",
+      "classified_record_sha256": "4948af8e9b1776ed99cc178260d6d19ae6b1222f5af7dff8b48d8acd43950c55"
+    },
+    "q-example-count_perm_comb": {
+      "previous_concept_ids": [
+        "count_perm_comb"
+      ],
+      "concept_ids": [
+        "count_perm_comb__subset_selection",
+        "count_perm_comb__ordered_selection"
+      ],
+      "reason_zh": "比较只选两人和将两人分配到不同职务的组合与排列数。",
+      "original_record_sha256": "4556e4d08aeee29ba74e4f3524d48b90c4a9dcdf6daaa842080fc10574835dc3",
+      "classified_record_sha256": "1d140808c440ea3589eef4ebf43a6f4423d75743c65b52b30ea811ffe9c1404e"
+    },
+    "q-example-count_binomial": {
+      "previous_concept_ids": [
+        "count_binomial"
+      ],
+      "concept_ids": [
+        "count_binomial__coefficient"
+      ],
+      "reason_zh": "直接用二项式展开公式提取指定次幂系数并计入常数因子的幂。",
+      "original_record_sha256": "60b780e2bed27f687301ec75f1cca521363740a5bb849e63d014cb8a7879d9a9",
+      "classified_record_sha256": "66c52bc577f7c802dfec794ade7ad7f61b8e94524c910333ad508b50efe3b389"
+    },
+    "q-example-count_pigeonhole": {
+      "previous_concept_ids": [
+        "count_pigeonhole"
+      ],
+      "concept_ids": [
+        "count_pigeonhole__capacity"
+      ],
+      "reason_zh": "十个样品分四类，利用总容量不足推出某类至少三个。",
+      "original_record_sha256": "ce3c547dfa6ad3e123fd6cafb3ee314a39b011cd2462b55d23b67b53bc723e0f",
+      "classified_record_sha256": "0f94c6790ad2a642e95b56db1f0e4294e9af0012d79a77b576e1f2c3bf913f0f"
+    },
+    "q-example-count_inclusion": {
+      "previous_concept_ids": [
+        "count_inclusion"
+      ],
+      "concept_ids": [
+        "count_inclusion__two_set"
+      ],
+      "reason_zh": "对两个条件集合求并集，减去被重复计数一次的交集。",
+      "original_record_sha256": "620c23cf513d95a9408e02c22d2b378bf87f4e0582e11553dc978c340ebf386a",
+      "classified_record_sha256": "5ba3c8d853d8ee9db8b8786b9da7ca84a5f3109ed7c53c0614a6c270ff3c1728"
+    },
+    "q-example-count_generating": {
+      "previous_concept_ids": [
+        "count_generating"
+      ],
+      "concept_ids": [
+        "count_generating__counting_product"
+      ],
+      "reason_zh": "把红蓝片的独立选择对应因子相乘，以总大小提取组合计数。",
+      "original_record_sha256": "641b6a7836a501ee48691350c1aa7e3c20558df30ec8762d38b35f4811c582ca",
+      "classified_record_sha256": "4b1ed8826044e1d2c002efdf065b725c074c55163dc55a90e623e432b47d9110"
+    },
+    "q-example-recurrence_model": {
+      "previous_concept_ids": [
+        "recurrence_model"
+      ],
+      "concept_ids": [
+        "recurrence_model__state_partition"
+      ],
+      "reason_zh": "按首块砖长度把铺法作互斥完备划分，建立与较小状态的一一对应。",
+      "original_record_sha256": "aa8cae94413540c773b55d09817a080b0d555b9dd3011b8b7811739de00aae96",
+      "classified_record_sha256": "0ff89aa5fc4be67590584ec63b3f47eeea4379da4402b928cf02312389b97c78"
+    },
+    "q-example-recurrence_homogeneous": {
+      "previous_concept_ids": [
+        "recurrence_homogeneous"
+      ],
+      "concept_ids": [
+        "recurrence_homogeneous__distinct_roots"
+      ],
+      "reason_zh": "分解得到两个互异特征根并由两个初值确定通解常数。",
+      "original_record_sha256": "9329acc31ac3c1bf277d2a323a991a9fdbec7a3e8b5762510307336e1dd45b0a",
+      "classified_record_sha256": "08e710edc8a95d4f501be89b74050b0ba596c9a1ee72bbcb8ccebb103e8aa1e3"
+    },
+    "q-example-recurrence_nonhomogeneous": {
+      "previous_concept_ids": [
+        "recurrence_nonhomogeneous"
+      ],
+      "concept_ids": [
+        "recurrence_nonhomogeneous__nonresonant",
+        "recurrence_nonhomogeneous__superposition"
+      ],
+      "reason_zh": "先取非共振常数特解，再加齐次通解并使用给定初值。",
+      "original_record_sha256": "ceb38bf0d42e997ff1092e43cfc2c83f21012e267045f01f0fb74ae977db8dbc",
+      "classified_record_sha256": "945813236066d2d3ae6c92953def6481863fac9ea652c517553a7a394cac5592"
+    },
+    "q-example-recurrence_initial": {
+      "previous_concept_ids": [
+        "recurrence_initial"
+      ],
+      "concept_ids": [
+        "recurrence_initial__forward_unique",
+        "recurrence_initial__compatibility"
+      ],
+      "reason_zh": "比较初值不足、足够初值确定唯一序列及额外矛盾条件导致无解。",
+      "original_record_sha256": "c34c1ef0c6e5e3c20a208b827a7a01b3bcc7e8cfa9cb47db1425bc9403e2ee20",
+      "classified_record_sha256": "dd6d27bc28c32fec1eb010ffb6024ec62300d6456f3728467b4961df3fa11bee"
+    },
+    "q-example-graph_basic": {
+      "previous_concept_ids": [
+        "graph_basic"
+      ],
+      "concept_ids": [
+        "graph_basic__undirected_graph",
+        "graph_basic__degree",
+        "graph_basic__handshake"
+      ],
+      "reason_zh": "以无序端点读取边集、逐点求度并核对握手定理。",
+      "original_record_sha256": "bdde4fc72d5047c80e7b4bf2518bcac8fee861feca616f2b6b898f3d43152c15",
+      "classified_record_sha256": "480320a8c2c4f983eec768ca4b21582a694e3a1d8e0e6b4f1c948c15cc18fd8c"
+    },
+    "q-example-graph_isomorphism": {
+      "previous_concept_ids": [
+        "graph_isomorphism"
+      ],
+      "concept_ids": [
+        "graph_isomorphism__mapping"
+      ],
+      "reason_zh": "给出两个路径间具体顶点双射并验证邻接保持，与绘图位置无关。",
+      "original_record_sha256": "574305b65b5fff23792b99b714ceebeff6d5fda7b024755e2317951d1c89e365",
+      "classified_record_sha256": "c6124aca7a926f611138cc2928afc94ecde0da50a474261ff910f42ae1993be9"
+    },
+    "q-example-graph_adjacency": {
+      "previous_concept_ids": [
+        "graph_adjacency"
+      ],
+      "concept_ids": [
+        "graph_adjacency__construction",
+        "graph_adjacency__walk_powers"
+      ],
+      "reason_zh": "按指定顶点顺序构造邻接矩阵并解释平方元素统计的两步游走。",
+      "original_record_sha256": "92d95993687fe8e15c1e93f7df53a39dd75019036e53097af6542b7ffedd1def",
+      "classified_record_sha256": "1f1775318967edd4a61d5b3181c8821d4e238c3912f1552b7042a8d8583a7320"
+    },
+    "q-example-graph_matrix": {
+      "previous_concept_ids": [
+        "graph_matrix"
+      ],
+      "concept_ids": [
+        "graph_matrix__signed_incidence",
+        "graph_matrix__laplacian"
+      ],
+      "reason_zh": "按弧尾负弧头正构造定向关联矩阵，验证BB转置等于D减A。",
+      "original_record_sha256": "9f2e3bdcf02aac53e513af6856eb2d5499a3702e957a8c334399fd98a679f3cc",
+      "classified_record_sha256": "26e414c76d26486b8583af76fe6e208970e1f2f2d21b156a1d332e71dfefbfef"
+    },
+    "q-example-graph_connectivity": {
+      "previous_concept_ids": [
+        "graph_connectivity"
+      ],
+      "concept_ids": [
+        "graph_connectivity__components",
+        "graph_connectivity__simple_paths"
+      ],
+      "reason_zh": "列出全部无向连通分量，并通过间接路径核对指定两点可达性。",
+      "original_record_sha256": "30744ba68e2d5a7a3ad1a468a9791a8844e0c641f70aca1716e0aae604c0befa",
+      "classified_record_sha256": "5d943596ee0a370b0c8f5fa03144cdae142c56d3e1d43714878ed573879d98c4"
+    },
+    "q-example-graph_cut": {
+      "previous_concept_ids": [
+        "graph_cut"
+      ],
+      "concept_ids": [
+        "graph_cut__bridges",
+        "graph_cut__articulation"
+      ],
+      "reason_zh": "识别两个回路间唯一连接边形成的桥及其两个割点端点。",
+      "original_record_sha256": "810243d2bc60e3174964373463234fbc88d0f781968019f9e7bb3db03edcd159",
+      "classified_record_sha256": "949c32862cfa6889665074bdc8363d9d69cd8e7f6828912f0e764792512eca74"
+    },
+    "q-example-graph_weighted": {
+      "previous_concept_ids": [
+        "graph_weighted"
+      ],
+      "concept_ids": [
+        "graph_weighted__path_cost",
+        "graph_weighted__optimization_objectives"
+      ],
+      "reason_zh": "计算两条路线的边权和，比较最少边数与最小费用目标。",
+      "original_record_sha256": "58c1e09392c21dc1e676e814f1783d046e7c00c816a582c13b7b0970e3e3f810",
+      "classified_record_sha256": "ba61db931b1c4a2cdd86862018fb1f8e57bcca3acf565163840d7a69b3de8400"
+    },
+    "q-example-graph_euler": {
+      "previous_concept_ids": [
+        "graph_euler"
+      ],
+      "concept_ids": [
+        "graph_euler__open_trail",
+        "graph_euler__undirected_circuit"
+      ],
+      "reason_zh": "根据两个奇度顶点构造开放欧拉通路，并排除欧拉回路。",
+      "original_record_sha256": "32247cfab39c47d74f1623644022d4e665434756f3f77c2c2a329679433e987a",
+      "classified_record_sha256": "36ae496155d885ad606ce915662c760db3ed249cd69f6e7340dde6756e1590c8"
+    },
+    "q-example-graph_hamilton": {
+      "previous_concept_ids": [
+        "graph_hamilton"
+      ],
+      "concept_ids": [
+        "graph_hamilton__spanning_paths",
+        "graph_hamilton__necessary"
+      ],
+      "reason_zh": "构造覆盖所有顶点的路径，利用二部大小不同排除哈密顿回路。",
+      "original_record_sha256": "9c837118bba1bfb95f72fb02f249b630d896ba96f8f502b94ecce97a2c4c73ce",
+      "classified_record_sha256": "f1971204450ae9514f52a436b3bd37fe52814da09f792bfd77dbbddb9e4e33ea"
+    },
+    "q-example-graph_shortest": {
+      "previous_concept_ids": [
+        "graph_shortest"
+      ],
+      "concept_ids": [
+        "graph_shortest__dijkstra"
+      ],
+      "reason_zh": "在非负权有向图中比较各路线费用并求源点到目标的最短路线。",
+      "original_record_sha256": "2f7ce2c62648b62c86d6888aaaeacfaba1807b0d5bf2b6a4f9167011a93e4a16",
+      "classified_record_sha256": "d96a356c1a4e57eb5ae4491cb984ad1e673a44716c880a75ddc6d221b11b0ff1"
+    },
+    "q-example-graph_coloring": {
+      "previous_concept_ids": [
+        "graph_coloring"
+      ],
+      "concept_ids": [
+        "graph_coloring__bipartite",
+        "graph_coloring__chromatic_bounds"
+      ],
+      "reason_zh": "通过奇偶回路的二着色可行性和三色方案确定色数。",
+      "original_record_sha256": "797403dfd88dfdf702d317ed6480e8d50bb8f8801fc0e97cb6f24266d8aebfc0",
+      "classified_record_sha256": "345d3e0fcfd7f924f45d46854cbbebbdeb56bbf94351d7d311816191a90820b4"
+    },
+    "q-example-graph_planar": {
+      "previous_concept_ids": [
+        "graph_planar"
+      ],
+      "concept_ids": [
+        "graph_planar__embedding",
+        "graph_planar__euler"
+      ],
+      "reason_zh": "在明确的K4平面嵌入中计数内外部面并核对欧拉公式。",
+      "original_record_sha256": "c5c82e189b257af83b506c2bee1c7094234937e4bc8cd9a7794eb551b9d3754d",
+      "classified_record_sha256": "ee9212c3af8bf6a0bc5580987fa46cf7cbd13c238e3ede0c840797fac512a1f2"
+    },
+    "q-example-graph_bipartite": {
+      "previous_concept_ids": [
+        "graph_bipartite"
+      ],
+      "concept_ids": [
+        "graph_bipartite__bipartition",
+        "graph_bipartite__odd_cycle"
+      ],
+      "reason_zh": "给出二部划分，并通过新增边形成奇圈判断二部性失效。",
+      "original_record_sha256": "9af0d1d5b77803b0694f171436f7b35bcb80db377bd0895d96a965351e3ca6d8",
+      "classified_record_sha256": "8baded44133deaebbb79d21aac3925e8ddf6da72df446fdb7ab0367b0d0123b7"
+    },
+    "q-example-graph_topological": {
+      "previous_concept_ids": [
+        "graph_topological"
+      ],
+      "concept_ids": [
+        "graph_topological__dag"
+      ],
+      "reason_zh": "逐弧检查候选线性顺序是否满足DAG的先后约束。",
+      "original_record_sha256": "4fe710fc9bf752b82e2a9f40fc8dae4b7a284e2d6906aca0213d0a17c5a09451",
+      "classified_record_sha256": "2dfea110c011c80878a5f0e85b54506244003e7aa5dba54a82d4a201b746e122"
+    },
+    "q-example-graph_domination": {
+      "previous_concept_ids": [
+        "graph_domination"
+      ],
+      "concept_ids": [
+        "graph_domination__dominating",
+        "graph_domination__vertex_cover",
+        "graph_domination__independent"
+      ],
+      "reason_zh": "分别求路径的最小支配集、最小顶点覆盖与最大独立集。",
+      "original_record_sha256": "ece8d069642002baf5149d0ce8b178b1fd366e6cedfcf324bd906fe1e9918d21",
+      "classified_record_sha256": "9001e3338056f7c5e3324dd123c4e0efd1ff3f68f2eb458dae19622e29a4d22d"
+    },
+    "q-example-graph_matching": {
+      "previous_concept_ids": [
+        "graph_matching"
+      ],
+      "concept_ids": [
+        "graph_matching__maximal_maximum",
+        "graph_matching__augmenting"
+      ],
+      "reason_zh": "区分极大与最大匹配，找到增广路并翻转得到完美匹配。",
+      "original_record_sha256": "efa1be8e222cebaf593c07674f00125dd1fa08565e6314f945fff2a3c306e1ee",
+      "classified_record_sha256": "983844265d81c69bbae0de3a637dde235046caadd238d66e3f7a43fa3e4bdc2c"
+    },
+    "q-example-tree_basic": {
+      "previous_concept_ids": [
+        "tree_basic"
+      ],
+      "concept_ids": [
+        "tree_basic__degree_leaves"
+      ],
+      "reason_zh": "结合树的度数和与顶点总数，解出叶子及二度顶点数量。",
+      "original_record_sha256": "f11aec001d27c2d388533ee789937ef578acfa7efa93b8c5fb5405e04e71839e",
+      "classified_record_sha256": "411ee70d8d5bbb54a07fac897dba996c0c77b6afec63267798da0b4c1636475c"
+    },
+    "q-example-tree_rooted": {
+      "previous_concept_ids": [
+        "tree_rooted"
+      ],
+      "concept_ids": [
+        "tree_rooted__depth_height",
+        "tree_rooted__hierarchy"
+      ],
+      "reason_zh": "对同一底层树换根，比较高度、父子关系及根树叶子变化。",
+      "original_record_sha256": "a1373b101ffd5df7f866d0f0afca539dae2c22a62781e593a59979100d574315",
+      "classified_record_sha256": "cd982920363b459ede3b2078dea2a3de415ca69c53ef925c404638fd2bb7e5ae"
+    },
+    "q-example-tree_spanning": {
+      "previous_concept_ids": [
+        "tree_spanning"
+      ],
+      "concept_ids": [
+        "tree_spanning__bridge_count"
+      ],
+      "reason_zh": "固定必选叶边，并按单圈恰删一边计数全部生成树。",
+      "original_record_sha256": "16a83f067e511d0e9004ccb30979107bff3dd1f00d67bb899c349168638b520b",
+      "classified_record_sha256": "6037994d737ae4e9466591372f927587716a9d51a4aacb0341ede3008f64c30b"
+    },
+    "q-example-tree_mst": {
+      "previous_concept_ids": [
+        "tree_mst"
+      ],
+      "concept_ids": [
+        "tree_mst__greedy"
+      ],
+      "reason_zh": "在含负边权的有限图中比较生成树总权，核对负权不妨碍最小生成树选择。",
+      "original_record_sha256": "60867241c7b8951d12e49529fa564e7dddf7172914332b545b4334c19728b738",
+      "classified_record_sha256": "e5926f2a5611cdb996ca03ddec362223c498fd22bc4b5ac2b21843036aef7133"
+    },
+    "q-example-tree_matrix_tree": {
+      "previous_concept_ids": [
+        "tree_matrix_tree"
+      ],
+      "concept_ids": [
+        "tree_matrix_tree__laplacian",
+        "tree_matrix_tree__cofactor"
+      ],
+      "reason_zh": "构造K3拉普拉斯矩阵并以主余子式行列式计算生成树数量。",
+      "original_record_sha256": "46dd8496eac52511e85212d22eb35e0f8722599763ecab90a83215e3607ae456",
+      "classified_record_sha256": "9e63cd0aee9f6692d96359b025e41939da26fb987db07fdfa2369cc68d6e0ea9"
+    },
+    "q-example-algebra_system": {
+      "previous_concept_ids": [
+        "algebra_system"
+      ],
+      "concept_ids": [
+        "algebra_system__associativity",
+        "algebra_system__identity_elements"
+      ],
+      "reason_zh": "核验自定义运算的结合律并求双侧单位元。",
+      "original_record_sha256": "d6d11edef87427503de2b062cd788ae71ff32ce172f141b747998e07374e82c7",
+      "classified_record_sha256": "22ea808bf397b8014249028efeb13104c5f50241e58b2ff24e4ee71405476bbe"
+    },
+    "q-example-algebra_homomorphism": {
+      "previous_concept_ids": [
+        "algebra_homomorphism"
+      ],
+      "concept_ids": [
+        "algebra_homomorphism__operation_preservation",
+        "algebra_homomorphism__images",
+        "algebra_homomorphism__kernels"
+      ],
+      "reason_zh": "检查模约简保持运算且满射，计算核以判断单射和同构。",
+      "original_record_sha256": "135be7ef7c79e7730b06c6a83c56372e887fe6b5df815ed86a13e6bdd49d00fe",
+      "classified_record_sha256": "3736388e2e4d431848488abe2b6da198658bccb1feb52dae5f303012047178a5"
+    },
+    "q-example-algebra_group": {
+      "previous_concept_ids": [
+        "algebra_group"
+      ],
+      "concept_ids": [
+        "algebra_group__element_orders",
+        "algebra_group__cyclic_subgroups"
+      ],
+      "reason_zh": "计算模加法群元素的阶并列出其循环生成子群。",
+      "original_record_sha256": "7fcb271e27227c911a2d72f2e7f812d3915f78e6d77564270e74b06e5ecb1a90",
+      "classified_record_sha256": "d4dd9302027e32e16b23691d6a733209a4740ffe45ebbe8077350a37101cf623"
+    },
+    "q-example-algebra_ring_field": {
+      "previous_concept_ids": [
+        "algebra_ring_field"
+      ],
+      "concept_ids": [
+        "algebra_ring_field__units",
+        "algebra_ring_field__zero_divisors",
+        "algebra_ring_field__finite_fields"
+      ],
+      "reason_zh": "在模环中求单位和逆元，并由非零零因子排除域结构。",
+      "original_record_sha256": "2c21052db55ee1481c8f2391991fd1e0ee64568d63384aa7f4f43f0c5d1619f7",
+      "classified_record_sha256": "7ca4b17e020ae70042566c66ec074eff7e4671d2353f077227b658d41c33d5e5"
+    },
+    "q-example-algebra_lattice_bool": {
+      "previous_concept_ids": [
+        "algebra_lattice_bool"
+      ],
+      "concept_ids": [
+        "algebra_lattice_bool__meets_joins",
+        "algebra_lattice_bool__bounded_lattices",
+        "algebra_lattice_bool__complements"
+      ],
+      "reason_zh": "确定因子格的交并及上下界，再按交为最小元且并为最大元检查补元。",
+      "original_record_sha256": "e94ab81a5318f921742266ecefc697295e22665af79b0a9660ab8c03f4e67cf5",
+      "classified_record_sha256": "07450c2fada495419fc590383402bf12942a8555ce8a57a1a899a73b7a3eecd0"
+    }
+  }
+}

@@ -45,7 +45,7 @@
 <link rel="stylesheet" href="/static/search-controls.css?v=27">
 <link rel="stylesheet" href="/static/button-themes.css?v=29">
 <link rel="stylesheet" href="/static/offline-knowledge-graph.css?v=17">
-<link rel="stylesheet" href="/static/offline.css?v=33">
+<link rel="stylesheet" href="/static/offline.css?v=34">
 <link rel="stylesheet" href="/static/select-controls.css?v=31">
 <link rel="stylesheet" href="/static/scrollbars.css?v=25">
 <script defer src="/static/mobile-select.js?v=26"></script>
@@ -75,7 +75,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/knowledge-graph-labels.js?v=17"></script>
 <script defer src="/static/offline-knowledge-graph.js?v=32"></script>
 <script defer src="/static/offline-entry.js?v=17"></script>
-<script defer src="/static/offline.js?v=32"></script>
+<script defer src="/static/offline.js?v=34"></script>
 </head>
 <body class="offline-workspace">
 <script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"light";</script>
@@ -182,6 +182,10 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
           <select id="questionDifficulty" aria-label="按难度筛选">
             <option value="">全部难度</option><option value="简单">简单</option><option value="中等">中等</option><option value="困难">困难</option>
           </select>
+          <select id="questionType" aria-label="按题型筛选"><option value="">全部题型</option></select>
+          <select id="questionSelection" aria-label="按选择状态筛选">
+            <option value="">全部</option><option value="selected">已选择</option><option value="unselected">未选择</option>
+          </select>
           <input type="search" id="questionSearch" class="offline-search" placeholder="搜索" aria-label="搜索">
         </div>
       </div>
@@ -198,6 +202,9 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
         <div><strong id="conceptCount">概念库</strong><span class="toolbar-muted">定义、解释与易错点</span></div>
         <div class="offline-filters">
           <select id="conceptCategory" aria-label="按章节筛选"><option value="">全部章节</option></select>
+          <select id="conceptSelection" aria-label="按选择状态筛选">
+            <option value="">全部</option><option value="selected">已选择</option><option value="unselected">未选择</option>
+          </select>
           <input type="search" id="conceptSearch" class="offline-search" placeholder="搜索" aria-label="搜索">
         </div>
       </div>

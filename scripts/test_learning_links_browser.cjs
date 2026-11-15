@@ -26,7 +26,7 @@ const difficulty = value => value === '基础' ? '简单' : ['进阶', '提高']
 const mobile = page => page.viewportSize().width <= 1100;
 const graphMobile = page => page.viewportSize().width <= 760;
 const title = (item, kind, language) => language === 'en' ? translations[kind][item.id].title : item.title;
-assert.equal(questions.length, 917, 'The learning UI retains the complete exercise pack');
+assert.equal(questions.length, 561 + concepts.length, 'The learning UI retains original exercises and every migrated concept example');
 assert.equal(overview.length, 68, 'Every graph node retains its overview concept');
 assert.ok(sameParent && multipleParents && child && richOverview);
 
@@ -65,7 +65,7 @@ async function openQuestion(page, question) {
   await choose(page, '#questionDifficulty', '');
   await page.locator('#questionSearch').fill(question.id);
   await page.locator('#questionList [data-question-id="' + question.id + '"]').click();
-  await page.waitForFunction(id => document.querySelector('#questionList .active')?.dataset.questionId === id, question.id);
+  await page.waitForFunction(id => document.querySelector('#questionList .question-item.active')?.dataset.questionId === id, question.id);
   await settle(page);
 }
 
@@ -158,7 +158,7 @@ async function checkChild(page, lang) {
   const parent = page.locator('#conceptDetail .concept-topic-links [data-concept-id]');
   assert.equal(await parent.getAttribute('data-concept-id'), child.graph_node_id);
   await parent.click();
-  assert.equal(await page.locator('#conceptList .active').getAttribute('data-concept-id'), child.graph_node_id);
+  assert.equal(await page.locator('#conceptList .concept-item.active').getAttribute('data-concept-id'), child.graph_node_id);
   assert.equal(await page.locator('#conceptDetail .concept-related-exercises').count(), 0);
 }
 
@@ -169,7 +169,7 @@ async function allOverviewSections(page) {
   for (const concept of overview) {
     assert.ok(concept.related_questions.length, 'Source overview exercise links remain present: ' + concept.id);
     await page.locator('#conceptList [data-concept-id="' + concept.id + '"]').click();
-    assert.equal(await page.locator('#conceptList .active').getAttribute('data-concept-id'), concept.id);
+    assert.equal(await page.locator('#conceptList .concept-item.active').getAttribute('data-concept-id'), concept.id);
     assert.equal(await page.locator('#conceptDetail .concept-related-exercises').count(), 0,
       'Overview has no practice UI: ' + concept.id);
   }
@@ -208,7 +208,7 @@ async function graphPracticeRoundTrip(page, lang) {
   await exitFullGraph(page);
   await page.locator('.graph-parent-concept [data-concept-id="' + next.id + '"]').click();
   await page.locator('#conceptsPanel').waitFor({ state: 'visible' });
-  assert.equal(await page.locator('#conceptList .active').getAttribute('data-concept-id'), next.id);
+  assert.equal(await page.locator('#conceptList .concept-item.active').getAttribute('data-concept-id'), next.id);
   assert.equal(await page.locator('#conceptDetail .concept-related-exercises').count(), 0);
   assert.equal(await page.locator('#knowledgeGraphModal').evaluate(modal =>
     modal.closest('#graphPanel') !== null && !modal.classList.contains('graph-fullscreen-view')), true,
@@ -228,7 +228,7 @@ async function graphPracticeRoundTrip(page, lang) {
   assert.equal(await page.locator('#questionCategory').inputValue(), '');
   assert.equal(await page.locator('#questionDifficulty').inputValue(), '');
   assert.equal(await page.locator('#questionSearch').inputValue(), '', 'Conflicting search is cleared when opening the linked exercise');
-  assert.equal(await page.locator('#questionList .active').getAttribute('data-question-id'), target.id);
+  assert.equal(await page.locator('#questionList .question-item.active').getAttribute('data-question-id'), target.id);
   await page.locator('#questionDetail .question-actions .offline-primary').click();
   await page.locator('#questionDetail .answer-panel').waitFor({ state: 'visible' });
   await page.waitForFunction(() => !document.querySelector('#questionDetail [data-dmate-render-state="pending"]'));
@@ -240,7 +240,7 @@ async function graphPracticeRoundTrip(page, lang) {
   const conceptId = await linkedConcept.getAttribute('data-concept-id');
   await linkedConcept.click();
   await page.locator('#conceptsPanel').waitFor({ state: 'visible' });
-  assert.equal(await page.locator('#conceptList .active').getAttribute('data-concept-id'), conceptId);
+  assert.equal(await page.locator('#conceptList .concept-item.active').getAttribute('data-concept-id'), conceptId);
   const module = nodeMap.get(conceptMap.get(conceptId).graph_node_id);
   await clickModule(page, '#conceptDetail .concept-graph-module ', module);
   await exitFullGraph(page);
@@ -253,7 +253,7 @@ async function graphPracticeRoundTrip(page, lang) {
   await exitFullGraph(page);
   await page.locator('.graph-related-exercises [data-question-id="' + matched.id + '"]').click();
   assert.equal(await page.locator('#questionSearch').inputValue(), matched.id);
-  assert.equal(await page.locator('#questionList .active').getAttribute('data-question-id'), matched.id);
+  assert.equal(await page.locator('#questionList .question-item.active').getAttribute('data-question-id'), matched.id);
 }
 
 async function richFooter(page, lang) {

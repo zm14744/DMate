@@ -1361,6 +1361,38 @@
         "Mistaking two odd vertices as a criterion for an Euler circuit.",
         "Choosing an even-degree vertex as an endpoint of an open Euler trail."
       ]
+    },
+    "recurrence_homogeneous__linear_structure": {
+      "title": "Constant-coefficient linear homogeneous recurrences and superposition",
+      "summary": "Identify fixed coefficients, linear sequence terms and a zero forcing term, then combine solutions and initial values with the same weights.",
+      "definition": "Let k≥1 and let c₁,…,cₖ be real constants with cₖ≠0. A relation a_n=Σ(j=1 to k)c_j a_(n−j), valid for n≥k, is a kth-order constant-coefficient linear homogeneous recurrence. Constant coefficients do not depend on n; linearity means that sequence terms occur only to the first power; homogeneity means that there is no nonzero forcing term independent of the sequence. If u and v satisfy this same recurrence, then w_n=αu_n+βv_n also satisfies it for any real constants α and β.",
+      "explanation": "Multiply the two recurrence identities by α and β and add them to obtain w_n=Σc_jw_(n−j). Superposition preserves the recurrence equation, but need not preserve a previously prescribed set of initial values: w_i=αu_i+βv_i for 0≤i<k. These initial values must be combined too. A nonzero forcing term, products of sequence terms or squared sequence terms prevent direct use of homogeneous linear superposition. Coefficients depending on n may still give a linear homogeneous recurrence, but not a constant-coefficient one.",
+      "notation": [
+        "The linear operator is L(a)_n=a_n−Σ(j=1 to k)c_j a_(n−j); the homogeneous equation is L(a)=0.",
+        "Solutions of the same homogeneous equation satisfy L(αu+βv)=αL(u)+βL(v)=0."
+      ],
+      "example": "Both u_n=2^n and v_n=3^n satisfy a_n=5a_(n−1)−6a_(n−2) for n≥2. Hence w_n=2u_n−v_n satisfies it as well. Its initial values are w_0=1 and w_1=1, so the recurrence gives w_2=5−6=−1, agreeing with 2·2²−3²=−1.",
+      "common_mistakes": [
+        "Noticing constant coefficients but overlooking a squared sequence term or a nonzero forcing term.",
+        "Combining two solutions while retaining the initial values of just one of them.",
+        "Combining sequences that satisfy recurrences with different coefficients as though they solved the same homogeneous equation."
+      ]
+    },
+    "graph_weighted__vertex_strength": {
+      "title": "Vertex strength and the weighted handshaking identity",
+      "summary": "Vertex strength sums incident edge weights; the sum of all strengths is twice the sum of all edge weights.",
+      "definition": "Let G=(V,E) be a finite undirected simple graph with a real-valued edge-weight function w:E→ℝ; positive, zero and negative weights are all allowed. The strength (weighted degree) of a vertex v is s(v)=Σ(e incident to v)w(e), with strength 0 for an isolated vertex. The weighted handshaking identity is Σ(v∈V)s(v)=2Σ(e∈E)w(e). This convention excludes loops. If loops are allowed and the same identity is desired, each loop weight must count twice in the strength of its endpoint.",
+      "explanation": "Expand the finite sum of all vertex strengths. An undirected edge e=uv has two distinct endpoints, so w(e) occurs once in s(u) and once in s(v), contributing 2w(e) altogether. This double counting uses the two endpoints, not positivity of the weights. Zero and negative weights therefore preserve the identity. When every edge has weight 1, strength equals ordinary degree and the identity reduces to the handshaking lemma.",
+      "notation": [
+        "s(v)=Σ(e incident to v)w(e); an isolated vertex gives the empty sum 0.",
+        "Σ(v∈V)s(v)=2Σ(e∈E)w(e), counting each loopless edge at its two endpoints."
+      ],
+      "example": "An undirected triangle has edge weights w(ab)=2, w(bc)=−1 and w(ac)=0. Its vertex strengths are s(a)=2+0=2, s(b)=2−1=1 and s(c)=−1+0=−1. Their sum is 2+1−1=2, while twice the total edge weight is 2(2−1+0)=2, so the two values agree.",
+      "common_mistakes": [
+        "Counting incident edges instead of summing their actual weights.",
+        "Counting each edge only once in the sum over all vertices and losing the factor 2 contributed by its endpoints.",
+        "Assuming that zero or negative weights invalidate the finite-sum identity, or counting a loop weight only once without stating a convention."
+      ]
     }
   },
   "questions": {
@@ -2978,6 +3010,13 @@
       "explanation": "Roots ±2i give four-step oscillation multiplied by 2^n. The normalized sequence may be periodic while the original amplitude grows.\n\nThe angle θ controls oscillation; r^n controls growth or decay. Even if the sine and cosine factors repeat periodically, the full sequence is usually not periodic when r≠1. Proving a least period requires finding a period and ruling out every smaller positive integer period.",
       "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
     },
+    "q-example-recurrence_homogeneous__linear_structure": {
+      "title": "Constant-coefficient linear homogeneous recurrences and superposition: example practice",
+      "statement": "Both u_n=2^n and v_n=3^n satisfy a_n=5a_(n−1)−6a_(n−2) for n≥2. Define w_n=2u_n−v_n. Use linear superposition to decide whether w satisfies the same recurrence. Find w₀ and w₁, then compute w₂ from the recurrence and check it against the definition.",
+      "answer_text": "Both u_n=2^n and v_n=3^n satisfy a_n=5a_(n−1)−6a_(n−2) for n≥2. Hence w_n=2u_n−v_n satisfies it as well. Its initial values are w_0=1 and w_1=1, so the recurrence gives w_2=5−6=−1, agreeing with 2·2²−3²=−1.",
+      "explanation": "Both u_n=2^n and v_n=3^n satisfy a_n=5a_(n−1)−6a_(n−2) for n≥2. Hence w_n=2u_n−v_n satisfies it as well. Its initial values are w_0=1 and w_1=1, so the recurrence gives w_2=5−6=−1, agreeing with 2·2²−3²=−1.\n\nMultiply the two recurrence identities by α and β and add them to obtain w_n=Σc_jw_(n−j). Superposition preserves the recurrence equation, but need not preserve a previously prescribed set of initial values: w_i=αu_i+βv_i for 0≤i<k. These initial values must be combined too. A nonzero forcing term, products of sequence terms or squared sequence terms prevent direct use of homogeneous linear superposition. Coefficients depending on n may still give a linear homogeneous recurrence, but not a constant-coefficient one.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
     "q-example-recurrence_nonhomogeneous": {
       "title": "Nonhomogeneous recurrences: example practice",
       "statement": "For n≥1, let a_n=2a_{n−1}+1. Find a constant particular solution and the general solution, then determine the solution satisfying a₀=0.",
@@ -3326,6 +3365,13 @@
       "statement": "Two routes have edge weights (1,8) and (4,4,4). Find the total cost and largest edge weight for each, then identify which route each objective selects.",
       "answer_text": "Weights 1,8 give total cost 9 and bottleneck 8; weights 4,4,4 give total cost 12 and bottleneck 4. The two objectives prefer opposite routes.",
       "explanation": "Weights 1,8 give total cost 9 and bottleneck 8; weights 4,4,4 give total cost 12 and bottleneck 4. The two objectives prefer opposite routes.\n\nThe objectives may select different routes. Giving weights does not automatically specify an objective; both model and answer should state the quantity optimized. Fewest edges and minimum total cost naturally agree when all edges have the same positive weight.",
+      "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
+    },
+    "q-example-graph_weighted__vertex_strength": {
+      "title": "Vertex strength and the weighted handshaking identity: example practice",
+      "statement": "An undirected simple graph has vertices a, b and c, and edges ab, bc and ac with weights 2, −1 and 0, respectively. Define a vertex strength as the sum of its incident edge weights. Find all three strengths, then compute their sum and twice the total edge weight to check the weighted handshaking identity.",
+      "answer_text": "An undirected triangle has edge weights w(ab)=2, w(bc)=−1 and w(ac)=0. Its vertex strengths are s(a)=2+0=2, s(b)=2−1=1 and s(c)=−1+0=−1. Their sum is 2+1−1=2, while twice the total edge weight is 2(2−1+0)=2, so the two values agree.",
+      "explanation": "An undirected triangle has edge weights w(ab)=2, w(bc)=−1 and w(ac)=0. Its vertex strengths are s(a)=2+0=2, s(b)=2−1=1 and s(c)=−1+0=−1. Their sum is 2+1−1=2, while twice the total edge weight is 2(2−1+0)=2, so the two values agree.\n\nExpand the finite sum of all vertex strengths. An undirected edge e=uv has two distinct endpoints, so w(e) occurs once in s(u) and once in s(v), contributing 2w(e) altogether. This double counting uses the two endpoints, not positivity of the weights. Zero and negative weights therefore preserve the identity. When every edge has weight 1, strength equals ordinary degree and the identity reduces to the handshaking lemma.",
       "grading_criteria": "Use the objects and conditions stated in the question. Give the requested conclusions and the necessary calculations or justification. Mathematically equivalent correct formulations receive credit."
     },
     "q-example-graph_euler": {
