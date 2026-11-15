@@ -90,12 +90,11 @@
   function openAppearance(event) {
     const trigger = event.currentTarget;
     closeDrawer(false);
-    // A mobile drawer becomes inert when closed. Return focus to its visible
-    // appearance entry; desktop retains the button that opened the settings.
-    const returnTarget = mobile.matches ? $('offlineAppearanceToggle') : trigger;
+    // The closed mobile drawer is inert, so restore focus to its visible opener.
+    // Desktop retains the appearance button that opened the settings.
+    const returnTarget = mobile.matches ? $('offlineNavToggle') : trigger;
     returnTarget?.focus({preventScroll:true});
     window.DMateOfflineAppearance?.open();
   }
   $('offlineAppearanceBtn').addEventListener('click',openAppearance);
-  $('offlineAppearanceToggle').addEventListener('click',openAppearance);
 })();

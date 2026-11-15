@@ -119,11 +119,9 @@ async function navigation(page, panel) {
 }
 
 async function languageChoice(page, language) {
-  if (page.viewportSize().width > 1100) {
-    const opener = page.locator('#offlineDesktopSidebarOpen');
-    if (await opener.getAttribute('aria-expanded') !== 'true') await opener.click();
-  }
-  await page.locator(page.viewportSize().width <= 1100 ? '#offlineAppearanceToggle' : '#offlineAppearanceBtn').click();
+  const opener = page.locator(page.viewportSize().width <= 1100 ? '#offlineNavToggle' : '#offlineDesktopSidebarOpen');
+  if (await opener.getAttribute('aria-expanded') !== 'true') await opener.click();
+  await page.locator('#offlineAppearanceBtn').click();
   await page.locator('#appearanceModal:not(.hidden)').waitFor();
   await page.locator('#appearanceModal [data-dmate-language="' + language + '"]').click();
   await page.waitForFunction(value => document.documentElement.dataset.uiLanguage === value, language);

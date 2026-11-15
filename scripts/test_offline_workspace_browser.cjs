@@ -274,10 +274,13 @@ async function sidebarControls(page, width) {
 }
 
 async function appearanceControls(page, width, theme, reference) {
-  for (const selector of ['#offlineAppearanceBtn svg', '#offlineAppearanceToggle svg']) {
-    assert.deepEqual(await geometry(page.locator(selector)), reference.appearanceIcon, 'Appearance entry shares the online icon: ' + selector);
-  }
-  await page.locator(width <= 1100 ? '#offlineAppearanceToggle' : '#offlineAppearanceBtn').click();
+  assert.deepEqual(await geometry(page.locator('#offlineAppearanceBtn svg')), reference.appearanceIcon, 'Sidebar appearance entry shares the online icon');
+  const openAppearance = async () => {
+    const opener = page.locator(width <= 1100 ? '#offlineNavToggle' : '#offlineDesktopSidebarOpen');
+    if (await opener.getAttribute('aria-expanded') !== 'true') await opener.click();
+    await page.locator('#offlineAppearanceBtn').click();
+  };
+  await openAppearance();
   const dialog = page.locator('#appearanceModal');
   await dialog.waitFor();
   assert.equal(await dialog.locator('[data-appearance-mode]').count(), 4, 'All four theme choices are available');
@@ -292,7 +295,7 @@ async function appearanceControls(page, width, theme, reference) {
   await page.waitForFunction(value => document.documentElement.dataset.appearanceTheme === value, alternate);
   await page.locator('#appearanceClose').click();
   await page.waitForFunction(value => document.documentElement.dataset.appearanceTheme === value, theme);
-  await page.locator(width <= 1100 ? '#offlineAppearanceToggle' : '#offlineAppearanceBtn').click();
+  await openAppearance();
   await dialog.locator('[data-appearance-mode="' + theme + '"]').click();
   await page.waitForFunction(value => document.documentElement.dataset.appearanceTheme === value, theme);
   assert.deepEqual(await closeStyle(page.locator('#appearanceClose')), reference.close, 'Appearance uses the shared close dot');
@@ -315,14 +318,14 @@ async function questionDifficulties(page, questions) {
       expected.map(question => question.id), 'Difficulty filter includes the exact complete-pack IDs: ' + difficulty);
     assert.equal(await page.locator('#questionCount').textContent(), expected.length + ' 道题目');
     assert.deepEqual(await page.locator('#questionList .question-item small').allTextContents(),
-      expected.map(question => question.category + ' · ' + displayDifficulty(question.difficulty) + ' · ' + question.type),
+      expected.map(question => question.category + ' ' + displayDifficulty(question.difficulty) + ' ' + question.type),
       'Question list uses normalized difficulty labels');
     if (expected.length) {
       const currentId = await page.locator('#questionList .question-item.active').getAttribute('data-question-id');
       const current = expected.find(question => question.id === currentId);
       assert.ok(current, 'The selected question belongs to the filtered result');
       assert.equal(await page.locator('#questionDetail .detail-kicker').textContent(),
-        current.category + ' / ' + displayDifficulty(current.difficulty) + ' / ' + current.type);
+        current.category + ' ' + displayDifficulty(current.difficulty) + ' ' + current.type);
     }
   }
   // Chapter and difficulty filters must compose, including legacy pack labels.
@@ -559,7 +562,7 @@ async function graph(page) {
     await host.locator('#knowledgeGraphCategory').selectOption('全部');
   } else {
     await host.locator('#knowledgeGraphCategoryTrigger').click();
-    await page.locator('#mobileChoiceModal').getByRole('radio', {name:'全部', exact:true}).click();
+    await page.locator('#mobileChoiceModal').getByRole('radio', {name:'全部模块', exact:true}).click();
   }
   const mobile = await page.evaluate(() => matchMedia('(max-width:760px)').matches);
   if (mobile) await host.locator('.kg-mobile-expand').click();

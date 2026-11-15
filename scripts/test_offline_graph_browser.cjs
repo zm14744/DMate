@@ -29,11 +29,16 @@ async function removeOnlineOnly(page) {
 }
 
 async function category(page, name) {
+  const option = await frame(page).locator('#knowledgeGraphCategory').evaluate((select, name) => {
+    const option = [...select.options].find(option => option.value === name || option.label === name);
+    return option && { value: option.value, label: option.label };
+  }, name);
+  assert.ok(option, 'The requested canonical module or display label exists: ' + name);
   if (mobile(page)) {
     if (await view(page).count()) await frame(page).locator('.kg-mobile-expand').click();
     await frame(page).locator('#knowledgeGraphCategoryTrigger').click();
-    await page.locator('#mobileChoiceModal').getByRole('radio', { name, exact: true }).click();
-  } else await frame(page).locator('#knowledgeGraphCategory').selectOption({ label: name });
+    await page.locator('#mobileChoiceModal').getByRole('radio', { name: option.label, exact: true }).click();
+  } else await frame(page).locator('#knowledgeGraphCategory').selectOption(option.value);
   await settle(page);
 }
 
@@ -154,6 +159,7 @@ async function onlineReference(browser, width, theme, available) {
     await removeOnlineOnly(page);
     await settle(page);
     const initial = await visual(page, available), categories = await frame(page).locator('#knowledgeGraphCategory option').allTextContents();
+    assert.equal(categories[0], '全部模块', 'The all-module option has the explicit browsing label');
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/online-graph-' + width + '-' + theme + '.png' });
     const expected = {};
     await fullGraph(page);
@@ -470,7 +476,7 @@ async function runCase(browser, width, theme) {
     await page.reload({ waitUntil: 'networkidle' });
     await openOfflineGraph(page);
     await fullGraph(page);
-    assert.equal(await nodes(page).count(), reference.expected['全部'].topology.nodes.length, 'The complete graph is available after another disconnected reload');
+    assert.equal(await nodes(page).count(), reference.expected[reference.categories[0]].topology.nodes.length, 'The complete graph is available after another disconnected reload');
     await category(page, '初等数论');
     await fullGraph(page);
     await selectFirst(page);

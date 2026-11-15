@@ -8278,8 +8278,8 @@ function buildWrongBookPdfExportElement(items) {
     subtitle.style.color = "#64748b";
     subtitle.style.marginBottom = "22px";
     const exportDate = new Date().toLocaleString(dmateUiLanguage());
-    subtitle.textContent = dmateUiText(`共 ${items.length} 道 · 导出时间：${exportDate}`,
-        `${items.length} questions · Exported: ${exportDate}`);
+    subtitle.textContent = dmateUiText(`共 ${items.length} 道 导出时间：${exportDate}`,
+        `${items.length} questions Exported: ${exportDate}`);
     container.appendChild(subtitle);
 
     items.forEach((item, index) => {
@@ -8326,7 +8326,7 @@ function buildWrongBookPdfExportElement(items) {
         if (item.retestCount) {
             metaParts.push(
                 dmateUiText(`复测 ${item.retestCount} 次，通过 ${item.retestPassCount || 0} 次`,
-                    `Retests: ${item.retestCount} · Passed: ${item.retestPassCount || 0}`)
+                    `Retests: ${item.retestCount} Passed: ${item.retestPassCount || 0}`)
             );
         }
 
@@ -8334,7 +8334,7 @@ function buildWrongBookPdfExportElement(items) {
         meta.style.marginTop = "10px";
         meta.style.fontSize = "12px";
         meta.style.color = "#64748b";
-        meta.textContent = metaParts.join(" · ");
+        meta.textContent = metaParts.join(" ");
         card.appendChild(meta);
 
         if (shouldShowWrongBookFeedback(item)) {
@@ -9596,9 +9596,9 @@ function renderWrongBook() {
         ) {
             answerSummary.textContent = "查看答案";
         } else if (wrongAnswerLoadingIds.has(item.id) || wrongAnswerQueue.includes(item.id)) {
-            answerSummary.textContent = "查看答案 · 自动准备中";
+            answerSummary.textContent = "查看答案 自动准备中";
         } else {
-            answerSummary.textContent = "查看答案 · 尚未生成";
+            answerSummary.textContent = "查看答案 尚未生成";
         }
 
         const answerInner = document.createElement("div");
@@ -14645,7 +14645,7 @@ function formatCanonicalGraphReview(graphs) {
         const properties=[g.direction_mode==="mixed"?"混合图":g.directed===true?"有向图":g.directed===false?"无向图":"方向未确定",
             g.weighted===true?"带权":"",g.multigraph===true?"多重图":""].filter(Boolean);
         lines.push("### 图 "+(i+1)+"（"+ocrReviewPlain(g.name || g.id)+"）");
-        lines.push("**类型：** "+properties.join(" · "));
+        lines.push("**类型：** "+properties.join(" "));
         if(g.complete!==true)lines.push("部分内容未识别完整，请对照原图确认。");
         lines.push("**顶点（"+nodes.length+"）：** "+nodes.map(v=>label(v.id)).join("、"));
         const incident=new Set(edges.flatMap(e=>[String(e.from),String(e.to)]));
@@ -14759,7 +14759,7 @@ function formatStructuredGraphReview(graphs) {
         });
         lines.push("### 图 "+(index+1)+"（"+ocrReviewLabel(graphId)+"）");
         const props=[kind,weightKind,multiKind].filter(Boolean);
-        if(props.length)lines.push("**类型：** "+props.join(" · "));
+        if(props.length)lines.push("**类型：** "+props.join(" "));
         lines.push("**顶点（"+ids.length+"）：** "+ids.map(label).join("、"));
         const isolated=ids.filter(id=>!incident.has(id));
         if(graph.complete===true&&isolated.length)
@@ -18912,6 +18912,12 @@ function getActiveKnowledgeContext() {
 }
 
 
+function knowledgeGraphCategoryLabel(value) {
+    return value === "全部"
+        ? dmateUiText("全部模块", "All modules")
+        : dmateKnowledgeLabel(value);
+}
+
 function fillKnowledgeGraphCategoryOptions() {
     const select = document.getElementById(
         "knowledgeGraphCategory"
@@ -18932,22 +18938,27 @@ function fillKnowledgeGraphCategoryOptions() {
 
     // 不在每次切换视图时重建 select，避免浏览器重新计算工具栏宽度。
     if (select) {
+        select.setAttribute("aria-label", dmateUiText("按模块筛选", "Filter by module"));
         const existing = [...select.options].map(option => option.value);
         if (existing.length !== categories.length
             || existing.some((value, index) => value !== categories[index])) {
             select.replaceChildren(...categories.map(value => {
                 const option = document.createElement("option");
                 option.value = value;
-                option.textContent = value;
+                option.textContent = knowledgeGraphCategoryLabel(value);
                 return option;
             }));
+        }
+        for (const option of select.options) {
+            const label = knowledgeGraphCategoryLabel(option.value);
+            if (option.textContent !== label) option.textContent = label;
         }
         if (select.value !== knowledgeGraphFilter) select.value = knowledgeGraphFilter;
     }
 
     if (trigger) {
-        trigger.textContent = `模块：${knowledgeGraphFilter}`;
-        trigger.setAttribute("aria-label", `当前知识图谱模块：${knowledgeGraphFilter}`);
+        trigger.textContent = knowledgeGraphCategoryLabel(knowledgeGraphFilter);
+        trigger.setAttribute("aria-label", dmateUiText("按模块筛选", "Filter by module"));
     }
 }
 
@@ -18956,10 +18967,10 @@ async function openKnowledgeGraphCategoryPicker() {
     fillKnowledgeGraphCategoryOptions();
     const categories = ["全部", ...getKnowledgeGraphCategories()];
     const choice = await openMobileChoiceModal({
-        title:"选择知识图谱模块",
+        title:dmateUiText("按模块筛选", "Filter by module"),
         intro:"在手机上用更清晰的列表样式切换模块",
         value:knowledgeGraphFilter || "全部",
-        options:categories.map(item => ({ value:item, label:item }))
+        options:categories.map(item => ({ value:item, label:knowledgeGraphCategoryLabel(item) }))
     });
     if (choice?.value) {
         setKnowledgeGraphFilter(choice.value);
@@ -20711,7 +20722,7 @@ function renderKnowledgeGraphSummary(context) {
         addItem(
             "查看范围",
             context.questionCount > 0
-                ? `本对话 · ${context.questionCount} 道题`
+                ? `本对话 ${context.questionCount} 道题`
                 : "本对话"
         );
 
@@ -21265,15 +21276,15 @@ function renderKnowledgeGraph() {
                             )
                             : (
                                 visibleNodes.length < fullNodes.length
-                                    ? `最近一题关联 · ${visibleNodes.length} 个知识点`
+                                    ? `最近一题关联 ${visibleNodes.length} 个知识点`
                                     : "当前没有可进一步收缩的题目上下文，显示全部知识"
                             )
                     )
             )
             : (
                 knowledgeGraphFilter === "全部"
-                    ? `全部知识 · ${fullNodes.length} 个知识点`
-                    : `本模块知识 · ${fullNodes.length} 个知识点`
+                    ? `全部知识 ${fullNodes.length} 个知识点`
+                    : `本模块知识 ${fullNodes.length} 个知识点`
             )
     );
 
@@ -22240,7 +22251,7 @@ function downloadOptionsForCurrentPlatform() {
     function installers(githubFilename, {gitcodeFilename = githubFilename, formatLabel = "", preferGithub = true} = {}) {
         const gitcodeUrl = gitcodeDownloadBase + encodeURIComponent(gitcodeFilename) + "/download";
         const githubUrl = githubDownloadBase + encodeURIComponent(githubFilename);
-        const suffix = formatLabel ? " · " + formatLabel : "";
+        const suffix = formatLabel ? " " + formatLabel : "";
         return preferGithub
             ? [
                 { label:"GitHub" + suffix, url:githubUrl },

@@ -91,7 +91,7 @@ function graphRows(graph,index){
  const position=v=>typeof v.position_description==='string'&&v.position_description.trim()||geometry?.positions.get(String(v.id))||'';
  const positions=vertices.filter(v=>!hasLabel(v)||position(v))
   .map(v=>({id:v.id,label:get(v.id),txt:get(v.id)+'：'+(position(v)||'位置未记录')}));
- return {title,type:orientation+' · '+weighted,showType:!titleIncludesType(graphName,graph),vertices:vertices.map(v=>get(v.id)),
+ return {title,type:orientation+' '+weighted,showType:!titleIncludesType(graphName,graph),vertices:vertices.map(v=>get(v.id)),
          named,relations,positions,
          anonymousNote:'',
          description:(typeof graph.visual_description==='string'?graph.visual_description.trim():'')||
@@ -111,10 +111,10 @@ function renderGraphInformation(container,documentValue,options={}){
   const graphName=literal(graph.name||graph.id||'G'+(index+1)),heading=element('h4','dgs-graph-title');
   heading.append(element('span','',uiText('图 ','Graph ')),content(/^G\d+$/i.test(graphName)?markName(graphName):(index+1)+'（'+graphName+'）'));
   section.append(heading);
-  const typeEnglish=(graph.direction_mode==='mixed'?'Mixed directions':graph.directed===true?'Directed':graph.directed===false?'Undirected':'Direction needs review')+' · '+(graph.weighted===true?'Weighted':graph.weighted===false?'Unweighted':'Weight needs review');
+  const typeEnglish=(graph.direction_mode==='mixed'?'Mixed directions':graph.directed===true?'Directed':graph.directed===false?'Undirected':'Direction needs review')+' '+(graph.weighted===true?'Weighted':graph.weighted===false?'Unweighted':'Weight needs review');
   if(row.showType!==false)section.append(element('p','dgs-graph-type',uiText(row.type,typeEnglish)));
   section.append(line('dgs-vertices','顶点：',row.vertices.join('、')),
-   element('p','dgs-counts',uiText(`${row.vertices.length} 个顶点 · ${row.relations.length} 条边`,`${row.vertices.length} vertices · ${row.relations.length} edges`)));
+   element('p','dgs-counts',uiText(`${row.vertices.length} 个顶点 ${row.relations.length} 条边`,`${row.vertices.length} vertices ${row.relations.length} edges`)));
   const appearance=line('dgs-appearance','图形外观：',row.description,'未提供外观描述。');
   // Generated geometry descriptions are chrome; uploaded/AI descriptions stay literal.
   if(row.description&&row.description===geometry?.description){

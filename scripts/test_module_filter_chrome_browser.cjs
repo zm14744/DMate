@@ -1,0 +1,263 @@
+/* Start Flask first. Exercises graph module controls, the offline topbar and
+ * plain study metadata without rewriting authored mathematics or content.
+ */
+'use strict';
+const assert = require('node:assert/strict');
+const { chromium } = require('playwright');
+const nodes = require('../static/offline-content/knowledge_graph.json').nodes;
+const questions = require('../static/offline-content/questions.zh-CN.json').questions;
+const translations = require('../static/offline-content/translations.en.json');
+const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
+const mobile = page => page.viewportSize().width <= 1100;
+const graphMobile = page => page.viewportSize().width <= 760;
+const normalize = value => value.replace(/\s+/g, ' ').trim();
+const difficulty = value => value === '基础' ? '简单' : ['进阶', '提高'].includes(value) ? '困难' : value;
+
+async function settle(page) {
+  await page.evaluate(async () => {
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await Promise.all(document.getAnimations().filter(animation =>
+      animation.effect?.getComputedTiming().iterations !== Infinity)
+      .map(animation => animation.finished.catch(() => {})));
+  });
+}
+
+async function noOverflow(page) {
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Module controls do not create horizontal overflow');
+}
+
+async function inlineGraph(page) {
+  if (await page.locator('#knowledgeGraphModal').evaluate(modal => modal.classList.contains('graph-fullscreen-view'))) {
+    await page.locator('#knowledgeGraphModal .kg-mobile-expand').click();
+    await settle(page);
+  }
+}
+
+async function moduleLabel(page, value, english) {
+  return value === '全部' ? english ? 'All modules' : '全部模块'
+    : page.evaluate(value => window.DMateKnowledgeLanguage.label(value), value);
+}
+
+async function chooseModule(page, value, english = false) {
+  await inlineGraph(page);
+  const select = page.locator('#knowledgeGraphCategory');
+  if (mobile(page)) {
+    await page.locator('#knowledgeGraphCategoryTrigger').tap();
+    const modal = page.locator('#mobileChoiceModal');
+    await modal.waitFor({ state: 'visible' });
+    assert.equal((await page.locator('#mobileChoiceTitle').innerText()).trim(), english ? 'Filter by module' : '按模块筛选');
+    assert.equal(await modal.getByRole('radio', { name: english ? 'All modules' : '全部模块', exact: true }).count(), 1);
+    await modal.getByRole('radio', { name: await moduleLabel(page, value, english), exact: true }).tap();
+    await modal.waitFor({ state: 'hidden' });
+  } else {
+    await select.selectOption(value);
+    assert.equal(await page.locator('#mobileChoiceModal').evaluate(modal => modal.open), false);
+  }
+  await settle(page);
+  assert.equal(await select.inputValue(), value, 'Filtering keeps canonical category values');
+  const expected = value === '全部' ? nodes : nodes.filter(node => node.category === value);
+  if (graphMobile(page)) {
+    await page.locator('#knowledgeGraphModal .kg-mobile-expand').click();
+    await page.waitForSelector('#knowledgeGraphCanvas .kg-mobile-node');
+  }
+  assert.equal(await page.locator('#knowledgeGraphCanvas ' + (graphMobile(page) ? '.kg-mobile-node' : '.kg-node-group')).count(),
+    expected.length, 'The chosen real module controls the displayed graph');
+  await inlineGraph(page);
+  assert.equal(await select.evaluate(select => select.selectedOptions[0].label), await moduleLabel(page, value, english));
+  if (mobile(page)) assert.equal((await page.locator('#knowledgeGraphCategoryTrigger').innerText()).trim(), await moduleLabel(page, value, english));
+}
+
+async function triggerPaint(page) {
+  const trigger = page.locator('#knowledgeGraphCategoryTrigger');
+  if (!mobile(page)) {
+    assert.equal(await trigger.isVisible(), false, 'Desktop keeps its native select');
+    assert.equal(await page.locator('#knowledgeGraphCategory').evaluate(select => getComputedStyle(select).appearance), 'auto');
+    return;
+  }
+  const read = () => trigger.evaluate(button => {
+    const css = getComputedStyle(button), probe = document.createElement('span');
+    probe.style.cssText = 'position:fixed;visibility:hidden;background:var(--surface-1)'; document.body.append(probe);
+    const surface = getComputedStyle(probe).backgroundColor; probe.remove();
+    return { background: css.backgroundColor, surface, image: css.backgroundImage,
+      border: css.borderTopWidth, style: css.borderTopStyle, radius: css.borderTopLeftRadius,
+      shadow: css.boxShadow, filter: css.filter };
+  });
+  const idle = await read();
+  assert.equal(idle.background, idle.surface, 'Module trigger uses the native input surface');
+  assert.equal(idle.border, '1px'); assert.equal(idle.style, 'solid');
+  assert.ok(parseFloat(idle.radius) >= 8);
+  assert.equal(idle.image, 'none'); assert.equal(idle.shadow, 'none'); assert.equal(idle.filter, 'none');
+  await trigger.hover(); await settle(page);
+  assert.deepEqual(await read(), idle, 'Hover does not turn the selector into a raised button');
+}
+
+async function moduleControls(page) {
+  assert.equal(await page.locator('label[for="knowledgeGraphCategory"]').count(), 0, 'No outside Module label remains');
+  const first = page.locator('#knowledgeGraphCategory option').first();
+  assert.equal(await first.getAttribute('value'), '全部');
+  assert.equal((await first.textContent()).trim(), '全部模块');
+  assert.equal(await page.locator('#knowledgeGraphCategory').getAttribute('aria-label'), '按模块筛选');
+  await triggerPaint(page);
+  for (const value of ['图论', '初等数论', '全部']) await chooseModule(page, value);
+  if (mobile(page)) {
+    await page.locator('#knowledgeGraphCategoryTrigger').tap();
+    await page.locator('#mobileChoiceModal').waitFor({ state: 'visible' });
+    await page.locator('#mobileChoiceClose').tap();
+    assert.equal(await page.locator('#knowledgeGraphCategory').inputValue(), '全部', 'Cancelling leaves the current module unchanged');
+  }
+  await page.evaluate(() => window.DMateI18n.setLanguage('en', false));
+  await page.waitForFunction(() => document.querySelector('#knowledgeGraphCategory option')?.textContent.trim() === 'All modules');
+  assert.equal(await page.locator('#knowledgeGraphCategory').getAttribute('aria-label'), 'Filter by module');
+  await chooseModule(page, '图论', true);
+  await chooseModule(page, '全部', true);
+  await noOverflow(page);
+}
+
+async function offlineHeader(page, wallpaper = false) {
+  assert.equal(await page.locator('#offlineAppearanceToggle').count(), 0, 'The topbar palette button is removed');
+  assert.equal(await page.locator('#offlineAppearanceBtn').count(), 1, 'Sidebar appearance action remains');
+  if (!mobile(page)) return;
+  const result = await page.locator('.offline-topbar').evaluate(header => {
+    const css = getComputedStyle(header), main = document.getElementById('offlineMain');
+    const background = node => {
+      for (; node; node = node.parentElement) {
+        const color = getComputedStyle(node).backgroundColor;
+        if (color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent') return color;
+      }
+      return 'rgba(0, 0, 0, 0)';
+    };
+    const brand = header.querySelector('.mobile-topbar-brand'), items = [...brand.children].map(node => node.getBoundingClientRect());
+    return { border: [css.borderTopWidth, css.borderRightWidth, css.borderBottomWidth, css.borderLeftWidth],
+      radius: css.borderRadius, shadow: css.boxShadow, blur: css.backdropFilter,
+      ownBackground: css.backgroundColor, mainBackground: getComputedStyle(main).backgroundColor,
+      background: background(header), main: background(main),
+      center: (Math.min(...items.map(rect => rect.left)) + Math.max(...items.map(rect => rect.right))) / 2,
+      viewportCenter: innerWidth / 2, buttons: header.querySelectorAll('button').length };
+  });
+  assert.deepEqual(result.border, ['0px', '0px', '0px', '0px']);
+  assert.equal(parseFloat(result.radius), 0); assert.equal(result.shadow, 'none'); assert.equal(result.blur, 'none');
+  assert.equal(result.background, result.main, 'Topbar and main share the background paint');
+  assert.ok(Math.abs(result.center - result.viewportCenter) <= 1.5, 'Brand remains centered with no right-side palette');
+  assert.equal(result.buttons, 1);
+  if (wallpaper) assert.equal(result.ownBackground, result.mainBackground, 'Wallpaper uses the same transparent background through the header');
+}
+
+async function navigate(page, panel) {
+  if (mobile(page) && !await page.evaluate(() => document.body.classList.contains('offline-nav-open'))) await page.locator('#offlineNavToggle').tap();
+  await page.locator('.offline-nav-item[data-panel="' + panel + '"]').click();
+  await page.locator('#' + panel + 'Panel').waitFor({ state: 'visible' });
+  await settle(page);
+}
+
+async function sidebarAppearance(page) {
+  if (mobile(page)) await page.locator('#offlineNavToggle').tap();
+  await page.locator('#offlineAppearanceBtn').click();
+  await page.locator('#appearanceModal').waitFor({ state: 'visible' });
+  await page.locator('#appearanceClose').click();
+  await page.locator('#appearanceModal').waitFor({ state: 'hidden' });
+}
+
+async function studyMetadata(page) {
+  await page.evaluate(() => {
+    window.DMateI18n.setLanguage('zh-CN', false);
+    const render = window.DMateAIAnswer.render;
+    window.__moduleFilterSources = new WeakMap();
+    window.DMateAIAnswer.render = function (target, source, ...args) {
+      window.__moduleFilterSources.set(target, source); return render.call(this, target, source, ...args);
+    };
+  });
+  await navigate(page, 'questions');
+  const question = questions.find(question => question.id === 'q01');
+  await page.locator('#questionSearch').fill(question.id);
+  const entry = page.locator('#questionList .question-item[data-question-id="' + question.id + '"]');
+  await entry.click();
+  const expected = [question.category, difficulty(question.difficulty), question.type].join(' ');
+  assert.equal(normalize(await entry.locator('small').textContent()), expected, 'List metadata uses readable spaces');
+  assert.equal(normalize(await page.locator('#questionDetail .detail-kicker').textContent()), expected, 'Detail metadata uses readable spaces');
+  for (const mathematical of [questions.find(question => question.statement.includes('/')),
+    questions.find(question => /[·⋅]/.test(question.statement))]) {
+    assert.ok(mathematical, 'The source pack includes authored division and multiplication examples');
+    await page.locator('#questionSearch').fill(mathematical.id);
+    await page.locator('#questionList .question-item[data-question-id="' + mathematical.id + '"]').click();
+    const source = await page.locator('#questionDetail .wrong-question').evaluate((node, authored) => ({
+      actual: window.__moduleFilterSources.get(node), expected: window.DMateMathMarkdown.prepareStudyText(authored)
+    }), mathematical.statement);
+    assert.equal(source.actual, source.expected, 'Removing UI separators preserves the complete authored mathematical statement');
+  }
+  await navigate(page, 'concepts');
+  await page.locator('#conceptSearch').fill('命题与真值');
+  await page.locator('#conceptList .concept-item[data-concept-id="logic_truth"]').click();
+  const related = page.locator('#conceptDetail .concept-related-exercises [data-question-id="q01"]');
+  await page.waitForFunction(() => !document.querySelector('#conceptDetail [data-dmate-render-state="pending"]'));
+  assert.equal(normalize(await related.textContent()), difficulty(question.difficulty) + ' ' + question.title,
+    'Related exercise difficulty and title are separated by a plain space');
+  await page.evaluate(() => window.DMateI18n.setLanguage('en', false));
+  await page.waitForFunction(() => !document.querySelector('#conceptDetail [data-dmate-render-state="pending"]'));
+  assert.equal(normalize(await related.textContent()), 'Easy ' + translations.questions[question.id].title);
+}
+
+async function runCase(browser, width, theme, offline) {
+  const context = await browser.newContext({ viewport: { width, height: 900 }, serviceWorkers: 'block',
+    ...(width <= 1100 ? { isMobile: true, hasTouch: true } : {}) });
+  const page = await context.newPage(), errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  try {
+    await page.goto(baseURL + (offline ? '/offline' : ''), { waitUntil: 'networkidle' });
+    if (offline) {
+      await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+      await page.evaluate(mode => window.DMateOfflineAppearance.apply({ mode }, null), theme);
+      await offlineHeader(page);
+    } else {
+      await page.evaluate(mode => { appearanceSettings.mode = mode; applyAppearanceSettings({ save: false }); openKnowledgeGraph(); }, theme);
+      await page.waitForSelector('#knowledgeGraphCanvas .kg-section');
+    }
+    await moduleControls(page);
+    if (offline) {
+      await sidebarAppearance(page);
+      if (mobile(page)) {
+        await page.evaluate(() => {
+          const layer = document.getElementById('appearanceBackgroundLayer');
+          layer.style.backgroundImage = 'linear-gradient(45deg, #164e63, #f59e0b)';
+          document.body.classList.add('has-custom-background');
+        });
+        await offlineHeader(page, true);
+      }
+      await studyMetadata(page);
+    }
+    await noOverflow(page);
+    assert.deepEqual(errors, [], 'No module/header/metadata script errors');
+    console.log('PASS ' + (offline ? 'offline ' : 'online ') + width + '/' + theme + ': module labels, canonical filtering and flat input chrome' + (offline ? ', seamless header and preserved study content' : ''));
+  } finally { await context.close(); }
+}
+
+async function disconnectedCase(browser) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 900 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
+    await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.register('/offline-service-worker.js', { scope: '/' });
+      await navigator.serviceWorker.ready;
+    });
+    await page.waitForFunction(() => navigator.serviceWorker.controller?.state === 'activated');
+    await context.setOffline(true);
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    assert.equal(await page.evaluate(() => navigator.onLine), false);
+    await offlineHeader(page);
+    await moduleControls(page);
+    await studyMetadata(page);
+    console.log('PASS disconnected reload: new module picker labels, offline chrome and plain study metadata remain available');
+  } finally { await context.close(); }
+}
+
+(async () => {
+  const browser = await chromium.launch({ headless: true,
+    ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
+  try {
+    for (const [width, theme] of [[390, 'dark'], [1440, 'light']]) for (const offline of [false, true]) await runCase(browser, width, theme, offline);
+    await runCase(browser, 820, 'light', true);
+    await disconnectedCase(browser);
+  } finally { await browser.close(); }
+})().catch(error => { console.error(error); process.exitCode = 1; });

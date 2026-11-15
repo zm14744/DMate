@@ -305,7 +305,7 @@
       item.setAttribute("data-i18n-content", "");
       item.dataset.questionId = question.id;
       item.setAttribute("aria-current", String(state.selectedQuestion?.id === question.id));
-      item.append(studyLabel("strong", "", display.title), el("small", "", tr(question.category) + " · " + tr(difficultyName(question.difficulty)) + " · " + tr(question.type)));
+      item.append(studyLabel("strong", "", display.title), el("small", "", [tr(question.category), tr(difficultyName(question.difficulty)), tr(question.type)].filter(Boolean).join(" ")));
       list.append(item);
     }
     if (state.selectedQuestion && filtered.some(q => q.id === state.selectedQuestion.id)) {
@@ -332,7 +332,7 @@
     const detail = $("questionDetail"), display = localized(question, "questions");
     detail.setAttribute("data-i18n-content", "");
     detail.replaceChildren();
-    detail.append(el("div", "detail-kicker", tr(question.category) + " / " + tr(difficultyName(question.difficulty)) + " / " + tr(question.type)));
+    detail.append(el("div", "detail-kicker", [tr(question.category), tr(difficultyName(question.difficulty)), tr(question.type)].filter(Boolean).join(" ")));
     detail.append(studyLabel("h2", "detail-title", display.title));
     const concepts = el("div", "prereq-list question-concept-links");
     for (const id of question.knowledge_points || []) {
@@ -446,7 +446,7 @@
         || left.index - right.index);
     for (const {question:q} of exercises) {
         const level = difficultyName(q.difficulty);
-        const link = studyButton(tr(level) + " · " + localized(q, "questions").title, "", () => {
+        const link = studyButton([tr(level), localized(q, "questions").title].filter(Boolean).join(" "), "", () => {
           state.questionCategory = ""; state.questionDifficulty = "";
           $("questionCategory").value = ""; $("questionDifficulty").value = "";
           if (!questionMatchesSearch(q, normalizedSearch($("questionSearch").value))) $("questionSearch").value = "";

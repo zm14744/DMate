@@ -2,9 +2,9 @@
 """Sync only the original appearance controls into the offline workspace.
 
 The required ``<!-- BEGIN ONLINE NAME -->`` / ``<!-- END ONLINE NAME -->``
-pairs are APPEARANCE and BACKGROUND VIEWER. Optional APPEARANCE ICON and
-MOBILE APPEARANCE ICON pairs copy only the original appearance button SVG. Run normally to update
-those fragments, or use --check in CI.
+pairs are APPEARANCE and BACKGROUND VIEWER. The optional APPEARANCE ICON
+pair copies only the original sidebar appearance button SVG. Run normally to
+update those fragments, or use --check in CI.
 
 The offline workspace keeps its own navigation, four tools, layout and styles.
 This script never copies the online chat shell, tool dialogs or CSS blocks.
@@ -86,7 +86,7 @@ def appearance_icon(online):
 def sync(online, offline):
     parsed = Elements(online)
     changed = []
-    for name in (*REQUIRED, 'APPEARANCE ICON', 'MOBILE APPEARANCE ICON'):
+    for name in (*REQUIRED, 'APPEARANCE ICON'):
         begin = '<!-- BEGIN ONLINE ' + name + ' -->'
         end = '<!-- END ONLINE ' + name + ' -->'
         if begin not in offline and end not in offline and name not in REQUIRED:
@@ -96,7 +96,7 @@ def sync(online, offline):
         pattern = re.compile(re.escape(begin) + r'[\s\S]*?' + re.escape(end))
         if not pattern.search(offline):
             raise ValueError('Online marker pair is out of order: ' + name)
-        if name in ('APPEARANCE ICON', 'MOBILE APPEARANCE ICON'):
+        if name == 'APPEARANCE ICON':
             fragment = appearance_icon(online)
         else:
             fragment = parsed.extract(ELEMENT_IDS[name])

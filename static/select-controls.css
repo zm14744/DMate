@@ -45,3 +45,28 @@
         }
     }
 }
+
+/* This chooser trigger shares the native module select's quiet surface.
+   Reuse the button layer so its generic important hover fill cannot raise it. */
+@layer dmate-button-themes {
+    @media(max-width:1100px) {
+        body[data-appearance-theme] #knowledgeGraphModal #knowledgeGraphCategoryTrigger {
+            box-sizing:border-box;
+            min-height:38px!important;
+            padding:9px 10px!important;
+            border:1px solid var(--border-strong)!important;
+            border-radius:9px!important;
+            background-color:var(--surface-1)!important;
+            background-image:none!important;
+            box-shadow:none!important;
+            filter:none!important;
+            color:var(--text-primary)!important;
+            -webkit-text-fill-color:currentColor!important;
+            font-size:14px!important;
+        }
+        body[data-appearance-theme] #knowledgeGraphModal #knowledgeGraphCategoryTrigger:focus-visible {
+            border-color:var(--dm-selected-ring,var(--text-primary))!important;
+            box-shadow:inset 0 0 0 1px var(--dm-selected-ring,var(--text-primary))!important;
+        }
+    }
+}

@@ -197,6 +197,7 @@ function mount(host,options={}) {
  let visibleNodes=[],previousSize='',fullscreenOrigin=null;
  const isMobileAppShell=()=>window.matchMedia('(max-width:760px)').matches;
  const knowledgeGraphNodeState=()=>({key:'neutral',label:'',fill:'#111827',stroke:'#475569',text:'#ffffff',badge:''});
+ const categoryOptionLabel=value=>value==='全部'?dmateUiText('全部模块','All modules'):dmateKnowledgeLabel(value);
  const categoryLabel=()=>dmateKnowledgeLabel(category);
  const countLabel=()=>dmateUiText(`${visibleNodes.length} 个知识点`,`${visibleNodes.length} concepts`);
  const disposeViews=()=>canvas.querySelectorAll('.kg-mobile-viewport').forEach(view=>view._kgDispose?.());
@@ -204,8 +205,8 @@ function mount(host,options={}) {
  function setCategory(value){category=categories.includes(value)?value:'全部';options.onCategoryChange?.(category);renderKnowledgeGraph();}
  async function openChoice(){
   if(categoryTrigger.disabled||typeof window.openMobileChoiceModal!=='function')return;
-  const selected=await window.openMobileChoiceModal({title:dmateUiText('模块','Module'),value:category,
-   options:categories.map(value=>({value,label:dmateKnowledgeLabel(value)})),owner:categoryTrigger});
+  const selected=await window.openMobileChoiceModal({title:dmateUiText('按模块筛选','Filter by module'),value:category,
+   options:categories.map(value=>({value,label:categoryOptionLabel(value)})),owner:categoryTrigger});
   if(!destroyed&&selected&&categories.includes(selected.value))setCategory(selected.value);
   if(!destroyed&&categoryTrigger.isConnected)categoryTrigger.focus({preventScroll:true});
  }
@@ -272,7 +273,10 @@ function mount(host,options={}) {
   disposeViews();visibleNodes=allNodes.filter(n=>category==='全部'||n.category===category);
   if(!visibleNodes.some(n=>String(n.id)===knowledgeGraphSelectedNodeId))knowledgeGraphSelectedNodeId=String(visibleNodes[0]?.id||'');
   host.dataset.graphView='full';categorySelect.value=category;
-  categoryTrigger.textContent=dmateUiText('模块：'+category,'Module: '+categoryLabel());
+  categorySelect.setAttribute('aria-label',dmateUiText('按模块筛选','Filter by module'));
+  for(const option of categorySelect.options){const label=categoryOptionLabel(option.value);if(option.textContent!==label)option.textContent=label;}
+  categoryTrigger.textContent=categoryOptionLabel(category);
+  categoryTrigger.setAttribute('aria-label',dmateUiText('按模块筛选','Filter by module'));
   const fragment=document.createDocumentFragment();
   if(isMobileAppShell())renderMobileKnowledgeGraphSection(fragment,visibleNodes,categoryLabel(),countLabel(),{});
   else renderKnowledgeGraphSection(fragment,visibleNodes,categoryLabel(),countLabel(),{});
@@ -306,7 +310,7 @@ function mount(host,options={}) {
   Promise.all([image,copied]).then(([blob,ok])=>{if(!ok)root.DMateDrawingExport.download(blob,dmateUiText('知识图谱','Knowledge Graph'),document);options.onStatus?.(dmateUiText(ok?'已复制图谱图片':'图谱图片已导出',ok?'Graph image copied':'Graph image exported'));})
    .catch(error=>options.onStatus?.(error.message||'图谱图片导出失败')).finally(()=>{copyButton.disabled=false;});
  }
- categorySelect.replaceChildren();for(const value of categories){const option=document.createElement('option');option.value=value;option.textContent=dmateKnowledgeLabel(value);categorySelect.append(option);}
+ categorySelect.replaceChildren();for(const value of categories){const option=document.createElement('option');option.value=value;option.textContent=categoryOptionLabel(value);categorySelect.append(option);}
  categorySelect.addEventListener('change',()=>setCategory(categorySelect.value),{signal});
  categoryTrigger.addEventListener('click',openChoice,{signal});
  document.getElementById('knowledgeGraphDesktopZoomOut').addEventListener('click',()=>setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale/1.2),{signal});

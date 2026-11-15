@@ -151,13 +151,20 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
   body.offline-workspace[data-appearance-theme] #offlineSidebar .offline-nav-item.active { background:var(--dm-selected-bg,var(--surface-3)) !important; font-weight:500; }
   body.offline-workspace[data-appearance-theme] #offlineSidebar :is(.offline-nav-item,.offline-return):hover { background:var(--dm-nav-hover,var(--surface-3)) !important; }
   body.offline-workspace[data-appearance-theme] #offlineMain .offline-primary { background:var(--accent) !important; border-color:var(--accent) !important; color:#fff !important; -webkit-text-fill-color:#fff !important; }
-  body.offline-workspace[data-appearance-theme] :is(#offlineDesktopSidebarToggle,#offlineDesktopSidebarOpen,#offlineNavToggle,#offlineAppearanceToggle):is(.offline-icon-button,.mobile-topbar-button) { border:0 !important; background:transparent !important; box-shadow:none !important; color:var(--text-primary) !important; }
+  body.offline-workspace[data-appearance-theme] :is(#offlineDesktopSidebarToggle,#offlineDesktopSidebarOpen,#offlineNavToggle):is(.offline-icon-button,.mobile-topbar-button) { border:0 !important; background:transparent !important; box-shadow:none !important; color:var(--text-primary) !important; }
   body.offline-workspace[data-appearance-theme] #offlineMain :is(.question-item,.concept-item) { background:transparent !important; border-color:transparent !important; box-shadow:none !important; color:var(--text-primary) !important; }
   body.offline-workspace[data-appearance-theme] #offlineMain :is(.question-item.active,.concept-item.active) { background:var(--dm-selected-bg,var(--surface-3)) !important; }
 }
+/* The shared surface layer also paints navigation headers. Keep this header
+   transparent so it follows the same canvas or wallpaper as the main area. */
+@layer dmate-panel-surfaces {
+  @media(max-width:1100px) {
+    body.offline-workspace[data-appearance-theme] .mobile-topbar.offline-topbar { background:transparent !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }
+  }
+}
 @media(max-width:1100px) {
   body.offline-workspace .offline-layout { display:block !important; grid-template-columns:1fr; padding-top:calc(56px + env(safe-area-inset-top)); }
-  body.offline-workspace .offline-topbar { position:absolute; display:grid !important; grid-template-columns:42px minmax(0,1fr) 42px; align-items:center; gap:8px; top:0; left:0; right:0; z-index:70; height:calc(56px + env(safe-area-inset-top)); padding:env(safe-area-inset-top) 10px 0; background:var(--surface-1); border-bottom:1px solid var(--surface-3); }
+  body.offline-workspace .offline-topbar { position:absolute; display:grid !important; grid-template-columns:42px minmax(0,1fr) 42px; align-items:center; gap:8px; top:0; left:0; right:0; z-index:70; height:calc(56px + env(safe-area-inset-top)); padding:env(safe-area-inset-top) 10px 0; }
   .offline-topbar .mobile-topbar-brand { display:flex; align-items:center; justify-content:center; gap:8px; min-width:0; }
   .offline-topbar .mobile-dmate-mark { display:block; width:26px; height:26px; object-fit:contain; }
   .offline-topbar .mobile-topbar-button { display:flex; align-items:center; justify-content:center; width:42px; height:42px; padding:8px; margin:0; border:0; background:transparent; }

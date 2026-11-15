@@ -15,10 +15,9 @@ async function ready(page) {
 async function openAppearance(page) {
   if (await page.locator('#offlineAppearanceBtn').count()) {
     const mobile = page.viewportSize().width <= 1100;
-    if (!mobile && await page.locator('#offlineDesktopSidebarOpen').getAttribute('aria-expanded') !== 'true') {
-      await page.locator('#offlineDesktopSidebarOpen').click();
-    }
-    await page.locator(mobile ? '#offlineAppearanceToggle' : '#offlineAppearanceBtn').click();
+    const opener = page.locator(mobile ? '#offlineNavToggle' : '#offlineDesktopSidebarOpen');
+    if (await opener.getAttribute('aria-expanded') !== 'true') await opener.click();
+    await page.locator('#offlineAppearanceBtn').click();
   } else {
     if (await page.locator('html').getAttribute('data-desktop-sidebar') === 'collapsed') {
       await page.locator('#desktopSidebarOpen').click();

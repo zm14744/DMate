@@ -212,6 +212,8 @@ async function offlineCase(browser, width, theme) {
     await page.evaluate(mode => window.DMateOfflineAppearance.apply({ mode }, null), theme);
     const values = id => page.locator('#' + id + ' option').evaluateAll(options => options.map(option => option.value));
     const graphCategories = await values('knowledgeGraphCategory');
+    assert.equal(graphCategories[0], '全部', 'The all-module canonical value remains unchanged');
+    assert.equal(await page.locator('#knowledgeGraphCategory option').first().textContent(), '全部模块');
     assert.equal(graphCategories.length, 11, 'All ten real major categories are available');
     await checkNativeStyle(page);
     await choose(page, 'knowledgeGraphCategory', '图论', '#knowledgeGraphCategoryTrigger');
@@ -238,6 +240,7 @@ async function onlineCase(browser, width, theme) {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
     await page.evaluate(mode => { appearanceSettings.mode = mode; applyAppearanceSettings({ save: false }); openKnowledgeGraph(); }, theme);
     await page.waitForSelector('#knowledgeGraphCanvas .kg-section');
+    assert.equal(await page.locator('#knowledgeGraphCategory option').first().textContent(), '全部模块');
     await checkNativeStyle(page);
     await choose(page, 'knowledgeGraphCategory', '图论', '#knowledgeGraphCategoryTrigger');
     await noOverflow(page, 'Online graph choices');

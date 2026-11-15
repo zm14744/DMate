@@ -119,7 +119,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
             if (!list) { refreshDraftViews(); return; }
             refreshDraftViews();
             const heading = panel.querySelector('h3');
-            if (heading) heading.textContent = uiText('节点 · ' + graph.vertices.length,'Vertices · '+graph.vertices.length);
+            if (heading) heading.textContent = uiText('节点 ' + graph.vertices.length,'Vertices '+graph.vertices.length);
             const present = new Set([...list.children].map(row => row.dataset.vertexId));
             graph.vertices.forEach((vertex, index) => {
                 if (!present.has(vertex.id)) {
@@ -156,7 +156,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
             const graphSelect = container.querySelector('select[data-current-graph]');
             if (graphSelect) for (const option of graphSelect.options) { const owner = document.graphs.find(row => row.id === option.value); if (owner) option.textContent = owner.name || owner.id; }
             if (graph) {
-                const edgeHeading = container.querySelector('.dge-edge-panel > h3'); if (edgeHeading) edgeHeading.textContent = uiText('边 · ' + graph.edges.length,'Edges · '+graph.edges.length);
+                const edgeHeading = container.querySelector('.dge-edge-panel > h3'); if (edgeHeading) edgeHeading.textContent = uiText('边 ' + graph.edges.length,'Edges '+graph.edges.length);
                 for (const count of container.querySelectorAll('[data-node-incident]')) {
                     const amount = graph.edges.filter(edge => edge.from === count.dataset.nodeIncident || edge.to === count.dataset.nodeIncident).length;
                     count.textContent = amount ? uiText(amount + ' 条关联边',amount+' incident edges') : '孤立点';
@@ -293,7 +293,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
             } else if(selectedGraph && !options.drawingOnly){
                 aside.append(element('h3','','子图属性'));
                 aside.append(field('名称',input(graph.name,'当前子图名称',v=>model.renameGraph(graph.id,v))));
-                aside.append(element('p','dge-muted',(graph.directed===false?'无向':'有向或待核对')+' · '+(graph.weighted===false?'无权':'带权或待核对')));
+                aside.append(element('p','dge-muted',(graph.directed===false?'无向':'有向或待核对')+' '+(graph.weighted===false?'无权':'带权或待核对')));
                 aside.append(button('删除子图',()=>removeGraph(graph.id),'dge-danger'));
             }
             if(aside.childElementCount){
@@ -380,7 +380,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
                 const labels = {queued:'待识别',recognizing:'识别中',done:'已识别',empty:'未识别到文字',error:'识别失败'};
                 for (const row of rows) {
                     const item = element('div', 'dge-text-region-row'); item.dataset.textRegionId = row.id;
-                    const rowHeading=element('strong','');rowHeading.append(element('span','',uiText('文字框 '+row.id,'Text region '+row.id)),dom.createTextNode(' · '),element('span','',uiText(labels[row.status])));item.append(rowHeading);
+                    const rowHeading=element('strong','');rowHeading.append(element('span','',uiText('文字框 '+row.id,'Text region '+row.id)),dom.createTextNode(' '),element('span','',uiText(labels[row.status])));item.append(rowHeading);
                     if (row.error) item.append(element('p', 'dge-muted', row.error));
                     if (row.text) {const excerpt=element('p','dge-text-excerpt',row.text);excerpt.setAttribute('data-i18n-content','');item.append(excerpt);}
                     if (['error','empty'].includes(row.status)) item.append(button(uiText('重试文字框 '+row.id,'Retry text region '+row.id), () => {
@@ -635,7 +635,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
                         : graph.directed === false ? '无向图' : '方向待核对';
                     const weight = graph.weighted === true ? '带权图'
                         : graph.weighted === false ? '无权图' : '权值待核对';
-                    toolbar.append(element('span', 'dge-detected-type', direction + ' · ' + weight));
+                    toolbar.append(element('span', 'dge-detected-type', direction + ' ' + weight));
                 }
             }
             if (graph) {
@@ -649,7 +649,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
             container.insertBefore(toolbar, workspace);
             if (graph && !useOverlay) {
                 const panels = element('div', 'dge-edit-panels'), nodes = element('section', 'dge-node-panel'), edges = element('section', 'dge-edge-panel');
-                nodes.append(element('h3', '', uiText('节点 · ' + graph.vertices.length,'Vertices · '+graph.vertices.length)));
+                nodes.append(element('h3', '', uiText('节点 ' + graph.vertices.length,'Vertices '+graph.vertices.length)));
                 const nodeList = element('div', 'dge-node-list');
                 graph.vertices.forEach((vertex, index) => nodeList.append(buildNodeRow(graph, vertex, index)));
 
@@ -662,7 +662,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
                 }, 'dge-danger'));
                 if (document.graphs.length > 1) { const target = select(graphOptions(document, graph.id), '', '节点移动目标', null);
                     nodes.append(field('节点归属', target), button('移动所选节点', () => { if (!target.value) throw new Error(uiText('请先选择目标子图。')); model.moveVertices(graph.id, target.value, [...selectedNodes]); selectedNodes.clear(); })); }
-                edges.append(element('h3', '', uiText('边 · ' + graph.edges.length,'Edges · '+graph.edges.length)));
+                edges.append(element('h3', '', uiText('边 ' + graph.edges.length,'Edges '+graph.edges.length)));
                 const separateLabel = element('label', 'dge-check'), separate = element('input'); separate.type = 'checkbox'; separate.checked = individually; separate.disabled = saving;
                 separate.addEventListener('change', () => act(() => { individually = separate.checked; })); separateLabel.append(separate, dom.createTextNode('逐条编辑重边')); edges.append(separateLabel);
                 const edgeList = element('div', 'dge-edge-list');
