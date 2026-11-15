@@ -1292,7 +1292,6 @@ function openMobileChoiceModal({ title = "请选择", intro = "", options = [], 
         button.setAttribute("aria-checked", String(item.value === value));
         button.innerHTML = `
             <span class="mobile-choice-option-text">${escapeRawHtml(item.label)}</span>
-            <span class="mobile-choice-option-check" aria-hidden="true"></span>
         `;
         button.addEventListener("click", () => selectMobileChoice(item.value));
         return button;

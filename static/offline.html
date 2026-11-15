@@ -44,8 +44,10 @@
 <link rel="stylesheet" href="/static/dmate-shared-overrides.css?v=23">
 <link rel="stylesheet" href="/static/button-themes.css?v=23">
 <link rel="stylesheet" href="/static/offline-knowledge-graph.css?v=17">
-<link rel="stylesheet" href="/static/offline.css?v=22">
+<link rel="stylesheet" href="/static/offline.css?v=26">
+<link rel="stylesheet" href="/static/select-controls.css?v=26">
 <link rel="stylesheet" href="/static/scrollbars.css?v=25">
+<script defer src="/static/mobile-select.js?v=26"></script>
 <script defer src="/static/scrollbars.js?v=25"></script>
 <script defer src="/static/graph-editor-model.js"></script>
 <script defer src="/static/graph-editor-format.js"></script>
@@ -69,9 +71,9 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/offline-appearance.js?v=8"></script>
 <script defer src="/static/offline-shell.js?v=8"></script>
 <script defer src="/static/knowledge-graph-labels.js?v=17"></script>
-<script defer src="/static/offline-knowledge-graph.js?v=23"></script>
+<script defer src="/static/offline-knowledge-graph.js?v=26"></script>
 <script defer src="/static/offline-entry.js?v=17"></script>
-<script defer src="/static/offline.js?v=22"></script>
+<script defer src="/static/offline.js?v=26"></script>
 </head>
 <body class="offline-workspace">
 <script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"light";</script>
@@ -176,16 +178,6 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
           </div>
         </div>
       </div>
-      <dialog id="mobileChoiceModal" class="modal hidden" aria-hidden="true" aria-labelledby="mobileChoiceTitle">
-        <div class="modal-card mobile-choice-card">
-          <div class="modal-head">
-            <div id="mobileChoiceTitle">模块</div>
-            <button id="mobileChoiceClose" class="modal-close-dot" type="button" aria-label="关闭" title="关闭"></button>
-          </div>
-          <div id="mobileChoiceIntro" class="mobile-choice-intro hidden" hidden></div>
-          <div id="mobileChoiceList" class="mobile-choice-list" role="radiogroup" aria-label="选项列表"></div>
-        </div>
-      </dialog>
     </section>
 
     <section class="offline-panel" id="questionsPanel" hidden>
@@ -209,7 +201,10 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
     <section class="offline-panel" id="conceptsPanel" hidden>
       <div class="offline-toolbar">
         <div><strong id="conceptCount">概念库</strong><span class="toolbar-muted">定义、解释与例题</span></div>
-        <input type="search" id="conceptSearch" class="offline-search" placeholder="搜索概念" aria-label="搜索概念">
+        <div class="offline-filters">
+          <select id="conceptCategory" aria-label="按章节筛选"><option value="">全部章节</option></select>
+          <input type="search" id="conceptSearch" class="offline-search" placeholder="搜索概念" aria-label="搜索概念">
+        </div>
       </div>
       <div class="concept-layout">
         <div class="concept-list" id="conceptList"></div>
@@ -220,6 +215,17 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
     </section>
   </main>
 </div>
+
+<dialog id="mobileChoiceModal" class="modal hidden" aria-hidden="true" aria-labelledby="mobileChoiceTitle">
+  <div class="modal-card mobile-choice-card">
+    <div class="modal-head">
+      <div id="mobileChoiceTitle">模块</div>
+      <button id="mobileChoiceClose" class="modal-close-dot" type="button" aria-label="关闭" title="关闭"></button>
+    </div>
+    <div id="mobileChoiceIntro" class="mobile-choice-intro hidden" hidden></div>
+    <div id="mobileChoiceList" class="mobile-choice-list" role="radiogroup" aria-label="选项列表"></div>
+  </div>
+</dialog>
 
 <!-- BEGIN ONLINE APPEARANCE -->
 <div id="appearanceModal" class="modal hidden">

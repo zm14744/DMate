@@ -200,19 +200,14 @@ function mount(host,options={}) {
  const categoryLabel=()=>dmateKnowledgeLabel(category);
  const countLabel=()=>dmateUiText(`${visibleNodes.length} 个知识点`,`${visibleNodes.length} concepts`);
  const disposeViews=()=>canvas.querySelectorAll('.kg-mobile-viewport').forEach(view=>view._kgDispose?.());
- const closeChoice=()=>{if(choice?.open)choice.close();choice?.classList.add('hidden');choice?.setAttribute('aria-hidden','true');};
+ const closeChoice=()=>{window.closeMobileChoiceModal?.(categoryTrigger);window.closeMobileChoiceModal?.(categorySelect);};
  function setCategory(value){category=categories.includes(value)?value:'全部';options.onCategoryChange?.(category);renderKnowledgeGraph();}
- function openChoice(){
-  const list=document.getElementById('mobileChoiceList');list.replaceChildren();
-  document.getElementById('mobileChoiceTitle').textContent=dmateUiText('模块','Module');
-  for(const value of categories){
-   const button=document.createElement('button');button.type='button';button.className='mobile-choice-option'+(value===category?' active':'');button.dataset.value=value;button.setAttribute('role','radio');button.setAttribute('aria-checked',String(value===category));
-   const label=document.createElement('span');label.className='mobile-choice-option-text';label.textContent=dmateKnowledgeLabel(value);
-   const check=document.createElement('span');check.className='mobile-choice-option-check';check.setAttribute('aria-hidden','true');button.append(label,check);
-   button.addEventListener('click',()=>{setCategory(value);closeChoice();},{signal});list.append(button);
-  }
-  choice.classList.remove('hidden');choice.setAttribute('aria-hidden','false');choice.showModal();
-  window.requestAnimationFrame(()=>{if(choice.open)list.querySelector('.active')?.focus();});
+ async function openChoice(){
+  if(categoryTrigger.disabled||typeof window.openMobileChoiceModal!=='function')return;
+  const selected=await window.openMobileChoiceModal({title:dmateUiText('模块','Module'),value:category,
+   options:categories.map(value=>({value,label:dmateKnowledgeLabel(value)})),owner:categoryTrigger});
+  if(!destroyed&&selected&&categories.includes(selected.value))setCategory(selected.value);
+  if(!destroyed&&categoryTrigger.isConnected)categoryTrigger.focus({preventScroll:true});
  }
  function renderDetail(){
   const title=document.getElementById('knowledgeGraphDetailTitle'),detail=document.getElementById('knowledgeGraphDetail');
@@ -301,16 +296,13 @@ function mount(host,options={}) {
  categorySelect.replaceChildren();for(const value of categories){const option=document.createElement('option');option.value=value;option.textContent=dmateKnowledgeLabel(value);categorySelect.append(option);}
  categorySelect.addEventListener('change',()=>setCategory(categorySelect.value),{signal});
  categoryTrigger.addEventListener('click',openChoice,{signal});
- document.getElementById('mobileChoiceClose').addEventListener('click',closeChoice,{signal});
- choice.addEventListener('cancel',event=>{event.preventDefault();closeChoice();},{signal});
- choice.addEventListener('click',event=>{if(event.target===choice)closeChoice();},{signal});
  document.getElementById('knowledgeGraphDesktopZoomOut').addEventListener('click',()=>setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale/1.2),{signal});
  document.getElementById('knowledgeGraphDesktopZoomIn').addEventListener('click',()=>setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale*1.2),{signal});
  document.getElementById('knowledgeGraphDesktopZoomFit').addEventListener('click',fitKnowledgeGraphDesktop,{signal});
  copyButton.addEventListener('click',copyImage,{signal});
  canvas.addEventListener('wheel',event=>{if(!event.ctrlKey||isMobileAppShell())return;event.preventDefault();setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale*(event.deltaY<0?1.12:.89));},{signal,passive:false});
  document.addEventListener('keydown',event=>{
-  if(event.key!=='Escape'||choice.open||host.closest('#graphPanel')?.hidden||!host.getClientRects().length)return;
+  if(event.key!=='Escape'||choice?.open||host.closest('#graphPanel')?.hidden||!host.getClientRects().length)return;
   if(document.querySelector('dialog[open],.modal:not(.hidden):not(#knowledgeGraphModal):not(#mobileChoiceModal)'))return;
   if(host.classList.contains('graph-fullscreen-view')){event.preventDefault();toggleKnowledgeGraphFullscreenView();}
  },{signal});

@@ -32,6 +32,7 @@ on:
       - 'scripts/test_mobile_drawers_browser.cjs'
       - 'scripts/test_service_worker_cache_browser.cjs'
       - 'scripts/test_scrollbar_visibility_browser.cjs'
+      - 'scripts/test_select_controls_browser.cjs'
       - 'scripts/test_drawing_panels_browser.cjs'
       - 'scripts/test_overlay_zoom_browser.cjs'
       - 'scripts/test_math_diagram_browser.cjs'
@@ -67,6 +68,7 @@ on:
       - 'scripts/test_mobile_drawers_browser.cjs'
       - 'scripts/test_service_worker_cache_browser.cjs'
       - 'scripts/test_scrollbar_visibility_browser.cjs'
+      - 'scripts/test_select_controls_browser.cjs'
       - 'scripts/test_drawing_panels_browser.cjs'
       - 'scripts/test_overlay_zoom_browser.cjs'
       - 'scripts/test_math_diagram_browser.cjs'
@@ -100,6 +102,7 @@ jobs:
           node --check static/offline-entry.js
           node --check static/offline-service-worker.js
           node --check static/scrollbars.js
+          node --check static/mobile-select.js
           node --check static/offline-shell.js
           node --check static/offline-appearance.js
           node --check static/offline-knowledge-graph.js
@@ -122,6 +125,7 @@ jobs:
           node --check scripts/test_mobile_drawers_browser.cjs
           node --check scripts/test_service_worker_cache_browser.cjs
           node --check scripts/test_scrollbar_visibility_browser.cjs
+          node --check scripts/test_select_controls_browser.cjs
           node --check scripts/test_drawing_panels_browser.cjs
           node --check scripts/test_overlay_zoom_browser.cjs
           node --check scripts/test_math_diagram_browser.cjs
@@ -205,6 +209,7 @@ jobs:
           node scripts/test_offline_data_migration_browser.cjs
           node scripts/test_service_worker_cache_browser.cjs
           node scripts/test_scrollbar_visibility_browser.cjs
+          node scripts/test_select_controls_browser.cjs
           node scripts/test_mobile_drawers_browser.cjs
           node scripts/test_knowledge_graph_browser.cjs
           node scripts/test_offline_graph_browser.cjs

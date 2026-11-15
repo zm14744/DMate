@@ -112,6 +112,7 @@ let appConfirmReturnFocus = null;
 let mobileChoiceResolver = null;
 let mobileChoiceOptions = [];
 let mobileChoiceOpenVersion = 0;
+let mobileChoiceOwner = null;
 
 function shouldPersistClientState() {
     // 绝不能信任上次登录留下的 localStorage 元信息作为认证依据。
@@ -1252,11 +1253,14 @@ function setMobileChoiceOpen(open) {
     }));
 }
 
-function closeMobileChoiceModal() {
+function closeMobileChoiceModal(owner = null) {
+    // Click/cancel handlers pass Events, while tool teardown can name its owner.
+    if (owner instanceof Element && mobileChoiceOwner !== owner) return;
     setMobileChoiceOpen(false);
     const resolver = mobileChoiceResolver;
     mobileChoiceResolver = null;
     mobileChoiceOptions = [];
+    mobileChoiceOwner = null;
     if (typeof resolver === "function") resolver(null);
 }
 
@@ -1265,12 +1269,13 @@ function selectMobileChoice(value) {
     if (!result || result.disabled) return;
     const resolver = mobileChoiceResolver;
     mobileChoiceResolver = null;
+    mobileChoiceOwner = null;
     setMobileChoiceOpen(false);
     mobileChoiceOptions = [];
     if (typeof resolver === "function") resolver(result);
 }
 
-function openMobileChoiceModal({ title = "请选择", intro = "", options = [], value = "" } = {}) {
+function openMobileChoiceModal({ title = "请选择", intro = "", options = [], value = "", owner = null } = {}) {
     const modal = document.getElementById("mobileChoiceModal");
     const titleEl = document.getElementById("mobileChoiceTitle");
     const introEl = document.getElementById("mobileChoiceIntro");
@@ -1281,6 +1286,7 @@ function openMobileChoiceModal({ title = "请选择", intro = "", options = [], 
 
     // 若窗口已打开，先结束上一轮选择，避免清空刚生成的新选项。
     if (mobileChoiceResolver) closeMobileChoiceModal();
+    mobileChoiceOwner = owner instanceof Element ? owner : null;
     titleEl.textContent = String(title || "请选择");
     introEl.textContent = String(intro || "");
     introEl.classList.toggle("hidden", !intro);
@@ -1301,7 +1307,6 @@ function openMobileChoiceModal({ title = "请选择", intro = "", options = [], 
         button.setAttribute("aria-checked", String(item.value === value));
         button.innerHTML = `
             <span class="mobile-choice-option-text">${escapeRawHtml(item.label)}</span>
-            <span class="mobile-choice-option-check" aria-hidden="true"></span>
         `;
         button.addEventListener("click", () => selectMobileChoice(item.value));
         return button;

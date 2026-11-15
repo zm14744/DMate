@@ -8,7 +8,7 @@
     panel: "graph", selectedQuestion: null, selectedConcept: null,
     revealed: false,
     drawingController: null, backgroundUrl: "", graphCategory: "", questionCategory: "",
-    questionDifficulty: "", conceptQuery: "", graphQuery: "", graphController: null,
+    questionDifficulty: "", conceptCategory: "", conceptQuery: "", graphQuery: "", graphController: null,
     appearanceQueue: Promise.resolve()
   };
   const panelMeta = {
@@ -212,11 +212,39 @@
     window.dispatchEvent(new CustomEvent("dmate:offlinepanelchange", {detail:{panel:name,title:panelMeta[name][0]}}));
   }
 
+  function chapterCategories() {
+    const graphCategories = (state.graph?.nodes || []).map(node => node.category).filter(Boolean);
+    const categories = graphCategories.length ? graphCategories
+      : [...state.concepts, ...state.questions].map(item => item.category).filter(Boolean);
+    return [...new Set(categories)].sort((left, right) => left.localeCompare(right, "zh-Hans-CN"));
+  }
+
+  function fillChapterFilter(select, value) {
+    const categories = chapterCategories();
+    const values = ["", ...categories];
+    if (select.options.length !== values.length || values.some((category, index) => select.options[index]?.value !== category)) {
+      select.replaceChildren(...values.map(category => new Option(category ? tr(category) : tr("全部章节", "All topics"), category)));
+    } else {
+      for (const option of select.options) option.textContent = option.value ? tr(option.value) : tr("全部章节", "All topics");
+    }
+    select.value = values.includes(value) ? value : "";
+    return select.value;
+  }
+
   function fillQuestionFilters() {
-    const select = $("questionCategory");
-    if (select.options.length > 1) return;
-    const categories = [...new Set(state.questions.map(q => q.category))].sort();
-    for (const value of categories) select.add(new Option(tr(value), value));
+    state.questionCategory = fillChapterFilter($("questionCategory"), state.questionCategory);
+  }
+
+  function openConcept(concept) {
+    // A graph/related/question link may point outside the current search or
+    // chapter. Move all filters and selection together before rebuilding.
+    state.selectedConcept = concept;
+    if (state.conceptCategory && state.conceptCategory !== concept.category) {
+      state.conceptCategory = concept.category;
+    }
+    state.conceptQuery = "";
+    $("conceptSearch").value = "";
+    switchPanel("concepts");
   }
 
   function difficultyName(value) {
@@ -273,8 +301,7 @@
       const concept = state.concepts.find(item => item.id === id);
       if (concept) {
         const link = studyButton(tr("知识点：", "Knowledge point: ") + localized(concept, "concepts").title, "", () => {
-          $("conceptSearch").value = "";
-          switchPanel("concepts"); fillConceptDetail(concept);
+          openConcept(concept);
         });
         link.dataset.conceptId = id; concepts.append(link);
       }
@@ -335,7 +362,7 @@
       section.append(el("h3", "", children.length ? tr("细分概念", "Detailed concepts") : tr("所属图谱知识点", "Knowledge-map topic")));
       const links = el("div", "prereq-list");
       for (const item of children.length ? children : [topic]) {
-        const link = studyButton(localized(item, "concepts").title, "", () => fillConceptDetail(item));
+        const link = studyButton(localized(item, "concepts").title, "", () => openConcept(item));
         link.dataset.conceptId = item.id;
         links.append(link);
       }
@@ -363,7 +390,11 @@
     const prereqs = el("div", "prereq-list");
     for (const id of concept.prerequisites || []) {
       const item = state.concepts.find(c => c.id === id);
-      if (item) prereqs.append(studyButton(localized(item, "concepts").title, "", () => fillConceptDetail(item)));
+      if (item) {
+        const link = studyButton(localized(item, "concepts").title, "", () => openConcept(item));
+        link.dataset.conceptId = item.id;
+        prereqs.append(link);
+      }
     }
     for (const id of concept.related_questions || []) {
       const q = state.questions.find(x => x.id === id);
@@ -381,10 +412,13 @@
   }
 
   function renderConcepts() {
+    state.conceptCategory = fillChapterFilter($("conceptCategory"), state.conceptCategory);
     const query = $("conceptSearch").value.trim().toLocaleLowerCase();
+    state.conceptQuery = $("conceptSearch").value;
     const rows = state.concepts.filter(c => {
       const translated = state.translations.concepts[c.id] || {};
-      return !query || [c.title,c.category,c.summary,c.definition,translated.title,translated.summary,translated.definition,tr(c.category)].join(" ").toLocaleLowerCase().includes(query);
+      return (!state.conceptCategory || c.category === state.conceptCategory)
+        && (!query || [c.title,c.category,c.summary,c.definition,translated.title,translated.summary,translated.definition,tr(c.category)].join(" ").toLocaleLowerCase().includes(query));
     });
     $("conceptCount").textContent = tr(rows.length + " 个概念", rows.length + (rows.length === 1 ? " concept" : " concepts"));
     const list = $("conceptList"); list.replaceChildren();
@@ -401,7 +435,10 @@
     }
     if (state.selectedConcept && rows.some(c => c.id === state.selectedConcept.id)) fillConceptDetail(state.selectedConcept);
     else if (rows.length) fillConceptDetail(rows[0]);
-    else $("conceptDetail").replaceChildren(el("div","offline-empty",tr("没有找到匹配的概念。", "No matching concepts.")));
+    else {
+      state.selectedConcept = null;
+      $("conceptDetail").replaceChildren(el("div","offline-empty",tr("没有找到匹配的概念。", "No matching concepts.")));
+    }
   }
 
   function renderGraph() {
@@ -418,7 +455,7 @@
       onSelect(node) {
       const concept = state.concepts.find(c => c.id === node.id || c.title === node.name);
       if (concept) {
-        $("conceptSearch").value = ""; switchPanel("concepts"); fillConceptDetail(concept);
+        openConcept(concept);
       } else toast("该知识点尚无独立概念条目");
       }
     });
@@ -486,6 +523,7 @@
     document.querySelectorAll(".offline-nav-item").forEach(item => item.addEventListener("click", () => switchPanel(item.dataset.panel)));
     $("questionCategory").addEventListener("change", event => { state.questionCategory=event.target.value; renderQuestions(); });
     $("questionDifficulty").addEventListener("change", event => { state.questionDifficulty=event.target.value; renderQuestions(); });
+    $("conceptCategory").addEventListener("change", event => { state.conceptCategory=event.target.value; renderConcepts(); });
     $("conceptSearch").addEventListener("input", renderConcepts);
     $("returnOnline").addEventListener("click", returnOnline);
     window.addEventListener("online", setNetworkStatus);

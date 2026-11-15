@@ -2,6 +2,67 @@
  'use strict';
  const doc=root.document;
  let pending=null,pointerIntent=null;
+ // The online page already owns this API. Offline pages use the same dialog
+ // and contract without borrowing handlers from a particular tool panel.
+ if(typeof root.openMobileChoiceModal!=='function'){
+  let current=null,version=0;
+  const bound=new WeakSet();
+  const finish=result=>{
+   if(!current)return;
+   const previous=current;current=null;++version;
+   previous.modal.classList.add('hidden');previous.modal.setAttribute('aria-hidden','true');
+   delete previous.modal.dataset.positioning;
+   if(previous.modal.open)previous.modal.close();
+   previous.resolve(result);
+   const ownerDialog=previous.focus?.closest?.('dialog');
+   if(previous.focus?.isConnected&&!previous.focus.disabled&&(!ownerDialog||ownerDialog.open))
+    previous.focus.focus({preventScroll:true});
+  };
+  root.closeMobileChoiceModal=owner=>{
+   // Event listeners also pass their MouseEvent here; only an explicit
+   // control owner narrows the close request.
+   if(owner instanceof root.Element&&current?.owner!==owner)return;
+   finish(null);
+  };
+  root.openMobileChoiceModal=({title='请选择',intro='',options=[],value='',owner=null}={})=>{
+   const modal=doc.getElementById('mobileChoiceModal'),list=doc.getElementById('mobileChoiceList');
+   const titleEl=doc.getElementById('mobileChoiceTitle'),introEl=doc.getElementById('mobileChoiceIntro');
+   if(!modal||!list||!titleEl||!introEl)return Promise.resolve(null);
+   finish(null);
+   if(!bound.has(modal)){
+    modal.addEventListener('cancel',event=>{event.preventDefault();root.closeMobileChoiceModal();});
+    modal.addEventListener('close',()=>{if(!modal.open)root.closeMobileChoiceModal();});
+    modal.addEventListener('click',event=>{
+     if(event.target===modal||event.target.closest?.('#mobileChoiceClose'))root.closeMobileChoiceModal();
+    });
+    bound.add(modal);
+   }
+   const rows=Array.isArray(options)?options.map(row=>({value:String(row.value??''),
+    label:String(row.label??row.value??''),disabled:row.disabled===true})):[];
+   titleEl.textContent=String(title||'请选择');introEl.textContent=String(intro||'');
+   introEl.hidden=!intro;introEl.classList.toggle('hidden',!intro);
+   list.replaceChildren(...rows.map(row=>{
+    const button=doc.createElement('button');button.type='button';button.className='mobile-choice-option';
+    button.disabled=row.disabled;button.classList.toggle('active',row.value===String(value));
+    button.setAttribute('role','radio');button.setAttribute('aria-checked',String(row.value===String(value)));
+    const label=doc.createElement('span');label.className='mobile-choice-option-text';label.textContent=row.label;
+    button.append(label);button.addEventListener('click',()=>{if(!row.disabled)finish(row);});return button;
+   }));
+   root.DMateI18n?.translate?.(modal);
+   return new Promise(resolve=>{
+    const ownVersion=++version;
+    current={modal,resolve,owner,focus:owner instanceof root.Element?owner:doc.activeElement};
+    modal.classList.remove('hidden');modal.setAttribute('aria-hidden','false');modal.dataset.positioning='true';
+    if(typeof modal.showModal==='function'&&!modal.open)modal.showModal();
+    root.requestAnimationFrame(()=>root.requestAnimationFrame(()=>{
+     if(version!==ownVersion||!current)return;
+     delete modal.dataset.positioning;
+     (list.querySelector('.active:not(:disabled)')||list.querySelector('button:not(:disabled)')
+      ||doc.getElementById('mobileChoiceClose'))?.focus({preventScroll:true});
+    }));
+   });
+  };
+ }
  function eligible(target){
   const select=target?.closest?.('select') || target?.closest?.('label')?.control;
   return root.matchMedia('(max-width:1100px)').matches && select?.tagName==='SELECT' && !select.disabled &&
@@ -18,13 +79,14 @@
   }));
   if(!options.length)return;
   const title=select.getAttribute('aria-label') || select.labels?.[0]?.querySelector('span')?.textContent || '请选择';
-  const cancel=()=>root.closeMobileChoiceModal();
-  const observer=new MutationObserver(()=>{if(!select.isConnected)cancel();});
+  const cancel=()=>root.closeMobileChoiceModal(select);
+  const observer=new MutationObserver(()=>{if(!select.isConnected||select.disabled)cancel();});
   pending=select;
   owner?.addEventListener('close',cancel);
   observer.observe(doc.body,{childList:true,subtree:true});
+  observer.observe(select,{attributes:true,attributeFilter:['disabled']});
   try{
-   const choice=await root.openMobileChoiceModal({title,options,value:oldValue});
+   const choice=await root.openMobileChoiceModal({title,options,value:oldValue,owner:select});
    if(!choice || !select.isConnected || select.disabled || (owner&&!owner.open) || select.value!==oldValue)return;
    const option=[...select.options].find(row=>row.value===choice.value);
    if(!option || option.hidden || option.disabled || option.parentElement?.disabled===true || choice.value===oldValue)return;

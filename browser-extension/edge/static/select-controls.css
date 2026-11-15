@@ -1,0 +1,47 @@
+/* Shared by the website, offline workspace and packaged browser sidebars. */
+@layer dmate-select-controls {
+    /* Older cached renderers may still append this decorative radio dot.
+       Selection continues to use the option's active background and ARIA state. */
+    .mobile-choice-option-check,
+    .mobile-choice-option-check::before,
+    .mobile-choice-option-check::after {
+        display:none!important;
+        content:none!important;
+    }
+
+    @media(min-width:1101px) {
+        /* Preserve the native popup, arrow and keyboard behavior. Only the
+           surface changes; compact editor controls retain their own dimensions. */
+        body[data-appearance-theme] select:not([multiple]):is(:not([size]),[size="1"]) {
+            appearance:auto!important;
+            -webkit-appearance:auto!important;
+            box-sizing:border-box;
+            border:1px solid var(--border-strong)!important;
+            border-radius:9px!important;
+            background-color:var(--surface-1)!important;
+            background-image:none!important;
+            box-shadow:none!important;
+            color:var(--text-primary)!important;
+            -webkit-text-fill-color:currentColor!important;
+            cursor:pointer;
+        }
+        body[data-appearance-theme="light"] select { color-scheme:light; }
+        body[data-appearance-theme="dark"] select,
+        body[data-appearance-theme="navy"] select { color-scheme:dark; }
+        body[data-appearance-theme] select:not([multiple]):is(:not([size]),[size="1"]):not(:disabled):hover {
+            border-color:var(--text-muted)!important;
+        }
+        body[data-appearance-theme] select:not([multiple]):is(:not([size]),[size="1"]):not(:disabled):focus-visible {
+            border-color:var(--dm-selected-ring,var(--text-primary))!important;
+            box-shadow:inset 0 0 0 1px var(--dm-selected-ring,var(--text-primary))!important;
+        }
+        body[data-appearance-theme] select:disabled {
+            opacity:.55;
+            cursor:not-allowed;
+        }
+        body[data-appearance-theme] select :is(option,optgroup) {
+            background-color:var(--surface-1);
+            color:var(--text-primary);
+        }
+    }
+}
