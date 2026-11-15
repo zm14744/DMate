@@ -46,14 +46,24 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
             if (label !== undefined) {node.textContent = label;if(tag==='text'||tag==='title')node.setAttribute('data-i18n-content','');} return node; };
         const button = (label, action, className) => { const node = element('button', className || '', label); node.type = 'button'; node.disabled = saving;
             node.addEventListener('click', event => { event.stopPropagation(); act(action); }); return node; };
-        const historyButton = (label, paths, action) => {
-            const node = button('', action, 'dge-history-arrow');
-            node.setAttribute('aria-label', label); node.title = label;
-            const icon = svgElement('svg', {viewBox:'0 0 24 24', width:24, height:24, fill:'none',
+        const lucideIcon = (name, size = 24) => {
+            const icon = svgElement('svg', {viewBox:'0 0 24 24', width:size, height:size, fill:'none',
+                class:'lucide lucide-' + name, 'data-lucide':name, 'data-icon':name,
                 stroke:'currentColor', 'stroke-width':1.8, 'stroke-linecap':'round', 'stroke-linejoin':'round',
                 'aria-hidden':'true', focusable:'false'});
-            for (const path of paths) icon.append(svgElement('path', {d:path}));
-            node.append(icon); return node;
+            const paths = {
+                'undo-2':['M9 14 4 9l5-5', 'M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11'],
+                'redo-2':['m15 14 5-5-5-5', 'M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13'],
+                'trash-2':['M3 6h18', 'M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6', 'M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2']
+            };
+            for (const path of paths[name]) icon.append(svgElement('path', {d:path}));
+            if (name === 'trash-2') for (const x of [10, 14]) icon.append(svgElement('line', {x1:x, x2:x, y1:11, y2:17}));
+            return icon;
+        };
+        const historyButton = (label, iconName, action) => {
+            const node = button('', action, 'dge-history-arrow');
+            node.setAttribute('aria-label', label); node.title = label;
+            node.append(lucideIcon(iconName)); return node;
         };
         const input = (value, aria, action, type) => { const node = element('input'); node.type = type || 'text'; node.value = value ?? ''; node.setAttribute('aria-label', aria); node.disabled = saving;
             if (action) node.addEventListener('input', () => edit(() => action(node.value))); return node; };
@@ -482,18 +492,19 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
             container.replaceChildren(); container.classList.add('dmate-graph-editor');
             const top = element('div', 'dge-topline');
             // The toolbar already names its actions; keep the dialog compact.
-            const undo = historyButton('撤销', ['M9 14 4 9l5-5', 'M4 9h10.5a6.5 6.5 0 0 1 0 13H11'], () => { model.undo(); });
+            const undo = historyButton('撤销', 'undo-2', () => { model.undo(); });
             undo.dataset.editorUndo = 'true'; undo.disabled = saving || !model.canUndo();
-            const redo = historyButton('重做', ['m15 14 5-5-5-5', 'M20 9H9.5a6.5 6.5 0 0 0 0 13H13'], () => { model.redo(); });
+            const redo = historyButton('重做', 'redo-2', () => { model.redo(); });
             redo.dataset.editorRedo = 'true'; redo.disabled = saving || !model.canRedo();
             if (!options.drawingOnly) top.append(questionChoice());
-            top.append(undo, redo,
-                button('清空', () => {
-                    recognitionEpoch++; model.reset(); selectedNodes.clear(); selectedEdge=null; selectedGraph=false;
-                    overlay?.resetInteraction(); textOverlay?.resetInteraction();
-                    clearTimeout(textTimer); textTimer=null; textState.regions=[]; textState.nextId=1; textState.selectedId=null; textState.manuallyEdited=false; textState.assemblyError='';
-                    refreshTextPanel?.();
-                }));
+            const clear = button('清空', () => {
+                recognitionEpoch++; model.reset(); selectedNodes.clear(); selectedEdge=null; selectedGraph=false;
+                overlay?.resetInteraction(); textOverlay?.resetInteraction();
+                clearTimeout(textTimer); textTimer=null; textState.regions=[]; textState.nextId=1; textState.selectedId=null; textState.manuallyEdited=false; textState.assemblyError='';
+                refreshTextPanel?.();
+            }, 'dge-clear-button');
+            clear.dataset.editorClear = 'true'; clear.prepend(lucideIcon('trash-2', 20));
+            top.append(undo, redo, clear);
             container.append(top);
             if (useOverlay && !options.drawingOnly) {
                 const tabs = element('div', 'dge-tabs'); tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', '识别方式');

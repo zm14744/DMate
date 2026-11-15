@@ -19,6 +19,10 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   let noticeFrame=0,noticeCurrent='',noticeQueue=[],persistNoticeShown='';
   const el=(tag,className,text)=>{const n=doc.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;};
   const button=(text,fn,className)=>{const b=el('button',className,text);b.type='button';b.addEventListener('click',event=>{event.stopPropagation();if(!destroyed)void fn();});return b;};
+  const trashIcon=()=>{const svg=doc.createElementNS('http://www.w3.org/2000/svg','svg');
+   for(const [key,value] of Object.entries({class:'lucide lucide-trash-2','data-lucide':'trash-2','data-icon':'trash-2',viewBox:'0 0 24 24',width:16,height:16,fill:'none',stroke:'currentColor','stroke-width':1.8,'stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true',focusable:'false'}))svg.setAttribute(key,String(value));
+   for(const d of ['M3 6h18','M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6','M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2']){const path=doc.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',d);svg.append(path);}
+   for(const x of [10,14]){const line=doc.createElementNS(svg.namespaceURI,'line');for(const [key,value] of Object.entries({x1:x,x2:x,y1:11,y2:17}))line.setAttribute(key,String(value));svg.append(line);}return svg;};
   const sendIcon=()=>{const svg=doc.createElementNS('http://www.w3.org/2000/svg','svg'),path=doc.createElementNS(svg.namespaceURI,'path');
    svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');
    for(const [key,value] of Object.entries({d:'M12 20V4m-7 7 7-7 7 7',fill:'none',stroke:'#fff','stroke-width':'2.4','stroke-linecap':'round','stroke-linejoin':'round'}))path.setAttribute(key,value);svg.append(path);return svg;};
@@ -216,6 +220,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
      open.setAttribute('data-i18n-content','');
      open.setAttribute('aria-current',String(p.id===activeId));
      const remove=button('',()=>requestRemovePage(p.id,remove),'ddw-history-delete');remove.setAttribute('aria-label',uiText('删除绘图：'+p.name+'（'+p.id+'）','Delete drawing: '+p.name+'（'+p.id+'）'));remove.title=uiText('删除'+p.name,'Delete '+p.name);remove.disabled=Boolean(deletePending);
+     remove.append(trashIcon());
      row.append(open,remove);list.append(row);
     });if(!pages.length)list.append(el('p','ddw-history-empty','无'));panel.append(list);syncChrome();return;
    }

@@ -48,11 +48,12 @@ body.offline-workspace .offline-main.center { position:relative; display:flex !i
 #drawingPanel.graph-editor-dialog { position:relative; inset:auto; display:flex; flex-direction:column; width:calc(100% - 48px); max-width:1280px; height:auto; max-height:none; padding:18px; border-radius:16px; overflow:hidden; }
 #drawingPanel > #offlineDrawingHost { flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain; }
 .question-toolbar { align-items:flex-start; }
-.offline-filters { display:flex; align-items:stretch; gap:8px; flex-wrap:wrap; min-width:0; max-width:100%; }
-.offline-filters select { flex:1 1 135px; min-width:135px; max-width:100%; }
-.offline-filters > :is(.offline-search,.dmate-search-wrap) { flex:1 1 200px; min-width:0; max-width:100%; }
+/* Shared control widths keep both libraries identical without letting headings
+   or the concept library's missing difficulty control stretch their fields. */
+.offline-filters { --offline-filter-select-width:153px; --offline-filter-search-width:218px; display:flex; align-items:stretch; gap:8px; flex:none; min-width:0; max-width:100%; }
+.offline-filters select { flex:0 0 var(--offline-filter-select-width); width:var(--offline-filter-select-width); min-width:0; max-width:100%; }
+.offline-filters > :is(.offline-search,.dmate-search-wrap) { flex:0 0 var(--offline-filter-search-width); width:var(--offline-filter-search-width); min-width:0; max-width:100%; }
 .offline-filters .dmate-search-wrap > .offline-search { width:100%; min-width:0; max-width:100%; }
-#conceptsPanel .offline-filters { flex:0 1 520px; }
 .question-layout,.concept-layout { display:grid; grid-template-columns:minmax(220px,280px) minmax(0,1fr); gap:20px; align-items:start; }
 .question-list,.concept-list { display:flex; flex-direction:column; gap:7px; max-height:calc(100dvh - 260px); overflow:auto; padding-right:3px; }
 .question-item,.concept-item { display:block; width:100%; min-height:58px; padding:11px 12px; border:1px solid transparent; border-radius:9px; background:transparent; color:var(--text-primary); text-align:left; cursor:pointer; }
@@ -176,11 +177,9 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
   .toolbar-muted { display:block; margin:4px 0 0; }
   .offline-toolbar .offline-primary { font-size:13px; }
   .question-toolbar { flex-direction:column; }
-  .offline-filters { width:100%; }
-  .offline-filters select { flex:1; min-width:0; }
-  #conceptsPanel .offline-filters { flex:1 1 100%; }
-  .offline-filters > .dmate-search-wrap { flex-basis:100%; width:100%; }
-  #conceptsPanel .offline-filters > .offline-search { flex-basis:100%; width:100%; }
+  .offline-filters { display:grid; width:100%; grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .offline-filters select,.offline-filters > :is(.offline-search,.dmate-search-wrap) { width:100%; }
+  .offline-filters > :is(.offline-search,.dmate-search-wrap) { grid-column:1 / -1; }
   .question-layout,.concept-layout { grid-template-columns:1fr; gap:14px; }
   .question-list,.concept-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); max-height:190px; }
   .question-detail,.concept-detail { min-height:280px; padding:16px; }

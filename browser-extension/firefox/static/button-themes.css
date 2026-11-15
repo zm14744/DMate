@@ -650,3 +650,23 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         outline-offset:2px!important;
     }
 }
+
+/* PDF export is a quiet toolbar action. */
+@layer dmate-button-themes {
+    body[data-appearance-theme] #wrongBookModal #wrongPdfBtn {
+        --dm-control-bg:transparent;
+        --dm-control-border:transparent;
+        border:0!important;
+        background:transparent!important;
+        background-image:none!important;
+        box-shadow:none!important;
+        color:var(--dm-icon-rest,var(--text-secondary))!important;
+        -webkit-text-fill-color:currentColor!important;
+        filter:none!important;
+        transition:var(--dm-control-transition);
+    }
+    body[data-appearance-theme] #wrongBookModal #wrongPdfBtn:not(:disabled):not([aria-disabled="true"]):is(:hover,:focus-visible,:active) {
+        background:var(--dm-nav-hover,var(--dm-selected-hover))!important;
+        color:var(--dm-icon-emphasis,var(--text-primary))!important;
+    }
+}
