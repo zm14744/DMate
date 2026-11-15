@@ -1,24 +1,12 @@
 /* Scrollbar gutters stay in place; only their paint changes while scrolling. */
 @layer dmate-scrollbars {
-    @supports not selector(::-webkit-scrollbar) {
-        * {
-            scrollbar-color:transparent transparent !important;
-        }
-        [data-dmate-scroll-active] {
-            scrollbar-color:rgba(148,163,184,.42) transparent !important;
-        }
-    }
-
+    * { scrollbar-color:transparent transparent !important; }
     @supports selector(::-webkit-scrollbar) {
         :root {
             --dmate-scrollbar-width:auto;
             --dmate-scrollbar-color:auto;
         }
-        /* Non-auto standard colors select Chromium's native scrollbar path,
-           bypassing the custom thumb and the arrow-free WebKit controls. */
-        * {
-            scrollbar-color:auto !important;
-        }
+        * { scrollbar-color:auto !important; }
         *::-webkit-scrollbar-track,
         *::-webkit-scrollbar-corner,
         *::-webkit-scrollbar-thumb {
@@ -26,13 +14,13 @@
             background-image:none !important;
             box-shadow:none !important;
         }
-        *::-webkit-scrollbar-thumb {
-            border-color:transparent !important;
-        }
-        [data-dmate-scroll-active]::-webkit-scrollbar-thumb {
+        *::-webkit-scrollbar-thumb { border-color:transparent !important; }
+        [data-dmate-scroll-active="x"]::-webkit-scrollbar-thumb:horizontal,
+        [data-dmate-scroll-active="y"]::-webkit-scrollbar-thumb:vertical {
             background-color:rgba(148,163,184,.42) !important;
         }
-        [data-dmate-scroll-active]::-webkit-scrollbar-thumb:hover {
+        [data-dmate-scroll-active="x"]::-webkit-scrollbar-thumb:horizontal:hover,
+        [data-dmate-scroll-active="y"]::-webkit-scrollbar-thumb:vertical:hover {
             background-color:rgba(148,163,184,.58) !important;
         }
         *::-webkit-scrollbar-button {
@@ -40,5 +28,31 @@
             width:0 !important;
             height:0 !important;
         }
+    }
+    /* Gecko parses WebKit selectors without drawing their pseudo-elements.
+       Its native paint stays transparent; JS supplies one visual thumb. */
+    @supports (-moz-appearance:none) {
+        * { scrollbar-color:transparent transparent !important; }
+    }
+    :root[data-dmate-scroll-fallback],
+    :root[data-dmate-scroll-fallback] * {
+        scrollbar-color:transparent transparent !important;
+    }
+    [data-dmate-scroll-thumb] {
+        position:fixed !important;
+        z-index:2147483646 !important;
+        display:block !important;
+        min-width:0 !important;
+        min-height:0 !important;
+        margin:0 !important;
+        padding:0 !important;
+        border:0 !important;
+        border-radius:999px !important;
+        background-color:rgba(148,163,184,.42) !important;
+        background-image:none !important;
+        box-shadow:none !important;
+        pointer-events:none !important;
+        overflow:hidden !important;
+        contain:strict;
     }
 }
