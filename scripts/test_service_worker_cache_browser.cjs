@@ -61,12 +61,18 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     assert.equal(reference.status(), 200, 'The server must provide the shared stylesheet');
     const networkCSS = await reference.text();
     assert.ok(networkCSS.trim().length, 'The shared stylesheet must not be empty');
+    const scrollingAssets = await Promise.all(['/static/scrollbars.css?v=24', '/static/scrollbars.js?v=24']
+      .map(async path => {
+        const response = await context.request.get(new URL(path, baseURL).href);
+        assert.equal(response.status(), 200, 'The server must provide ' + path);
+        return { path, text: await response.text() };
+      }));
 
     // Simulate the pinned stylesheet left by the previous offline shell.
     await page.goto(new URL('/health', baseURL).href);
     await page.evaluate(async () => {
-      const cache = await caches.open('dmate-offline-shell-v22');
-      await cache.put('/static/button-themes.css?v=21', new Response('/* obsolete framed controls */'));
+      const cache = await caches.open('dmate-offline-shell-v23');
+      await cache.put('/static/button-themes.css?v=23', new Response('/* obsolete shell without idle scrollbar handling */'));
     });
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });
     await page.evaluate(async () => {
@@ -83,9 +89,16 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       if (canonical.length !== 1) throw new Error('Expected exactly one precached shared stylesheet');
       return { name: names[0], canonical: canonical[0].url };
     }, assetPath);
-    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 23, 'Updated offline controls require the refreshed cache');
+    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 24, 'Idle scrollbar handling requires the refreshed cache');
     assert.equal((await fetchAsset(page, current.canonical)).text, networkCSS,
-      'The refreshed shell loads current frameless controls instead of the v22 stylesheet');
+      'The refreshed shell loads current frameless controls instead of the obsolete stylesheet');
+    for (const asset of scrollingAssets) {
+      const cached = await page.evaluate(async ({ name, path }) => {
+        const response = await (await caches.open(name)).match(path);
+        return response ? response.text() : null;
+      }, { name: current.name, path: asset.path });
+      assert.equal(cached, asset.text, 'The refreshed shell precaches ' + asset.path);
+    }
     const token = Date.now().toString(36);
     const revision = assetPath + '?v=online-cache-regression-' + token;
     const unseen = assetPath + '?v=unseen-cache-regression-' + token;
@@ -124,6 +137,12 @@ async function disconnectWorkerNetwork(browser, workerURL) {
 
     await context.setOffline(true);
     workerProtocol = await disconnectWorkerNetwork(browser, new URL('/offline-service-worker.js', baseURL).href);
+    for (const asset of scrollingAssets) {
+      const offlineAsset = await fetchAsset(page, asset.path);
+      assert.equal(offlineAsset.status, 200);
+      assert.equal(offlineAsset.text, asset.text, 'Idle scrollbar handling remains available offline: ' + asset.path);
+    }
+    console.log('PASS the previous shell cache upgrades and scrolling resources remain available offline');
     const exactOffline = await fetchAsset(page, revision);
     assert.equal(exactOffline.status, 200);
     assert.equal(exactOffline.text, networkCSS, 'Offline lookup must prefer the requested exact revision');
