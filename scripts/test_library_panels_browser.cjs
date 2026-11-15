@@ -14,13 +14,17 @@ const difficulty = value => value === '基础' ? '简单' : ['进阶', '提高']
 const ranks = { '简单': 0, '中等': 1, '困难': 2 };
 const child = concepts.find(concept => concept.graph_node_id !== concept.id
   && nodes.some(node => node.id === concept.graph_node_id) && concept.related_questions?.length);
-const longConcept = concepts.slice().sort((a, b) => (b.related_questions?.length || 0) - (a.related_questions?.length || 0))[0];
+const longConcepts = concepts.filter(concept => concept.id !== concept.graph_node_id).sort((a, b) => {
+  const size = concept => JSON.stringify([concept.definition, concept.explanation, concept.notation,
+    concept.common_mistakes, concept.related_questions]).length;
+  return size(b) - size(a);
+});
 const longQuestion = questions.filter(question => question.source?.migrated_from?.kind !== 'concept_example').sort((a, b) => {
   const size = question => JSON.stringify([question.statement, question.options, question.answer_text,
     question.explanation, question.grading_criteria]).length;
   return size(b) - size(a);
 })[0];
-assert.ok(child && longConcept && longQuestion, 'Real packs provide representative concepts and exercises');
+assert.ok(child && longConcepts.length && longQuestion, 'Real packs provide representative concepts and exercises');
 
 async function settle(page) {
   await page.evaluate(async () => {
@@ -57,7 +61,7 @@ async function noOverflow(page, panel) {
 }
 
 async function openConcept(page, concept) {
-  await navigate(page, 'concepts');
+  if (!await page.locator('#conceptsPanel').isVisible()) await navigate(page, 'concepts');
   await page.locator('#conceptSearch').fill(concept.title);
   const entry = page.locator('#conceptList .concept-item[data-concept-id="' + concept.id + '"]');
   await entry.click();
@@ -65,6 +69,14 @@ async function openConcept(page, concept) {
   await page.locator('#conceptSearch').fill('');
   await page.waitForFunction(() => !document.querySelector('#conceptDetail [data-dmate-render-state="pending"]'));
   await settle(page);
+}
+
+async function openScrollableConcept(page) {
+  for (const concept of longConcepts.slice(0, 20)) {
+    await openConcept(page, concept);
+    if (await page.locator('#conceptDetail').evaluate(element => element.scrollHeight > element.clientHeight + 5)) return concept;
+  }
+  assert.fail('A real child concept should overflow the independent detail pane at this viewport');
 }
 
 async function frameState(page, panel) {
@@ -130,6 +142,10 @@ async function checkConceptSections(page, concept, language = 'zh-CN') {
   assert.ok(!headings.some(heading => heading === '典型例题' || /typical examples?/i.test(heading)), 'Removed examples section stays absent');
   assert.ok(!headings.includes('所属图谱知识点') && !headings.includes('关联知识点'), 'Old headings are gone');
   const exercises = page.locator('#conceptDetail .concept-related-exercises');
+  if (concept.id === concept.graph_node_id) {
+    assert.equal(await exercises.count(), 0, 'Overview concepts keep their data links without showing a practice section');
+    return [];
+  }
   assert.equal((await exercises.locator('h3').innerText()).trim(), language === 'en' ? 'Related exercises' : '关联练习');
   assert.equal(await exercises.locator('[data-concept-id]').count(), 0, 'Exercise links do not include prerequisite concepts');
   const actual = await exercises.locator('[data-question-id]').evaluateAll(links => links.map(link => ({
@@ -175,7 +191,7 @@ async function graphRoundTrip(page, concept, language = 'zh-CN') {
     await page.locator('.kg-mobile-expand').click();
     await settle(page);
   }
-  await page.locator('.offline-graph-concept-button').click();
+  await page.locator('.graph-parent-concept [data-concept-id="' + node.id + '"]').click();
   await page.locator('#conceptsPanel').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#conceptList .concept-item.active').getAttribute('data-concept-id'), node.id,
     'Graph details can return to the associated concept');
@@ -208,14 +224,14 @@ async function openRelatedExercise(page, concept, language = 'zh-CN') {
 
 async function libraryFeatures(page) {
   await openConcept(page, child);
-  assert.equal((await page.locator('#conceptDetail .concept-topic-links h3').innerText()).trim(), '所属知识点');
+  assert.equal((await page.locator('#conceptDetail .concept-topic-links h3').innerText()).trim(), '所属总概念');
   await checkConceptSections(page, child);
   await graphRoundTrip(page, child);
   await openConcept(page, child);
   await page.evaluate(() => window.DMateI18n.setLanguage('en', false));
   await page.waitForFunction(() => document.documentElement.dataset.uiLanguage === 'en');
   assert.equal((await page.locator('#conceptDetail .detail-title').innerText()).trim(), translations.concepts[child.id].title);
-  assert.equal((await page.locator('#conceptDetail .concept-topic-links h3').innerText()).trim(), 'Parent knowledge point');
+  assert.equal((await page.locator('#conceptDetail .concept-topic-links h3').innerText()).trim(), 'Parent concept');
   await checkConceptSections(page, child, 'en');
   await graphRoundTrip(page, child, 'en');
   await page.evaluate(() => window.DMateI18n.setLanguage('zh-CN', false));
@@ -231,7 +247,7 @@ async function runCase(browser, width, height) {
   try {
     await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
-    await openConcept(page, longConcept);
+    const longConcept = await openScrollableConcept(page);
     await checkConceptSections(page, longConcept);
     await independentScroll(page, 'concepts', 'detail');
     await independentScroll(page, 'concepts', 'list');

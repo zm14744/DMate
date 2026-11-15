@@ -507,6 +507,8 @@ async function curriculum(page) {
     await navigate(page, 'concepts');
     await page.locator('#conceptList [data-concept-id="' + topic.id + '"]').click();
     const overview = concepts.find(item => item.id === topic.id);
+    assert.equal(await page.locator('#conceptDetail .concept-related-exercises').count(), 0,
+      'Broad overview concepts keep their detailed concepts without duplicating graph exercise links');
     assert.equal(await page.locator('#conceptDetail .concept-topic-links [data-concept-id]').count(),
       overview.related_concepts.length);
     const child = concepts.find(item => item.id === overview.related_concepts[0]);
@@ -537,7 +539,7 @@ async function curriculum(page) {
     await page.locator('#questionDetail .question-concept-links [data-concept-id="' + child.id + '"]').click();
     await page.locator('#conceptsPanel').waitFor({ state: 'visible' });
     await studyOutput(page.locator('#conceptDetail .detail-title'), child.title);
-    assert.equal(await page.locator('#conceptDetail .concept-topic-links').getByRole('heading', {name:'所属知识点', exact:true}).count(), 1);
+    assert.equal(await page.locator('#conceptDetail .concept-topic-links').getByRole('heading', {name:'所属总概念', exact:true}).count(), 1);
     await page.locator('#conceptDetail .concept-topic-links [data-concept-id="' + topic.id + '"]').click();
     await studyOutput(page.locator('#conceptDetail .detail-title'), topic.name);
     const module = page.locator('#conceptDetail .concept-graph-module');
@@ -593,7 +595,10 @@ async function graph(page) {
   const restored = await viewport.evaluate(node => Number(node.dataset.scale));
   assert.ok(Math.abs(restored - original) < .001, 'Fit restores graph scale');
   if (mobile) await host.locator('.kg-mobile-expand').click();
-  await host.locator('.offline-graph-concept-button').click();
+  const learning = host.locator('.offline-graph-learning-links');
+  assert.equal(await learning.locator('.graph-parent-concept').getByRole('heading', {name:'总概念', exact:true}).count(), 1);
+  assert.equal(await learning.getByRole('button', {name:'查看概念', exact:true}).count(), 0);
+  await learning.locator('.graph-parent-concept [data-concept-id="' + nodeId + '"]').click();
   await page.locator('#conceptsPanel').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#conceptList .concept-item.active').getAttribute('data-concept-id'), nodeId,
     'The graph opens the overview for its exact topic ID');

@@ -187,12 +187,17 @@ async function studyMetadata(page) {
   await navigate(page, 'concepts');
   await page.locator('#conceptSearch').fill('命题与真值');
   await page.locator('#conceptList .concept-item[data-concept-id="logic_truth"]').click();
-  const related = page.locator('#conceptDetail .concept-related-exercises [data-question-id="q01"]');
-  await page.waitForFunction(() => !document.querySelector('#conceptDetail [data-dmate-render-state="pending"]'));
+  assert.equal(await page.locator('#conceptDetail .concept-related-exercises').count(), 0,
+    'The broad overview keeps exercise links on its graph topic');
+  await page.locator('#conceptDetail .concept-graph-module [data-graph-node-id="logic_truth"]').click();
+  await page.locator('#graphPanel').waitFor({state:'visible'});
+  await page.waitForFunction(() => document.querySelector('#knowledgeGraphCanvas .selected[data-node-id]')?.dataset.nodeId === 'logic_truth');
+  const related = page.locator('#knowledgeGraphDetail .graph-related-exercises [data-question-id="q01"]');
+  await page.waitForFunction(() => !document.querySelector('#knowledgeGraphDetail [data-dmate-render-state="pending"]'));
   assert.equal(normalize(await related.textContent()), difficulty(question.difficulty) + ' ' + question.title,
-    'Related exercise difficulty and title are separated by a plain space');
+    'Graph-related exercise difficulty and title are separated by a plain space');
   await page.evaluate(() => window.DMateI18n.setLanguage('en', false));
-  await page.waitForFunction(() => !document.querySelector('#conceptDetail [data-dmate-render-state="pending"]'));
+  await page.waitForFunction(() => !document.querySelector('#knowledgeGraphDetail [data-dmate-render-state="pending"]'));
   assert.equal(normalize(await related.textContent()), 'Easy ' + translations.questions[question.id].title);
 }
 

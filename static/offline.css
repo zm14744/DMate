@@ -127,6 +127,17 @@ html[data-ui-language="en"] .question-option{line-height:var(--dmate-reading-lin
 .concept-detail .detail-section { padding-top:14px; border-top:1px solid var(--surface-3); }
 .prereq-list { display:flex; gap:7px; flex-wrap:wrap; }
 .prereq-list button { min-height:34px; padding:7px 10px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface-2); color:var(--text-primary); font:inherit; font-size:13px; }
+/* New library relations use the concept detail's section separators. Long
+   exercise titles wrap inside a narrow graph sidebar without shrinking rows. */
+body.offline-workspace :is(.question-parent-concepts,.question-graph-modules,.offline-graph-learning-links > .detail-section) { min-width:0; margin-top:18px; padding-top:14px; border-top:1px solid var(--surface-3); }
+body.offline-workspace .offline-graph-learning-links { flex:0 0 auto; min-width:0; }
+body.offline-workspace :is(.question-parent-concepts,.question-graph-modules,.offline-graph-learning-links) .prereq-list button { box-sizing:border-box; flex:none; min-width:0; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+/* Tablet-width landscape keeps the two graph columns inside the short page.
+   Their original minimum heights otherwise clip the detail's scrollport. */
+@media(min-width:761px) and (max-width:1100px) and (max-height:550px) {
+  body.offline-workspace #knowledgeGraphModal.offline-graph-inline:not(.graph-fullscreen-view) .knowledge-graph-layout { grid-template-rows:minmax(0,1fr); }
+  body.offline-workspace #knowledgeGraphModal.offline-graph-inline:not(.graph-fullscreen-view) :is(.knowledge-graph-main,.knowledge-graph-side) { min-height:0!important; }
+}
 .offline-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:260px; padding:36px 16px; color:var(--text-muted); text-align:center; }
 .offline-empty h2 { margin:0 0 8px; color:var(--text-primary); font-size:15px; font-weight:500; }
 .offline-empty p { margin:0; max-width:380px; color:var(--text-muted); font-size:13px; line-height:1.7; }

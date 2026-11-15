@@ -63,9 +63,9 @@ async function visual(page, size) {
   await page.mouse.move(0, 0);
   return frame(page).locator('.graph-modal-card').evaluate(async (card, size) => {
     const original = card.getAttribute('style');
-    // The offline-only concept-library link adds content below the common
-    // fields. Exclude its space for comparison, then restore the real control.
-    const concept = card.querySelector('.offline-graph-concept-button');
+    // Offline learning links add content below the common graph fields.
+    // Exclude their space for comparison, then restore the actual controls.
+    const concept = card.querySelector('.offline-graph-learning-links');
     const conceptParent = concept?.parentElement, conceptNext = concept?.nextSibling;
     concept?.remove();
     if (size) {

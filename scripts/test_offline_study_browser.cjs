@@ -186,13 +186,13 @@ async function packs(page) {
     }
     window.studyPacks = { concepts: concepts.concepts, questions: questions.questions, en };
     const math = value => DMateMathMarkdown.protectMathForMarkdown(DMateMathMarkdown.prepareStudyText(value)).mathSegments.length;
-    const concept = examples.find(row => math(row.example) && math(en.concepts[row.id].example)
+    const concept = examples.find(row => row.id === row.graph_node_id && math(row.example) && math(en.concepts[row.id].example)
       && ['summary', 'definition', 'explanation', 'notation'].some(field => math(row[field]) && math(en.concepts[row.id][field])));
     const choice = questions.questions.find(row => row.options?.length && row.options.some(option => math(option.text)));
     const proof = questions.questions.find(row => row.type === '证明' && math(row.explanation) && math(en.questions[row.id].explanation));
     require(concept && choice && proof, 'Actual packs must provide mathematical concept, options, and proof examples');
     const example = migrated.find(row => row.source.migrated_from.concept_id === concept.id);
-    return { concept: { id: concept.id, query: en.concepts[concept.id].title }, example: {id:example.id, conceptId:concept.id},
+    return { concept: { id: concept.id, graphNodeId: concept.graph_node_id, query: en.concepts[concept.id].title }, example: {id:example.id, conceptId:concept.id},
       counts: {concepts:concepts.concepts.length, questions:questions.questions.length, examples:migrated.length},
       questions: [choice, proof].map(row => ({ id: row.id, category: row.category,
         difficulty: row.difficulty === '基础' ? '简单' : ['进阶', '提高'].includes(row.difficulty) ? '困难' : row.difficulty })) };
@@ -349,9 +349,23 @@ async function run(browser, width) {
       }
       if (language === 'zh-CN') checkedChineseProbe = true;
     }
-    // Follow the migrated association instead of dropping coverage of the
-    // former concept example: its complete CN/EN source must still be typeset.
-    await page.locator('#conceptDetail .concept-related-exercises [data-question-id="' + data.example.id + '"]').click();
+    // Broad overviews keep their concept hierarchy; their practice links now
+    // live on the corresponding graph topic. Follow that real navigation while
+    // retaining the original migrated example's full CN/EN source and math.
+    assert.equal(await page.locator('#conceptDetail .concept-related-exercises').count(), 0,
+      'An overview has no duplicated related-exercise section');
+    await page.locator('#conceptDetail .concept-graph-module [data-graph-node-id="' + data.concept.graphNodeId + '"]').click();
+    await page.locator('#graphPanel').waitFor({state:'visible'});
+    await page.waitForFunction(id => document.querySelector('#knowledgeGraphCanvas .selected[data-node-id]')?.dataset.nodeId === id,
+      data.concept.graphNodeId);
+    if (await page.locator('#knowledgeGraphModal').evaluate(node => node.classList.contains('graph-fullscreen-view'))) {
+      await page.locator('#knowledgeGraphModal .kg-mobile-expand').click();
+      await settle(page);
+    }
+    const learning = page.locator('#knowledgeGraphDetail .offline-graph-learning-links');
+    assert.equal(await learning.locator('.graph-parent-concept [data-concept-id="' + data.concept.id + '"]').count(), 1,
+      'The graph footer links back to the exact overview whose example was migrated');
+    await learning.locator('.graph-related-exercises [data-question-id="' + data.example.id + '"]').click();
     await page.locator('#questionsPanel').waitFor({state:'visible'});
     assert.equal(await page.locator('#questionList .question-item.active').getAttribute('data-question-id'), data.example.id);
     await page.locator('#questionDetail .question-actions button').click();

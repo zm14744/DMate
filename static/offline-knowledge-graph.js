@@ -229,9 +229,17 @@ function mount(host,options={}) {
   field('前置知识',node.prerequisites.filter(n=>names.has(n)),'当前图中暂无前置');
   field('后续知识',visibleNodes.filter(n=>n.prerequisites.includes(node.name)).map(n=>n.name),'当前图中暂无后续');
   if(node.note)field('说明',[node.note],'');
-  if(typeof options.onSelect==='function'){
-   const entry=document.createElement('button');entry.type='button';entry.className='graph-side-copy offline-graph-concept-button';entry.textContent=dmateUiText('查看概念','View concept');
-   entry.addEventListener('click',()=>{host.classList.remove('graph-fullscreen-view');options.onSelect(node);},{signal});detail.append(entry);
+  if(typeof options.renderLearningLinks==='function'){
+   // The offline study workspace owns concept/exercise matching and routing.
+   // Rebuild these links with each node/language change alongside its details.
+   const links=options.renderLearningLinks(node);if(links)detail.append(links);
+  }else if(typeof options.onSelect==='function'){
+   const links=document.createElement('div');links.className='offline-graph-learning-links';
+   const parent=document.createElement('section');parent.className='graph-parent-concept';
+   const heading=document.createElement('h3');heading.textContent=dmateUiText('总概念','Overview concept');
+   const entry=document.createElement('button');entry.type='button';entry.className='graph-side-copy offline-graph-concept-button';entry.textContent=dmateKnowledgeLabel(node.name);
+   entry.addEventListener('click',()=>{restoreInline();options.onSelect(node);},{signal});
+   parent.append(heading,entry);links.append(parent);detail.append(links);
   }
   root.DMateI18n?.translate(detail);
  }

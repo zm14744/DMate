@@ -249,6 +249,7 @@
     state.conceptQuery = "";
     $("conceptSearch").value = "";
     switchPanel("concepts");
+    $("conceptDetail").scrollTop = 0;
   }
 
   function openGraphModule(node) {
@@ -262,6 +263,83 @@
     if (value === "基础") return "简单";
     if (value === "进阶" || value === "提高") return "困难";
     return value;
+  }
+
+  function openQuestion(question) {
+    state.questionCategory = ""; state.questionDifficulty = "";
+    $("questionCategory").value = ""; $("questionDifficulty").value = "";
+    if (!questionMatchesSearch(question, normalizedSearch($("questionSearch").value))) $("questionSearch").value = "";
+    state.selectedQuestion = question;
+    state.revealed = false;
+    switchPanel("questions");
+    $("questionDetail").scrollTop = 0;
+  }
+
+  function questionGraphNodes(question) {
+    const ids = new Set();
+    for (const id of question.knowledge_points || []) {
+      const concept = state.concepts.find(item => item.id === id);
+      if (concept?.graph_node_id) ids.add(concept.graph_node_id);
+    }
+    for (const id of question.graph_node_ids || []) ids.add(id);
+    return [...ids].map(id => (state.graph?.nodes || []).find(node => node.id === id)).filter(Boolean);
+  }
+
+  function graphModuleSection(nodes, className, linkClassName) {
+    if (!nodes.length) return null;
+    const section = el("section", "detail-section " + className);
+    section.append(el("h3", "", tr("所属图谱模块", "Knowledge-map module")));
+    const links = el("div", "prereq-list");
+    for (const node of nodes) {
+      const label = window.DMateKnowledgeLanguage?.label?.(node.name) ?? tr(node.name);
+      const link = studyButton(label, linkClassName, () => openGraphModule(node));
+      link.dataset.graphNodeId = node.id;
+      link.dataset.graphCategory = node.category;
+      links.append(link);
+    }
+    section.append(links);
+    return section;
+  }
+
+  function relatedExercisesSection(questionIds, className) {
+    const section = el("section", "detail-section " + className);
+    section.append(el("h3", "", tr("关联练习", "Related exercises")));
+    const links = el("div", "prereq-list");
+    const seen = new Set(), ranks = {"简单":0, "中等":1, "困难":2};
+    const exercises = (questionIds || []).map((id, index) => ({question:state.questions.find(q => q.id === id), index}))
+      .filter(({question}) => {
+        if (!question || seen.has(question.id)) return false;
+        seen.add(question.id); return true;
+      })
+      .sort((left, right) => (ranks[difficultyName(left.question.difficulty)] ?? 3) - (ranks[difficultyName(right.question.difficulty)] ?? 3)
+        || left.index - right.index);
+    for (const {question} of exercises) {
+      const level = difficultyName(question.difficulty);
+      const link = studyButton([tr(level), localized(question, "questions").title].filter(Boolean).join(" "), "", () => openQuestion(question));
+      link.dataset.questionId = question.id;
+      link.dataset.difficulty = level;
+      links.append(link);
+    }
+    if (!links.children.length) links.append(el("span", "", tr("暂无关联练习", "No related exercises yet")));
+    section.append(links);
+    return section;
+  }
+
+  function renderGraphLearningLinks(node) {
+    const wrapper = el("div", "offline-graph-learning-links");
+    const concept = state.concepts.find(item => item.id === node.id);
+    if (concept) {
+      const section = el("section", "detail-section graph-parent-concept");
+      section.append(el("h3", "", tr("总概念", "Overview concept")));
+      const links = el("div", "prereq-list");
+      const link = studyButton(localized(concept, "concepts").title, "", () => openConcept(concept));
+      link.dataset.conceptId = concept.id;
+      links.append(link); section.append(links); wrapper.append(section);
+    }
+    const questionIds = concept?.related_questions
+      || state.questions.filter(question => (question.graph_node_ids || []).includes(node.id)).map(question => question.id);
+    wrapper.append(relatedExercisesSection(questionIds, "graph-related-exercises"));
+    return wrapper;
   }
 
   function searchText(value) {
@@ -334,17 +412,19 @@
     detail.replaceChildren();
     detail.append(el("div", "detail-kicker", [tr(question.category), tr(difficultyName(question.difficulty)), tr(question.type)].filter(Boolean).join(" ")));
     detail.append(studyLabel("h2", "detail-title", display.title));
-    const concepts = el("div", "prereq-list question-concept-links");
-    for (const id of question.knowledge_points || []) {
+    const concepts = el("section", "detail-section question-concept-links question-parent-concepts");
+    concepts.append(el("h3", "", tr("所属概念", "Related concepts")));
+    const conceptLinks = el("div", "prereq-list");
+    for (const id of new Set(question.knowledge_points || [])) {
       const concept = state.concepts.find(item => item.id === id);
       if (concept) {
-        const link = studyButton(tr("知识点：", "Knowledge point: ") + localized(concept, "concepts").title, "", () => {
-          openConcept(concept);
-        });
-        link.dataset.conceptId = id; concepts.append(link);
+        const link = studyButton(localized(concept, "concepts").title, "", () => openConcept(concept));
+        link.dataset.conceptId = id; conceptLinks.append(link);
       }
     }
-    if (concepts.children.length) detail.append(concepts);
+    if (conceptLinks.children.length) { concepts.append(conceptLinks); detail.append(concepts); }
+    const graphModules = graphModuleSection(questionGraphNodes(question), "question-graph-module question-graph-modules", "question-graph-module-link");
+    if (graphModules) detail.append(graphModules);
     const statement = el("div", "detail-section wrong-question-section");
     statement.append(el("h3", "", tr("题目", "Question")));
     statement.append(rich("wrong-question", display.statement));
@@ -397,7 +477,7 @@
     const children = (concept.related_concepts || []).map(id => state.concepts.find(item => item.id === id)).filter(Boolean);
     if (children.length || (topic && topic.id !== concept.id)) {
       const section = el("section", "detail-section concept-topic-links");
-      section.append(el("h3", "", children.length ? tr("细分概念", "Detailed concepts") : tr("所属知识点", "Parent knowledge point")));
+      section.append(el("h3", "", children.length ? tr("细分概念", "Detailed concepts") : tr("所属总概念", "Parent concept")));
       const links = el("div", "prereq-list");
       for (const item of children.length ? children : [topic]) {
         const link = studyButton(localized(item, "concepts").title, "", () => openConcept(item));
@@ -408,14 +488,7 @@
     }
     const graphNode = (state.graph?.nodes || []).find(node => node.id === (concept.graph_node_id || concept.id));
     if (graphNode) {
-      const module = el("section", "detail-section concept-graph-module");
-      module.append(el("h3", "", tr("所属图谱模块", "Knowledge-map module")));
-      const links = el("div", "prereq-list");
-      const label = window.DMateKnowledgeLanguage?.label?.(graphNode.name) ?? tr(graphNode.name);
-      const link = studyButton(label, "concept-graph-module-link", () => openGraphModule(graphNode));
-      link.dataset.graphNodeId = graphNode.id;
-      link.dataset.graphCategory = graphNode.category;
-      links.append(link); module.append(links); detail.append(module);
+      detail.append(graphModuleSection([graphNode], "concept-graph-module", "concept-graph-module-link"));
     }
     document.querySelectorAll(".concept-item").forEach(item => {
       const selected = item.dataset.conceptId === concept.id;
@@ -433,33 +506,9 @@
     section("理解与说明", display.explanation);
     section("数学符号", display.notation || []);
     section("常见错误", display.common_mistakes || []);
-    const related = el("section", "detail-section concept-related-exercises");
-    related.append(el("h3", "", tr("关联练习", "Related exercises")));
-    const prereqs = el("div", "prereq-list");
-    const seen = new Set(), ranks = {"简单":0, "中等":1, "困难":2};
-    const exercises = (concept.related_questions || []).map((id, index) => ({question:state.questions.find(q => q.id === id), index}))
-      .filter(({question}) => {
-        if (!question || seen.has(question.id)) return false;
-        seen.add(question.id); return true;
-      })
-      .sort((left, right) => (ranks[difficultyName(left.question.difficulty)] ?? 3) - (ranks[difficultyName(right.question.difficulty)] ?? 3)
-        || left.index - right.index);
-    for (const {question:q} of exercises) {
-        const level = difficultyName(q.difficulty);
-        const link = studyButton([tr(level), localized(q, "questions").title].filter(Boolean).join(" "), "", () => {
-          state.questionCategory = ""; state.questionDifficulty = "";
-          $("questionCategory").value = ""; $("questionDifficulty").value = "";
-          if (!questionMatchesSearch(q, normalizedSearch($("questionSearch").value))) $("questionSearch").value = "";
-          state.selectedQuestion = q;
-          state.revealed = false;
-          switchPanel("questions");
-        });
-        link.dataset.questionId = q.id;
-        link.dataset.difficulty = level;
-        prereqs.append(link);
+    if (concept.id !== concept.graph_node_id) {
+      detail.append(relatedExercisesSection(concept.related_questions, "concept-related-exercises"));
     }
-    if (!prereqs.children.length) prereqs.append(el("span", "", tr("暂无关联练习", "No related exercises yet")));
-    related.append(prereqs); detail.append(related);
   }
 
   function renderConcepts() {
@@ -505,6 +554,7 @@
       onCategoryChange(category) { state.graphCategory = category === "全部" ? "" : category; },
       onSelectionChange(node) { if (node) state.graphSelectedNodeId = node.id; },
       onStatus: toast,
+      renderLearningLinks: renderGraphLearningLinks,
       onSelect(node) {
       const concept = state.concepts.find(c => c.id === node.id || c.title === node.name);
       if (concept) {
@@ -566,7 +616,8 @@
     window.DMateI18n?.register?.({
       "基本定义":"Definition", "理解与说明":"Explanation", "典型例题":"Worked example", "常见错误":"Common mistakes",
       "评分要点":"Marking criteria", "细分概念":"Detailed concepts", "所属图谱知识点":"Knowledge-map topic",
-      "所属知识点":"Parent knowledge point", "所属图谱模块":"Knowledge-map module", "关联练习":"Related exercises", "暂无关联练习":"No related exercises yet",
+      "所属知识点":"Parent knowledge point", "所属概念":"Related concepts", "所属总概念":"Parent concept", "总概念":"Overview concept",
+      "所属图谱模块":"Knowledge-map module", "关联练习":"Related exercises", "暂无关联练习":"No related exercises yet",
       "概念列表":"Concept list", "练习列表":"Exercise list", "概念详情":"Concept details", "练习详情":"Exercise details",
       "关联知识点":"Related knowledge", "暂无已关联条目":"No linked entries yet", "数学符号":"Mathematical notation",
       ...questionTypeLabels, "简单":"Easy", "中等":"Medium", "困难":"Hard",

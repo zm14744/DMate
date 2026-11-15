@@ -39,6 +39,7 @@ on:
       - 'scripts/test_library_panels_browser.cjs'
       - 'scripts/test_drawing_controls_browser.cjs'
       - 'scripts/test_module_filter_chrome_browser.cjs'
+      - 'scripts/test_learning_links_browser.cjs'
       - 'scripts/test_drawing_panels_browser.cjs'
       - 'scripts/test_overlay_zoom_browser.cjs'
       - 'scripts/test_math_diagram_browser.cjs'
@@ -81,6 +82,7 @@ on:
       - 'scripts/test_library_panels_browser.cjs'
       - 'scripts/test_drawing_controls_browser.cjs'
       - 'scripts/test_module_filter_chrome_browser.cjs'
+      - 'scripts/test_learning_links_browser.cjs'
       - 'scripts/test_drawing_panels_browser.cjs'
       - 'scripts/test_overlay_zoom_browser.cjs'
       - 'scripts/test_math_diagram_browser.cjs'
@@ -143,6 +145,7 @@ jobs:
           node --check scripts/test_library_panels_browser.cjs
           node --check scripts/test_drawing_controls_browser.cjs
           node --check scripts/test_module_filter_chrome_browser.cjs
+          node --check scripts/test_learning_links_browser.cjs
           node --check scripts/test_drawing_panels_browser.cjs
           node --check scripts/test_overlay_zoom_browser.cjs
           node --check scripts/test_math_diagram_browser.cjs
@@ -233,6 +236,7 @@ jobs:
           node scripts/test_library_panels_browser.cjs
           node scripts/test_drawing_controls_browser.cjs
           node scripts/test_module_filter_chrome_browser.cjs
+          node scripts/test_learning_links_browser.cjs
           node scripts/test_mobile_drawers_browser.cjs
           node scripts/test_knowledge_graph_browser.cjs
           node scripts/test_offline_graph_browser.cjs
