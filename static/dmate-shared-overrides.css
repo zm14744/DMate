@@ -572,7 +572,7 @@ html[data-ui-language="en"] .learning-review-section-title {
     html[data-ui-language="en"] .dcn-ai-result table { font-size: .9em; }
 }
 
-/* Center only the empty state; conversation details keep their usual alignment. */
+/* Empty-state fallback; panel styles also center populated conversation details. */
 .right #info.is-empty {
     text-align:center;
 }

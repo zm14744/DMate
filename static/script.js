@@ -20917,13 +20917,13 @@ function renderKnowledgeGraphDetail() {
     };
 
     addDetailField(
-        "图中前置知识",
+        "前置知识",
         visiblePrerequisites,
         "当前图中暂无前置"
     );
 
     addDetailField(
-        "图中直接后续",
+        "后续知识",
         nextNodes,
         "当前图中暂无后续"
     );
@@ -21275,7 +21275,7 @@ function openMobileShellDrawer(kind) {
 
 function paintMobileDrawerDragProgress(kind, progress) {
     const p = Math.max(0, Math.min(1, Number(progress) || 0));
-    const { left, right, backdrop, center } = getMobileDrawerGestureElements();
+    const { left, right, backdrop } = getMobileDrawerGestureElements();
 
     document.body.classList.add("mobile-drawer-dragging");
 
@@ -21289,12 +21289,6 @@ function paintMobileDrawerDragProgress(kind, progress) {
     if (backdrop instanceof HTMLElement) {
         backdrop.style.opacity = String(p);
         backdrop.style.pointerEvents = "none";
-    }
-
-    if (center instanceof HTMLElement) {
-        const direction = kind === "left" ? 1 : -1;
-        const offset = direction * p * 8;
-        center.style.transform = `translate3d(${offset}px,0,0)`;
     }
 }
 

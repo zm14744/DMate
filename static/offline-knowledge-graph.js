@@ -230,8 +230,8 @@ function mount(host,options={}) {
    if(values.length)for(const name of values){const term=document.createElement('span');term.className='graph-detail-term';term.textContent=dmateKnowledgeLabel(name);content.append(term);}else content.textContent=dmateUiText(empty);
    box.append(label,content);detail.append(box);
   };
-  field('图中前置知识',node.prerequisites.filter(n=>names.has(n)),'当前图中暂无前置');
-  field('图中直接后续',visibleNodes.filter(n=>n.prerequisites.includes(node.name)).map(n=>n.name),'当前图中暂无后续');
+  field('前置知识',node.prerequisites.filter(n=>names.has(n)),'当前图中暂无前置');
+  field('后续知识',visibleNodes.filter(n=>n.prerequisites.includes(node.name)).map(n=>n.name),'当前图中暂无后续');
   if(node.note)field('说明',[node.note],'');
   if(typeof options.onSelect==='function'){
    const entry=document.createElement('button');entry.type='button';entry.className='graph-side-copy offline-graph-concept-button';entry.textContent=dmateUiText('查看概念','View concept');

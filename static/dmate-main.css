@@ -5343,7 +5343,6 @@ body[data-appearance-theme="light"] .input input {
    - 不再依赖 Fennec/Android 系统返回键劫持
    ========================================================= */
 @media (max-width:1100px) {
-    .center,
     .left,
     .right,
     .mobile-shell-backdrop {
@@ -5352,8 +5351,6 @@ body[data-appearance-theme="light"] .input input {
     }
 
     .center {
-        will-change:transform;
-        transition:transform .28s cubic-bezier(.22,1,.36,1);
         touch-action:pan-y;
     }
 
@@ -5373,17 +5370,8 @@ body[data-appearance-theme="light"] .input input {
         -webkit-backdrop-filter:none !important;
     }
 
-    body.mobile-left-open .center {
-        transform:translate3d(8px,0,0);
-    }
-
-    body.mobile-tools-open .center {
-        transform:translate3d(-8px,0,0);
-    }
-
     body.mobile-drawer-dragging .left,
     body.mobile-drawer-dragging .right,
-    body.mobile-drawer-dragging .center,
     body.mobile-drawer-dragging .mobile-shell-backdrop {
         transition:none !important;
     }

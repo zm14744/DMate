@@ -56,7 +56,8 @@ async function checkTools(page, empty) {
     const panel = document.querySelector('#learningToolsPanel .learning-panel'), panelBox = panel.getBoundingClientRect();
     const lines = [...info.querySelectorAll('.conversation-info-line')].map(line => {
       const lineRange = document.createRange(); lineRange.selectNodeContents(line);
-      return lineRange.getBoundingClientRect().left;
+      const bounds = lineRange.getBoundingClientRect();
+      return bounds.left + bounds.width / 2;
     });
     return { text: info.textContent.trim(), center: box.x + box.width / 2, textCenter: text.x + text.width / 2,
       centerY: box.y + box.height / 2, textCenterY: text.y + text.height / 2,
@@ -79,8 +80,88 @@ async function checkTools(page, empty) {
     near(state.textCenterY, state.centerY, 'Empty conversation information is vertically centered', 3);
   } else {
     assert.ok(state.lines.length >= 2, 'New conversation produces real information lines');
-    for (const left of state.lines) near(left, state.contentLeft, 'Nonempty conversation information remains left aligned');
+    for (const center of state.lines) near(center, state.center, 'Conversation information lines are centered');
   }
+}
+
+async function checkStationaryBackground(page) {
+  await page.evaluate(() => {
+    getCurrent().messages.push({role:'ai',text:'背景聊天文字和位置保持不变。\n\n'.repeat(60)});
+    renderChat();
+  });
+  const settle = () => page.evaluate(async () => {
+    await Promise.all(document.getAnimations().filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity)
+      .map(animation => animation.finished.catch(() => {})));
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+  const snapshot = () => page.evaluate(() => {
+    const result = {};
+    for (const selector of ['.center','.center > .input-wrap','.msg.ai .msg-content','#appearanceBackgroundLayer','.appearance-mask-layer']) {
+      const node = document.querySelector(selector), rect = node.getBoundingClientRect(), css = getComputedStyle(node);
+      result[selector] = { x:rect.x,y:rect.y,width:rect.width,height:rect.height,backgroundPosition:css.backgroundPosition };
+    }
+    result.scrollTop = document.getElementById('chat').scrollTop;
+    return result;
+  });
+  const unchanged = async (before, label) => {
+    const after = await snapshot();
+    near(after.scrollTop, before.scrollTop, label + ': chat scroll is preserved', .5);
+    for (const selector of Object.keys(before).filter(key => key !== 'scrollTop')) {
+      for (const key of ['x','y','width','height']) near(after[selector][key], before[selector][key], label + '/' + selector + '/' + key, .5);
+      assert.equal(after[selector].backgroundPosition, before[selector].backgroundPosition, label + ': wallpaper position is preserved');
+    }
+  };
+  await settle();
+  for (const wallpaper of [false,true]) {
+    if (wallpaper) await page.evaluate(async () => {
+      const canvas = document.createElement('canvas');canvas.width=canvas.height=16;
+      const ctx=canvas.getContext('2d');ctx.fillStyle='#587483';ctx.fillRect(0,0,16,16);
+      setAppearanceBackgroundVisual(await new Promise(resolve => canvas.toBlob(resolve)));
+    });
+    await page.locator('#chat').evaluate(chat => {chat.scrollTop=(chat.scrollHeight-chat.clientHeight)/3;});
+    await settle();
+    const before = await snapshot();
+    for (const kind of ['left','tools']) {
+      await openDrawer(page,kind);
+      await settle();
+      await unchanged(before,kind + '/open/' + wallpaper);
+      await closeDrawer(page,kind);
+      await settle();
+      await unchanged(before,kind + '/close/' + wallpaper);
+      let previousLeft;
+      for (const progress of [.25,.75]) {
+        const left = await page.evaluate(({kind,progress}) => {
+          paintMobileDrawerDragProgress(kind,progress);
+          return document.querySelector(kind === 'left' ? '.left' : '.right').getBoundingClientRect().left;
+        },{kind,progress});
+        await unchanged(before,kind + '/drag/' + progress);
+        if (previousLeft !== undefined) assert.ok(Math.abs(left-previousLeft)>20, 'The drawer itself still follows the gesture');
+        previousLeft=left;
+      }
+      await page.evaluate(kind => settleMobileDrawerGesture(kind,false),kind);
+      await settle();
+      await unchanged(before,kind + '/cancel/' + wallpaper);
+    }
+  }
+}
+
+async function checkDesktopInfo(browser,theme) {
+  const page=await browser.newPage({viewport:{width:1440,height:900}});
+  try {
+    await page.goto(baseURL,{waitUntil:'networkidle'});
+    await page.evaluate(theme => {appearanceSettings.mode=theme;applyAppearanceSettings({save:false});newChat();},theme);
+    await page.locator('#desktopToolsBtn').click();
+    const lines=await page.locator('#info').evaluate(info => {
+      const box=info.getBoundingClientRect();
+      return [...info.querySelectorAll('.conversation-info-line')].map(line=>{
+        const range=document.createRange();range.selectNodeContents(line);const text=range.getBoundingClientRect();
+        return {textCenter:text.left+text.width/2,center:box.left+box.width/2};
+      });
+    });
+    assert.ok(lines.length>=2,'Desktop conversation information is populated');
+    for(const line of lines)near(line.textCenter,line.center,'Desktop information is centered');
+    console.log('PASS desktop/'+theme+': centered conversation information');
+  } finally {await page.close();}
 }
 
 async function runCase(browser, width, theme) {
@@ -90,8 +171,8 @@ async function runCase(browser, width, theme) {
   try {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
     await page.evaluate(value => {
-      document.documentElement.dataset.appearanceTheme = value;
-      document.body.dataset.appearanceTheme = value;
+      appearanceSettings.mode = value;
+      applyAppearanceSettings({save:false});
     }, theme);
     await page.waitForFunction(() => document.getElementById('info').textContent.trim() === '无');
     await openDrawer(page, 'tools');
@@ -124,8 +205,9 @@ async function runCase(browser, width, theme) {
       await page.screenshot({ path: process.env.MOBILE_DRAWER_SCREENSHOT_DIR + '/' + width + '-' + theme + '-left.png' });
     }
     await closeDrawer(page, 'left');
+    await checkStationaryBackground(page);
     assert.deepEqual(errors, [], 'No drawer script errors');
-    console.log('PASS ' + width + '/' + theme + ': close rows, centered empty info/new chat, section headings and conversation creation');
+    console.log('PASS ' + width + '/' + theme + ': centered info, drawer controls and stationary transcript/wallpaper through opening and dragging');
   } catch (error) {
     if (process.env.MOBILE_DRAWER_SCREENSHOT_DIR) {
       await page.screenshot({ path: process.env.MOBILE_DRAWER_SCREENSHOT_DIR + '/FAILED-' + width + '-' + theme + '.png' }).catch(() => {});
@@ -139,5 +221,6 @@ async function runCase(browser, width, theme) {
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
     for (const width of [390, 620, 820]) for (const theme of ['light', 'dark', 'navy']) await runCase(browser, width, theme);
+    for (const theme of ['light','dark','navy']) await checkDesktopInfo(browser,theme);
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
