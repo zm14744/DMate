@@ -751,3 +751,26 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         color:var(--dm-icon-emphasis,var(--text-primary))!important;
     }
 }
+
+/* Appearance actions use filled surfaces without an outlined edge. */
+@layer dmate-button-themes {
+    body[data-appearance-theme] #appearanceModal :is(#appearanceBackgroundRemove,#appearanceReset) {
+        --dm-control-bg:var(--dm-selected-bg);
+        --dm-control-hover-bg:var(--dm-selected-hover);
+        --dm-control-text:var(--text-primary);
+    }
+    body[data-appearance-theme] #appearanceModal :is(
+        #appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone
+    ) {
+        border:0!important;
+        background:var(--dm-control-bg)!important;
+        background-image:none!important;
+        color:var(--dm-control-text)!important;
+        box-shadow:none!important;
+    }
+    body[data-appearance-theme] #appearanceModal :is(
+        #appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone
+    ):not(:disabled):is(:hover,:focus-visible,:active) {
+        background:var(--dm-control-hover-bg)!important;
+    }
+}

@@ -15,6 +15,12 @@ const gallery = { version: 2, activeId: 'page-A', pages: names.map((name, index)
     edges: [{ id: 'e1', from: 'v1', to: 'v2', direction: 'forward', weight: 3, edge_label: 'AB', style: 'solid' }] }] }
 })) };
 const settle = page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+async function modalHeading(page, title) {
+  const reference = page.locator(await page.locator('#appConfirmTitle').count() ? '#appConfirmTitle' : '#appearanceModal .modal-head > div:first-child');
+  const read = control => control.evaluate(node => Object.fromEntries(['fontFamily','fontSize','fontWeight','fontStyle','lineHeight']
+    .map(key => [key,getComputedStyle(node)[key]])));
+  assert.deepEqual(await read(title), await read(reference), 'Drawing popup heading uses ordinary modal typography');
+}
 async function readyView(page) {
   await page.locator('.dge-overlay[data-geometry-ready="true"]').waitFor();
   await settle(page);
@@ -162,6 +168,7 @@ async function compactPanel(page, selector, mobile) {
 
 async function propertyCard(page, mobile) {
   const panel = page.locator('.dge-selection-panel');
+  await modalHeading(page, panel.locator('.dge-property-head > h3'));
   assert.equal(await panel.getByRole('button', { name: /反转方向|Reverse direction/i }).count(), 0,
     'Drawing properties omit the redundant Reverse direction action');
   const body = panel.locator('.dge-property-body');
@@ -177,7 +184,10 @@ async function propertyCard(page, mobile) {
   });
   assert.ok(bounds.right >= 8 && bounds.right <= 20 && bounds.top >= 8 && bounds.top <= 20,
     'Close dot stays at the property card top-right: ' + JSON.stringify(bounds));
-  assert.ok(Math.abs(bounds.width - 20) <= 1 && Math.abs(bounds.height - 20) <= 1, 'Close dot keeps its original size');
+  const sharedSize = await page.locator(await page.locator('#graphEditorClose').count() ? '#graphEditorClose' : '#appearanceClose')
+    .evaluate(node => parseFloat(getComputedStyle(node).width));
+  assert.ok(Math.abs(bounds.width - sharedSize) <= 1 && Math.abs(bounds.height - sharedSize) <= 1,
+    'Property close dot matches the responsive modal close size');
   await compactPanel(page, '.dge-selection-panel', mobile);
   const after = await close.boundingBox();
   for (const key of ['x', 'y', 'width', 'height']) assert.ok(Math.abs(before[key] - after[key]) <= .5, 'Property close dot does not scroll with fields');
@@ -343,6 +353,13 @@ async function viewportAndPopoverChecks(page, mobile, label, online = true) {
   const metrics = {};
   for (const [name, trigger, panel] of popovers) {
     await page.locator(trigger).click(); await page.locator(panel).waitFor(); await settle(page);
+    if (name !== 'tools') {
+      const title = page.locator(panel + ' :is(.ddw-panel-header,.ddw-editor-panel-header) > h3');
+      await modalHeading(page, title);
+      await page.evaluate(() => DMateI18n.setLanguage('en', false));
+      await modalHeading(page, title);
+      await page.evaluate(() => DMateI18n.setLanguage('zh-CN', false));
+    }
     if (name === 'ai-guidance' || name === 'ai-generation') {
       const generating = name === 'ai-generation';
       assert.equal(await page.locator(panel + ' [data-math-diagram-generate]').count(), generating ? 1 : 0,

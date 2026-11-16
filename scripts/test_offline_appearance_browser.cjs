@@ -66,6 +66,32 @@ async function appearanceControls(page) {
   });
 }
 
+async function filledAppearanceActions(page) {
+  const surface = await page.locator('#appearanceModal .appearance-card').evaluate(node => getComputedStyle(node).backgroundColor);
+  for (const id of ['appearanceBackgroundUpload','appearanceBackgroundRemove','appearanceReset','appearanceDone']) {
+    const button = page.locator('#' + id);
+    const paint = () => button.evaluate(node => {
+      const style = getComputedStyle(node);
+      return { border:style.borderWidth, background:style.backgroundColor, image:style.backgroundImage, shadow:style.boxShadow };
+    });
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(150);
+    const idle = await paint();
+    assert.equal(idle.border, '0px', id + ' has no outlined edge');
+    assert.equal(idle.image, 'none');
+    assert.equal(idle.shadow, 'none');
+    assert.notEqual(idle.background, 'rgba(0, 0, 0, 0)', id + ' retains a filled surface');
+    assert.notEqual(idle.background, surface, id + ' stays distinct from the dialog surface');
+    if (await button.isEnabled()) {
+      await button.hover();
+      await page.waitForFunction(({ id, color }) => getComputedStyle(document.getElementById(id)).backgroundColor !== color,
+        { id, color:idle.background });
+    }
+  }
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(150);
+}
+
 (async () => {
   const browser = await chromium.launch({ headless:true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath:process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
@@ -88,6 +114,7 @@ async function appearanceControls(page) {
     await settledWallpaper(page);
     const online = await appearance(page);
     await openAppearance(page);
+    await filledAppearanceActions(page);
     const onlineControls = await appearanceControls(page);
     await page.locator('#appearanceClose').click();
     await page.goto(baseURL + '/offline', { waitUntil:'networkidle' });
@@ -98,6 +125,7 @@ async function appearanceControls(page) {
     console.log('PASS online/offline custom wallpaper, ten appearance variables, and both background layers match');
 
     await openAppearance(page);
+    await filledAppearanceActions(page);
     assert.deepEqual(await appearanceControls(page), onlineControls, 'The full appearance dialog retains online control styles');
     const png = await page.evaluate(() => {
       const canvas = document.createElement('canvas'); canvas.width = canvas.height = 8;

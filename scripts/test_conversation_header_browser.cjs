@@ -113,6 +113,9 @@ async function renameCurrent(page, name) {
       'Selecting the active conversation preserves its name node for reliable double-click renaming');
     await original.dispose();
   }
+  // Two rename operations can run faster than the application's deliberate
+  // duplicate-gesture guard when reduced motion is enabled in the test.
+  await page.waitForFunction(() => Date.now() - lastSessionRenameAt >= 400);
   await current.dblclick();
   await page.locator('#sessionRenameModal').waitFor({ state: 'visible' });
   await page.locator('#sessionRenameInput').fill(name);
@@ -240,9 +243,10 @@ async function notebookAiActions(page, newButton) {
   await newButton.click();
   await page.locator('#conceptNotebookDialog .dcn-title').fill('关联概念');
   for (const checkbox of await page.locator('#conceptNotebookDialog .dcn-note input[type="checkbox"]').all()) await checkbox.check();
-  assert.equal(await actions.nth(0).isEnabled(), true);
+  assert.equal(await actions.nth(0).isDisabled(), true, 'Multiple concepts disable single-concept explanation');
   assert.equal(await actions.nth(1).isEnabled(), true, 'Two selected concepts enable relation analysis');
   for (const button of await actions.all()) {
+    if (await button.isDisabled()) continue;
     await page.mouse.move(0, 0); await page.locator('#conceptNotebookTitle').focus(); await settle(page);
     const idle = await quiet(button);
     if (!mobile(page)) {
@@ -252,6 +256,9 @@ async function notebookAiActions(page, newButton) {
     await page.mouse.move(0, 0); await page.keyboard.press('Tab'); await button.focus(); await settle(page);
     assert.notDeepEqual(await aiActionPaint(button), idle, 'Enabled notebook AI action has keyboard focus feedback');
   }
+  await page.locator('#conceptNotebookDialog .dcn-note input[type="checkbox"]').last().uncheck();
+  assert.equal(await actions.nth(0).isEnabled(), true, 'Returning to exactly one concept restores explanation');
+  assert.equal(await actions.nth(1).isDisabled(), true);
 }
 
 async function notebookButton(page) {

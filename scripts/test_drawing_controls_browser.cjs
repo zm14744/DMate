@@ -8,8 +8,7 @@ const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const mobile = page => page.viewportSize().width <= 1100;
 const officialPaths = {
   'undo-2': ['M9 14 4 9l5-5', 'M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11'],
-  'redo-2': ['m15 14 5-5-5-5', 'M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13'],
-  'trash-2': ['M3 6h18', 'M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6', 'M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2']
+  'redo-2': ['m15 14 5-5-5-5', 'M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13']
 };
 
 async function settle(page) {
@@ -46,10 +45,6 @@ async function checkIcon(button, name, size) {
   assert.equal(await svg.getAttribute('viewBox'), '0 0 24 24');
   assert.equal(await svg.getAttribute('stroke-width'), '1.8');
   assert.deepEqual(await svg.locator('path').evaluateAll(paths => paths.map(path => path.getAttribute('d'))), officialPaths[name]);
-  if (name === 'trash-2') {
-    assert.deepEqual(await svg.locator('line').evaluateAll(lines => lines.map(line =>
-      ['x1', 'x2', 'y1', 'y2'].map(name => line.getAttribute(name)))), [['10', '10', '11', '17'], ['14', '14', '11', '17']]);
-  }
   const rect = await svg.boundingBox();
   assert.ok(rect && Math.abs(rect.width - size) <= 1 && Math.abs(rect.height - size) <= 1, name + ': glyph remains visible at its intended size');
 }
@@ -97,22 +92,40 @@ async function safeHistoryDelete(page, name) {
   await page.locator('.ddw-page-actions > button').filter({ hasText: /^历史绘图$/ }).click();
   const row = page.locator('.ddw-history-item').filter({ hasText: name });
   const remove = row.locator('.ddw-history-delete');
-  await checkIcon(remove, 'trash-2', 16);
-  const paint = await remove.evaluate(button => {
-    const css = getComputedStyle(button), rect = button.getBoundingClientRect();
-    const stroke = getComputedStyle(button.querySelector('svg path')).stroke;
-    return { background: css.backgroundColor, radius: css.borderRadius, width: rect.width, height: rect.height, stroke };
-  });
-  const [red, green, blue] = paint.background.match(/[\d.]+/g).map(Number);
-  assert.ok(red > 200 && green < 120 && blue < 120, 'History delete keeps its red circle');
-  assert.ok(Math.abs(paint.width - paint.height) <= 1 && parseFloat(paint.radius) >= paint.width / 2);
-  assert.ok(/rgb\(255, 255, 255\)/.test(paint.stroke), 'Trash lines remain white inside the red circle');
+  assert.equal(await remove.locator('*').count(), 0, 'History removal is the same empty red dot as a modal close, without a trash glyph');
+  assert.equal((await remove.textContent()).trim(), '');
+  const reference = page.locator(await page.locator('#graphEditorClose').count() ? '#graphEditorClose' : '#appearanceClose');
+  const paint = control => control.evaluate(button => Object.fromEntries(
+    ['width','height','padding','borderWidth','borderRadius',
+      'backgroundColor','backgroundImage','boxShadow','filter'].map(key => [key, getComputedStyle(button)[key]])));
+  const original = await page.evaluate(() => [document.documentElement.dataset.appearanceTheme, document.body.dataset.appearanceTheme]);
+  try {
+    for (const theme of ['light','dark','navy']) {
+      await page.evaluate(theme => [document.documentElement,document.body].forEach(node => { node.dataset.appearanceTheme = theme; }), theme);
+      await page.mouse.move(0,0); await settle(page);
+      const expected = await paint(reference);
+      assert.deepEqual(await paint(remove), expected, 'History dot matches modal close geometry and paint in ' + theme);
+      await remove.hover(); await settle(page);
+      assert.deepEqual(await paint(remove), expected, 'Hover does not change the solid close-dot parameters');
+    }
+  } finally {
+    await page.evaluate(values => [document.documentElement,document.body].forEach((node,i) => {
+      if (values[i] === undefined) delete node.dataset.appearanceTheme; else node.dataset.appearanceTheme = values[i];
+    }), original);
+  }
   const before = await page.evaluate(() => window.__drawingControlsController.getPages().map(page => ({ id: page.id, name: page.name })));
   const own = before.find(page => page.name === name);
   assert.ok(own, 'Delete is limited to this context’s temporary drawing');
   await remove.click();
   const prompt = page.locator('.dmate-delete-confirm[open]');
   await prompt.waitFor({ state: 'visible' });
+  const heading = control => control.evaluate(node => Object.fromEntries(['fontFamily','fontSize','fontWeight','lineHeight']
+    .map(key => [key,getComputedStyle(node)[key]])));
+  const referenceTitle = page.locator(await page.locator('#appConfirmTitle').count() ? '#appConfirmTitle' : '#appearanceModal .modal-head > div:first-child');
+  assert.deepEqual(await heading(prompt.locator('.dmate-delete-confirm-title')), await heading(referenceTitle),
+    'Drawing confirmation heading shares ordinary modal typography');
+  assert.deepEqual(await paint(prompt.locator('.dmate-delete-confirm-close')), await paint(reference),
+    'Drawing confirmation also uses the shared red close dot');
   assert.ok((await prompt.innerText()).includes(name), 'Confirmation names the drawing being removed');
   await prompt.locator('.dmate-delete-confirm-close').click();
   assert.deepEqual(await page.evaluate(() => window.__drawingControlsController.getPages().map(page => ({ id: page.id, name: page.name }))), before,

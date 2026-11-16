@@ -247,6 +247,17 @@ async function pngDownload(page, mobile) {
   if (mobile) {
     const preview = page.locator('.ddw-export-preview'); await preview.waitFor();
     await page.waitForFunction(() => document.querySelector('.ddw-export-image')?.naturalWidth > 64);
+    const typography = locator => locator.evaluate(node => Object.fromEntries(
+      ['fontFamily','fontSize','fontWeight','lineHeight'].map(key => [key,getComputedStyle(node)[key]])));
+    assert.deepEqual(await typography(preview.locator('.ddw-export-header>h3')),
+      await typography(page.locator('#appConfirmTitle')), 'Drawing export title matches ordinary modal typography');
+    const dot = locator => locator.evaluate(node => {
+      const style = getComputedStyle(node), box = node.getBoundingClientRect();
+      return { width:box.width, height:box.height, background:style.backgroundColor,
+        border:style.borderWidth, radius:style.borderRadius };
+    });
+    assert.deepEqual(await dot(preview.locator('.ddw-export-close')),
+      await dot(page.locator('#graphEditorClose')), 'Image preview uses the same solid red close dot as the drawing dialog');
     await preview.locator('.ddw-export-download').click();
   }
   const download = await downloading;

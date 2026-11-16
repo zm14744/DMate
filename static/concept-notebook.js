@@ -56,7 +56,7 @@ function mount(options){
  function renderActions(){
   const empty=state.notes.length===0;dialog.classList.toggle('is-empty',empty);selection.hidden=empty;ai.hidden=empty;main.hidden=empty;
   const size=selected.size;count.textContent=uiText('已选 '+size+' 条',size+' selected');
-  explainButton.disabled=!!active||size===0;relationButton.disabled=!!active||size<2;cancelButton.hidden=!active;
+  explainButton.disabled=!!active||size!==1;relationButton.disabled=!!active||size<2;cancelButton.hidden=!active;
   ai.setAttribute('aria-busy',String(Boolean(active)));
   newButton.disabled=state.notes.length>=LIMITS.notes;
   for(const remove of list.querySelectorAll('.dcn-note-delete'))remove.disabled=!!deletePending;
@@ -146,6 +146,7 @@ function mount(options){
  async function analyze(kind){
   if(active)return;
   const notes=state.notes.filter(n=>selected.has(n.id)).map(n=>({id:n.id,title:n.title,content:n.content}));
+  if(kind==='explain'&&notes.length!==1){status.textContent=uiText('请选择一条概念进行AI解释。','Select exactly one concept for AI explanation.');return;}
   if(!notes.length||notes.length>LIMITS.selected){status.textContent='每次请选择1至12条概念。';return;}
   if(kind==='relations'&&notes.length<2){status.textContent='请选择至少两条概念分析关联。';return;}
   if(notes.some(n=>!n.title.trim()&&!n.content.trim())){status.textContent='请先写下所选概念的名称或内容。';return;}
