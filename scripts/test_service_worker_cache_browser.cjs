@@ -61,7 +61,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     assert.equal(reference.status(), 200, 'The server must provide the shared stylesheet');
     const networkCSS = await reference.text();
     assert.ok(networkCSS.trim().length, 'The shared stylesheet must not be empty');
-    const sharedAssets = await Promise.all(['/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
+    const sharedAssets = await Promise.all(['/static/dmate-main.css?v=36', '/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
       '/static/select-controls.css?v=31', '/static/mobile-select.js?v=26', '/static/offline.css?v=34',
       '/static/drawing-workspace.css?v=29', '/static/graph-editor.js?v=35', '/static/graph-editor-overlay.js?v=35', '/static/drawing-workspace.js?v=35',
       '/static/graph-editor-format.js?v=31', '/static/language-catalog.js?v=31', '/static/offline-shell.js?v=33',
@@ -79,8 +79,8 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     // Simulate the pinned stylesheet left by the previous offline shell.
     await page.goto(new URL('/health', baseURL).href);
     await page.evaluate(async () => {
-      const cache = await caches.open('dmate-offline-shell-v34');
-      await cache.put('/static/button-themes.css?v=29', new Response('/* obsolete shell before responsive view restoration */'));
+      const cache = await caches.open('dmate-offline-shell-v35');
+      await cache.put('/static/button-themes.css?v=29', new Response('/* obsolete shell before unified graph heading styles */'));
     });
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });
     await page.evaluate(async () => {
@@ -97,7 +97,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       if (canonical.length !== 1) throw new Error('Expected exactly one precached shared stylesheet');
       return { name: names[0], canonical: canonical[0].url };
     }, assetPath);
-    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 35, 'Responsive view restoration requires the refreshed cache');
+    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 36, 'Unified graph heading styles require the refreshed cache');
     assert.equal((await fetchAsset(page, current.canonical)).text, networkCSS,
       'The refreshed shell loads current frameless controls instead of the obsolete stylesheet');
     for (const asset of sharedAssets) {

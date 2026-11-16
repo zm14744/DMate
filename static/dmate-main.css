@@ -1927,9 +1927,10 @@ input[type="search"]::-webkit-search-cancel-button {
 }
 
 .graph-detail-field-label {
-    margin-bottom:4px;
-    color:var(--text-subtle);
-    font-size:var(--font-xs);
+    margin:0 0 8px;
+    color:var(--text-muted);
+    font-size:14px;
+    font-weight:600;
 }
 
 .graph-detail-field-value {
