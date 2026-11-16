@@ -274,8 +274,10 @@ async function viewportAndPopoverChecks(page, mobile, label, online = true) {
     if (online) {
       assert.deepEqual(labels[3].style, labels[2].style,
         label + '/' + language + ': AI generation uses the same rail button styling as AI guidance');
-      assert.equal(await page.locator('.ddw-side-actions>[data-math-diagram-generate]').count(), 1,
-        'AI generation belongs to the shared canvas control rail');
+      assert.equal(await page.locator('.ddw-side-actions>[data-drawing-ai-generation]').count(), 1,
+        'The AI generation panel entry belongs to the shared canvas control rail');
+      assert.equal(await page.locator('.ddw-side-actions>[data-math-diagram-generate]').count(), 0,
+        'The canvas rail does not send a generation request directly');
     }
     for (const item of labels) {
       assert.ok(item.overflow <= 1, label + '/' + language + ': button label must remain complete: ' + JSON.stringify(item));
@@ -334,13 +336,20 @@ async function viewportAndPopoverChecks(page, mobile, label, online = true) {
     ['information', '.ddw-side-actions>button:nth-child(2)', '.dge-float-panel[data-panel-key="results"][open]>.dge-float-content'],
     ['history', '.ddw-page-actions>button:nth-child(2)', '.ddw-side-panel:not([hidden])'],
   ];
-  if (online) popovers.push(['ai', '.ddw-side-actions>[data-drawing-ai-guidance]', '.ddw-side-panel:not([hidden])']);
+  if (online) popovers.push(
+    ['ai-guidance', '.ddw-side-actions>[data-drawing-ai-guidance]', '.ddw-side-panel:not([hidden])'],
+    ['ai-generation', '.ddw-side-actions>[data-drawing-ai-generation]', '.ddw-side-panel:not([hidden])']
+  );
   const metrics = {};
   for (const [name, trigger, panel] of popovers) {
     await page.locator(trigger).click(); await page.locator(panel).waitFor(); await settle(page);
-    if (name === 'ai') {
-      assert.equal(await page.locator(panel + ' [data-math-diagram-generate]').count(), 0,
-        'The guidance panel does not duplicate the rail generation action');
+    if (name === 'ai-guidance' || name === 'ai-generation') {
+      const generating = name === 'ai-generation';
+      assert.equal(await page.locator(panel + ' [data-math-diagram-generate]').count(), generating ? 1 : 0,
+        'Only the generation panel contains its explicit generation send button');
+      assert.equal(await page.locator(panel + ' [data-drawing-guide]').count(), generating ? 0 : 1,
+        'Only the guidance panel contains its explicit guidance send button');
+      assert.equal(await page.locator(panel + ' .ddw-panel-header>h3').innerText(), generating ? 'AI生成' : 'AI指导');
       const requirementLabel = await page.locator(panel + ' .ddw-ai-label').innerText();
       assert.match(requirementLabel, /可选|optional/i, 'Drawing requirements are optional');
       assert.doesNotMatch(requirementLabel, /必填|required/i, 'Optional drawing requirements never claim to be required');
@@ -366,7 +375,9 @@ async function history(page) {
 async function runCase(browser, width) {
   const page = await browser.newPage({ viewport: { width, height: width === 390 ? 740 : 900 },
     isMobile: width === 390, hasTouch: width === 390 });
-  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  const errors = []; let modelCalls = 0;
+  page.on('pageerror', error => errors.push(error.message));
+  await page.route(/\/(?:chat|ocr|drawing\/[^?]+)(?:\?|$)/, route => { modelCalls++; return route.abort(); });
   try {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
     await mount(page, true);
@@ -414,6 +425,7 @@ async function runCase(browser, width) {
     await page.locator('.ddw-history-open').getByText(names[1], { exact: true }).click();
     assert.equal(await page.locator('.ddw-name').inputValue(), names[1]);
     assert.deepEqual(await (await history(page)).allTextContents(), expected);
+    assert.equal(modelCalls, 0, 'Opening and closing drawing panels never invokes a model');
     assert.deepEqual(errors, []);
     console.log('PASS ' + width + ': vertex ' + JSON.stringify(vertex) + '; edge ' + JSON.stringify(edge) + '; stable selectable history and refresh');
   } finally { await page.close(); }

@@ -219,14 +219,24 @@ async function drawingReference(page) {
   assert.equal(await workspace.getByRole('button', { name: '上传', exact: true }).count(), 1, 'Online upload remains available');
   await workspace.getByRole('button', { name: 'AI指导', exact: true }).click();
   await workspace.locator('.ddw-ai-requirement').waitFor();
-  assert.equal(await workspace.locator('[data-drawing-guide],[data-math-diagram-generate]').count(), 2,
-    'Online guidance and mathematical generation remain available');
+  assert.equal(await workspace.locator('[data-drawing-guide]').count(), 1,
+    'The online guidance panel contains its explicit send button');
+  assert.equal(await workspace.locator('.ddw-side-actions>[data-drawing-ai-generation]').count(), 1,
+    'Online mathematical generation has its own panel entry');
+  assert.equal(await workspace.locator('[data-math-diagram-generate]').count(), 0,
+    'Guidance does not expose the separate generation send button');
   await workspace.getByRole('button', { name: 'AI指导', exact: true }).click();
+  await workspace.locator('.ddw-side-actions>[data-drawing-ai-generation]').click();
+  await workspace.locator('.ddw-side-panel:not([hidden]) [data-math-diagram-generate]').waitFor();
+  assert.equal(await workspace.locator('.ddw-side-panel:not([hidden]) .ddw-panel-header>h3').innerText(), 'AI生成');
+  assert.equal(await workspace.locator('[data-drawing-guide]').count(), 0,
+    'Generation uses its own explicit send button');
+  await workspace.locator('.ddw-side-actions>[data-drawing-ai-generation]').click();
   // Remove the intentionally unavailable controls from this reference
   // page, after proving the real online UI provides both capabilities.
   await workspace.evaluate(node => {
     node.querySelector('.ddw-upload-button').remove();
-    node.querySelectorAll('.ddw-side-actions>[data-drawing-ai-guidance],.ddw-side-actions>[data-math-diagram-generate]')
+    node.querySelectorAll('.ddw-side-actions>[data-drawing-ai-guidance],.ddw-side-actions>[data-drawing-ai-generation]')
       .forEach(button => button.remove());
   });
   await workspace.getByRole('button', { name: '新建空白页', exact: true }).click();
@@ -640,7 +650,7 @@ async function drawing(page, reference) {
   assert.equal(await page.locator('#drawingPanel .offline-intro').count(), 0, 'The old standalone drawing introduction is removed');
   assert.equal(await workspace.getByRole('button', { name: /AI指导|上传|AI生成/ }).count(), 0);
   assert.equal(await workspace.locator('.ddw-ai-requirement,.ddw-ai-label,.ddw-ai-actions,.ddw-ai-answer,'
-    + '[data-drawing-guide],[data-math-diagram-generate],.ddw-upload-button,input[type="file"]').count(), 0,
+    + '[data-drawing-ai-guidance],[data-drawing-ai-generation],[data-drawing-guide],[data-math-diagram-generate],.ddw-upload-button,input[type="file"]').count(), 0,
   'Unavailable AI/upload functionality has no controls or request form in the offline DOM');
   const frame = await page.locator('#offlineDrawingHost').evaluate(node => {
     const style = getComputedStyle(node);

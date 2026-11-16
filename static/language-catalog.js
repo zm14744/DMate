@@ -750,6 +750,7 @@
         "要求（可选）": "Instructions (optional)",
         "绘图指导要求（可选）": "Drawing guidance instructions (optional)",
         "请求 AI 指导": "Request AI guidance",
+        "请求 AI 生成": "Request AI generation",
         "删除这个绘图？": "Delete this drawing?",
         "删除绘图": "Delete drawing",
         "删除确认界面未加载，请刷新后重试。": "The delete confirmation interface did not load. Refresh and try again.",

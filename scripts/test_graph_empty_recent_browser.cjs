@@ -12,6 +12,20 @@ async function assertEmpty(page, text, label) {
   assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(), text, label + ': canvas contains only the empty label');
   assert.equal((await page.locator('#knowledgeGraphDetail').innerText()).trim(), text, label + ': detail contains only the empty label');
   assert.equal(await page.locator('#knowledgeGraphDetailTitle').isVisible(), false, label + ': no stale selected-node title');
+  const position = await page.locator('#knowledgeGraphDetail').evaluate(body => {
+    const pane = body.getBoundingClientRect(), empty = body.querySelector('.graph-detail-empty').getBoundingClientRect();
+    const layout = body.closest('.knowledge-graph-layout'), layoutBox = layout.getBoundingClientRect();
+    const availableBottom = layoutBox.top + layout.clientTop + layout.clientHeight - parseFloat(getComputedStyle(layout).paddingBottom);
+    return { x: empty.left + empty.width / 2 - (pane.left + pane.width / 2),
+      y: empty.top + empty.height / 2 - (pane.top + pane.height / 2),
+      height: pane.height, availableHeight: body.parentElement.getBoundingClientRect().height,
+      remainingSpace: availableBottom - pane.bottom };
+  });
+  assert.ok(Math.abs(position.x) <= 1 && Math.abs(position.y) <= 1, label + ': empty detail label is centered in both axes');
+  assert.ok(Math.abs(position.height - position.availableHeight) <= 1, label + ': empty detail fills the available pane');
+  assert.ok(position.height > 100, label + ': empty detail uses the remaining sidebar height');
+  if (page.viewportSize().width <= 760) assert.ok(Math.abs(position.remainingSpace) <= 1,
+    label + ': mobile empty detail fills the remaining visible graph pane');
   assert.equal(await page.locator('#knowledgeGraphCanvas .kg-section, #knowledgeGraphCanvas .kg-mobile-expand, #knowledgeGraphCanvas .kg-mobile-node, #knowledgeGraphCanvas .kg-node-group').count(), 0,
     label + ': no graph, complete-view entry, or unrelated nodes');
   assert.equal(await page.locator('#knowledgeGraphDetail .kg-video-section, #knowledgeGraphDetail .graph-detail-field').count(), 0,
