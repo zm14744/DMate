@@ -194,13 +194,14 @@ function mount(host,options={}) {
  let category=categories.includes(options.category)?options.category:'全部';
  let knowledgeGraphSelectedNodeId=String(options.selectedId||allNodes[0]?.id||'');
  let knowledgeGraphDesktopScale=1,desktopFitted=true,destroyed=false,resizeFrame=0;
- let visibleNodes=[],previousSize='',fullscreenOrigin=null;
+ let visibleNodes=[],fullscreenOrigin=null,mobileFullscreen=false;
+ const viewMemory=host._dmateGraphViewMemory||(host._dmateGraphViewMemory=new Map());
  const isMobileAppShell=()=>window.matchMedia('(max-width:760px)').matches;
  const knowledgeGraphNodeState=()=>({key:'neutral',label:'',fill:'#111827',stroke:'#475569',text:'#ffffff',badge:''});
  const categoryOptionLabel=value=>value==='全部'?dmateUiText('全部模块','All modules'):dmateKnowledgeLabel(value);
  const categoryLabel=()=>dmateKnowledgeLabel(category);
  const countLabel=()=>dmateUiText(`${visibleNodes.length} 个知识点`,`${visibleNodes.length} concepts`);
- const disposeViews=()=>canvas.querySelectorAll('.kg-mobile-viewport').forEach(view=>view._kgDispose?.());
+ const disposeViews=()=>canvas.querySelectorAll('.kg-mobile-viewport,.kg-desktop-viewport').forEach(view=>view._kgDispose?.());
  const closeChoice=()=>{window.closeMobileChoiceModal?.(categoryTrigger);window.closeMobileChoiceModal?.(categorySelect);};
  function setCategory(value){category=categories.includes(value)?value:'全部';options.onCategoryChange?.(category);renderKnowledgeGraph();}
  async function openChoice(){
@@ -258,9 +259,11 @@ function mount(host,options={}) {
    const node=canvas.querySelector(`[data-node-id="${CSS.escape(knowledgeGraphSelectedNodeId)}"]`);
    const viewport=canvas.querySelector('.kg-mobile-viewport,.kg-desktop-viewport');
    if(!node||!viewport)return;
+   viewport._kgBeginViewInteraction?.();
    const rect=node.getBoundingClientRect(),view=viewport.getBoundingClientRect();
    viewport.scrollLeft+=rect.left+rect.width/2-(view.left+viewport.clientLeft+viewport.clientWidth/2);
    viewport.scrollTop+=rect.top+rect.height/2-(view.top+viewport.clientTop+viewport.clientHeight/2);
+   viewport._kgRemember?.();
    if(!isMobileAppShell())desktopFitted=false;
   }));
  }
@@ -274,6 +277,7 @@ function mount(host,options={}) {
    fullscreenOrigin=document.createComment('offline graph fullscreen origin');
    host.before(fullscreenOrigin);document.body.append(host);host.classList.add('graph-fullscreen-view');
   }
+  mobileFullscreen=host.classList.contains('graph-fullscreen-view');
   renderKnowledgeGraph();
  }
  function renderKnowledgeGraph(){
@@ -293,7 +297,9 @@ function mount(host,options={}) {
    node.dataset.nodeId=String(visibleNodes[i].id);node.setAttribute('role','button');node.setAttribute('aria-label',dmateKnowledgeLabel(visibleNodes[i].name));node.setAttribute('aria-pressed',String(node.classList.contains('selected')));
    if(node.localName==='g'){node.setAttribute('tabindex','0');node.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();selectKnowledgeGraphNode(node.dataset.nodeId,node);}},{signal});}
   });
-  if(!isMobileAppShell())fitKnowledgeGraphDesktop();
+  const mobileGraph=isMobileAppShell();
+  const viewKey=[mobileGraph?'mobile':'desktop',dmateUiLanguage(),visibleNodes.map(node=>node.id).join(',')].join('|');
+  installKnowledgeGraphViewMemory(canvas.querySelector('.kg-mobile-viewport,.kg-desktop-viewport'),viewKey,viewMemory,mobileGraph);
   renderDetail();root.DMateI18n?.translate(host);host.dataset.ready='true';
  }
  async function exportPNG(){
@@ -323,7 +329,7 @@ function mount(host,options={}) {
  categoryTrigger.addEventListener('click',openChoice,{signal});
  document.getElementById('knowledgeGraphDesktopZoomOut').addEventListener('click',()=>setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale/1.2),{signal});
  document.getElementById('knowledgeGraphDesktopZoomIn').addEventListener('click',()=>setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale*1.2),{signal});
- document.getElementById('knowledgeGraphDesktopZoomFit').addEventListener('click',fitKnowledgeGraphDesktop,{signal});
+ document.getElementById('knowledgeGraphDesktopZoomFit').addEventListener('click',()=>{canvas.querySelector('.kg-desktop-viewport')?._kgBeginViewInteraction?.();fitKnowledgeGraphDesktop();},{signal});
  copyButton.addEventListener('click',copyImage,{signal});
  canvas.addEventListener('wheel',event=>{if(!event.ctrlKey||isMobileAppShell())return;event.preventDefault();setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale*(event.deltaY<0?1.12:.89));},{signal,passive:false});
  document.addEventListener('keydown',event=>{
@@ -337,9 +343,9 @@ function mount(host,options={}) {
   if(next!==lastFontScale){lastFontScale=next;renderKnowledgeGraph();}
  });
  fontObserver.observe(document.documentElement,{attributes:true,attributeFilter:['style']});
- const breakpoint=window.matchMedia('(max-width:760px)');breakpoint.addEventListener('change',()=>{if(!breakpoint.matches)restoreInline();renderKnowledgeGraph();},{signal});
+ const breakpoint=window.matchMedia('(max-width:760px)');breakpoint.addEventListener('change',()=>{if(!breakpoint.matches)restoreInline();else if(mobileFullscreen&&!host.classList.contains('graph-fullscreen-view')){toggleKnowledgeGraphFullscreenView();return;}renderKnowledgeGraph();},{signal});
  window.addEventListener('dmate:languagechange',renderKnowledgeGraph,{signal});
- const observer=new ResizeObserver(()=>{const size=canvas.clientWidth+':'+canvas.clientHeight;if(size===previousSize)return;previousSize=size;window.cancelAnimationFrame(resizeFrame);resizeFrame=window.requestAnimationFrame(()=>{if(!destroyed&&!isMobileAppShell()&&desktopFitted)fitKnowledgeGraphDesktop();});});observer.observe(canvas);
+ const observer=new ResizeObserver(()=>{if(!destroyed)canvas.querySelector('.kg-desktop-viewport')?._kgResizeRememberedView?.();});observer.observe(canvas);
  host.classList.remove('graph-fullscreen-view');renderKnowledgeGraph();
  return {exportPNG,select(id,selectionOptions={}){
   const record=allNodes.find(node=>String(node.id)===String(id));if(!record)return;
@@ -350,6 +356,86 @@ function mount(host,options={}) {
   selectKnowledgeGraphNode(knowledgeGraphSelectedNodeId,node);
   if(reveal)revealSelectedGraphNode();
  },destroy(){destroyed=true;disposeViews();fontObserver.disconnect();controller.abort();observer.disconnect();window.cancelAnimationFrame(resizeFrame);closeChoice();restoreInline();canvas.replaceChildren();delete host.dataset.ready;}};
+// A responsive renderer has a different layout, so keep its own camera. The
+// cache outlives rebuilt DOM; scroll/zoom snapshots precede breakpoint changes.
+function installKnowledgeGraphViewMemory(viewport, key, memory, mobile) {
+    if (!viewport) return;
+    const stage = viewport.querySelector(mobile ? '.kg-mobile-stage' : '.kg-desktop-zoom-stage');
+    const surface = viewport.querySelector(mobile ? '.kg-mobile-zoom-surface' : '.kg-desktop-zoom-surface');
+    if (!stage || !surface) return;
+    let initialized = false, applying = false, disposed = false, frame = 0, releaseFrame = 0;
+    let width = 0, height = 0;
+    const active = () => window.matchMedia('(max-width:760px)').matches === mobile;
+    const scale = () => Number(mobile ? viewport._kgScale : surface.dataset.scale) || 1;
+    const remember = () => {
+        // A breakpoint/resize can clamp scroll before its callback runs. Keep
+        // the last camera from the old dimensions rather than saving that clamp.
+        if (!initialized || applying || disposed || !active()
+            || !viewport.isConnected || viewport.clientWidth !== width || viewport.clientHeight !== height) return;
+        const view = viewport.getBoundingClientRect(), bounds = stage.getBoundingClientRect(), zoom = scale();
+        memory.set(key, {scale:zoom,
+            x:(view.left + viewport.clientLeft + viewport.clientWidth / 2 - bounds.left) / zoom,
+            y:(view.top + viewport.clientTop + viewport.clientHeight / 2 - bounds.top) / zoom});
+    };
+    const initialize = () => {
+        if (disposed || !active() || !viewport.isConnected || !viewport.clientWidth || !viewport.clientHeight) return;
+        const saved = memory.get(key);
+        applying = true;
+        width = viewport.clientWidth; height = viewport.clientHeight;
+        if (saved) {
+            if (mobile) viewport._kgRestoreScale?.(saved.scale);
+            else setKnowledgeGraphDesktopScale(saved.scale, false);
+            const view = viewport.getBoundingClientRect(), bounds = stage.getBoundingClientRect();
+            viewport.scrollLeft += bounds.left + saved.x * scale() - (view.left + viewport.clientLeft + width / 2);
+            viewport.scrollTop += bounds.top + saved.y * scale() - (view.top + viewport.clientTop + height / 2);
+            viewport.style.visibility = '';
+        } else if (mobile) viewport._kgFit?.();
+        else fitKnowledgeGraphDesktop();
+        initialized = true;
+        // Scroll events produced by restoring/clamping arrive asynchronously.
+        // Keep the saved graph point until actual user input changes the view.
+        cancelAnimationFrame(releaseFrame);
+        releaseFrame = requestAnimationFrame(() => {
+            releaseFrame = requestAnimationFrame(() => {
+                applying = false;
+                if (!saved) remember();
+            });
+        });
+    };
+    const beginInteraction = () => {
+        if (!initialized) initialize();
+        cancelAnimationFrame(releaseFrame);
+        applying = false;
+    };
+    const resize = () => {
+        if (disposed || !active() || !viewport.clientWidth || !viewport.clientHeight) return;
+        if (initialized && viewport.clientWidth === width && viewport.clientHeight === height) return;
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(initialize);
+    };
+    viewport._kgRemember = remember;
+    viewport._kgBeginViewInteraction = beginInteraction;
+    viewport.addEventListener('pointerdown', beginInteraction, {capture:true});
+    viewport.addEventListener('wheel', beginInteraction, {capture:true,passive:true});
+    viewport.addEventListener('keydown', beginInteraction, {capture:true});
+    viewport._kgInitializeView = () => { if (!initialized) initialize(); };
+    viewport._kgResizeRememberedView = resize;
+    viewport.addEventListener('scroll', remember, {passive:true});
+    const observer = mobile ? null : new ResizeObserver(resize);
+    observer?.observe(viewport);
+    const previousDispose = viewport._kgDispose;
+    viewport._kgDispose = () => {
+        if (disposed) return;
+        disposed = true; cancelAnimationFrame(frame); cancelAnimationFrame(releaseFrame);
+        observer?.disconnect(); viewport.removeEventListener('scroll', remember);
+        viewport.removeEventListener('pointerdown', beginInteraction, {capture:true});
+        viewport.removeEventListener('wheel', beginInteraction, {capture:true});
+        viewport.removeEventListener('keydown', beginInteraction, {capture:true});
+        previousDispose?.();
+    };
+    requestAnimationFrame(() => requestAnimationFrame(() => viewport._kgInitializeView?.()));
+}
+
 function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     if (!viewport || !surface || !stage) return;
 
@@ -409,6 +495,7 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     };
 
     const applyScale = (nextScale, anchor = null) => {
+        if (anchor) viewport._kgBeginViewInteraction?.();
         const point = anchor ? graphPoint(anchor) : null;
         const scale = clampMobileGraphScale(nextScale, minimumScale);
         fitted = false;
@@ -425,6 +512,7 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
 
         if (point) positionGraphPoint(point, anchor);
         lastCenterAnchor = centerAnchor();
+        viewport._kgRemember?.();
 
         return scale;
     };
@@ -460,9 +548,14 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
                 y: selected.offsetTop + selected.offsetHeight / 2
             }, centerAnchor());
         }
+        viewport._kgRemember?.();
     };
 
     viewport._kgSetScale = applyScale;
+    viewport._kgRestoreScale = value => {
+        minimumScale = Math.min(minimumScale, Number(value) || 1);
+        return applyScale(value);
+    };
     viewport._kgFit = fitGraph;
     viewport._kgReset = () => {
         applyScale(1);
@@ -489,7 +582,8 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
         cancelAnimationFrame(resizeFrame);
         resizeFrame = requestAnimationFrame(() => {
             resizeFrame = 0;
-            if (fitted) fitGraph();
+            if (viewport._kgResizeRememberedView) viewport._kgResizeRememberedView();
+            else if (fitted) fitGraph();
             else {
                 applyScale(currentScale());
                 positionGraphPoint(point, centerAnchor());
@@ -995,12 +1089,16 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     zoomFit.addEventListener("click", event => {
         event.preventDefault();
         event.stopPropagation();
+        viewport._kgBeginViewInteraction?.();
         viewport._kgFit?.();
     });
 
     // section 先在 DocumentFragment 内构造；等挂载、全屏 flex 布局完成后再适应。
     requestAnimationFrame(() => {
-        requestAnimationFrame(() => viewport._kgFit?.());
+        requestAnimationFrame(() => {
+            if (viewport._kgInitializeView) viewport._kgInitializeView();
+            else viewport._kgFit?.();
+        });
     });
 }
 
@@ -1013,6 +1111,7 @@ function setKnowledgeGraphDesktopScale(value, keepCenter = true) {
     const stage = surface?.querySelector(".kg-desktop-zoom-stage");
     const viewport = canvas?.querySelector(".kg-desktop-viewport");
     if (!canvas || !surface || !stage || !viewport) return;
+    if (keepCenter) viewport._kgBeginViewInteraction?.();
 
     const baseWidth = Number(stage.dataset.baseWidth) || 1;
     const baseHeight = Number(stage.dataset.baseHeight) || 1;
@@ -1047,6 +1146,7 @@ function setKnowledgeGraphDesktopScale(value, keepCenter = true) {
     }
     const label = document.getElementById("knowledgeGraphDesktopZoomLabel");
     if (label) label.textContent = `${Math.round(next * 100)}%`;
+    viewport._kgRemember?.();
 }
 
 // 根据图谱形状选择适应策略：
@@ -1075,6 +1175,7 @@ function fitKnowledgeGraphDesktop() {
     viewport.scrollLeft = 0;
     viewport.scrollTop = 0;
     desktopFitted = true;
+    viewport._kgRemember?.();
 }
 
 function renderKnowledgeGraphSection(container, nodes, title, description, context, options = {}) {

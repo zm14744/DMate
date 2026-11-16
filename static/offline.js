@@ -642,7 +642,6 @@
 
   function mountDrawing() {
     if (state.drawingController) {
-      state.drawingController.fitView?.();
       return;
     }
     const host = $("offlineDrawingHost");

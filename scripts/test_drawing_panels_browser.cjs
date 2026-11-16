@@ -48,6 +48,15 @@ async function automaticFit(page, label) {
   }
 }
 
+async function preservedView(page, expected, label) {
+  await readyView(page);
+  const actual = await viewState(page);
+  const values = [...actual.camera, ...actual.nodes.flat()], baseline = [...expected.camera, ...expected.nodes.flat()];
+  assert.equal(values.length, baseline.length);
+  values.forEach((value, index) => assert.ok(Math.abs(value - baseline[index]) <= (index === 0 ? .02 : 1),
+    label + ': restore the previous drawing camera: ' + JSON.stringify({ actual, expected })));
+}
+
 async function zoomAway(page) {
   const historyButton = page.locator('.ddw-page-actions>button[aria-expanded="true"]');
   if (await historyButton.count()) await historyButton.click();
@@ -362,11 +371,14 @@ async function runCase(browser, width) {
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/drawing-' + width + '-edge.png' });
     await closeProperty(page);
     assert.deepEqual(await (await history(page)).allTextContents(), names, 'History follows saved array order, not updatedAt');
+    const savedViews = new Map();
     for (const index of [1, 0, 2]) {
       await zoomAway(page);
+      savedViews.set(await page.locator('.ddw-name').inputValue(), await viewState(page));
       await history(page);
       await page.locator('.ddw-history-open').getByText(names[index], { exact: true }).click();
-      await automaticFit(page, 'Online selected ' + names[index]);
+      if (savedViews.has(names[index])) await preservedView(page, savedViews.get(names[index]), 'Online selected ' + names[index]);
+      else await automaticFit(page, 'Online first selected ' + names[index]);
       assert.equal(await page.locator('.ddw-name').inputValue(), names[index]);
       assert.equal(await page.locator('.dge-overlay-node[data-vertex-id="v1"] .dge-overlay-label').textContent(), 'ABC'[index] + '1');
       assert.deepEqual(await (await history(page)).allTextContents(), names, 'Visiting another drawing must not reorder history');
@@ -425,7 +437,7 @@ async function openOnline(page) {
   await page.locator('#graphDrawingBtn').click();
   await page.locator('#graphEditorDialog[open] .dmate-drawing-workspace').waitFor();
   await page.waitForFunction(() => !document.getElementById('graphEditorDialog').dataset.positioning);
-  await automaticFit(page, 'Actual online open/reopen');
+  await readyView(page);
 }
 
 async function closeOnline(page) {
@@ -503,8 +515,10 @@ async function runAccountGalleryLifecycle(browser) {
     assert.equal((await onlineState(page)).name, names[1], 'Online entry restores selected existing drawing');
     assert.equal(await page.locator('.dge-overlay-node').count(), 2);
     assert.deepEqual((await onlineState(page)).pages.map(p => p.id), gallery.pages.map(p => p.id));
-    await zoomAway(page); await closeOnline(page); await openOnline(page);
-    assert.equal((await onlineState(page)).name, names[1], 'Reopening automatically fits the existing selected drawing');
+    await automaticFit(page, 'First account drawing open');
+    await zoomAway(page); const priorView = await viewState(page); await closeOnline(page); await openOnline(page);
+    await preservedView(page, priorView, 'Account drawing reopen');
+    assert.equal((await onlineState(page)).name, names[1], 'Reopening preserves the existing selected drawing');
     await page.locator('.ddw-page-actions').getByRole('button', { name: '新建空白页', exact: true }).click();
     await page.locator('.ddw-name').fill('账号保存空白页');
     const saved = await onlineState(page);
@@ -595,17 +609,22 @@ async function runOfflineViewport(browser, width) {
       console.log('PASS offline ' + width + ' ' + kind + ': ' + JSON.stringify(position) + '; last action reachable');
       await closeProperty(page);
     }
+    const savedViews = new Map();
     for (const index of [1, 0]) {
-      await zoomAway(page); await history(page);
+      await zoomAway(page);
+      savedViews.set(await page.locator('.ddw-name').inputValue(), await viewState(page));
+      await history(page);
       await page.locator('.ddw-history-open').getByText(names[index], { exact: true }).click();
-      await automaticFit(page, 'Offline selected ' + names[index]);
+      if (savedViews.has(names[index])) await preservedView(page, savedViews.get(names[index]), 'Offline selected ' + names[index]);
+      else await automaticFit(page, 'Offline first selected ' + names[index]);
     }
     await zoomAway(page);
+    const priorView = await viewState(page);
     for (const target of ['concepts', 'drawing']) {
       if (width === 390) await page.locator('#offlineNavToggle').click();
       await page.locator('.offline-nav-item[data-panel="' + target + '"]').click();
     }
-    await automaticFit(page, 'Offline navigation return');
+    await preservedView(page, priorView, 'Offline navigation return');
     assert.equal(await page.locator('.ddw-name').inputValue(), names[0], 'Returning to drawing preserves the selected page');
     assert.equal(modelCalls, 0); assert.deepEqual(errors, []);
   } finally { await page.close(); }

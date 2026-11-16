@@ -53,13 +53,13 @@
 <script defer src="/static/scrollbars.js?v=25"></script>
 <script defer src="/static/graph-editor-model.js"></script>
 <script defer src="/static/graph-editor-format.js?v=31"></script>
-<script defer src="/static/graph-editor-overlay.js?v=20"></script>
+<script defer src="/static/graph-editor-overlay.js?v=35"></script>
 <script defer src="/static/math-markdown.js?v=22"></script>
 <script defer src="/static/ai-answer-renderer.js?v=22"></script>
 <script defer src="/static/delete-confirm.js"></script>
 <script defer src="/static/drawing-export.js"></script>
-<script defer src="/static/graph-editor.js?v=31"></script>
-<script defer src="/static/drawing-workspace.js?v=29"></script>
+<script defer src="/static/graph-editor.js?v=35"></script>
+<script defer src="/static/drawing-workspace.js?v=35"></script>
 <script>
 window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:{inlineMath:[['\\(','\\)'],['$','$']],displayMath:[['\\[','\\]'],['$$','$$']]},svg:{fontCache:'none'},startup:{typeset:false},options:{enableMenu:false}};
 </script>
@@ -73,9 +73,9 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/offline-appearance.js?v=8"></script>
 <script defer src="/static/offline-shell.js?v=33"></script>
 <script defer src="/static/knowledge-graph-labels.js?v=17"></script>
-<script defer src="/static/offline-knowledge-graph.js?v=32"></script>
+<script defer src="/static/offline-knowledge-graph.js?v=35"></script>
 <script defer src="/static/offline-entry.js?v=17"></script>
-<script defer src="/static/offline.js?v=34"></script>
+<script defer src="/static/offline.js?v=35"></script>
 </head>
 <body class="offline-workspace">
 <script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"light";</script>
@@ -176,7 +176,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 
     <section class="offline-panel" id="questionsPanel" hidden>
       <div class="offline-toolbar question-toolbar">
-        <div><strong id="questionCount">练习库</strong><span class="toolbar-muted">题目、答案与解析</span></div>
+        <div><strong id="questionCount">练习库</strong></div>
         <div class="offline-filters">
           <select id="questionCategory" aria-label="按章节筛选"><option value="">全部章节</option></select>
           <select id="questionDifficulty" aria-label="按难度筛选">
@@ -199,7 +199,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 
     <section class="offline-panel" id="conceptsPanel" hidden>
       <div class="offline-toolbar">
-        <div><strong id="conceptCount">概念库</strong><span class="toolbar-muted">定义、解释与易错点</span></div>
+        <div><strong id="conceptCount">概念库</strong></div>
         <div class="offline-filters">
           <select id="conceptCategory" aria-label="按章节筛选"><option value="">全部章节</option></select>
           <select id="conceptSelection" aria-label="按选择状态筛选">

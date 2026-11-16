@@ -124,9 +124,10 @@ async function checkReturnPreservesView(browser, width) {
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
     await checkPreserved(width + '/video return');
 
-    // Switching category and reopening must still fit the newly displayed graph.
+    // A previously unseen category fits once; reopening retains its custom camera.
     await page.evaluate(() => setKnowledgeGraphFilter('命题逻辑'));
     if (mobile) await settleGraph(page);
+    else await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     assert.equal(await viewport.evaluate(view => view.isConnected), false, width + ': category rebuilds the graph');
     const fitted = () => page.locator(viewSelector).evaluate(view => ({
       scale: view._kgScale || Number(view.querySelector('.kg-desktop-zoom-surface').dataset.scale),
@@ -135,15 +136,20 @@ async function checkReturnPreservesView(browser, width) {
     const categoryFit = await fitted();
     await page.locator(mobile ? '.kg-mobile-zoom-fit' : '#knowledgeGraphDesktopZoomFit').click();
     assert.deepEqual(await fitted(), categoryFit, width + ': category is already fitted');
+    for (let i = 0; i < 3; i++) await zoomIn.click();
+    await page.locator(viewSelector).evaluate(view => { view.scrollLeft = 40; view.scrollTop = 80; });
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const categoryCustom = await fitted();
     await page.evaluate(() => { closeKnowledgeGraph(); openKnowledgeGraph(); });
     if (mobile) {
       await page.locator('.kg-mobile-expand').click();
       await settleGraph(page);
     } else await page.waitForSelector(viewSelector);
-    const openingFit = await fitted();
+    if (!mobile) await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    assert.deepEqual(await fitted(), categoryCustom, width + ': reopening restores the category camera');
     await page.locator(mobile ? '.kg-mobile-zoom-fit' : '#knowledgeGraphDesktopZoomFit').click();
-    assert.deepEqual(await fitted(), openingFit, width + ': opening is already fitted');
-    console.log('PASS ' + width + ': tab/video return preserves view; opening and category changes still fit');
+    assert.deepEqual(await fitted(), categoryFit, width + ': explicit Fit still restores the initial category framing');
+    console.log('PASS ' + width + ': tab/video/reopen preserve view; unseen categories fit once');
   } finally { await page.close(); }
 }
 
@@ -284,7 +290,7 @@ async function mobileCase(browser, width) {
       console.log('PASS ' + label + ': ' + initial.nodes.count + ' nodes, fit ' + Math.round(initial.scale * 100) + '%');
     }
 
-    // A manual zoom must survive viewport resize. Explicit Fit resumes automatic fitting.
+    // Resize preserves the last camera, including a camera set by explicit Fit.
     await page.evaluate(() => setKnowledgeGraphFilter('全部'));
     await settleGraph(page);
     await page.locator('.kg-mobile-zoom-btn').last().click();
@@ -292,6 +298,7 @@ async function mobileCase(browser, width) {
       view.scrollLeft = (view.scrollWidth - view.clientWidth) / 2;
       view.scrollTop = (view.scrollHeight - view.clientHeight) / 2;
     });
+    await settleGraph(page);
     const manual = await snapshot(page);
     const centerPoint = state => ({
       x: (state.content.left + state.content.width / 2 - state.stage.left) / state.scale,
@@ -304,18 +311,16 @@ async function mobileCase(browser, width) {
     near(resizedManual.scale, manual.scale, width + ': resize preserves manual zoom', .0001);
     near(centerPoint(resizedManual).x, centerPoint(manual).x, width + ': resize preserves horizontal graph center');
     near(centerPoint(resizedManual).y, centerPoint(manual).y, width + ': resize preserves vertical graph center');
-    await fit(page);
+    const explicit = await fit(page);
     await page.setViewportSize({ width, height: 600 });
     await settleGraph(page);
-    const automatic = await snapshot(page);
-    const explicit = await fit(page);
-    near(automatic.scale, explicit.scale, width + ': resize automatically refits', .0001);
-    checkCenteredAxes(automatic, width + '/resize');
+    const retained = await snapshot(page);
+    near(retained.scale, explicit.scale, width + ': resize preserves the explicitly fitted scale', .0001);
+    checkCenteredAxes(retained, width + '/resize');
     await page.setViewportSize({ width, height: 844 });
     await settleGraph(page);
     const originalViewport = await snapshot(page);
-    const originalExplicit = await fit(page);
-    near(originalViewport.scale, originalExplicit.scale, width + ': height restoration refits', .0001);
+    near(originalViewport.scale, explicit.scale, width + ': height restoration preserves scale', .0001);
     await page.setViewportSize({ width: 820, height: 844 });
     await page.waitForSelector('.kg-desktop-zoom-stage');
     assert.equal(await page.locator('.kg-mobile-stage').count(), 0, 'Breakpoint must replace the mobile graph');

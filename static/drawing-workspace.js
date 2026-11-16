@@ -193,7 +193,9 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    editor?.destroy();editor=null;const p=active(),documentValue=p?.document||emptyDocument();
    name.value=p?.name||'';nameFollowsGraph=false;requirement=p?.requirement||'';answer='';answerDocument='';answerRequirement='';
    const initial=p?blank(p.name):emptyDocument(),url='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700"><rect width="100%" height="100%" fill="white"/></svg>');
-   editor=root.DMateGraphEditor.mount(editorHost,{document:clone(documentValue),initialDocument:initial,originalUrl:url,drawingOnly:true,
+   if(p&&(!p.viewState||typeof p.viewState!=='object'||Array.isArray(p.viewState)))p.viewState={};
+   editor=root.DMateGraphEditor.mount(editorHost,{document:clone(documentValue),initialDocument:initial,originalUrl:url,drawingOnly:true,viewState:p?.viewState,
+    onViewChange:()=>{if(!destroyed)schedule();},
     onChange:value=>{if(destroyed)return;const selected=active();if(!selected)return;selected.document=clone(value);selected.updatedAt=Date.now();
      if(nameFollowsGraph&&doc.activeElement!==name&&value.graphs[0]){selected.name=caption(value.graphs[0].name);name.value=selected.name;}
      options.onChange?.(clone(value));invalidateAnswer();schedule();},

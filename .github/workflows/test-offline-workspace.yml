@@ -43,6 +43,7 @@ on:
       - 'scripts/test_learning_links_browser.cjs'
       - 'scripts/test_library_selection_browser.cjs'
       - 'scripts/test_drawing_panels_browser.cjs'
+      - 'scripts/test_responsive_graph_views_browser.cjs'
       - 'scripts/test_overlay_zoom_browser.cjs'
       - 'scripts/test_math_diagram_browser.cjs'
       - '.github/workflows/test-offline-workspace.yml'
@@ -88,6 +89,7 @@ on:
       - 'scripts/test_learning_links_browser.cjs'
       - 'scripts/test_library_selection_browser.cjs'
       - 'scripts/test_drawing_panels_browser.cjs'
+      - 'scripts/test_responsive_graph_views_browser.cjs'
       - 'scripts/test_overlay_zoom_browser.cjs'
       - 'scripts/test_math_diagram_browser.cjs'
       - '.github/workflows/test-offline-workspace.yml'
@@ -152,6 +154,7 @@ jobs:
           node --check scripts/test_learning_links_browser.cjs
           node --check scripts/test_library_selection_browser.cjs
           node --check scripts/test_drawing_panels_browser.cjs
+          node --check scripts/test_responsive_graph_views_browser.cjs
           node --check scripts/test_overlay_zoom_browser.cjs
           node --check scripts/test_math_diagram_browser.cjs
       - name: Test math startup, rendering queue and proof endings
@@ -249,6 +252,7 @@ jobs:
           node scripts/test_graph_labels_browser.cjs
           node scripts/test_composer_motion_browser.cjs
           node scripts/test_drawing_panels_browser.cjs
+          node scripts/test_responsive_graph_views_browser.cjs
           node scripts/test_overlay_zoom_browser.cjs
           node scripts/test_math_diagram_browser.cjs
       - name: Preserve browser screenshots

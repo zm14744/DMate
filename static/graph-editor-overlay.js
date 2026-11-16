@@ -92,6 +92,11 @@ function mount(host,o){
  let sampleCanvas=d.createElement('canvas'),sampleCtx=null,loaded=false,autoFitted=false;
  const pointers=new Map();
  const world={left:0,top:0,right:1,bottom:1};
+ // Drawing cameras belong to the page and responsive layout, independently
+ // from its semantic graph. OCR/image overlays keep their existing behavior.
+ const viewState=o.drawingOnly?(o.viewState&&typeof o.viewState==='object'&&!Array.isArray(o.viewState)?o.viewState:{}):null;
+ const mobileView=d.defaultView.matchMedia('(max-width:760px)');
+ let cameraMode=mobileView.matches?'mobile':'desktop',cameraSize=null,cameraRestoring=false,cameraFrame=0,cameraFitPending=false,pendingFitFrame=0;
  const finite=x=>typeof x==='number'&&Number.isFinite(x);
  const layoutWorld=()=>{
   if(!scroll.clientWidth)return;
@@ -128,7 +133,7 @@ function mount(host,o){
  const paletteTitle=d.createElement(o.drawingOnly?'summary':'h3');paletteTitle.textContent=o.scanOnly?'框选':o.textOnly?'文字工具':'绘图工具';palette.append(paletteTitle,bar);
  const viewControls=d.createElement('div');viewControls.className='dge-view-controls';viewControls.setAttribute('aria-label','视图控制');
  stage.append(image,svg);scroll.append(stage);root.append(viewControls,palette,scroll);host.append(root);
- const button=(label,key,fn,parent=bar)=>{const b=d.createElement('button');b.type='button';b.textContent=label;b.dataset.overlayTool=key;b.addEventListener('click',event=>{event.stopPropagation();if(!o.disabled?.())fn();});parent.append(b);return b;};
+ const button=(label,key,fn,parent=bar)=>{const b=d.createElement('button');b.type='button';b.textContent=label;b.dataset.overlayTool=key;b.addEventListener('click',event=>{event.stopPropagation();if(!o.disabled?.()){fn();rememberCamera();}});parent.append(b);return b;};
  for(const [key,label] of (o.scanOnly?[['select','选择 / 平移'],['bounds','图形框选'],['text_rect','文字框选']]:o.textOnly?[['select','选择 / 移动'],['text_rect','框选文字']]:o.drawingOnly?[['select','选择 / 移动'],['vertex','添加顶点'],['edge','添加边']]:[['select','选择 / 移动'],['vertex','添加顶点'],['edge','添加边'],['bounds','框选图形']])){
   button(label,key,()=>{s.mode=o.scanOnly&&s.irregular?(key==='bounds'?'graph_poly':key==='text_rect'?'text_poly':key):key;s.start=null;o.clearSelection?.();draw();});
  }
@@ -677,7 +682,7 @@ function mount(host,o){
  });
  svg.addEventListener('pointermove',e=>{
   if(pointers.has(e.pointerId))pointers.set(e.pointerId,[e.clientX,e.clientY]);
-  if(base&&pointers.size>=2){const a=[...pointers.values()],distance=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(base.distance>4){zoom(base.zoom*distance/base.distance);draw();}return;}
+  if(base&&pointers.size>=2){const a=[...pointers.values()],distance=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(base.distance>4){zoom(base.zoom*distance/base.distance);draw();rememberCamera();}return;}
   if(!active||active.pointer!==e.pointerId)return;
   if(active.kind==='pan'){
     // A click or small finger/mouse tremor must only select. In particular,
@@ -689,7 +694,7 @@ function mount(host,o){
     if(y<0){const shift=expandWorld(world.left,world.top-1);active.sx+=shift[0];active.sy+=shift[1];x+=shift[0];y+=shift[1];}
     if(x+scroll.clientWidth>=stage.offsetWidth)expandWorld(world.right+1,world.top);
     if(y+scroll.clientHeight>=stage.offsetHeight)expandWorld(world.left,world.bottom+1);
-    scroll.scrollLeft=x;scroll.scrollTop=y;
+    scroll.scrollLeft=x;scroll.scrollTop=y;rememberCamera();
     return;
   }
   active.end=mouse(e);
@@ -750,17 +755,72 @@ function mount(host,o){
   }draw();
  }
  svg.addEventListener('pointerup',e=>release(e));svg.addEventListener('pointercancel',e=>release(e,true));
- scroll.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();zoom(s.zoom*(e.deltaY>0?0.9:1.1));draw();},{passive:false});
+ scroll.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();zoom(s.zoom*(e.deltaY>0?0.9:1.1));draw();rememberCamera();},{passive:false});
  const syncGeometryReady=()=>{const ready=loaded&&autoFitted&&scroll.clientWidth>0&&scroll.clientHeight>0;root.dataset.geometryReady=String(ready);svg.setAttribute('aria-busy',String(!ready));};
+ function validCamera(camera){
+  return camera&&finite(camera.zoom)&&camera.zoom>0&&camera.world&&camera.center
+   &&['left','top','right','bottom'].every(key=>finite(camera.world[key]))
+   &&camera.world.right>camera.world.left&&camera.world.bottom>camera.world.top
+   &&finite(camera.center.x)&&finite(camera.center.y);
+ }
+ function rememberCamera(){
+  if(!viewState||!loaded||!autoFitted||cameraRestoring||!cameraSize
+   ||cameraMode!==(mobileView.matches?'mobile':'desktop')
+   ||cameraSize.width!==scroll.clientWidth||cameraSize.height!==scroll.clientHeight)return;
+  const scale=scroll.clientWidth*s.zoom/100;
+  if(scale<=0||scroll.clientHeight<=0)return;
+  const camera={zoom:s.zoom,world:{...world},center:{
+   x:world.left+(scroll.scrollLeft+scroll.clientWidth/2)/scale,
+   y:world.top+(scroll.scrollTop+scroll.clientHeight/2)/(scale*h/w)}};
+  if(JSON.stringify(camera)!==JSON.stringify(viewState[cameraMode])){
+   viewState[cameraMode]=camera;o.onViewChange?.();
+  }
+ }
+ function restoreCamera(camera){
+  s.zoom=boundedZoom(camera.zoom);Object.assign(world,camera.world);
+  const scale=scroll.clientWidth*s.zoom/100,halfX=scroll.clientWidth/(2*scale),halfY=scroll.clientHeight/(2*scale*h/w);
+  world.left=Math.min(world.left,camera.center.x-halfX);world.right=Math.max(world.right,camera.center.x+halfX);
+  world.top=Math.min(world.top,camera.center.y-halfY);world.bottom=Math.max(world.bottom,camera.center.y+halfY);
+  layoutWorld();updateZoomControls();
+  const actualScale=scroll.clientWidth*s.zoom/100;
+  scroll.scrollLeft=(camera.center.x-world.left)*actualScale-scroll.clientWidth/2;
+  scroll.scrollTop=(camera.center.y-world.top)*actualScale*h/w-scroll.clientHeight/2;
+  autoFitted=true;
+ }
+ function syncDrawingCamera(){
+  if(!viewState||!loaded)return false;
+  if(scroll.clientWidth<=0||scroll.clientHeight<=0){cameraSize=null;return false;}
+  const mode=mobileView.matches?'mobile':'desktop',size={width:scroll.clientWidth,height:scroll.clientHeight};
+  if(autoFitted&&!cameraFitPending&&mode===cameraMode&&cameraSize?.width===size.width&&cameraSize?.height===size.height){layoutWorld();draw();syncGeometryReady();return true;}
+  const restoring=!cameraFitPending&&validCamera(viewState[mode]);cameraFitPending=false;
+  cameraRestoring=true;cameraMode=mode;
+  if(restoring)restoreCamera(viewState[mode]);
+  else{autoFitted=false;fitImage();}
+  cameraSize={width:scroll.clientWidth,height:scroll.clientHeight};
+  draw();syncGeometryReady();
+  if(!restoring){cameraRestoring=false;rememberCamera();cameraRestoring=true;}
+  d.defaultView.cancelAnimationFrame(cameraFrame);
+  cameraFrame=d.defaultView.requestAnimationFrame(()=>{cameraRestoring=false;});
+  return true;
+ }
+ scroll.addEventListener('scroll',rememberCamera,{passive:true});
  function fitView(){
   // The image or a reused page can be opened while its panel is hidden.
   // Keep the requested fit pending until the viewport has real dimensions; later
   // edits and ordinary resizes must preserve the user's chosen camera.
   autoFitted=false;fitImage();draw();syncGeometryReady();
+  if(viewState){
+   cameraFitPending=!autoFitted;cameraMode=mobileView.matches?'mobile':'desktop';cameraSize={width:scroll.clientWidth,height:scroll.clientHeight};cameraRestoring=false;rememberCamera();
+   // Hide/reveal can happen before the next paint. ResizeObserver then sees
+   // the same final size and has no change to report, so retry this explicit
+   // pending Fit once after layout. A genuinely hidden panel waits for its RO.
+   d.defaultView.cancelAnimationFrame(pendingFitFrame);
+   if(cameraFitPending)pendingFitFrame=d.defaultView.requestAnimationFrame(()=>{pendingFitFrame=0;syncDrawingCamera();});
+  }
  }
- image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;loaded=true;syncOriginal();buildSampler();fitView();};
+ image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;loaded=true;syncOriginal();buildSampler();if(!syncDrawingCamera())fitView();};
  image.onerror=()=>{status.textContent='原图未能显示，可使用下方结构编辑';};image.src=o.originalUrl;zoom(s.zoom);draw();
- const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(loaded&&!autoFitted)fitImage();else layoutWorld();draw();syncGeometryReady();}):null;observer?.observe(scroll);observer?.observe(viewControls);
+ const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(!syncDrawingCamera()){if(loaded&&!autoFitted)fitImage();else layoutWorld();draw();syncGeometryReady();}}):null;observer?.observe(scroll);observer?.observe(viewControls);
  const resetInteraction=()=>{cancelResizePreview();active=null;ghost=null;base=null;pointers.clear();s.start=null;s.polygonDraft=[];scanSequence++;draw();};
  svg.addEventListener('keydown',e=>{if(e.key==='Escape')resetInteraction();});
  function getDrawingSvg(){
@@ -788,7 +848,7 @@ function mount(host,o){
   const background=E(d,'rect',{x,y,width,height,fill:'#ffffff'});output.insertBefore(background,output.firstChild);
   return output;
  }
- return {refresh:draw,fitView,resetInteraction,state:s,getDrawingSvg,destroy(){cancelResizePreview();observer?.disconnect();image.onload=null;image.onerror=null;host.replaceChildren();}};
+ return {refresh:draw,fitView,resetInteraction,state:s,getDrawingSvg,destroy(){rememberCamera();d.defaultView.cancelAnimationFrame(cameraFrame);d.defaultView.cancelAnimationFrame(pendingFitFrame);cancelResizePreview();observer?.disconnect();image.onload=null;image.onerror=null;host.replaceChildren();}};
 }
 root.DMateGraphOverlay={mount,elasticRegionStart,elasticRegionPoints,nearestRegionBoundary};if(typeof module!=='undefined'&&module.exports)module.exports={mount,elasticRegionStart,elasticRegionPoints,nearestRegionBoundary};
 })(typeof window!=='undefined'?window:globalThis);

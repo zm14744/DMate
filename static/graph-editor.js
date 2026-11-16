@@ -541,6 +541,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
                 container.append(workspace);
                 if (!overlay) overlay = root.DMateGraphOverlay.mount(host, {
                     instance, originalUrl: options.originalUrl, model, state: overlayState, drawingOnly: options.drawingOnly,
+                    viewState: options.viewState, onViewChange: options.onViewChange,
                     graph: () => model.getDocument().graphs.find(row => row.id === currentGraph),
                     createRegion: (points,polygon) => {
                         const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);

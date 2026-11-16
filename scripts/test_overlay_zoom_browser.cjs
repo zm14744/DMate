@@ -129,6 +129,16 @@ async function automaticFitCases(page) {
     fixtureOverlay.fitView();
   }); await settle(page);
   equalCamera(await camera(page), a, 'Visible explicit fitView uses the same Fit camera');
+  await page.evaluate(() => {
+    for (let i = 0; i < 12; i++) document.querySelector('[data-overlay-tool="zoom-in"]').click();
+    const viewport = document.querySelector('.dge-overlay-viewport'); viewport.scrollLeft += 123; viewport.scrollTop += 91;
+    // Both style changes occur within one task, so ResizeObserver can coalesce
+    // them and observe the same final dimensions it had before hiding.
+    const host = document.getElementById('overlay-fixture'); host.style.display = 'none';
+    fixtureOverlay.fitView(); host.style.display = '';
+  });
+  await page.waitForFunction(() => document.querySelector('.dge-overlay').dataset.geometryReady === 'true'); await settle(page);
+  equalCamera(await camera(page), a, 'Explicit Fit completes after a same-frame hide/reveal');
   await mount(page, { graph: pageB, zoom: 400, hidden: true });
   assert.deepEqual(await page.evaluate(() => ({ width: document.querySelector('.dge-overlay-viewport').clientWidth,
     ready: document.querySelector('.dge-overlay').dataset.geometryReady })), { width: 0, ready: 'false' }, 'Loaded hidden image waits for real dimensions');

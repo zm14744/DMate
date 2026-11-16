@@ -289,9 +289,9 @@ async function inlineLifecycle(page) {
   await settle(page);
   await inlineLayout(page);
   await page.setViewportSize({ width: 390, height: 900 });
-  await frame(page).locator('.kg-mobile-entry-only').waitFor();
-  await inlineLayout(page);
   await fullGraph(page);
+  assert.equal(await frame(page).evaluate(root => root.classList.contains('graph-fullscreen-view')
+    && root.parentElement === document.body), true, 'Returning to mobile restores its prior full-view layout');
   // Exercise the real navigation handler during full view, as an application
   // navigation can occur while its sidebar button is intentionally covered.
   await page.locator('.offline-nav-item[data-panel="concepts"]').evaluate(button => button.click());
