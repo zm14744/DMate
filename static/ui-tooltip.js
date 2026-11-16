@@ -1,7 +1,8 @@
 /* Delegated, accessible tooltips for titled interface controls. */
 (function (root) {
     'use strict';
-    const controls = 'button,a,[role="button"],summary';
+    const conversationLabels = '#desktopConversationTitle,#sessions [data-session-name]';
+    const controls = 'button,a,[role="button"],summary,' + conversationLabels;
     const content = '.msg-content,.ai-content,.wrong-question,.wrong-note-body,.wrong-feedback-body,.wrong-answer-inner,.wrong-analysis-body,.wrong-pdf-question,.kg-history-preview,.ocr-review-rendered,.dcn-ai-result,.dcn-result,.dge-text-excerpt,.dge-text-body';
     const excluded = 'mjx-container,math,code,pre,textarea,script,style,[contenteditable]:not([contenteditable="false"])';
     const held = new Map();
@@ -13,7 +14,10 @@
         const control = element?.closest?.(controls);
         if (!control || control.closest(excluded)) return null;
         const zone = control.closest('[data-i18n-content],[translate="no"],[data-i18n-ui]');
-        if (zone ? !zone.hasAttribute('data-i18n-ui') : control.closest(content)) return null;
+        // App-owned conversation labels keep user text protected from UI
+        // translation while sharing the same tooltip as interface controls.
+        if (!control.matches(conversationLabels)
+            && (zone ? !zone.hasAttribute('data-i18n-ui') : control.closest(content))) return null;
         return held.has(control) || control.getAttribute('title')?.trim() ? control : null;
     }
 

@@ -356,7 +356,7 @@
   }
 
   function fillSelectionFilter(select, value) {
-    const labels = {"":tr("全部", "All"), selected:tr("已选择", "Selected"), unselected:tr("未选择", "Unselected")};
+    const labels = {"":tr("全部状态", "All statuses"), selected:tr("已选择", "Selected"), unselected:tr("未选择", "Unselected")};
     for (const option of select.options) option.textContent = labels[option.value];
     select.value = Object.hasOwn(labels, value) ? value : "";
     return select.value;
@@ -759,7 +759,7 @@
       "关联知识点":"Related knowledge", "暂无已关联条目":"No linked entries yet", "数学符号":"Mathematical notation",
       ...questionTypeLabels, "简单":"Easy", "中等":"Medium", "困难":"Hard",
       "按章节筛选":"Filter by topic", "按难度筛选":"Filter by difficulty", "全部章节":"All topics", "全部难度":"All difficulties",
-      "按题型筛选":"Filter by question type", "全部题型":"All question types", "按选择状态筛选":"Filter by selection",
+      "按题型筛选":"Filter by question type", "全部题型":"All question types", "按状态筛选":"Filter by status", "全部状态":"All statuses",
       "已选择":"Selected", "未选择":"Unselected", "全部":"All",
       "完整查看":"Full view", "完整查看概念详情":"View complete concept details", "完整查看练习详情":"View complete exercise details",
       "关闭详情":"Close details",

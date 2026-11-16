@@ -668,9 +668,10 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
     }
 }
 
-/* Wrong-book actions share the message toolbar's quiet hover/focus feedback. */
+/* Wrong-book and notebook actions share the message toolbar's quiet feedback. */
 @layer dmate-button-themes {
-    body[data-appearance-theme] #wrongBookModal .wrong-actions > button {
+    body[data-appearance-theme] #wrongBookModal .wrong-actions > button,
+    body[data-appearance-theme] #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel) {
         border:0!important;
         border-radius:8px!important;
         background:transparent!important;
@@ -705,16 +706,19 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         pointer-events:none;
     }
     @media(hover:hover) {
-        body[data-appearance-theme] #wrongBookModal .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):hover {
+        body[data-appearance-theme] #wrongBookModal .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):hover,
+        body[data-appearance-theme] #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel):not(:disabled):not([aria-disabled="true"]):hover {
             background:var(--dm-nav-hover,var(--dm-selected-hover))!important;
             color:var(--dm-icon-emphasis,var(--text-primary))!important;
         }
     }
-    body[data-appearance-theme] #wrongBookModal .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):is(:focus-visible,:active) {
+    body[data-appearance-theme] #wrongBookModal .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):is(:focus-visible,:active),
+    body[data-appearance-theme] #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel):not(:disabled):not([aria-disabled="true"]):is(:focus-visible,:active) {
         background:var(--dm-nav-hover,var(--dm-selected-hover))!important;
         color:var(--dm-icon-emphasis,var(--text-primary))!important;
     }
-    body[data-appearance-theme] #wrongBookModal .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):focus-visible {
+    body[data-appearance-theme] #wrongBookModal .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):focus-visible,
+    body[data-appearance-theme] #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel):not(:disabled):not([aria-disabled="true"]):focus-visible {
         outline:2px solid var(--dm-selected-ring)!important;
         outline-offset:2px!important;
     }

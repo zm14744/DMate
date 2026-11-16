@@ -26,15 +26,37 @@ async function sidebar(page, open) {
 
 async function headerTitle(page, expected) {
   const title = page.locator('#desktopConversationTitle');
+  if (!expected) {
+    assert.equal(await title.isVisible(), false, 'No current conversation leaves the desktop header blank');
+    assert.equal(await title.textContent(), '', 'No fallback brand or stale conversation title');
+    assert.ok(!await title.getAttribute('title'), 'An empty header has no stale tooltip');
+  }
   if (mobile(page)) {
     assert.equal(await title.isVisible(), false, 'Conversation title is desktop only');
     assert.equal(await page.locator('#mobileConversationTitle').count(), 0, 'Mobile topbar stays icon only');
-  } else {
+  } else if (expected) {
     assert.equal(await title.innerText(), expected, 'Header follows the current conversation');
     assert.equal(await title.getAttribute('title'), expected);
     assert.equal(await title.getAttribute('data-i18n-content'), '');
   }
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Header causes no page overflow');
+}
+
+async function sharedTooltip(page, target, text) {
+  await target.hover();
+  const tooltip = page.locator('.dm-ui-tooltip[role="tooltip"]');
+  await tooltip.waitFor({ state: 'visible' });
+  assert.equal(await tooltip.innerText(), text, 'The shared tooltip displays the complete protected conversation name');
+  assert.equal(await tooltip.locator('*').count(), 0, 'Conversation names stay literal text inside the tooltip');
+  assert.equal(await target.getAttribute('title'), '', 'Native rectangular tooltip is suppressed while the shared tooltip is active');
+  assert.ok((await target.getAttribute('aria-describedby') || '').split(/\s+/).includes(await tooltip.getAttribute('id')));
+  const style = await tooltip.evaluate(node => Object.fromEntries(['backgroundColor', 'backgroundImage', 'borderWidth', 'borderColor',
+    'borderRadius', 'boxShadow', 'color', 'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'padding']
+    .map(key => [key, getComputedStyle(node)[key]])));
+  await page.mouse.move(0, 0);
+  await tooltip.waitFor({ state: 'hidden' });
+  await settle(page);
+  return style;
 }
 
 async function headerIcons(page, expanded) {
@@ -94,7 +116,7 @@ async function language(page, value) {
 async function conversationLifecycle(page, width, theme) {
   await page.evaluate(() => { sessions = []; currentId = null; saveState(); renderAll(); });
   await settle(page);
-  await headerTitle(page, 'DMate'); await headerIcons(page, false);
+  await headerTitle(page, ''); await headerIcons(page, false);
   const create = page.locator(mobile(page) ? '#mobileNewChatBtn' : '#desktopNewChatBtn');
   await create.click();
   await page.waitForFunction(() => sessions.length === 1 && Boolean(getCurrent()));
@@ -124,10 +146,16 @@ async function conversationLifecycle(page, width, theme) {
   await page.locator('#sessions .session[data-session-id="' + firstId + '"] [data-session-name]').click();
   await page.waitForFunction(id => String(currentId) === id, firstId);
   await headerTitle(page, '新对话');
-  const longName = '很长的对话名称'.repeat(12).slice(0, 80);
+  const longName = ('<b>集合 & “逻辑”</b> ' + '很长的对话名称'.repeat(12)).slice(0, 80);
   await renameCurrent(page, longName);
   await headerTitle(page, longName);
+  assert.equal(await page.locator('#desktopConversationTitle b,#sessions [data-session-name] b').count(), 0,
+    'User-supplied title markup is displayed as text');
+  let conversationTooltipStyle;
   if (!mobile(page)) {
+    const sidebarTooltip = await sharedTooltip(page, page.locator('#sessions .session.active [data-session-name]'), longName);
+    conversationTooltipStyle = await sharedTooltip(page, page.locator('#desktopConversationTitle'), longName);
+    assert.deepEqual(conversationTooltipStyle, sidebarTooltip, 'Sidebar and header conversation names share the same tooltip');
     const overflow = await page.locator('#desktopConversationTitle').evaluate(node => {
       const css = getComputedStyle(node), bounds = node.getBoundingClientRect();
       return { overflow: css.overflowX, ellipsis: css.textOverflow, wrap: css.whiteSpace,
@@ -141,6 +169,13 @@ async function conversationLifecycle(page, width, theme) {
   }
   await sidebar(page, false);
   await headerIcons(page, false); await headerTitle(page, longName);
+  if (!mobile(page)) {
+    assert.deepEqual(await sharedTooltip(page, page.locator('#desktopNewChatBtn'), '＋ 新对话'), conversationTooltipStyle,
+      'Conversation labels use the existing interface tooltip styling');
+    await language(page, 'en');
+    await sharedTooltip(page, page.locator('#desktopConversationTitle'), longName);
+    await language(page, 'zh-CN');
+  }
   if (screenshotDir && theme === 'dark' && [390, 1440].includes(width)) {
     await page.screenshot({ path: screenshotDir + (width === 390 ? '/mobile-topbar.png' : '/desktop-collapsed.png') });
   }
@@ -154,7 +189,7 @@ async function conversationLifecycle(page, width, theme) {
   await page.locator('#appConfirmModal').waitFor({ state: 'visible' });
   await page.locator('#appConfirmConfirm').click();
   await page.waitForFunction(() => currentId === null && sessions.length === 1);
-  await headerTitle(page, 'DMate');
+  await headerTitle(page, '');
   await sidebar(page, false);
 }
 
@@ -164,6 +199,45 @@ const notebookStyle = locator => locator.evaluate(node => {
     'color', 'borderRadius', 'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'padding', 'height', 'boxShadow']
     .map(key => [key, css[key]])), renderedHeight: node.getBoundingClientRect().height };
 });
+
+const aiActionPaint = locator => locator.evaluate(node => {
+  const css = getComputedStyle(node);
+  return { background: css.backgroundColor, image: css.backgroundImage, border: css.borderWidth,
+    shadow: css.boxShadow, outline: [css.outlineStyle, css.outlineWidth, css.outlineColor], color: css.color };
+});
+
+async function notebookAiActions(page, newButton) {
+  const actions = page.locator('#conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel)');
+  assert.equal(await actions.count(), 2);
+  assert.equal(await actions.nth(0).isDisabled(), true, 'No selected concepts disables explanation');
+  assert.equal(await actions.nth(1).isDisabled(), true, 'No selected concepts disables relation analysis');
+  const quiet = async button => {
+    const paint = await aiActionPaint(button);
+    assert.equal(paint.background, 'rgba(0, 0, 0, 0)', 'Notebook AI actions have no idle fill');
+    assert.equal(paint.image, 'none'); assert.equal(paint.border, '0px'); assert.equal(paint.shadow, 'none');
+    return paint;
+  };
+  await page.mouse.move(0, 0); await page.locator('#conceptNotebookTitle').focus(); await settle(page);
+  for (const button of await actions.all()) await quiet(button);
+  await page.locator('#conceptNotebookDialog .dcn-note input[type="checkbox"]').first().check();
+  assert.equal(await actions.nth(0).isEnabled(), true, 'One selected concept enables explanation');
+  assert.equal(await actions.nth(1).isDisabled(), true, 'Relation analysis still requires two concepts');
+  await newButton.click();
+  await page.locator('#conceptNotebookDialog .dcn-title').fill('关联概念');
+  for (const checkbox of await page.locator('#conceptNotebookDialog .dcn-note input[type="checkbox"]').all()) await checkbox.check();
+  assert.equal(await actions.nth(0).isEnabled(), true);
+  assert.equal(await actions.nth(1).isEnabled(), true, 'Two selected concepts enable relation analysis');
+  for (const button of await actions.all()) {
+    await page.mouse.move(0, 0); await page.locator('#conceptNotebookTitle').focus(); await settle(page);
+    const idle = await quiet(button);
+    if (!mobile(page)) {
+      await button.hover(); await settle(page);
+      assert.notDeepEqual(await aiActionPaint(button), idle, 'Enabled notebook AI action has hover feedback');
+    }
+    await page.mouse.move(0, 0); await page.keyboard.press('Tab'); await button.focus(); await settle(page);
+    assert.notDeepEqual(await aiActionPaint(button), idle, 'Enabled notebook AI action has keyboard focus feedback');
+  }
+}
 
 async function notebookButton(page) {
   await sidebar(page, true);
@@ -187,9 +261,11 @@ async function notebookButton(page) {
   await button.click();
   assert.equal(await page.locator('#conceptNotebookDialog .dcn-note').count(), before + 1, 'New concept still creates an editable notebook entry');
   await page.locator('#conceptNotebookDialog .dcn-title').fill('局部概念');
+  await notebookAiActions(page, button);
+  const savedTitle = await page.locator('#conceptNotebookDialog .dcn-title').inputValue();
   await language(page, 'en');
   assert.equal(await button.innerText(), '＋ New concept');
-  assert.equal(await page.locator('#conceptNotebookDialog .dcn-title').inputValue(), '局部概念', 'Language changes preserve concept content');
+  assert.equal(await page.locator('#conceptNotebookDialog .dcn-title').inputValue(), savedTitle, 'Language changes preserve concept content');
   await language(page, 'zh-CN');
   await page.locator('#conceptNotebookDialog .dcn-close').first().click();
 }
@@ -201,7 +277,7 @@ async function runCase(browser, width, theme) {
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/auth/me', route => route.fulfill({ contentType: 'application/json',
     body: JSON.stringify({ configured: true, authenticated: false }) }));
-  for (const endpoint of ['**/chat', '**/analyze-questions']) await page.route(endpoint, route => {
+  for (const endpoint of ['**/chat', '**/analyze-questions', '**/notebook/analyze']) await page.route(endpoint, route => {
     modelRequests.push(route.request().url()); return route.abort();
   });
   try {
@@ -211,7 +287,7 @@ async function runCase(browser, width, theme) {
     await conversationLifecycle(page, width, theme);
     await notebookButton(page);
     assert.deepEqual(modelRequests, [], 'No AI endpoint calls'); assert.deepEqual(errors, [], 'No browser script errors');
-    console.log('PASS ' + width + '/' + theme + ': conversation header lifecycle, sidebar state, live language, no overflow and new concept styling');
+    console.log('PASS ' + width + '/' + theme + ': blank/header lifecycle, shared conversation tooltips, sidebar state, live language and quiet notebook AI actions');
   } finally { await context.close(); }
 }
 

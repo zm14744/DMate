@@ -66,11 +66,21 @@ async function navigate(page, panel) {
 async function choose(page, selector, value) {
   await closeLibraryDetail(page);
   const select = page.locator(selector);
+  const selectionFilter = /^#(?:concept|question)Selection$/.test(selector);
+  const english = await page.locator('html').getAttribute('data-ui-language') === 'en';
+  const statusLabel = english ? 'Filter by status' : '按状态筛选';
+  if (selectionFilter) {
+    assert.equal(await select.getAttribute('aria-label'), statusLabel, 'The status picker uses the shorter shared label');
+    assert.equal(await select.locator('option[value=""]').innerText(), english ? 'All statuses' : '全部状态',
+      'The unfiltered status option names all statuses while retaining its empty value');
+  }
   if (await select.inputValue() === value) return;
   if (mobile(page)) {
     const label = await select.evaluate((select, value) => [...select.options].find(option => option.value === value).label, value);
     await select.tap();
     await page.locator('#mobileChoiceModal').waitFor({ state: 'visible' });
+    if (selectionFilter) assert.equal(await page.locator('#mobileChoiceTitle').innerText(), statusLabel,
+      'The mobile choice dialog presents the same status label');
     await page.locator('#mobileChoiceModal').getByRole('radio', { name: label, exact: true }).tap();
     await page.locator('#mobileChoiceModal').waitFor({ state: 'hidden' });
   } else await select.selectOption(value);
@@ -212,7 +222,7 @@ async function englishFilters(page) {
   await choose(page, '#conceptSelection', 'selected');
   await language(page, 'en');
   for (const selector of ['#conceptSelection', '#questionSelection']) {
-    assert.deepEqual(await page.locator(selector + ' option').evaluateAll(options => options.map(option => option.label)), ['All', 'Selected', 'Unselected']);
+    assert.deepEqual(await page.locator(selector + ' option').evaluateAll(options => options.map(option => option.label)), ['All statuses', 'Selected', 'Unselected']);
   }
   assert.equal(await page.locator('#conceptSelection').inputValue(), 'selected', 'Changing language preserves the current selection filter');
   await assertRows(page, 'concepts', concepts.filter(concept => selectedConcepts.some(value => value.id === concept.id)));

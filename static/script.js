@@ -1006,8 +1006,8 @@ let currentWrongEditId = null;
 let pendingWrongQuestionSelection = null;
 let pendingWrongSafeItems = [];
 let pendingWrongSafeIndex = 0;
-let wrongSafePreviewRevision = 0;
-let wrongSafePreviewTimer = null;
+const wrongSafeQuestionPreviewState = { revision: 0, timer: null };
+const wrongEditQuestionPreviewState = { revision: 0, timer: null };
 
 const wrongAnswerLoadingIds = new Set();
 const wrongAnswerQueue = [];
@@ -6688,31 +6688,32 @@ function openWrongSafePreview(items) {
     return true;
 }
 
-function clearWrongSafeQuestionPreview() {
-    wrongSafePreviewRevision += 1;
-    clearTimeout(wrongSafePreviewTimer);
-    wrongSafePreviewTimer = null;
-    const preview = document.getElementById("wrongSafePreview");
+function clearWrongQuestionPreview(state, previewId) {
+    state.revision += 1;
+    clearTimeout(state.timer);
+    state.timer = null;
+    const preview = document.getElementById(previewId);
     window.DMateAIAnswer.clear(preview);
     preview?.removeAttribute("aria-busy");
 }
 
-function updateWrongSafeQuestionPreview(delay = 0) {
-    const revision = ++wrongSafePreviewRevision;
-    clearTimeout(wrongSafePreviewTimer);
-    const modal = document.getElementById("wrongSafeModal");
-    const textarea = document.getElementById("wrongSafeQuestion");
-    const preview = document.getElementById("wrongSafePreview");
+function updateWrongQuestionPreview(state, ids, contextIsCurrent, delay = 0) {
+    const revision = ++state.revision;
+    clearTimeout(state.timer);
+    state.timer = null;
+    const modal = document.getElementById(ids.modal);
+    const textarea = document.getElementById(ids.textarea);
+    const preview = document.getElementById(ids.preview);
     if (!preview || !textarea || !modal || modal.classList.contains("hidden")) return;
 
     const source = textarea.value;
-    const isCurrent = () => revision === wrongSafePreviewRevision
+    const isCurrent = () => revision === state.revision && contextIsCurrent()
         && !modal.classList.contains("hidden") && textarea.value === source;
     preview.setAttribute("aria-busy", "true");
     // Keep the previous typeset preview visible while the latest edit is
     // prepared. Input invalidates older work before the debounce expires.
-    wrongSafePreviewTimer = setTimeout(async () => {
-        wrongSafePreviewTimer = null;
+    state.timer = setTimeout(async () => {
+        state.timer = null;
         if (!isCurrent()) return;
         const stage = document.createElement("div");
         stage.className = "wrong-safe-preview reply-render-stage";
@@ -6735,6 +6736,28 @@ function updateWrongSafeQuestionPreview(delay = 0) {
             if (isCurrent()) preview.removeAttribute("aria-busy");
         }
     }, delay);
+}
+
+function clearWrongSafeQuestionPreview() {
+    clearWrongQuestionPreview(wrongSafeQuestionPreviewState, "wrongSafePreview");
+}
+
+function updateWrongSafeQuestionPreview(delay = 0) {
+    const item = pendingWrongSafeItems[pendingWrongSafeIndex];
+    updateWrongQuestionPreview(wrongSafeQuestionPreviewState, {
+        modal: "wrongSafeModal", textarea: "wrongSafeQuestion", preview: "wrongSafePreview"
+    }, () => Boolean(item) && pendingWrongSafeItems[pendingWrongSafeIndex] === item, delay);
+}
+
+function clearWrongEditQuestionPreview() {
+    clearWrongQuestionPreview(wrongEditQuestionPreviewState, "wrongEditPreview");
+}
+
+function updateWrongEditQuestionPreview(delay = 0) {
+    const id = currentWrongEditId;
+    updateWrongQuestionPreview(wrongEditQuestionPreviewState, {
+        modal: "wrongEditModal", textarea: "wrongEditQuestion", preview: "wrongEditPreview"
+    }, () => Boolean(id) && currentWrongEditId === id, delay);
 }
 
 function renderWrongSafePreview() {
@@ -6765,11 +6788,11 @@ function renderWrongSafePreview() {
     updateWrongSafeQuestionPreview();
 
     if (progress) {
-        progress.textContent = (
-            pendingWrongSafeItems.length > 1
-                ? `第 ${pendingWrongSafeIndex + 1} / ${pendingWrongSafeItems.length} 道`
-                : "请确认下面就是要保存的题目"
-        );
+        const multiple = pendingWrongSafeItems.length > 1;
+        progress.textContent = multiple
+            ? `第 ${pendingWrongSafeIndex + 1} / ${pendingWrongSafeItems.length} 道`
+            : "";
+        progress.classList.toggle("hidden", !multiple);
     }
 
     modal.querySelector(".wrong-safe-body").scrollTop = 0;
@@ -8013,21 +8036,24 @@ function openWrongEdit(id) {
 
     if (!entry) return;
 
-    currentWrongEditId = id;
-
     const modal = document.getElementById("wrongEditModal");
     const question = document.getElementById("wrongEditQuestion");
     const note = document.getElementById("wrongEditNote");
 
     if (!modal || !question || !note) return;
 
+    clearWrongEditQuestionPreview();
+    currentWrongEditId = id;
     question.value = entry.question;
     note.value = entry.note || "";
 
     modal.classList.remove("hidden");
+    modal.querySelector(".wrong-edit-body").scrollTop = 0;
+    updateWrongEditQuestionPreview();
 }
 
 function closeWrongEdit() {
+    clearWrongEditQuestionPreview();
     const modal = document.getElementById("wrongEditModal");
     if (modal) {
         modal.classList.add("hidden");
@@ -21480,8 +21506,10 @@ function refreshConversationTitle() {
     const session = getCurrent();
     const name = sessionDisplayName(session).trim();
     title.setAttribute("data-i18n-content", "");
-    title.textContent = name || "DMate";
-    title.title = name || "DMate";
+    title.textContent = name;
+    title.hidden = !name;
+    if (name) title.title = name;
+    else title.removeAttribute("title");
 }
 
 
@@ -22414,6 +22442,7 @@ document.addEventListener(
         const wrongEditClose = document.getElementById("wrongEditClose");
         const wrongEditSave = document.getElementById("wrongEditSave");
         const wrongEditModal = document.getElementById("wrongEditModal");
+        const wrongEditQuestion = document.getElementById("wrongEditQuestion");
         const wrongQuestionPickerClose = document.getElementById("wrongQuestionPickerClose");
         const wrongQuestionPickerConfirm = document.getElementById("wrongQuestionPickerConfirm");
         const wrongQuestionPickerModal = document.getElementById("wrongQuestionPickerModal");
@@ -22646,6 +22675,10 @@ document.addEventListener(
                 "click",
                 saveWrongEdit
             );
+        }
+
+        if (wrongEditQuestion) {
+            wrongEditQuestion.addEventListener("input", () => updateWrongEditQuestionPreview(120));
         }
 
         if (wrongEditModal) {

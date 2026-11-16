@@ -372,6 +372,8 @@
         "笔记本组件未加载，请刷新后重试。": "The Notebook component did not load. Refresh and try again.",
         "本机存储空间不足，笔记暂留在当前页面；请不要关闭页面，并检查云同步状态。": "Local storage is full. Notes remain in this page for now. Keep it open and check cloud sync status.",
         "状态筛选：": "Status:",
+        "按状态筛选": "Filter by status",
+        "全部状态": "All statuses",
         "待处理": "Pending",
         "已订正": "Corrected",
         "搜索": "Search",
