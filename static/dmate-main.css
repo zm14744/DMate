@@ -592,6 +592,14 @@ body[data-appearance-theme="light"] #sendBtn.ai-stop-button:hover {
     border-bottom:1px solid var(--surface-3);
 }
 
+#knowledgeGraphModal .graph-head-actions {
+    display:flex;
+    align-items:center;
+    flex:0 0 auto;
+    gap:10px;
+    margin-left:auto;
+}
+
 .modal-head .modal-close-dot {
     flex:0 0 auto;
     width:20px;
@@ -7049,9 +7057,6 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         min-width:0;
         padding:7px 6px;
         font-size:13px;
-    }
-    #knowledgeGraphModal #knowledgeGraphCopyBtn {
-        grid-column:1 / -1;
     }
     #knowledgeGraphModal .graph-legend,
     #knowledgeGraphModal .graph-summary,

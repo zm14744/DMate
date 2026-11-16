@@ -68,6 +68,10 @@ async function visual(page, size) {
     const concept = card.querySelector('.offline-graph-learning-links');
     const conceptParent = concept?.parentElement, conceptNext = concept?.nextSibling;
     concept?.remove();
+    // Only the online dialog has a close button beside the shared copy action.
+    const close = card.querySelector('#knowledgeGraphClose');
+    const closeParent = close?.parentElement, closeNext = close?.nextSibling;
+    close?.remove();
     if (size) {
       card.style.setProperty('width', size.width + 'px', 'important');
       card.style.setProperty('height', size.height + 'px', 'important');
@@ -95,6 +99,7 @@ async function visual(page, size) {
       if (original === null) card.removeAttribute('style'); else card.setAttribute('style', original);
     }
     if (concept) conceptParent.insertBefore(concept, conceptNext);
+    if (close) closeParent.insertBefore(close, closeNext);
     return { size: { width: origin.width, height: origin.height }, blocks: result };
   }, size || null);
 }
