@@ -283,6 +283,9 @@ async function offlineEntry(browser, width) {
     const navigation = page.waitForURL('**/offline', { waitUntil: 'commit', timeout: 10000 });
     await page.evaluate(() => releaseOfflineSnapshot());
     await navigation;
+    // Navigation has committed without the service worker; settle the new
+    // document before disposing its context to avoid racing browser teardown.
+    await page.waitForLoadState('domcontentloaded');
     console.log('PASS offline entry/' + width + ': stable label, retained snapshot handoff and navigation bypasses unresolved service-worker promises');
   } finally { await context.close(); }
 }

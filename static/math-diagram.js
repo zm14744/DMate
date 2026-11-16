@@ -94,8 +94,8 @@
 
     function engineFor(kind, graph) {
         if (kind === 'hasse') return 'dot';
-        if (kind === 'cyclic_cayley') return 'circo';
-        if (kind === 'zero_divisor_graph') return 'neato';
+        if (kind === 'cyclic_cayley' || kind === 'finite_group_cayley') return 'circo';
+        if (kind === 'zero_divisor_graph' || kind === 'finite_zero_divisor_graph') return 'neato';
         return graph.directed ? 'dot' : 'neato';
     }
 

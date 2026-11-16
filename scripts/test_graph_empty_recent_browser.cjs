@@ -10,6 +10,16 @@ async function nextFrames(page) {
 
 async function assertEmpty(page, text, label) {
   assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(), text, label + ': canvas contains only the empty label');
+  const canvasPosition = await page.locator('#knowledgeGraphCanvas').evaluate(canvas => {
+    const pane = canvas.getBoundingClientRect(), empty = canvas.querySelector(':scope > .kg-empty').getBoundingClientRect();
+    return { x: empty.left + empty.width / 2 - (pane.left + pane.width / 2),
+      y: empty.top + empty.height / 2 - (pane.top + pane.height / 2),
+      height: pane.height, availableHeight: canvas.parentElement.clientHeight };
+  });
+  assert.ok(Math.abs(canvasPosition.x) <= 1 && Math.abs(canvasPosition.y) <= 1,
+    label + ': empty canvas label is centered in both axes');
+  assert.ok(Math.abs(canvasPosition.height - canvasPosition.availableHeight) <= 1 && canvasPosition.height > 120,
+    label + ': empty canvas fills its available graph body');
   assert.equal((await page.locator('#knowledgeGraphDetail').innerText()).trim(), text, label + ': detail contains only the empty label');
   assert.equal(await page.locator('#knowledgeGraphDetailTitle').isVisible(), false, label + ': no stale selected-node title');
   const position = await page.locator('#knowledgeGraphDetail').evaluate(body => {

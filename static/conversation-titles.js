@@ -1,4 +1,4 @@
-/* Content-grounded conversation titles. Naming never starts another AI request. */
+/* Immediate offline-safe fallback; semantic conversation names come from /conversation/title. */
 (function (root) {
     'use strict';
 
@@ -104,7 +104,7 @@
         return chars.slice(0, limit - 1).join('') + '…';
     }
 
-    function summarize(text, options = {}) {
+    function legacySummary(text, options = {}) {
         const value = clean(text), english = !/[\u3400-\u9fff]/u.test(value) && /[a-z]{3}/i.test(value);
         const fallback = options.source === 'ocr' ? '图片识题' : '新对话';
         if (!value || /^(?:你好|您好|嗨|哈[喽啰]|谢谢|感谢|hello|hi|hey|thanks|thank you)[！!。.,，\s]*$/i.test(value)
@@ -160,5 +160,25 @@
         return { title: clip(subject + (english ? ' discussion' : '讨论'), english), specificity: 0, useful: true };
     }
 
-    root.DMateConversationTitles = Object.freeze({ summarize, legacyName });
+    function summarize(text, options = {}) {
+        const value = clean(text);
+        const legacy = legacySummary(text, options);
+        if (!value || options.source === 'ocr' && /^[^\s]+\.(?:png|jpe?g|webp|heic|pdf)$/i.test(value)) return legacy;
+        const english = !/[\u3400-\u9fff]/u.test(value) && /[a-z]{3}/i.test(value);
+        if (/^(?:你好|您好|嗨|哈[喽啰]|hello|hi|hey)[！!。.,，\s]*$/i.test(value)) {
+            return { title: english ? 'First conversation' : '初次交流', specificity: 0, useful: false };
+        }
+        if (/^(?:谢谢|感谢|thanks|thank you)[！!。.,，\s]*$/i.test(value)) {
+            return { title: english ? 'Conversation and thanks' : '交流与致谢', specificity: 0, useful: false };
+        }
+        if (legacy.specificity > 0 || !legacy.useful || /练习题|复习计划|Practice questions|Study plan/.test(legacy.title)) return legacy;
+        if (/渲染|render(?:ing)?/i.test(value) && /检查|测试|check|test/i.test(value)) {
+            return { title: english ? 'Rendering test' : /长文本/.test(value) ? '长文本渲染测试' : '渲染效果测试', specificity: 1, useful: true };
+        }
+        // A provider failure must never turn a full copied request plus a suffix
+        // into a supposedly summarized title. Keep an honest broad fallback.
+        return { title: english ? 'Learning conversation' : '学习交流', specificity: 0, useful: true };
+    }
+
+    root.DMateConversationTitles = Object.freeze({ summarize, legacyName, legacySummary });
 })(typeof window === 'undefined' ? globalThis : window);

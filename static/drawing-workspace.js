@@ -29,7 +29,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    for(const x of [10,14]){const line=doc.createElementNS(svg.namespaceURI,'line');for(const [key,value] of Object.entries({x1:x,x2:x,y1:11,y2:17}))line.setAttribute(key,String(value));svg.append(line);}return svg;};
   const sendIcon=()=>{const svg=doc.createElementNS('http://www.w3.org/2000/svg','svg'),path=doc.createElementNS(svg.namespaceURI,'path');
    svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');
-   for(const [key,value] of Object.entries({d:'M12 20V4m-7 7 7-7 7 7',fill:'none',stroke:'#fff','stroke-width':'2.4','stroke-linecap':'round','stroke-linejoin':'round'}))path.setAttribute(key,value);svg.append(path);return svg;};
+   for(const [key,value] of Object.entries({d:'M12 20V4m-7 7 7-7 7 7',fill:'none',stroke:'currentColor','stroke-width':'2.4','stroke-linecap':'round','stroke-linejoin':'round'}))path.setAttribute(key,value);svg.append(path);return svg;};
   const shell=el('section','dmate-drawing-workspace'),top=el('div','ddw-header'),name=el('input','ddw-name');
   name.type='text';name.maxLength=80;name.setAttribute('aria-label','绘图名称');
   const actions=el('div','ddw-page-actions'),body=el('div','ddw-body'),editorHost=el('div','ddw-editor'),rail=el('div','ddw-side-actions'),panel=el('aside','ddw-side-panel'),noticeOwner=el('div','ddw-notice-owner');
@@ -73,7 +73,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   function abortAnswer(){aiEpoch++;aiAbort?.abort();aiAbort=null;aiTask='';}
   function invalidateAnswer(){
    abortAnswer();answer='';answerDocument='';answerRequirement='';
-   const ask=panel.querySelector('[data-drawing-guide],[data-math-diagram-generate]');if(ask){ask.disabled=panelMode==='ai'&&!active();ask.setAttribute('aria-busy','false');}
+   const ask=panel.querySelector('[data-drawing-guide],[data-math-diagram-generate]');if(ask)ask.setAttribute('aria-busy','false');
    const result=panel.querySelector('.ddw-ai-answer');if(result)result.replaceChildren();
    syncChrome();
   }
@@ -92,7 +92,11 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    content.style.visibility='hidden';
    const viewport=win.visualViewport,margin=8,gap=8,leftEdge=(viewport?.offsetLeft||0)+margin,topEdge=(viewport?.offsetTop||0)+margin;
    const rightEdge=leftEdge+(viewport?.width||win.innerWidth)-2*margin,bottomEdge=topEdge+(viewport?.height||win.innerHeight)-2*margin;
-   const anchor=trigger.getBoundingClientRect(),below=bottomEdge-anchor.bottom-gap,above=anchor.top-gap-topEdge;
+   // Translated rail labels can wrap. Keep every row reachable when a
+   // popover opens from a button in the first row.
+   const triggerBox=trigger.getBoundingClientRect(),railBox=trigger.closest('.ddw-side-actions')?.getBoundingClientRect();
+   const anchor=railBox?{left:triggerBox.left,right:triggerBox.right,top:railBox.top,bottom:railBox.bottom}:triggerBox;
+   const below=bottomEdge-anchor.bottom-gap,above=anchor.top-gap-topEdge;
    const upwards=below<120&&above>below,space=Math.max(40,upwards?above:below);
    content.style.maxHeight=space+'px';content.style.maxWidth=Math.max(40,rightEdge-leftEdge)+'px';
    // A host can create a fixed containing block (for example will-change:
@@ -129,7 +133,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    settingsButton.disabled=empty||disabled;informationButton.disabled=empty||disabled;if(aiButton)aiButton.disabled=disabled;
    if(generateButton){generateButton.disabled=disabled;generateButton.setAttribute('aria-busy',String(aiTask==='generate'));}
    const send=panel.querySelector('[data-drawing-guide],[data-math-diagram-generate]');
-   if(send){send.disabled=disabled||Boolean(aiAbort)||(panelMode==='ai'&&!active());send.setAttribute('aria-busy',String(aiTask===(panelMode==='generate'?'generate':'guide')));}
+   if(send){send.disabled=disabled||Boolean(aiAbort)||(panelMode==='generate'?!requirement.trim():!active());send.setAttribute('aria-busy',String(aiTask===(panelMode==='generate'?'generate':'guide')));}
    shell.classList.toggle('is-empty',empty);
    if(palette){palette.open=toolsExpanded&&!empty;const trigger=palette.querySelector(':scope > summary');trigger?.setAttribute('aria-expanded',String(palette.open));trigger?.setAttribute('aria-disabled',String(disabled));}
    for(const item of editorHost.querySelectorAll('.dge-float-panel')){
@@ -248,10 +252,11 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
      row.append(open,remove);list.append(row);
     });if(!pages.length)list.append(el('p','ddw-history-empty','无'));panel.append(list);syncChrome();return;
    }
-   const label=el('label','ddw-ai-label',uiText('绘图要求（可选）','Diagram request (optional)')),input=el('textarea','ddw-ai-requirement');input.rows=3;input.maxLength=2000;input.value=requirement;input.setAttribute('aria-label',uiText('绘图要求（可选）','Diagram request (optional)'));
+   const generating=panelMode==='generate',requestLabel=generating?uiText('绘图要求','Diagram request'):uiText('绘图要求（可选）','Diagram request (optional)');
+   const label=el('label','ddw-ai-label',requestLabel),input=el('textarea','ddw-ai-requirement');input.rows=3;input.maxLength=2000;input.value=requirement;input.required=generating;input.setAttribute('aria-label',requestLabel);
    input.addEventListener('input',()=>{requirement=input.value;const p=active();if(p){p.requirement=requirement;p.updatedAt=Date.now();schedule();}invalidateAnswer();});label.append(input);
    const actionRow=el('div','ddw-ai-actions');
-   const generating=panelMode==='generate',ask=button('',()=>generating?requestGenerate():requestGuide(),'ddw-guide-button');ask.append(sendIcon());
+   const ask=button('',()=>generating?requestGenerate():requestGuide(),'ddw-guide-button');ask.append(sendIcon());
    if(generating){ask.dataset.mathDiagramGenerate='true';ask.setAttribute('aria-label',uiText('请求 AI 生成','Request AI generation'));ask.title=uiText('生成数学图','Generate diagram');}
    else{ask.dataset.drawingGuide='true';ask.setAttribute('aria-label','请求 AI 指导');ask.title='指导当前图形';}
    const result=el('div','ddw-ai-answer');result.setAttribute('data-i18n-content','');result.setAttribute('aria-live','polite');
@@ -303,8 +308,8 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   }
   async function requestGenerate(){
    if(!features.ai||aiAbort||destroyed||panelMode!=='generate')return;
-   const requestedRequirement=requirement.trim();
-   const request=requestedRequirement||uiText('生成一个有5个顶点的简单无向环图 C5，顶点标为0、1、2、3、4。','Draw a simple undirected cycle graph C5 with vertices labeled 0, 1, 2, 3, 4.');
+   const requestedRequirement=requirement.trim();if(!requestedRequirement)return;
+   const request=requestedRequirement;
    if(pages.length>=50){setStatus('最多保留 50 张绘图，请先导出并删除不再需要的历史绘图。');return;}
    if(!root.DMateMathDiagram?.generate){setStatus(uiText('数学图生成模块未加载，请刷新后重试。','The diagram generator is not loaded. Refresh and try again.'));return;}
    const selected=activeId,epoch=++aiEpoch,controller=new win.AbortController();aiAbort=controller;aiTask='generate';answer='';renderPanel();setStatus('');

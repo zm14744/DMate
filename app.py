@@ -3338,6 +3338,28 @@ def graph_confirmation_session():
     return response
 
 
+@app.route("/conversation/title", methods=["POST"])
+def conversation_title():
+    """Name a conversation without delaying or changing its teaching reply."""
+    from conversation_titles import ConversationTitleError, MAX_REQUEST_BYTES, summarize_conversation
+    if not _check_rate_limit(_get_client_ip(), "conversation_title"):
+        response = jsonify({"ok": False, "code": "title_rate_limited"})
+        response.status_code = 429
+    elif request.content_length is not None and request.content_length > MAX_REQUEST_BYTES:
+        response = jsonify({"ok": False, "code": "title_request_too_large"})
+        response.status_code = 413
+    else:
+        try:
+            result = summarize_conversation(request.get_json(silent=True))
+        except ConversationTitleError as exc:
+            response = jsonify({"ok": False, "code": exc.code})
+            response.status_code = exc.status
+        else:
+            response = jsonify(result)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.route("/notebook/analyze", methods=["POST"])
 def notebook_analyze():
     """Explain only explicitly selected notes; never edit their source text."""

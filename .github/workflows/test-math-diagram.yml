@@ -7,6 +7,7 @@ on:
     paths:
       - "app.py"
       - "math_diagram.py"
+      - "finite_algebra_diagrams.py"
       - "static/math-diagram.js"
       - "static/drawing-workspace.js"
       - "static/drawing-workspace.css"
@@ -20,6 +21,7 @@ on:
     paths:
       - "app.py"
       - "math_diagram.py"
+      - "finite_algebra_diagrams.py"
       - "static/math-diagram.js"
       - "static/drawing-workspace.js"
       - "static/drawing-workspace.css"
@@ -45,7 +47,7 @@ jobs:
           python -m pip install networkx jsonschema requests
       - name: Compile and test diagram structure generation
         run: |
-          python -m py_compile app.py math_diagram.py
+          python -m py_compile app.py math_diagram.py finite_algebra_diagrams.py
           PYTHONPATH=. python scripts/test_math_diagram.py
       - name: Validate drawing workspace integration syntax
         run: |

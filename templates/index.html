@@ -1794,6 +1794,18 @@ input[type="search"]::-webkit-search-cancel-button {
     color:var(--text-subtle);
 }
 
+#knowledgeGraphCanvas:has(> .kg-empty:only-child) {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
+
+@media(max-width:760px) {
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .knowledge-graph-main:has(> #knowledgeGraphCanvas > .kg-empty:only-child) {
+        flex:1 1 0 !important;
+    }
+}
+
 .knowledge-graph-side {
     display:flex;
     flex-direction:column;

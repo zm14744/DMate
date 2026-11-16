@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - 'app.py'
+      - 'conversation_titles.py'
+      - 'finite_algebra_diagrams.py'
       - 'math_diagram.py'
       - 'knowledge_graph.json'
       - 'offline-content/**'
@@ -41,6 +43,7 @@ on:
       - 'scripts/test_conversation_header_browser.cjs'
       - 'scripts/test_conversation_titles_browser.cjs'
       - 'scripts/test_conversation_titles.cjs'
+      - 'scripts/test_conversation_titles.py'
       - 'scripts/test_voice_input_controls_browser.cjs'
       - 'scripts/test_wrongbook_filters_browser.cjs'
       - 'scripts/test_wrong_question_previews_browser.cjs'
@@ -61,6 +64,8 @@ on:
   pull_request:
     paths:
       - 'app.py'
+      - 'conversation_titles.py'
+      - 'finite_algebra_diagrams.py'
       - 'math_diagram.py'
       - 'knowledge_graph.json'
       - 'offline-content/**'
@@ -98,6 +103,7 @@ on:
       - 'scripts/test_conversation_header_browser.cjs'
       - 'scripts/test_conversation_titles_browser.cjs'
       - 'scripts/test_conversation_titles.cjs'
+      - 'scripts/test_conversation_titles.py'
       - 'scripts/test_voice_input_controls_browser.cjs'
       - 'scripts/test_wrongbook_filters_browser.cjs'
       - 'scripts/test_wrong_question_previews_browser.cjs'
@@ -137,7 +143,7 @@ jobs:
             requirements.txt
             requirements-agents.txt
       - name: Validate Python syntax
-        run: python -m py_compile app.py scripts/migrate_concept_examples.py scripts/offline_question_classification.py
+        run: python -m py_compile app.py conversation_titles.py scripts/test_conversation_titles.py scripts/migrate_concept_examples.py scripts/offline_question_classification.py
       - name: Validate offline JavaScript syntax
         run: |
           node --check static/offline.js
@@ -228,6 +234,8 @@ jobs:
           python -m pip install -r requirements.txt
           npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
           npx playwright install --with-deps chromium
+      - name: Verify semantic conversation title summaries without model requests
+        run: python -m unittest discover -s scripts -p 'test_conversation_titles.py' -v
       - name: Verify the original favicon variants on each platform
         env:
           OMP_NUM_THREADS: '1'

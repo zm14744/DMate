@@ -2405,6 +2405,22 @@ function cloudHash(value) {
     return (hash >>> 0).toString(36);
 }
 
+function mergeSessionTitleFields(local, remote) {
+    const hasSummary = item => item?.nameSource === "content"
+        && normalizeSessionTitleSummary(item.titleSummary)?.title === item.name;
+    // Old clients did not record provenance. A nondefault name without it may
+    // have been entered by the user, so a newer automatic title cannot erase it.
+    const protectedLegacy = item => !item?.nameSource && typeof item?.name === "string"
+        && item.name.trim() && !["新对话", "New conversation"].includes(item.name.trim());
+    const chosen = local.nameSource === "user" ? local
+        : remote.nameSource === "user" ? remote
+        : protectedLegacy(local) ? local : protectedLegacy(remote) ? remote
+        : hasSummary(local) ? local : hasSummary(remote) ? remote : local;
+    return { name:chosen.name || remote.name || "新对话", nameSource:chosen.nameSource,
+        titleSummary:chosen.nameSource === "user" || protectedLegacy(chosen)
+            ? null : normalizeSessionTitleSummary(chosen.titleSummary) };
+}
+
 function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
     if (!window.DMateConceptNotebookModel && [localSnapshot, remoteSnapshot].some(snapshot => {
         const notebook = snapshot?.learning?.conceptNotebook;
@@ -2477,6 +2493,7 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
             resultSessions[index] = {
                 ...cloudSession,
                 ...localSession,
+                ...mergeSessionTitleFields(localSession, cloudSession),
                 messages: longer.map((message, i) => (
                     i < shared ? mergeCloudMessage(cloudMessages[i], localMessages[i]) : message
                 )),
@@ -10386,6 +10403,7 @@ function loadState() {
                     : "新对话",
                 nameSource: ["default", "user", "content", "ocr", "retest"].includes(session.nameSource)
                     ? session.nameSource : undefined,
+                titleSummary: normalizeSessionTitleSummary(session.titleSummary),
                 messages,
                 deletedMessageIds: session.deletedMessageIds,
                 teaching: normalizeTeaching(session.teaching),
@@ -12929,11 +12947,16 @@ function canRefreshAutoSessionName(session, message) {
     // A stale provenance flag cannot overwrite an unrelated custom title.
     return session.name === titles.legacyName(message.text, source)
         || firstInput && session.name === titles.legacyName(firstInput.text, firstInput.source || "text")
+        || session.name === titles.legacySummary(message.text, { source }).title
+        || session.name === titles.legacySummary(message.text, { source, teaching:message.questionTeaching }).title
         || session.name === deriveSessionName(message.text, source)
+        || session.name === deriveSessionName(message.text, source, message.questionTeaching)
+        || session.titleSummary?.title === session.name
         || session.nameSource === "ocr" && session.name === "图片识题";
 }
 
 function refineFirstSessionName(session, teaching, userMessage) {
+    if (session.titleSummary?.version === 2 && session.titleSummary.title === session.name) return false;
     const message = firstSessionNamingMessage(session);
     if (!message || message !== userMessage || !canRefreshAutoSessionName(session, message)) return false;
     const source = message.source || "text";
@@ -12989,6 +13012,7 @@ function refreshUnnamedSessionNames() {
             && canRefreshAutoSessionName(session, firstUser)
         ) {
             const source = firstUser.source || "text";
+            if (session.titleSummary?.version === 2 && session.titleSummary.title === session.name) continue;
             const name = deriveSessionName(firstUser.text, source, firstUser.questionTeaching);
             if (name !== "新对话" && name !== session.name) {
                 session.name = name;
@@ -13001,6 +13025,97 @@ function refreshUnnamedSessionNames() {
     if (changed) {
         saveState();
     }
+}
+
+function normalizeSessionTitleSummary(value) {
+    if (!value || value.version !== 2 || typeof value.title !== "string" || value.title.length > 72
+        || typeof value.anchor !== "string" || value.anchor.length > 80
+        || typeof value.fingerprint !== "string" || value.fingerprint.length > 80
+        || typeof value.topicEstablished !== "boolean") return null;
+    return { version:2, title:value.title, anchor:value.anchor,
+        fingerprint:value.fingerprint, topicEstablished:value.topicEstablished };
+}
+
+// Only successful, saved exchanges are summarized. The teaching response never
+// waits for this auxiliary request, and rendering cannot create duplicate jobs.
+const semanticTitleJobs = new WeakMap();
+function conversationTitleContext(session) {
+    const opening = (session.messages || []).filter(message => message && typeof message.text === "string"
+        && message.text.trim() && ["user", "ai"].includes(message.role) && !message.isError && !message.isNotice);
+    if (!opening.length || opening[opening.length - 1].role !== "ai") return null;
+    const first = firstSessionNamingMessage(session);
+    if (!first) return null;
+    const anchorIndex = opening.indexOf(first);
+    if (anchorIndex < 0 || !opening.slice(anchorIndex + 1).some(message => message.role === "ai")) return null;
+    const start = Math.max(0, anchorIndex - 2);
+    const selected = opening.slice(start, start + 10);
+    let remaining = 8500;
+    const messages = [];
+    for (const message of selected) {
+        const content = message.text.trim().slice(0, Math.min(remaining, message.role === "ai" ? 1800 : 3000));
+        if (!content) break;
+        messages.push({ role:message.role === "ai" ? "assistant" : "user", content });
+        remaining -= content.length;
+    }
+    const anchor = cloudHash({ text:first.text, source:first.source || "text" });
+    return { messages, anchor, fingerprint:cloudHash(messages) };
+}
+
+function scheduleSemanticSessionTitle(session = getCurrent()) {
+    if (!session || session.nameSource === "user" || session.retest || navigator.onLine === false) return;
+    const first = firstSessionNamingMessage(session);
+    if (!first || !canRefreshAutoSessionName(session, first)) return;
+    const context = conversationTitleContext(session);
+    if (!context) return;
+    const summary = normalizeSessionTitleSummary(session.titleSummary);
+    if (summary && summary.title === session.name && summary.anchor === context.anchor
+        && (summary.topicEstablished || summary.fingerprint === context.fingerprint)) return;
+    const previous = semanticTitleJobs.get(session);
+    if (previous?.fingerprint === context.fingerprint && previous.name === session.name
+        && previous.source === session.nameSource && previous.accountVersion === cloudSyncContextVersion
+        && (previous.pending || Date.now() < previous.retryAt)) return;
+    previous?.controller?.abort();
+    if (previous?.timer) window.clearTimeout(previous.timer);
+    const controller = new AbortController();
+    const job = { fingerprint:context.fingerprint, controller, pending:true, retryAt:0, timer:0,
+        name:session.name, source:session.nameSource, accountVersion:cloudSyncContextVersion };
+    semanticTitleJobs.set(session, job);
+    const account = `${accountState.authenticated ? "account:" + accountState.username : "guest"}`;
+    const accountVersion = cloudSyncContextVersion;
+    const originalName = session.name, originalSource = session.nameSource;
+    job.timer = window.setTimeout(async () => {
+        job.timer = 0;
+        const timeout = window.setTimeout(() => controller.abort(), 23000);
+        const isCurrent = () => semanticTitleJobs.get(session) === job && sessions.includes(session)
+            && cloudSyncContextVersion === accountVersion
+            && `${accountState.authenticated ? "account:" + accountState.username : "guest"}` === account
+            && session.name === originalName && session.nameSource === originalSource && !session.retest
+            && conversationTitleContext(session)?.fingerprint === context.fingerprint;
+        try {
+            if (!isCurrent()) return;
+            const response = await fetch("/conversation/title", { method:"POST", credentials:"same-origin",
+                headers:{ "Content-Type":"application/json" }, signal:controller.signal,
+                body:JSON.stringify({ messages:context.messages, language:dmateUiLanguage() }) });
+            const data = await response.json();
+            if (!response.ok || data?.ok !== true || data.version !== 2 || typeof data.title !== "string"
+                || !data.title.trim() || Array.from(data.title).length > 72
+                || /[\r\n\x00-\x1f<>`]/.test(data.title) || typeof data.topic_established !== "boolean"
+                || !isCurrent()) return;
+            session.name = data.title.trim();
+            session.nameSource = "content";
+            session.titleSummary = { version:2, title:session.name, anchor:context.anchor,
+                fingerprint:context.fingerprint, topicEstablished:data.topic_established };
+            saveState();
+            refreshSessionNameDisplays();
+        } catch (_error) {
+            // Naming is best effort. A provider outage leaves the usable local
+            // fallback and never adds an error message to the conversation.
+        } finally {
+            window.clearTimeout(timeout);
+            job.pending = false;
+            job.retryAt = Date.now() + 5 * 60 * 1000;
+        }
+    }, 350);
 }
 
 
@@ -17198,6 +17313,7 @@ function renameSession(session) {
         if (name && (edited || name !== displayedName)) {
             session.name = name.slice(0, 80);
             session.nameSource = "user";
+            delete session.titleSummary;
             saveState();
             renderSessions();
             renderInfo();
@@ -17241,6 +17357,7 @@ function renderSessions() {
     }
 
     refreshUnnamedSessionNames();
+    scheduleSemanticSessionTitle();
     refreshConversationTitle();
     box.innerHTML = "";
 

@@ -45,7 +45,7 @@ async function ai(page, requirement) {
   const generate = page.locator('[data-math-diagram-generate]');
   assert.equal(await generate.evaluate(button => Boolean(button.closest('.ddw-side-panel'))), true,
     'Only the generation popover arrow submits a request');
-  assert.equal(await generate.isEnabled(), true);
+  assert.equal(await generate.isEnabled(), Boolean(requirement.trim()), 'Generation requires nonblank drawing requirements');
   return generate;
 }
 
@@ -80,25 +80,58 @@ async function passiveGenerationPanel(page, mock, guideRequests, initial, langua
     assert.deepEqual(current.pages.map(item => item.id), initial.pages.map(item => item.id), label + ': no new drawing page');
     assert.deepEqual(current.document, initial.document, label + ': current drawing stays intact');
   };
-  const optional = language === 'en' ? 'Diagram request (optional)' : '绘图要求（可选）';
-  const request = 'K5 optional request retained without submitting';
+  const requiredLabel = language === 'en' ? 'Diagram request' : '绘图要求';
+  const optionalLabel = language === 'en' ? 'Diagram request (optional)' : '绘图要求（可选）';
+  const request = 'K5 request retained without submitting';
   await ai(page, '');
   assert.equal(await page.locator('.ddw-side-panel h3').innerText(), language === 'en' ? 'AI generation' : 'AI生成');
-  assert.equal(await page.locator('.ddw-ai-requirement').getAttribute('aria-label'), optional);
+  assert.equal(await page.locator('.ddw-ai-requirement').getAttribute('aria-label'), requiredLabel);
+  assert.equal(await page.locator('.ddw-ai-requirement').getAttribute('required'), '');
   assert.equal(await page.locator('[data-drawing-guide]').count(), 0, 'Generation and guidance have separate submit actions');
-  const generationStyle = await panelStyle(page, '[data-math-diagram-generate]');
-  assert.equal(generationStyle.buttonSize[0], generationStyle.buttonSize[1], 'Generation submit is circular');
-  assert.ok(parseFloat(generationStyle.button.borderRadius) >= generationStyle.buttonSize[0] / 2
-    || generationStyle.button.borderRadius.includes('%'), 'Generation uses the guidance arrow circle');
-  const rgb = generationStyle.button.backgroundColor.match(/[\d.]+/g).map(Number);
-  assert.ok(rgb[2] > rgb[0] + 30 && rgb[2] > rgb[1], 'Generation submit keeps the blue action color');
+  const originalTheme = await page.evaluate(() => [document.documentElement.dataset.appearanceTheme, document.body.dataset.appearanceTheme]);
+  for (const theme of ['light', 'dark', 'navy']) {
+    await page.evaluate(value => { document.documentElement.dataset.appearanceTheme = document.body.dataset.appearanceTheme = value; }, theme);
+    const disabledStyle = await panelStyle(page, '[data-math-diagram-generate]');
+    const composerStyle = await page.locator('#sendBtn').evaluate(button => ({
+      background: getComputedStyle(button).backgroundColor, arrow: getComputedStyle(button, '::before').backgroundColor
+    }));
+    assert.equal(disabledStyle.button.backgroundColor, composerStyle.background, theme + ': the inactive generation arrow shares the composer surface');
+    assert.equal(disabledStyle.button.color, composerStyle.arrow, theme + ': the inactive generation arrow shares the composer icon color');
+  }
+  await page.evaluate(([rootTheme, bodyTheme]) => {
+    document.documentElement.dataset.appearanceTheme = rootTheme; document.body.dataset.appearanceTheme = bodyTheme;
+  }, originalTheme);
+  const disabledStyle = await panelStyle(page, '[data-math-diagram-generate]');
+  for (const value of ['', '  \n\t  ']) {
+    await page.locator('.ddw-ai-requirement').fill(value);
+    assert.equal(await page.locator('[data-math-diagram-generate]').isDisabled(), true);
+    await page.locator('[data-math-diagram-generate]').evaluate(button => {
+      button.click();
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    await page.locator('.ddw-ai-requirement').press('Enter');
+    await settle(page);
+    await unchanged('Blank input, click and Enter');
+  }
   if (process.env.OFFLINE_SCREENSHOT_DIR) {
     await fs.mkdir(process.env.OFFLINE_SCREENSHOT_DIR, { recursive: true });
     await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/generation-panel-' + page.viewportSize().width + '-' + language + '.png' });
   }
   await unchanged('Opening generation');
   await page.locator('.ddw-ai-requirement').fill(request); await settle(page);
-  await unchanged('Typing the optional request');
+  assert.equal(await page.locator('[data-math-diagram-generate]').isEnabled(), true);
+  const generationStyle = await panelStyle(page, '[data-math-diagram-generate]');
+  assert.equal(generationStyle.buttonSize[0], generationStyle.buttonSize[1], 'Generation submit is circular');
+  assert.ok(parseFloat(generationStyle.button.borderRadius) >= generationStyle.buttonSize[0] / 2
+    || generationStyle.button.borderRadius.includes('%'), 'Generation uses the guidance arrow circle');
+  const rgb = generationStyle.button.backgroundColor.match(/[\d.]+/g).map(Number);
+  assert.ok(rgb[2] > rgb[0] + 30 && rgb[2] > rgb[1], 'A valid generation request activates the blue action color');
+  await page.locator('.ddw-ai-requirement').fill('  ');
+  assert.equal(await page.locator('[data-math-diagram-generate]').isDisabled(), true, 'Deleting the requirement disables send again');
+  assert.equal((await panelStyle(page, '[data-math-diagram-generate]')).button.backgroundColor,
+    disabledStyle.button.backgroundColor, 'Deleting the requirement restores the inactive surface');
+  await page.locator('.ddw-ai-requirement').fill(request);
+  await unchanged('Typing the required request');
   await generation.click();
   assert.equal(await page.locator('.ddw-side-panel').isVisible(), false, 'Clicking the rail again closes the panel');
   await unchanged('Closing generation');
@@ -111,8 +144,18 @@ async function passiveGenerationPanel(page, mock, guideRequests, initial, langua
   assert.equal(await page.locator('.ddw-side-panel:visible').count(), 1, 'There is one anchored popover');
   assert.equal(await page.locator('.ddw-side-panel h3').innerText(), language === 'en' ? 'AI guidance' : 'AI指导');
   assert.equal(await page.locator('[data-math-diagram-generate]').count(), 0);
+  const popoverIntersectsRail = await page.locator('.ddw-side-panel').evaluate(panel => {
+    const p = panel.getBoundingClientRect(), r = panel.closest('.dmate-drawing-workspace').querySelector('.ddw-side-actions').getBoundingClientRect();
+    return p.left < r.right && p.right > r.left && p.top < r.bottom && p.bottom > r.top;
+  });
+  assert.equal(popoverIntersectsRail, false, 'Guidance leaves every wrapped toolbar row reachable');
+  assert.equal(await page.locator('.ddw-ai-requirement').getAttribute('aria-label'), optionalLabel);
+  assert.equal(await page.locator('.ddw-ai-requirement').getAttribute('required'), null);
   assert.deepEqual(await panelStyle(page, '[data-drawing-guide]'), generationStyle,
-    'Generation and guidance share the same popover, optional input and arrow styling');
+    'Generation and guidance share the same popover, input and enabled arrow styling');
+  await page.locator('.ddw-ai-requirement').fill('');
+  assert.equal(await page.locator('[data-drawing-guide]').isEnabled(), true, 'AI guidance accepts an optional empty requirement');
+  await page.locator('.ddw-ai-requirement').fill(request);
   await unchanged('Switching to guidance');
   await generation.click();
   await page.evaluate(value => DMateI18n.setLanguage(value, false), language === 'en' ? 'zh-CN' : 'en');
@@ -246,16 +289,21 @@ async function runCase(browser, width, language) {
     const emptySubmit = await ai(page, '');
     assert.equal(mock.requests.length, 0, 'Opening generation from an empty gallery still makes no request');
     assert.equal((await state(page)).pages.length, 0, 'The empty-gallery request panel creates no page before send');
-    const starter = fixture('graph', 'C5', true), defaultRequest = mock.enqueue({ json: starter });
-    await emptySubmit.click();
-    const defaultPayload = (await defaultRequest.started).payload;
-    assert.equal(defaultPayload.language, language);
-    assert.match(defaultPayload.requirement, /C5/, 'The optional empty request generates a concrete starter cycle');
+    assert.equal(await emptySubmit.isDisabled(), true, 'An empty gallery also requires an explicit drawing request');
+    await emptySubmit.evaluate(button => button.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    await settle(page);
+    assert.equal(mock.requests.length, 0, 'Blank submission never falls back to a preset mathematical diagram');
+    assert.equal((await state(page)).pages.length, 0);
+    const cycleRequirement = language === 'en' ? 'Draw a cycle graph C5.' : '生成五阶环图 C5。';
+    const starter = fixture('graph', 'C5', true), cycleRequest = mock.enqueue({ json: starter });
+    await (await ai(page, '  ' + cycleRequirement + '  ')).click();
+    const cyclePayload = (await cycleRequest.started).payload;
+    assert.deepEqual(cyclePayload, { requirement: cycleRequirement, language }, 'Generation submits the explicit trimmed drawing request');
     await notice(page, language === 'en' ? /diagram generated/i : /数学图已生成/);
     assert.equal(await page.locator('.ddw-ai-requirement').count(), 0,
       'Successful generation closes the request popover');
     const started = await checkDiagram(page, starter);
-    assert.equal(started.pages[0].requirement, '', 'The default prompt does not replace the user’s optional empty requirement');
+    assert.equal(started.pages[0].requirement, cycleRequirement, 'The generated page retains the explicit drawing requirement');
     await history(page);
     await page.locator('.ddw-history-delete').click();
     await page.locator('.dmate-delete-confirm-delete').click();
@@ -278,14 +326,15 @@ async function runCase(browser, width, language) {
     assert.deepEqual(generated.pages[0].document, original.document, 'Original mathematical drawing is preserved');
     assert.deepEqual(generated.pages[1].document, before.document, 'The existing blank page remains available');
     assert.deepEqual(await (await history(page)).allTextContents(), generated.pages.map(item => item.name));
-    console.log('CHECK ' + width + '/' + language + ': optional C5, empty-gallery K5 and Hasse generation rendered with real WASM; previous pages retained');
+    console.log('CHECK ' + width + '/' + language + ': required explicit C5, empty-gallery K5 and Hasse generation rendered with real WASM; previous pages retained');
 
-    for (const action of ['edit', 'optional-edit', 'switch', 'dismiss', 'guidance', 'close']) {
+    for (const action of ['edit', 'requirement-edit', 'switch', 'dismiss', 'guidance', 'close']) {
       const held = mock.enqueue({ json: fixture('graph', 'STALE ' + action) }, true);
-      await (await ai(page, action === 'optional-edit' ? '' : 'K5 pending ' + action)).click(); await held.started;
+      await (await ai(page, 'K5 pending ' + action)).click(); await held.started;
       assert.equal(await page.locator('[data-math-diagram-generate]').isDisabled(), true, 'Only one generation runs at a time');
       const count = (await state(page)).pages.length;
-      if (action === 'edit' || action === 'optional-edit') await page.locator('.ddw-name').fill('Edited during ' + action);
+      if (action === 'edit') await page.locator('.ddw-name').fill('Edited during ' + action);
+      if (action === 'requirement-edit') await page.locator('.ddw-ai-requirement').fill('');
       if (action === 'switch') await (await history(page)).first().click();
       if (action === 'dismiss') await page.locator('[data-drawing-ai-generation]').click();
       if (action === 'guidance') await page.locator('[data-drawing-ai-guidance]').click();
@@ -324,7 +373,7 @@ async function runCase(browser, width, language) {
     assert.deepEqual(mock.unexpected, [], 'Every generation request is mocked');
     assert.deepEqual(guideRequests, [], 'No paid guidance call is made');
     assert.deepEqual(errors, [], 'No page errors');
-    console.log('PASS ' + width + '/' + language + ': passive matching AI popovers, explicit-arrow optional C5 generation, real Graphviz K5/Hasse with hyphen IDs and retained SVG routes, stable pages, edit/switch/dismiss/close cancellation, localized errors and PNG ' + JSON.stringify(png));
+    console.log('PASS ' + width + '/' + language + ': passive matching AI popovers, required generation and disabled empty arrow, explicit C5, real Graphviz K5/Hasse with hyphen IDs and retained SVG routes, stable pages, edit/switch/dismiss/close cancellation, localized errors and PNG ' + JSON.stringify(png));
   } catch (error) {
     console.error('Drawing state at failure:', JSON.stringify(await state(page).catch(() => null)));
     if (process.env.OFFLINE_SCREENSHOT_DIR) {
@@ -338,6 +387,6 @@ async function runCase(browser, width, language) {
 (async () => {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
-  try { for (const [width, language] of [[390, 'zh-CN'], [1440, 'en']]) await runCase(browser, width, language); }
+  try { for (const width of [390, 1440]) for (const language of ['zh-CN', 'en']) await runCase(browser, width, language); }
   finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

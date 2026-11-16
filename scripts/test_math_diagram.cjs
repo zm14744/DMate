@@ -69,6 +69,9 @@ const api = require('../static/math-diagram.js');
   const hasse = await api.layoutDocument(hasseDocument, 'hasse', viz);
   assert.equal(hasse.engine, 'dot');
   assert.equal(hasse.document.graphs[0].vertices.length, 3);
+  assert.ok(hasse.document.graphs[0].vertices[0].y > hasse.document.graphs[0].vertices[1].y
+    && hasse.document.graphs[0].vertices[1].y > hasse.document.graphs[0].vertices[2].y,
+    'Hasse covers place smaller elements physically below larger elements');
 
   const cayleyDocument = {
     body_text: '',
@@ -84,6 +87,21 @@ const api = require('../static/math-diagram.js');
   const cayley = await api.layoutDocument(cayleyDocument, 'cyclic_cayley', viz);
   assert.equal(cayley.engine, 'circo');
   assert.equal(cayley.document.graphs[0].vertices.length, 4);
+
+  const kleinDocument = {body_text:'', graphs:[{id:'G1', name:'V4 Cayley', directed:true, weighted:false,
+    vertices:['e','a','b','ab'].map((label, index) => ({id:'v' + index,label})),
+    edges:[[0,1,'a'],[0,2,'b'],[1,0,'a'],[1,3,'b'],[2,3,'a'],[2,0,'b'],[3,2,'a'],[3,1,'b']]
+      .map(([from,to,edge_label], index) => ({id:'e' + index,from:'v'+from,to:'v'+to,direction:'forward',edge_label}))}]};
+  const finiteCayley = await api.layoutDocument(kleinDocument, 'finite_group_cayley', viz);
+  assert.equal(finiteCayley.engine, 'circo');
+  assert.deepEqual(finiteCayley.document.graphs[0].edges.map(edge => [edge.from,edge.to,edge.edge_label]),
+    kleinDocument.graphs[0].edges.map(edge => [edge.from,edge.to,edge.edge_label]),
+    'Finite-group layout preserves right multiplication, arrow directions, and generator labels');
+  const finiteRing = await api.layoutDocument({body_text:'',graphs:[{id:'G1',name:'Z2 × Z2 zero divisors',directed:false,weighted:false,
+    vertices:[{id:'v0',label:'(0,1)'},{id:'v1',label:'(1,0)'}],
+    edges:[{id:'e0',from:'v0',to:'v1',direction:'undirected'}]}]}, 'finite_zero_divisor_graph', viz);
+  assert.equal(finiteRing.engine, 'neato');
+  assert.equal(finiteRing.document.graphs[0].vertices.length, 2);
 
   // A valid Hasse cover used to be drawn straight through an unrelated vertex
   // after throwing away Graphviz's spline. Keep its actual routed geometry.
@@ -108,6 +126,8 @@ const api = require('../static/math-diagram.js');
     assert.ok(edge.path.every(point => point.every(value => Number.isFinite(value) && value >= 0 && value <= 1)));
   }
   const model = require('../static/graph-editor-model.js');
+  assert.deepEqual(model.validateDocument(model.importDocument(finiteCayley.document)), []);
+  assert.deepEqual(model.validateDocument(model.importDocument(finiteRing.document)), []);
   const imported = model.importDocument(routed);
   assert.deepEqual(model.validateDocument(imported), []);
   assert.deepEqual(imported.graphs[0].edges.map(edge => edge.path), routedGraph.edges.map(edge => edge.path),

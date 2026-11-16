@@ -2,6 +2,7 @@ import json
 import unittest
 
 from math_diagram import MathDiagramError, build_document, generate_diagram
+from finite_algebra_diagrams import AlgebraStructureError, group_structure, ring_structure
 
 
 class MathDiagramStructureTests(unittest.TestCase):
@@ -263,6 +264,223 @@ class MathDiagramRequirementTests(unittest.TestCase):
         ):
             with self.subTest(requirement=requirement):
                 self.assertTrue(self.generate(requirement, path)["ok"])
+
+class FiniteAlgebraDiagramTests(unittest.TestCase):
+    @staticmethod
+    def build(kind, **fields):
+        return build_document({"kind": kind, "title": "Finite structure", **fields})
+
+    def test_known_noncyclic_subgroup_lattices(self):
+        for group, count, covers in (
+            ({"family": "klein"}, 5, 6),
+            ({"family": "symmetric", "parameter": 3}, 6, 8),
+            ({"family": "quaternion"}, 6, 7),
+            ({"family": "dihedral", "parameter": 4}, 10, 15),
+            ({"family": "symmetric", "parameter": 4}, 30, 66),
+        ):
+            with self.subTest(group=group):
+                document, kind = self.build("finite_subgroup_lattice", group=group)
+                graph = document["graphs"][0]
+                self.assertEqual(kind, "hasse")
+                self.assertEqual(len(graph["vertices"]), count)
+                self.assertEqual(len(graph["edges"]), covers)
+
+    def test_cayley_named_generators_use_actual_group_operation(self):
+        for group, generators, order in (
+            ({"family": "symmetric", "parameter": 3}, ["(12)", "(123)"], 6),
+            ({"family": "dihedral", "parameter": 4}, ["r", "s"], 8),
+            ({"family": "klein"}, ["a", "b"], 4),
+            ({"family": "quaternion"}, ["i", "j"], 8),
+            ({"family": "product_cyclic", "moduli": [2, 4]}, ["(1,0)", "(0,1)"], 8),
+        ):
+            with self.subTest(group=group):
+                table, labels, identity = group_structure(group)
+                document, kind = self.build("finite_group_cayley", group=group, generators=generators)
+                graph = document["graphs"][0]
+                self.assertEqual(kind, "finite_group_cayley")
+                self.assertEqual(len(graph["vertices"]), order)
+                self.assertEqual(len(graph["edges"]), order * len(generators))
+                self.assertTrue(graph["directed"])
+                for edge in graph["edges"]:
+                    left, right = int(edge["from"][1:]), int(edge["to"][1:])
+                    self.assertEqual(table[left][labels.index(edge["edge_label"])], right)
+
+    def test_cayley_rejects_proper_subgroup_generators_or_unknown_labels(self):
+        for group, generators in (
+            ({"family": "symmetric", "parameter": 3}, ["(123)"]),
+            ({"family": "quaternion"}, ["i"]),
+            ({"family": "dihedral", "parameter": 4}, ["x", "s"]),
+            ({"family": "klein"}, ["a", "a"]),
+        ):
+            with self.subTest(group=group, generators=generators), self.assertRaises(MathDiagramError):
+                self.build("finite_group_cayley", group=group, generators=generators)
+
+    def test_generator_matching_preserves_exact_labels_and_rejects_ambiguous_normalization(self):
+        group = {"family": "table", "multiplication_table": [[0, 1], [1, 0]], "labels": ["ab", "a b"]}
+        # The exact identity label must never select the distinct element whose
+        # label differs by internal whitespace.
+        for generators in (["ab"], ["a  b"]):
+            with self.subTest(generators=generators), self.assertRaises(MathDiagramError):
+                self.build("finite_group_cayley", group=group, generators=generators)
+        document, _ = self.build("finite_group_cayley", group=group, generators=["a b"])
+        self.assertEqual([(edge["from"], edge["to"], edge["edge_label"])
+                          for edge in document["graphs"][0]["edges"]],
+                         [("v0", "v1", "a b"), ("v1", "v0", "a b")])
+
+    def test_quaternion_and_permutation_tables_obey_noncommutative_laws(self):
+        table, labels, identity = group_structure({"family": "quaternion"})
+        self.assertEqual(labels[identity], "1")
+        self.assertEqual(labels[table[labels.index("i")][labels.index("j")]], "k")
+        self.assertEqual(labels[table[labels.index("j")][labels.index("i")]], "−k")
+        self.assertEqual(labels[table[labels.index("i")][labels.index("i")]], "−1")
+        table, labels, identity = group_structure({"family": "symmetric", "parameter": 3})
+        transposition = labels.index("(1 2)")
+        cycle = labels.index("(1 2 3)")
+        self.assertNotEqual(table[transposition][cycle], table[cycle][transposition])
+
+    def test_ring_ideals_are_not_all_additive_subgroups(self):
+        ring = {"family": "product_zn", "moduli": [2, 2]}
+        document, kind = self.build("finite_ideal_lattice", ring=ring)
+        graph = document["graphs"][0]
+        self.assertEqual(kind, "hasse")
+        self.assertEqual(len(graph["vertices"]), 4)
+        self.assertEqual(len(graph["edges"]), 4)
+        subgroup, _ = self.build("finite_subgroup_lattice", group={"family": "product_cyclic", "moduli": [2, 2]})
+        self.assertEqual(len(subgroup["graphs"][0]["vertices"]), 5)
+
+    def test_ring_zero_divisors_have_witnesses_and_correct_edges(self):
+        for ring in ({"family": "product_zn", "moduli": [2, 3]}, {"family": "zn", "parameter": 12}):
+            with self.subTest(ring=ring):
+                _, multiplication, labels, zero = ring_structure(ring)
+                document, kind = self.build("finite_zero_divisor_graph", ring=ring)
+                graph = document["graphs"][0]
+                vertices = {vertex["id"]: labels.index(vertex["label"]) for vertex in graph["vertices"]}
+                members = set(vertices.values())
+                expected = {item for item in range(len(labels)) if item != zero
+                            and any(other != zero and multiplication[item][other] == zero for other in range(len(labels)))}
+                self.assertEqual(members, expected)
+                actual_edges = {frozenset((vertices[edge["from"]], vertices[edge["to"]])) for edge in graph["edges"]}
+                expected_edges = {frozenset((a, b)) for a in members for b in members if a != b and multiplication[a][b] == zero}
+                self.assertEqual(actual_edges, expected_edges)
+
+    def test_explicit_group_tables_validate_closure_identity_inverse_and_associativity(self):
+        good = [[(a + b) % 5 for b in range(5)] for a in range(5)]
+        self.assertEqual(group_structure({"family": "table", "multiplication_table": good})[2], 0)
+        closure = [row[:] for row in good]
+        closure[1][2] = 9
+        no_identity = [[1 - ((a + b) % 2) for b in range(2)] for a in range(2)]
+        no_identity[0][0] = 0
+        no_inverse = [[0, 1], [1, 1]]
+        nonassociative = [row[:] for row in good]
+        nonassociative[1][2], nonassociative[1][3] = nonassociative[1][3], nonassociative[1][2]
+        for table in (closure, no_identity, no_inverse, nonassociative, [[0], [1, 0]]):
+            with self.subTest(table=table), self.assertRaises(AlgebraStructureError):
+                group_structure({"family": "table", "multiplication_table": table})
+        with self.assertRaises(AlgebraStructureError):
+            group_structure({"family": "table", "multiplication_table": [[0, 1], [1, 0]], "labels": ["e", " e"]})
+
+    def test_explicit_ring_tables_check_distributivity_identity_and_commutativity(self):
+        addition = [[(a + b) % 3 for b in range(3)] for a in range(3)]
+        multiplication = [[(a * b) % 3 for b in range(3)] for a in range(3)]
+        ring_structure({"family": "table", "addition_table": addition, "multiplication_table": multiplication})
+        # Additive operation used as multiplication remains associative,
+        # commutative and unital, but fails distributivity.
+        for bad_multiplication in (addition, [[0] * 3 for _ in range(3)]):
+            with self.assertRaises(AlgebraStructureError):
+                ring_structure({"family": "table", "addition_table": addition, "multiplication_table": bad_multiplication})
+
+    def test_standard_lattice_counts_and_cover_orientation(self):
+        for lattice, size, covers in (
+            ({"family": "boolean", "parameter": 3}, 8, 12),
+            ({"family": "boolean", "parameter": 5}, 32, 80),
+            ({"family": "divisors", "parameter": 12}, 6, 7),
+            ({"family": "diamond"}, 5, 6),
+            ({"family": "pentagon"}, 5, 5),
+        ):
+            with self.subTest(lattice=lattice):
+                document, kind = self.build("standard_lattice", lattice=lattice)
+                graph = document["graphs"][0]
+                self.assertEqual(kind, "hasse")
+                self.assertEqual(len(graph["vertices"]), size)
+                self.assertEqual(len(graph["edges"]), covers)
+                # Every deterministic family's least element is index 0.
+                self.assertFalse(any(edge["to"] == "v0" for edge in graph["edges"]))
+
+    def test_poset_cannot_claim_to_be_lattice_without_unique_meets_and_joins(self):
+        for count, pairs in ((3, [(0, 1), (0, 2)]), (4, [(0, 2), (0, 3), (1, 2), (1, 3)])):
+            spec = {"vertices": [{"id": "v" + str(i), "label": str(i)} for i in range(count)],
+                    "order_relations": [["v" + str(a), "v" + str(b)] for a, b in pairs]}
+            # They are valid posets, but not lattices.
+            self.build("hasse", **spec)
+            with self.assertRaises(MathDiagramError) as caught:
+                self.build("lattice", **spec)
+            self.assertEqual(caught.exception.code, "invalid_finite_lattice")
+
+    def test_explicit_names_cannot_be_replaced_with_other_group_ring_or_lattice(self):
+        cases = (
+            ("画S3的子群格", {"kind": "finite_subgroup_lattice", "group": {"family": "cyclic", "parameter": 6}}),
+            ("Draw the Cayley graph of S3", {"kind": "finite_group_cayley", "group": {"family": "cyclic", "parameter": 6}, "generators": [1]}),
+            ("生成环Z2×Z2的理想格", {"kind": "finite_subgroup_lattice", "group": {"family": "klein"}}),
+            ("画布尔格B3的哈斯图", {"kind": "standard_lattice", "lattice": {"family": "boolean", "parameter": 2}}),
+            ("Draw the divisor lattice of 12", {"kind": "standard_lattice", "lattice": {"family": "divisors", "parameter": 6}}),
+        )
+        for requirement, fields in cases:
+            with self.subTest(requirement=requirement):
+                MathDiagramRequirementTests().assert_mismatch(requirement, {"title": "Wrong structure", **fields})
+
+    def test_legacy_named_zn_requests_accept_equivalent_general_algebra_builders(self):
+        for requirement, fields in (
+            ("画循环群Z6的子群格", {"kind": "finite_subgroup_lattice", "group": {"family": "cyclic", "parameter": 6}}),
+            ("画循环群Z6的Cayley图", {"kind": "finite_group_cayley", "group": {"family": "cyclic", "parameter": 6}, "generators": ["1"]}),
+            ("画环Z6的理想格", {"kind": "finite_ideal_lattice", "ring": {"family": "zn", "parameter": 6}}),
+            ("画Z6的零因子图", {"kind": "finite_zero_divisor_graph", "ring": {"family": "zn", "parameter": 6}}),
+        ):
+            with self.subTest(requirement=requirement):
+                self.assertTrue(MathDiagramRequirementTests.generate(requirement, {"title": "Z6", **fields})["ok"])
+
+    def test_nondiscrete_requests_rejected_before_call_even_if_model_would_return_graph(self):
+        for requirement in (
+            "画正弦函数曲线", "太阳系示意图", "画一只猫", "Plot y = x^2", "Draw a solar system relation graph",
+            "Draw the graph y=x^2 on the finite interval [-1,1]", "Draw a bar chart for a finite data set",
+            "Draw a flowchart for a finite graph traversal",
+            "Plot the graph of x^2", "Graph sin(x)",
+            "Draw the graph of sin(x)", "Draw graph y=x over the real numbers", "Draw graph y=e^x",
+        ):
+            with self.subTest(requirement=requirement):
+                def completion(*args, **kwargs):
+                    self.fail("Out-of-scope requests must not invoke the model")
+                with self.assertRaises(MathDiagramError) as caught:
+                    generate_diagram({"requirement": requirement}, completion=completion)
+                self.assertEqual(caught.exception.code, "outside_discrete_math_scope")
+                self.assertEqual(caught.exception.status, 422)
+
+    def test_explicit_adjacency_and_finite_mapping_remain_in_scope(self):
+        path = MathDiagramRequirementTests.graph_spec(3, [(0, 1), (1, 2)])
+        for requirement in ("A -> B -> C", "画三个点和两条边", "有限映射 A={1,2} 到 B={a,b}，1映到a，2映到b", "Draw a finite mapping f(x)=x mod 3"):
+            with self.subTest(requirement=requirement):
+                self.assertTrue(MathDiagramRequirementTests.generate(requirement, path)["ok"])
+
+    def test_common_discrete_graph_names_are_not_blocked_by_scope_gate(self):
+        graph = MathDiagramRequirementTests.graph_spec(3, [(0, 1), (1, 2)])
+        for requirement in ("画一棵5阶树", "画五阶树", "画彼得森图", "画欧拉图", "画一个平面图"):
+            with self.subTest(requirement=requirement):
+                # Structure-specific checks still apply after scope admission;
+                # this test is specifically about not rejecting course terms.
+                self.assertTrue(MathDiagramRequirementTests.generate(requirement, graph)["ok"])
+
+    def test_limits_and_blank_requirements_are_rejected(self):
+        for spec in (
+            {"kind": "finite_subgroup_lattice", "group": {"family": "symmetric", "parameter": 5}},
+            {"kind": "finite_ideal_lattice", "ring": {"family": "product_zn", "moduli": [5, 6]}},
+            {"kind": "standard_lattice", "lattice": {"family": "boolean", "parameter": 6}},
+        ):
+            with self.subTest(spec=spec), self.assertRaises(MathDiagramError):
+                build_document({"title": "Too large", **spec})
+        for requirement in (None, "", " \n "):
+            with self.subTest(requirement=requirement), self.assertRaises(MathDiagramError) as caught:
+                generate_diagram({"requirement": requirement}, completion=lambda *a, **k: self.fail("No model call"))
+            self.assertEqual(caught.exception.code, "empty_math_diagram_request")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -40,18 +40,30 @@ test('never adds unrelated topics from arbitrary context; matching metadata can 
     assert.equal(summarize('解释真值表。', { teaching: { focus_points: ['生成树'] } }).title, '真值表解析');
     assert.equal(summarize('请来一道简单题。', { teaching: { focus_points: '错误数据' } }).title, '练习题');
     const unknown = summarize('请解释关于有限自动机的状态转换。');
-    assert.ok(unknown.title.includes('有限自动机'));
+    assert.equal(unknown.title, '学习交流');
     assert.ok(!unknown.title.includes('请解释'));
     assert.ok(!unknown.title.includes('图论'));
 });
 
 test('greetings and OCR filenames do not lock the title before useful content arrives', () => {
-    for (const text of ['', '你好！', 'Thank you.', '请帮我看看这道题', '我有个问题']) {
+    for (const text of ['', '请帮我看看这道题', '我有个问题']) {
         assert.equal(summarize(text).useful, false, text);
         assert.equal(summarize(text).title, '新对话');
     }
+    assert.equal(summarize('你好！').title, '初次交流');
+    assert.equal(summarize('你好！').useful, false);
+    assert.equal(summarize('Thank you.').title, 'Conversation and thanks');
+    assert.equal(summarize('Thank you.').useful, false);
     assert.equal(summarize('IMG_1024.jpg', { source: 'ocr' }).title, '图片识题');
     assert.equal(summarize('[图片识题]\n【题目文字】\n求中国剩余定理的应用示例。', { source: 'ocr' }).title, '中国剩余定理解析');
+});
+
+test('a provider failure has a faithful fallback, never a copied imperative with a suffix', () => {
+    assert.equal(summarize('给一个长文本检查渲染').title, '长文本渲染测试');
+    const unknown = '给一个关于新的尚未识别主题的长篇说明';
+    assert.equal(summarize(unknown).title, '学习交流');
+    assert.notEqual(summarize(unknown).title, unknown + '讨论');
+    assert.ok(context.DMateConversationTitles.legacySummary(unknown).title.includes('讨论'));
 });
 
 test('titles are bounded without splitting a surrogate pair, and old automatic names are recognizable', () => {
