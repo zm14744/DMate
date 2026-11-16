@@ -8,10 +8,18 @@
     const held = new Map();
     let hovered = null, focused = null, intent = null, dismissed = null;
     let tooltip = null, visible = null, timer = null;
+    let keyboardFocusUntil = 0, pointerSuspended = false, pointerPosition = null;
 
     function controlFor(node) {
         const element = node?.nodeType === 1 ? node : node?.parentElement;
-        const control = element?.closest?.(controls);
+        // The mounted native file input covers the visible plus button so real
+        // taps can still open pickers in Android/WebKit. Share the button's hint
+        // without replacing that input or exposing its native filename tooltip.
+        const fileInput = element?.closest?.('#imagePickerWrap > input#imageInput');
+        const pickerInput = fileInput && !fileInput.closest(content)
+            && !fileInput.closest('[data-i18n-content],[translate="no"]');
+        if (pickerInput) fileInput.setAttribute('title', '');
+        const control = pickerInput ? fileInput.parentElement.querySelector(':scope > #imageBtn') : element?.closest?.(controls);
         if (!control || control.closest(excluded)) return null;
         const zone = control.closest('[data-i18n-content],[translate="no"],[data-i18n-ui]');
         // App-owned conversation labels keep user text protected from UI
@@ -113,6 +121,12 @@
         hide();
     }
 
+    function suspend() {
+        keyboardFocusUntil = 0;
+        pointerSuspended = true;
+        dismiss();
+    }
+
     function getTooltip() {
         if (!tooltip) {
             tooltip = document.createElement('div');
@@ -191,43 +205,67 @@
         if (control === hovered) return;
         hovered = control;
         syncHeld();
-        schedule(control, 360);
+        if (!pointerSuspended) schedule(control, 360);
+    }, {capture:true, passive:true});
+
+    document.addEventListener('pointermove', event => {
+        if (event.pointerType === 'touch') return;
+        const moved = !pointerPosition || event.clientX !== pointerPosition.x || event.clientY !== pointerPosition.y;
+        pointerPosition = {x:event.clientX, y:event.clientY};
+        if (!pointerSuspended || !moved) return;
+        pointerSuspended = false;
+        hovered = controlFor(event.target);
+        syncHeld();
+        // Resuming after an OS overlay needs fresh pointer intent, even if the
+        // pointer returns to the same close button that was focused before it.
+        dismissed = null;
+        schedule(hovered, 360);
     }, {capture:true, passive:true});
 
     document.addEventListener('pointerout', event => {
-        if (event.pointerType === 'touch' || !hovered || hovered.contains(event.relatedTarget)) return;
-        if (!hovered.contains(event.target)) return;
+        if (event.pointerType === 'touch' || !hovered || controlFor(event.relatedTarget) === hovered) return;
+        if (controlFor(event.target) !== hovered) return;
         hovered = null;
         hide();
         syncHeld();
     }, {capture:true, passive:true});
 
     document.addEventListener('focusin', event => {
+        const keyboardRequested = Date.now() < keyboardFocusUntil;
+        keyboardFocusUntil = 0;
         const control = controlFor(event.target);
         if (control === focused) return;
         focused = control;
         syncHeld();
-        if (control?.matches(':focus-visible')) schedule(control, 0);
+        // Focus-visible also becomes true after screenshot modifiers and modal
+        // autofocus. Only an actual navigation key should request a focus hint.
+        if (control && keyboardRequested && event.target.matches?.(':focus-visible')) schedule(control, 0);
         else hide();
     }, true);
 
     document.addEventListener('focusout', event => {
-        if (!focused || focused.contains(event.relatedTarget)) return;
-        if (!focused.contains(event.target)) return;
+        if (!focused || controlFor(event.relatedTarget) === focused) return;
+        if (controlFor(event.target) !== focused) return;
         focused = null;
         hide();
         syncHeld();
     }, true);
 
-    document.addEventListener('pointerdown', dismiss, {capture:true, passive:true});
+    document.addEventListener('pointerdown', () => { keyboardFocusUntil = 0; dismiss(); }, {capture:true, passive:true});
     document.addEventListener('click', dismiss, {capture:true, passive:true});
-    document.addEventListener('keydown', event => { if (event.key === 'Escape') dismiss(); }, true);
+    document.addEventListener('keydown', event => {
+        const navigation = ['Tab','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End'].includes(event.key)
+            && !event.altKey && !event.ctrlKey && !event.metaKey;
+        keyboardFocusUntil = navigation ? Date.now() + 1000 : 0;
+        if (event.key === 'PrintScreen' || event.altKey || event.ctrlKey || event.metaKey || event.key === 'Meta') suspend();
+        else if (event.key === 'Escape') dismiss();
+    }, true);
     root.addEventListener('scroll', dismiss, {capture:true, passive:true});
     root.addEventListener('resize', dismiss, {passive:true});
     root.visualViewport?.addEventListener('resize', dismiss, {passive:true});
     root.visualViewport?.addEventListener('scroll', dismiss, {passive:true});
-    root.addEventListener('blur', dismiss);
-    document.addEventListener('visibilitychange', () => { if (document.hidden) dismiss(); });
+    root.addEventListener('blur', suspend);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) suspend(); });
     root.addEventListener('dmate:languagechange', () => {
         hide();
         flushTitles();

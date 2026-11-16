@@ -93,8 +93,8 @@
     }
 
     function engineFor(kind, graph) {
-        if (kind === 'hasse') return 'dot';
-        if (kind === 'cyclic_cayley' || kind === 'finite_group_cayley') return 'circo';
+        if (kind === 'hasse' || kind === 'rooted_tree') return 'dot';
+        if (['cyclic_cayley', 'finite_group_cayley', 'semigroup_cayley', 'monoid_cayley'].includes(kind)) return 'circo';
         if (kind === 'zero_divisor_graph' || kind === 'finite_zero_divisor_graph') return 'neato';
         return graph.directed ? 'dot' : 'neato';
     }
@@ -112,6 +112,8 @@
         ];
         if (kind === 'hasse') {
             lines.push('graph [rankdir=BT];', 'edge [arrowhead=none];');
+        } else if (kind === 'rooted_tree') {
+            lines.push('graph [rankdir=TB, ordering=out];');
         } else if (directed) {
             lines.push('graph [rankdir=LR];');
         }

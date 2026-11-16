@@ -6,6 +6,8 @@ on:
       - 'app.py'
       - 'conversation_titles.py'
       - 'finite_algebra_diagrams.py'
+      - 'discrete_structure_diagrams.py'
+      - 'logic_structure_diagrams.py'
       - 'math_diagram.py'
       - 'knowledge_graph.json'
       - 'offline-content/**'
@@ -41,6 +43,7 @@ on:
       - 'scripts/test_image_export_browser.cjs'
       - 'scripts/test_mistake_action_chrome_browser.cjs'
       - 'scripts/test_conversation_header_browser.cjs'
+      - 'scripts/test_ui_tooltips_browser.cjs'
       - 'scripts/test_conversation_titles_browser.cjs'
       - 'scripts/test_conversation_titles.cjs'
       - 'scripts/test_conversation_titles.py'
@@ -66,6 +69,8 @@ on:
       - 'app.py'
       - 'conversation_titles.py'
       - 'finite_algebra_diagrams.py'
+      - 'discrete_structure_diagrams.py'
+      - 'logic_structure_diagrams.py'
       - 'math_diagram.py'
       - 'knowledge_graph.json'
       - 'offline-content/**'
@@ -101,6 +106,7 @@ on:
       - 'scripts/test_image_export_browser.cjs'
       - 'scripts/test_mistake_action_chrome_browser.cjs'
       - 'scripts/test_conversation_header_browser.cjs'
+      - 'scripts/test_ui_tooltips_browser.cjs'
       - 'scripts/test_conversation_titles_browser.cjs'
       - 'scripts/test_conversation_titles.cjs'
       - 'scripts/test_conversation_titles.py'
@@ -179,6 +185,7 @@ jobs:
           node --check scripts/test_image_export_browser.cjs
           node --check scripts/test_mistake_action_chrome_browser.cjs
           node --check scripts/test_conversation_header_browser.cjs
+          node --check scripts/test_ui_tooltips_browser.cjs
           node --check scripts/test_conversation_titles_browser.cjs
           node --check scripts/test_conversation_titles.cjs
           node --check scripts/test_voice_input_controls_browser.cjs
@@ -285,6 +292,7 @@ jobs:
           node scripts/test_image_export_browser.cjs
           node scripts/test_mistake_action_chrome_browser.cjs
           node scripts/test_conversation_header_browser.cjs
+          node scripts/test_ui_tooltips_browser.cjs
           node scripts/test_conversation_titles_browser.cjs
           node scripts/test_voice_input_controls_browser.cjs
           node scripts/test_wrongbook_filters_browser.cjs

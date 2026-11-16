@@ -81,7 +81,15 @@ async function headerIcons(page, expanded) {
       background: css.backgroundColor, color: css.color };
   });
   await page.mouse.move(0, 0); await page.locator('#text').focus(); await settle(page);
-  assert.deepEqual(await style(icon), await style(toggle), 'New conversation matches the adjacent sidebar icon');
+  assert.deepEqual(await style(icon), await style(toggle), 'New conversation keeps the adjacent sidebar control dimensions and feedback');
+  const iconColors = await icon.evaluate(node => {
+    const probe = document.createElement('span'); probe.style.color = 'var(--text-muted)'; document.body.append(probe);
+    const expected = getComputedStyle(probe).color; probe.remove();
+    return { actual:getComputedStyle(node.querySelector('svg')).color,
+      adjacent:getComputedStyle(node.previousElementSibling.querySelector('svg')).color, expected };
+  });
+  assert.equal(iconColors.actual, iconColors.expected, 'New-conversation icon uses the quieter theme color on every viewport');
+  assert.notEqual(iconColors.actual, iconColors.adjacent, 'New-conversation icon is visibly quieter than the sidebar icon');
   assert.equal(await icon.locator('svg[data-icon="square-pen"]').count(), 1, 'Use the local Lucide square-pen icon');
   assert.equal((await icon.innerText()).trim(), '', 'Topbar button has no visible text');
   assert.equal(await icon.getAttribute('title'), '＋ 新对话');
@@ -91,13 +99,20 @@ async function headerIcons(page, expanded) {
     return { gap: current.left - prior.right, center: current.y + current.height / 2,
       priorCenter: prior.y + prior.height / 2 };
   });
-  assert.ok(positions.gap >= 0 && positions.gap <= 12, 'New conversation sits immediately after the sidebar toggle');
+  assert.ok(positions.gap >= 8 && positions.gap <= 12, 'Header icons have the slightly wider shared spacing');
   near(positions.center, positions.priorCenter, 'Adjacent header icons share a baseline');
 }
 
 async function renameCurrent(page, name) {
   await sidebar(page, true);
   const current = page.locator('#sessions .session.active [data-session-name]');
+  if (!mobile(page)) {
+    const original = await current.elementHandle();
+    await current.click();
+    assert.equal(await original.evaluate(node => node.isConnected), true,
+      'Selecting the active conversation preserves its name node for reliable double-click renaming');
+    await original.dispose();
+  }
   await current.dblclick();
   await page.locator('#sessionRenameModal').waitFor({ state: 'visible' });
   await page.locator('#sessionRenameInput').fill(name);

@@ -75,7 +75,7 @@ body[data-appearance-theme="navy"] {
         .dge-panel-close,.dgs-source-delete,.ddw-history-delete,.ddw-export-close,.session > button.del,
         .appearance-swatch,.mobile-topbar-button,.mobile-install-button,.chat-jump-button,
         .rich-copy-smart,.rich-copy-button,.dge-history-arrow,.ddw-guide-button,
-        .msg-actions button,#knowledgeGraphCopyBtn,
+        .msg-actions button,#knowledgeGraphCopyBtn,.ddw-header-export,
         .kg-mobile-zoom-btn,.kg-mobile-zoom-fit,.kg-mobile-expand,.kg-mobile-node,
         .kg-desktop-zoom-controls button,.kg-mobile-zoom-controls button,
         .mobile-choice-option,.dge-review-relation,.dcn-note-open,.ddw-history-open,
@@ -99,7 +99,7 @@ body[data-appearance-theme="navy"] {
         .dge-panel-close,.dgs-source-delete,.ddw-history-delete,.ddw-export-close,.session > button.del,
         .appearance-swatch,.mobile-topbar-button,.mobile-install-button,.chat-jump-button,
         .rich-copy-smart,.rich-copy-button,.dge-history-arrow,.ddw-guide-button,
-        .msg-actions button,#knowledgeGraphCopyBtn,
+        .msg-actions button,#knowledgeGraphCopyBtn,.ddw-header-export,
         .kg-mobile-zoom-btn,.kg-mobile-zoom-fit,.kg-mobile-expand,.kg-mobile-node,
         .kg-desktop-zoom-controls button,.kg-mobile-zoom-controls button,
         .mobile-choice-option,.dge-review-relation,.dcn-note-open,.ddw-history-open,
@@ -569,7 +569,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
 @layer dmate-button-themes {
     body[data-appearance-theme] :is(
         .msg-actions > button,
-        #knowledgeGraphCopyBtn,
+        #knowledgeGraphCopyBtn,.ddw-header-export,
         .kg-desktop-zoom-controls button,
         .kg-mobile-zoom-controls button
     ) {
@@ -583,7 +583,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         cursor:pointer;
         transition:var(--dm-control-transition);
     }
-    body[data-appearance-theme] :is(.msg-actions > button,#knowledgeGraphCopyBtn) {
+    body[data-appearance-theme] :is(.msg-actions > button,#knowledgeGraphCopyBtn,.ddw-header-export) {
         display:inline-flex!important;
         align-items:center!important;
         justify-content:center!important;
@@ -601,7 +601,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
     body[data-appearance-theme] #knowledgeGraphModal .kg-mobile-zoom-controls button {
         border-radius:999px!important;
     }
-    body[data-appearance-theme] :is(.msg-actions > button,#knowledgeGraphCopyBtn) > svg {
+    body[data-appearance-theme] :is(.msg-actions > button,#knowledgeGraphCopyBtn,.ddw-header-export) > svg {
         display:block!important;
         flex:0 0 20px!important;
         width:20px!important;
@@ -614,7 +614,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
     @media(hover:hover) {
         body[data-appearance-theme] :is(
             .msg-actions > button,
-            #knowledgeGraphCopyBtn,
+            #knowledgeGraphCopyBtn,.ddw-header-export,
             .kg-desktop-zoom-controls button,
             .kg-mobile-zoom-controls button
         ):not(:disabled):not([aria-disabled="true"]):hover {
@@ -624,7 +624,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
     }
     body[data-appearance-theme] :is(
         .msg-actions > button,
-        #knowledgeGraphCopyBtn,
+        #knowledgeGraphCopyBtn,.ddw-header-export,
         .kg-desktop-zoom-controls button,
         .kg-mobile-zoom-controls button
     ):not(:disabled):not([aria-disabled="true"]):is(:focus-visible,:active) {
@@ -633,7 +633,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
     }
     body[data-appearance-theme] :is(
         .msg-actions > button,
-        #knowledgeGraphCopyBtn,
+        #knowledgeGraphCopyBtn,.ddw-header-export,
         .kg-desktop-zoom-controls button,
         .kg-mobile-zoom-controls button
     ):not(:disabled):not([aria-disabled="true"]):focus-visible {
@@ -643,7 +643,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
     body[data-appearance-theme] .msg-actions > button.danger:not(:disabled):not([aria-disabled="true"]):is(:hover,:focus-visible,:active) {
         color:var(--dm-danger-text,#ef4444)!important;
     }
-    body[data-appearance-theme] :is(.msg-actions > button,#knowledgeGraphCopyBtn):is(:disabled,[aria-disabled="true"]) {
+    body[data-appearance-theme] :is(.msg-actions > button,#knowledgeGraphCopyBtn,.ddw-header-export):is(:disabled,[aria-disabled="true"]) {
         opacity:.45;
         cursor:not-allowed;
     }

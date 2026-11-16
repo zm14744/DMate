@@ -126,6 +126,21 @@ const api = require('../static/math-diagram.js');
     assert.ok(edge.path.every(point => point.every(value => Number.isFinite(value) && value >= 0 && value <= 1)));
   }
   const model = require('../static/graph-editor-model.js');
+  const logicTreeInput = {body_text:'', graphs:[{id:'G1', name:'¬p∧(q∨r)', directed:true, weighted:false,
+    vertices:['∧','¬','p','∨','q','r'].map((label,index) => ({id:'t'+index,label})),
+    edges:[[0,1,'1'],[0,3,'2'],[1,2,'1'],[3,4,'1'],[3,5,'2']].map(([from,to,label],index) =>
+      ({id:'logic'+index,from:'t'+from,to:'t'+to,direction:'forward',edge_label:label}))}]};
+  const logicTree = await api.layoutDocument(logicTreeInput, 'rooted_tree', viz);
+  assert.equal(logicTree.engine, 'dot');
+  const treeGraph = logicTree.document.graphs[0], treeNodes = new Map(treeGraph.vertices.map(vertex => [vertex.id, vertex]));
+  for (const edge of treeGraph.edges) assert.ok(treeNodes.get(edge.from).y < treeNodes.get(edge.to).y,
+    'Every rooted-tree parent must remain above its child');
+  assert.ok(treeNodes.get('t1').x < treeNodes.get('t3').x, 'First operand is left of second operand');
+  assert.ok(treeNodes.get('t4').x < treeNodes.get('t5').x, 'Nested operand ordering is stable');
+  assert.deepEqual(treeGraph.edges.map(({from,to,edge_label,direction}) => ({from,to,edge_label,direction})),
+    logicTreeInput.graphs[0].edges.map(({from,to,edge_label,direction}) => ({from,to,edge_label,direction})),
+    'Layout must preserve logic operand roles and edge directions');
+  assert.deepEqual(model.validateDocument(model.importDocument(logicTree.document)), []);
   assert.deepEqual(model.validateDocument(model.importDocument(finiteCayley.document)), []);
   assert.deepEqual(model.validateDocument(model.importDocument(finiteRing.document)), []);
   const imported = model.importDocument(routed);
@@ -144,7 +159,7 @@ const api = require('../static/math-diagram.js');
     await assert.rejects(api.generate('Draw a graph', 'en', controller.signal), {name:'AbortError'});
   } finally { global.fetch = originalFetch; }
 
-  console.log('PASS real Graphviz WASM layout, pinned bundle integrity, Hasse and Cayley layouts');
+  console.log('PASS real Graphviz WASM layout, pinned bundle integrity, Hasse/Cayley and ordered rooted-tree layouts');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

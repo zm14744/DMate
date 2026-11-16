@@ -61,7 +61,7 @@ def check_group(table, *, abelian=False):
 def _cyclic_product(moduli, operation):
     if not isinstance(moduli, list) or not 1 <= len(moduli) <= 4:
         raise AlgebraStructureError("invalid cyclic factors")
-    moduli = [_integer(modulus, 2, 30) for modulus in moduli]
+    moduli = [_integer(modulus, 1, 30) for modulus in moduli]
     size = math.prod(moduli)
     if size > 24:
         raise AlgebraStructureError("at most 24 elements")
@@ -94,7 +94,7 @@ def group_structure(spec):
         raise AlgebraStructureError("missing finite group")
     family = spec.get("family")
     if family == "cyclic":
-        table, labels = _cyclic_product([_integer(spec.get("parameter"), 2, 24)], lambda a, b: a + b)
+        table, labels = _cyclic_product([_integer(spec.get("parameter"), 1, 24)], lambda a, b: a + b)
     elif family == "product_cyclic":
         table, labels = _cyclic_product(spec.get("moduli"), lambda a, b: a + b)
     elif family == "klein":
@@ -130,7 +130,7 @@ def group_structure(spec):
         labels = ["1", "i", "j", "k", "−1", "−i", "−j", "−k"]
     elif family == "table":
         values = spec.get("multiplication_table")
-        size = _integer(len(values) if isinstance(values, list) else None, 2, 16)
+        size = _integer(len(values) if isinstance(values, list) else None, 1, 16)
         table = _table(values, size)
         labels = _labels(spec.get("labels"), size)
     else:
@@ -165,10 +165,9 @@ def subgroups(table, identity, *, limit=80):
     return sorted(found.items(), key=lambda row: (len(row[0]), sorted(row[0])))
 
 
-def cayley_structure(group, generators):
-    table, labels, identity = group_structure(group)
-    if not isinstance(generators, list) or not 1 <= len(generators) <= 8:
-        raise AlgebraStructureError("specify one to eight generator indices")
+def _generator_indices(labels, generators):
+    if not isinstance(generators, list) or len(generators) > 8:
+        raise AlgebraStructureError("specify up to eight generator indices")
     exact_labels = {label: index for index, label in enumerate(labels)}
     normalized_labels = {}
     for index, label in enumerate(labels):
@@ -187,8 +186,17 @@ def cayley_structure(group, generators):
                     raise AlgebraStructureError("unknown or ambiguous generator label")
                 converted.append(matches[0])
         else:
-            converted.append(_integer(item, 0, len(table) - 1))
-    generators = converted
+            converted.append(_integer(item, 0, len(labels) - 1))
+    if len(set(converted)) != len(converted):
+        raise AlgebraStructureError("duplicate generators")
+    return converted
+
+
+def cayley_structure(group, generators):
+    table, labels, identity = group_structure(group)
+    if len(table) == 1 and generators is None:
+        generators = []
+    generators = _generator_indices(labels, generators)
     if len(set(generators)) != len(generators) or identity in generators:
         raise AlgebraStructureError("invalid generators")
     if len(generated_subgroup(table, identity, generators)) != len(table):
@@ -209,7 +217,88 @@ def subgroup_structure(group):
     return names, relations
 
 
-def ring_structure(spec):
+def semigroup_cayley_structure(spec, generators, *, require_identity=False):
+    if not isinstance(spec, dict):
+        raise AlgebraStructureError("missing finite semigroup")
+    family = spec.get("family")
+    if family in ("modular_multiplication", "left_zero", "right_zero"):
+        size = _integer(spec.get("parameter"), 1, 24)
+        table = [[(left * right) % size if family == "modular_multiplication"
+                  else left if family == "left_zero" else right
+                  for right in range(size)] for left in range(size)]
+        labels = [str(index) for index in range(size)]
+    elif family == "table":
+        values = spec.get("multiplication_table")
+        size = _integer(len(values) if isinstance(values, list) else None, 1, 16)
+        table = _table(values, size)
+        labels = _labels(spec.get("labels"), size)
+    else:
+        raise AlgebraStructureError("unsupported finite semigroup")
+    if any(table[table[a][b]][c] != table[a][table[b][c]]
+           for a in range(size) for b in range(size) for c in range(size)):
+        raise AlgebraStructureError("operation is not associative")
+    identities = [item for item in range(size)
+                  if all(table[item][other] == table[other][item] == other for other in range(size))]
+    if require_identity and len(identities) != 1:
+        raise AlgebraStructureError("monoid must have an identity")
+    indices = _generator_indices(labels, generators)
+    members = {identities[0], *indices} if require_identity else set(indices)
+    while True:
+        expanded = members | {table[a][b] for a in members for b in members}
+        if expanded == members:
+            break
+        members = expanded
+    if len(members) != size:
+        raise AlgebraStructureError("generators do not generate the structure")
+    return labels, [(index, table[index][generator], labels[generator])
+                    for index in range(size) for generator in indices]
+
+
+def _finite_field(order):
+    order = _integer(order, 2, 24)
+    if all(order % divisor for divisor in range(2, math.isqrt(order) + 1)):
+        addition, labels = _cyclic_product([order], lambda a, b: a + b)
+        multiplication, _ = _cyclic_product([order], lambda a, b: a * b)
+        return addition, multiplication, labels
+    extensions = {4: (2, [1, 1, 1]), 8: (2, [1, 1, 0, 1]),
+                  9: (3, [1, 0, 1]), 16: (2, [1, 1, 0, 0, 1])}
+    if order not in extensions:
+        raise AlgebraStructureError("finite field order must be a supported prime power")
+    prime, polynomial = extensions[order]
+    degree = len(polynomial) - 1
+    digits = [[(value // prime ** index) % prime for index in range(degree)] for value in range(order)]
+    encode = lambda coefficients: sum(value % prime * prime ** index for index, value in enumerate(coefficients))
+    addition = [[encode([(a + b) % prime for a, b in zip(left, right)])
+                 for right in digits] for left in digits]
+    multiplication = []
+    for left in digits:
+        row = []
+        for right in digits:
+            product = [0] * (2 * degree - 1)
+            for a, coefficient in enumerate(left):
+                for b, other in enumerate(right):
+                    product[a + b] = (product[a + b] + coefficient * other) % prime
+            for exponent in range(len(product) - 1, degree - 1, -1):
+                factor = product[exponent]
+                for index, coefficient in enumerate(polynomial):
+                    position = exponent - degree + index
+                    product[position] = (product[position] - factor * coefficient) % prime
+            row.append(encode(product[:degree]))
+        multiplication.append(row)
+    labels = []
+    for coefficients in digits:
+        terms = []
+        for exponent in range(degree - 1, -1, -1):
+            coefficient = coefficients[exponent]
+            if not coefficient:
+                continue
+            power = "" if exponent == 0 else "α" if exponent == 1 else "α^" + str(exponent)
+            terms.append((str(coefficient) if exponent == 0 or coefficient != 1 else "") + power)
+        labels.append("+".join(terms) or "0")
+    return addition, multiplication, labels
+
+
+def ring_structure(spec, *, require_commutative=False):
     if not isinstance(spec, dict):
         raise AlgebraStructureError("missing finite ring")
     family = spec.get("family")
@@ -217,9 +306,11 @@ def ring_structure(spec):
         moduli = [spec.get("parameter")] if family == "zn" else spec.get("moduli")
         addition, labels = _cyclic_product(moduli, lambda a, b: a + b)
         multiplication, _ = _cyclic_product(moduli, lambda a, b: a * b)
+    elif family == "finite_field":
+        addition, multiplication, labels = _finite_field(spec.get("parameter"))
     elif family == "table":
         values = spec.get("addition_table")
-        size = _integer(len(values) if isinstance(values, list) else None, 2, 16)
+        size = _integer(len(values) if isinstance(values, list) else None, 1, 16)
         addition = _table(values, size)
         multiplication = _table(spec.get("multiplication_table"), size)
         labels = _labels(spec.get("labels"), size)
@@ -232,11 +323,12 @@ def ring_structure(spec):
         raise AlgebraStructureError("ring must have an identity")
     for a in range(size):
         for b in range(size):
-            if multiplication[a][b] != multiplication[b][a]:
+            if require_commutative and multiplication[a][b] != multiplication[b][a]:
                 raise AlgebraStructureError("ring must be commutative")
             for c in range(size):
                 if (multiplication[multiplication[a][b]][c] != multiplication[a][multiplication[b][c]]
-                        or multiplication[a][addition[b][c]] != addition[multiplication[a][b]][multiplication[a][c]]):
+                        or multiplication[a][addition[b][c]] != addition[multiplication[a][b]][multiplication[a][c]]
+                        or multiplication[addition[a][b]][c] != addition[multiplication[a][c]][multiplication[b][c]]):
                     raise AlgebraStructureError("invalid ring laws")
     return addition, multiplication, labels, zero
 
@@ -244,7 +336,7 @@ def ring_structure(spec):
 def ideal_structure(ring):
     addition, multiplication, labels, zero = ring_structure(ring)
     structures = [(members, generators) for members, generators in subgroups(addition, zero)
-                  if all(multiplication[scalar][item] in members
+                  if all(multiplication[scalar][item] in members and multiplication[item][scalar] in members
                          for scalar in range(len(addition)) for item in members)]
     names = ["{" + labels[zero] + "}" if len(members) == 1 else "R" if len(members) == len(addition)
              else "(" + ", ".join(labels[index] for index in generators) + ")"
@@ -255,7 +347,7 @@ def ideal_structure(ring):
 
 
 def zero_divisor_structure(ring):
-    _, multiplication, labels, zero = ring_structure(ring)
+    _, multiplication, labels, zero = ring_structure(ring, require_commutative=True)
     members = [item for item in range(len(labels)) if item != zero
                and any(other != zero and multiplication[item][other] == zero for other in range(len(labels)))]
     if not members:

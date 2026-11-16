@@ -30,6 +30,9 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   const sendIcon=()=>{const svg=doc.createElementNS('http://www.w3.org/2000/svg','svg'),path=doc.createElementNS(svg.namespaceURI,'path');
    svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');
    for(const [key,value] of Object.entries({d:'M12 20V4m-7 7 7-7 7 7',fill:'none',stroke:'currentColor','stroke-width':'2.4','stroke-linecap':'round','stroke-linejoin':'round'}))path.setAttribute(key,value);svg.append(path);return svg;};
+  const imageIcon=()=>{const svg=doc.createElementNS('http://www.w3.org/2000/svg','svg');
+   for(const [key,value] of Object.entries({class:'dmate-lucide-icon',width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor','stroke-width':1.8,'stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true',focusable:'false','data-icon':'image'}))svg.setAttribute(key,String(value));
+   for(const [tag,attributes] of [['rect',{width:18,height:18,x:3,y:3,rx:2,ry:2}],['circle',{cx:9,cy:9,r:2}],['path',{d:'m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'}]]){const part=doc.createElementNS(svg.namespaceURI,tag);for(const [key,value] of Object.entries(attributes))part.setAttribute(key,String(value));svg.append(part);}return svg;};
   const shell=el('section','dmate-drawing-workspace'),top=el('div','ddw-header'),name=el('input','ddw-name');
   name.type='text';name.maxLength=80;name.setAttribute('aria-label','绘图名称');
   const actions=el('div','ddw-page-actions'),body=el('div','ddw-body'),editorHost=el('div','ddw-editor'),rail=el('div','ddw-side-actions'),panel=el('aside','ddw-side-panel'),noticeOwner=el('div','ddw-notice-owner');
@@ -42,10 +45,11 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   rail.setAttribute('role','toolbar');rail.setAttribute('aria-label','绘图面板');
   settingsButton.setAttribute('aria-expanded','false');informationButton.setAttribute('aria-expanded','false');
   historyButton.setAttribute('aria-expanded','false');aiButton?.setAttribute('aria-expanded','false');
-  const newButton=button('新建空白页',()=>newPage()),exportButton=button('导出图片',()=>exportImage()),uploadButton=features.upload?button('上传',()=>uploadImage(),'ddw-primary ddw-upload-button'):null;
-  exportButton.title=uiText('以图片形式导出','Export as image');
+  const newButton=button('新建空白页',()=>newPage()),exportButton=button('',()=>exportImage(),'ddw-header-export'),uploadButton=features.upload?button('上传',()=>uploadImage(),'ddw-primary ddw-upload-button'):null;
+  exportButton.dataset.drawingExport='true';exportButton.title=uiText('以图片形式导出','Export as image');exportButton.setAttribute('aria-label',exportButton.title);exportButton.append(imageIcon());
   if(uploadButton){uploadButton.setAttribute('aria-label','上传');uploadButton.title='上传';}
-  actions.append(newButton,historyButton,exportButton);if(uploadButton)actions.append(uploadButton);top.append(name,actions);rail.append(settingsButton,informationButton);if(aiButton)rail.append(aiButton,generateButton);body.append(editorHost,rail);shell.append(top,body,panel,noticeOwner);host.replaceChildren(shell);host.classList.add('has-drawing-workspace');
+  actions.append(newButton,historyButton);if(uploadButton)actions.append(uploadButton);top.append(name,actions);rail.append(settingsButton,informationButton);if(aiButton)rail.append(aiButton,generateButton);body.append(editorHost,rail);shell.append(top,body,panel,noticeOwner);host.replaceChildren(shell);host.classList.add('has-drawing-workspace');
+  const exportHeader=host.closest('.graph-editor-dialog')?.querySelector(':scope > .graph-editor-dialog-head')||top;
   let requirement='',answer='',answerDocument='',answerRequirement='',nameFollowsGraph=false,aiTask='';
   const active=()=>pages.find(p=>p.id===activeId);
   function showNextNotice(){
@@ -129,6 +133,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
     trigger?.setAttribute('aria-label','绘图工具');trigger?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();toggleTools();});
    }
    const empty=!active(),disabled=exportBusy||Boolean(exportPreview);name.disabled=empty||disabled;editorHost.inert=disabled;rail.inert=disabled;
+   exportButton.disabled=empty||disabled||!currentDocument().graphs.some(graph=>graph.vertices.length);exportButton.setAttribute('aria-busy',String(exportBusy));
    if(viewport)viewport.inert=empty;
    settingsButton.disabled=empty||disabled;informationButton.disabled=empty||disabled;if(aiButton)aiButton.disabled=disabled;
    if(generateButton){generateButton.disabled=disabled;generateButton.setAttribute('aria-busy',String(aiTask==='generate'));}
@@ -362,7 +367,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
     }
    });busy(exportBusy);close.focus({preventScroll:true});
   }
-  async function exportImage(){if(exportBusy)return;busy(true);try{collect();persist();const {blob}=await makeImage();if(destroyed)return;const metadata={name:caption(name.value)};if(typeof options.onExport==='function')await options.onExport(blob,metadata);else await root.DMateDrawingExport.save(blob,metadata.name,{document:doc,mobilePreview:showExportPreview});if(!destroyed)setStatus('');}catch(error){if(!destroyed)setStatus(error?.message||'图片导出失败。');}finally{if(!destroyed)busy(false);}}
+  async function exportImage(){if(exportBusy)return;busy(true);try{collect();persist();const metadata={name:caption(name.value)},{blob}=await makeImage();if(destroyed)return;if(typeof options.onExport==='function')await options.onExport(blob,metadata);else await root.DMateDrawingExport.save(blob,metadata.name,{document:doc,mobilePreview:showExportPreview});if(!destroyed)setStatus('');}catch(error){if(!destroyed)setStatus(error?.message||'图片导出失败。');}finally{if(!destroyed)busy(false);}}
   async function uploadImage(){
    if(!features.upload||exportBusy)return;busy(true);uploadBusy=true;
    try{if(typeof options.onUpload!=='function')throw new Error(uiText('上传功能未就绪，请刷新后重试。'));collect();persist();const pageName=caption(name.value),requirements=requirement,{blob,document}=await makeImage();if(destroyed)return;await options.onUpload(blob,{name:pageName,document,requirements});if(!destroyed){setStatus('');options.onClose?.();}}
@@ -396,10 +401,13 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    name:caption(graph.name||p.name+' '+(index+1)),document:{...clone(p.document),graphs:[clone(graph)]}})));
   if(!pages.length&&options.createBlankIfEmpty===true)newPage();
   else{mountPage();persist();}
+  // Attach external chrome only after the editor mounted successfully, so a
+  // failed mount cannot leave a drawing action in the shared image dialog.
+  exportHeader.classList.add('has-drawing-header-export');exportHeader.insertBefore(exportButton,exportHeader.querySelector(':scope > .graph-editor-close-dot'));
   const pageHide=()=>{collect();persist(false);};win.addEventListener('pagehide',pageHide);
   return{getDocument:()=>clone(currentDocument()),getPages:()=>clone(pages),isBusy:()=>uploadBusy,createPageFromDocument,
    fitView:()=>editor?.fitView?.(),
-   destroy(){if(destroyed)return;collect();persist(false);destroyed=true;noticeQueue=[];if(noticeFrame)win.cancelAnimationFrame(noticeFrame);root.DMateDeleteConfirm?.cancel(noticeOwner);cancelDelete();closeExportPreview();clearTimeout(timer);if(chromeFrame)win.cancelAnimationFrame(chromeFrame);chromeObserver.disconnect();resizeObserver?.disconnect();abortAnswer();doc.removeEventListener('pointerdown',outsidePointer,true);doc.removeEventListener('keydown',escapeKey,true);doc.removeEventListener('scroll',documentScrolled,true);win.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('scroll',queueChrome);win.removeEventListener('pagehide',pageHide);editor?.destroy();host.replaceChildren();host.classList.remove('has-drawing-workspace');}};
+   destroy(){if(destroyed)return;collect();persist(false);destroyed=true;noticeQueue=[];if(noticeFrame)win.cancelAnimationFrame(noticeFrame);root.DMateDeleteConfirm?.cancel(noticeOwner);cancelDelete();closeExportPreview();clearTimeout(timer);if(chromeFrame)win.cancelAnimationFrame(chromeFrame);chromeObserver.disconnect();resizeObserver?.disconnect();abortAnswer();doc.removeEventListener('pointerdown',outsidePointer,true);doc.removeEventListener('keydown',escapeKey,true);doc.removeEventListener('scroll',documentScrolled,true);win.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('scroll',queueChrome);win.removeEventListener('pagehide',pageHide);editor?.destroy();exportButton.remove();if(!exportHeader.querySelector(':scope > .ddw-header-export'))exportHeader.classList.remove('has-drawing-header-export');host.replaceChildren();host.classList.remove('has-drawing-workspace');}};
  }
  root.DMateDrawingWorkspace={mount,blankDocument:blank};
 })(typeof window!=='undefined'?window:globalThis);

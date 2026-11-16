@@ -29,10 +29,10 @@
 }
 #learningReviewModal .learning-review-section-title {
     margin:0 0 10px;
-    color:var(--text-primary);
-    font-size:var(--font-base,16px);
-    font-weight:650;
-    line-height:1.5;
+    color:var(--text-muted);
+    font-size:14px;
+    font-weight:600;
+    line-height:1.6;
 }
 #learningReviewModal .learning-review-section-text {
     margin:0;

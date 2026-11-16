@@ -2,9 +2,14 @@
 .desktop-chat-toolbar,
 .desktop-shell-button { display:none; }
 
+body[data-appearance-theme] :is(#desktopNewChatBtn,#mobileNewChatBtn) {
+    --dm-icon-rest:var(--text-muted);
+    --dm-icon-emphasis:var(--text-secondary);
+}
+
 @media(max-width:1100px) {
     .mobile-topbar { grid-template-columns:auto minmax(0,1fr) auto !important; }
-    .mobile-topbar-start { gap:2px; }
+    .mobile-topbar-start { gap:8px; }
     .mobile-topbar-actions { grid-column:3; }
     #mobileNewChatBtn { flex:none; }
     body.mobile-left-open #mobileNewChatBtn { display:none; }
@@ -60,7 +65,7 @@
         gap:12px;
     }
     .desktop-chat-toolbar-start {
-        display:flex; align-items:center; gap:4px;
+        display:flex; align-items:center; gap:10px;
         flex:1 1 auto; min-width:0;
     }
     .desktop-conversation-title {

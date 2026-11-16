@@ -6,6 +6,10 @@
 .ddw-name{width:190px;min-width:100px;max-width:100%;border:1px solid var(--border-strong,#cbd5e1);border-radius:9px;background:var(--surface-1,#fff);color:inherit;padding:9px 11px;font:inherit}
 .ddw-page-actions{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto;min-width:0;max-width:100%}
 .ddw-page-actions>button{white-space:nowrap}
+.graph-editor-dialog>.graph-editor-dialog-head.has-drawing-header-export{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}
+.graph-editor-dialog>.graph-editor-dialog-head.has-drawing-header-export:has(>.graph-editor-close-dot){grid-template-columns:minmax(0,1fr) auto auto}
+.graph-editor-dialog-head>.ddw-header-export{flex:0 0 auto}
+.ddw-header>.ddw-header-export{flex:0 0 auto}
 .dmate-drawing-workspace button{font:inherit;color:inherit;background:var(--surface-2,#f8fafc);border:1px solid var(--border-strong,#cbd5e1);border-radius:9px;padding:9px 12px;cursor:pointer;touch-action:manipulation}
 .dmate-drawing-workspace button:hover:not(:disabled){filter:none}
 /* Keep the existing button dimensions while removing the visible frame. */

@@ -379,6 +379,70 @@ async function history(page) {
   return page.locator('.ddw-history-open');
 }
 
+async function headerExportChecks(page, label, offline = false) {
+  const head = page.locator(offline ? '#drawingPanel>.graph-editor-dialog-head' : '#graphEditorDialog>.graph-editor-dialog-head');
+  const trigger = head.locator('[data-drawing-export]');
+  assert.equal(await trigger.count(), 1, 'Exactly one image export belongs to the drawing header');
+  assert.equal(await page.locator('.ddw-page-actions [data-drawing-export]').count(), 0, 'Export is removed from the page action row');
+  assert.equal(await trigger.textContent(), '', 'The header action uses the image icon without a text button');
+  assert.equal(await trigger.locator('svg[data-icon="image"]').count(), 1);
+  const geometry = await trigger.evaluate(node => {
+    const box = node.getBoundingClientRect(), close = node.parentElement.querySelector('.graph-editor-close-dot')?.getBoundingClientRect();
+    const css = getComputedStyle(node), icon = node.querySelector('svg').getBoundingClientRect();
+    return {width:box.width, height:box.height, icon:icon.width, border:css.borderWidth,
+      leftOfClose:!close || box.right <= close.left - 5,
+      gap:close ? Math.round(close.left - box.right) : null,
+      centered:!close || Math.abs(box.y + box.height / 2 - close.y - close.height / 2) < 1};
+  });
+  assert.deepEqual(geometry, {width:32, height:32, icon:20, border:'0px', leftOfClose:true, gap:offline ? null : 10, centered:true});
+  await page.evaluate(() => {
+    window.headerExportRecords = [];
+    window.headerOriginalPng = DMateDrawingExport.pngBlob;
+    window.headerOriginalSave = DMateDrawingExport.save;
+    DMateDrawingExport.pngBlob = async (svg, ...args) => {
+      const labels = svg.textContent;
+      const blob = await window.headerOriginalPng(svg, ...args);
+      window.headerExportSvg = labels;
+      return blob;
+    };
+    DMateDrawingExport.save = async (blob, name) => {
+      window.headerExportRecords.push({name, labels:window.headerExportSvg, type:blob.type, bytes:blob.size});
+      await new Promise(resolve => { window.finishHeaderExport = resolve; });
+      return {destination:'download'};
+    };
+  });
+  try {
+    for (const index of [0, 1]) {
+      if (index) {
+        await (await history(page)).getByText(names[index], {exact:true}).click();
+        await readyView(page);
+      }
+      await trigger.click();
+      await page.waitForFunction(count => window.headerExportRecords.length === count, index + 1);
+      assert.equal(await trigger.isDisabled(), true, 'Export stays disabled until image saving completes');
+      assert.equal(await trigger.getAttribute('aria-busy'), 'true');
+      assert.equal(await page.locator('.ddw-name').isDisabled(), true);
+      await trigger.dispatchEvent('click');
+      const records = await page.evaluate(() => window.headerExportRecords);
+      assert.equal(records.length, index + 1, 'A second click cannot start another image save');
+      const record = records[index];
+      assert.equal(record.name, names[index], 'The export filename is the current drawing name');
+      assert.equal(record.type, 'image/png'); assert.ok(record.bytes > 1000, 'The current drawing produces a real PNG');
+      assert.match(record.labels, new RegExp('ABC'[index] + '1'));
+      for (const other of [0, 1, 2].filter(other => other !== index)) assert.doesNotMatch(record.labels, new RegExp('ABC'[other] + '1'), 'Other gallery drawings do not enter the exported image');
+      await page.evaluate(() => finishHeaderExport());
+      await page.waitForFunction(() => !document.querySelector('[data-drawing-export]').disabled);
+    }
+    await (await history(page)).getByText(names[0], {exact:true}).click();
+    await readyView(page);
+    const toggle = page.locator('.ddw-page-actions>button[aria-expanded="true"]');
+    if (await toggle.count()) await toggle.click();
+  } finally {
+    await page.evaluate(() => { DMateDrawingExport.pngBlob = window.headerOriginalPng; DMateDrawingExport.save = window.headerOriginalSave; });
+  }
+  console.log('PASS ' + label + ': header image icon exports only the selected drawing, with real PNG and busy guards');
+}
+
 async function runCase(browser, width) {
   const page = await browser.newPage({ viewport: { width, height: width === 390 ? 740 : 900 },
     isMobile: width === 390, hasTouch: width === 390 });
@@ -388,6 +452,7 @@ async function runCase(browser, width) {
   try {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
     await mount(page, true);
+    await headerExportChecks(page, 'online-' + width);
     await viewportAndPopoverChecks(page, width === 390, 'online-' + width);
     await selectShape(page, 'vertex', width === 390);
     const vertex = await panelPosition(page);
@@ -483,6 +548,7 @@ async function openOnline(page) {
 async function closeOnline(page) {
   await page.locator('#graphEditorClose').click();
   await page.waitForFunction(() => !document.getElementById('graphEditorDialog').open && ocrEditorController === null);
+  assert.equal(await page.locator('#graphEditorDialog [data-drawing-export]').count(), 0, 'Closing removes the drawing-only header action before the dialog is reused');
 }
 
 async function onlineState(page) {
@@ -498,6 +564,7 @@ async function assertEditableBlank(page) {
   assert.deepEqual(state.pages[0].document.graphs[0].vertices, []);
   assert.deepEqual(state.pages[0].document.graphs[0].edges, []);
   assert.equal(await page.locator('.ddw-name').isEnabled(), true, 'Blank page name is editable');
+  assert.equal(await page.locator('[data-drawing-export]').isDisabled(), true, 'An empty drawing has no image to export');
   assert.equal(await page.locator('.dge-overlay-viewport').evaluate(node => Boolean(node.closest('[inert]'))), false,
     'Blank page canvas is editable, rather than the inert zero-page placeholder');
   return state;
@@ -640,6 +707,7 @@ async function runOfflineViewport(browser, width) {
     await page.locator('#graphDrawingBtn').click();
     await page.locator('#offlineDrawingHost .dge-overlay-viewport').waitFor();
     await readyView(page);
+    await headerExportChecks(page, 'offline-' + width, true);
     await viewportAndPopoverChecks(page, width === 390, 'offline-' + width, false);
     for (const kind of ['vertex', 'edge']) {
       await selectShape(page, kind, width === 390);

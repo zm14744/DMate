@@ -29,6 +29,7 @@ _PROMPT = """你为聊天产品生成左侧会话列表和顶部使用的对话�
 
 要求：
 - 标题表达具体主题和必要的任务，通常中文4至14字，最多24字；英文通常3至8个词，最多72字符。保留重要数学名称、符号、软件名称。
+- 标题跟随用户实际对话的语言：英文对话使用英文标题，中文对话使用简体中文标题；不要因本说明或示例使用中文就翻译英文话题。
 - 不照抄用户的开场白、整句请求或第一句，不机械加“讨论”“解析”“问题”“求助”等后缀，不出现“给一个”“帮我”“请”“关于”等请求语气。
 - 结合对话判断实际主题；助手内容仅用于理解用户请求，不能把助手顺带提到的其他知识当成主题。后续明确的实际任务优先于最初的寒暄。
 - 用户只寒暄时可用“初次交流”；仅致谢可用“交流与致谢”。这种情况下 topic_established 为 false，方便之后更新。已出现明确主题时为 true。
@@ -41,6 +42,8 @@ _PROMPT = """你为聊天产品生成左侧会话列表和顶部使用的对话�
 用户先说“你好”，再问“欧拉回路和哈密顿回路有什么不同” → {"title":"欧拉与哈密顿回路比较","topic_established":true}
 用户“这个报错是什么原因，怎么修”，随后提供OBS的1080P设置报错 → {"title":"OBS 1080P设置排错","topic_established":true}
 用户“请比较Z12的所有子群之间的包含关系”，助手解释子群格 → {"title":"Z12子群格与包含关系","topic_established":true}
+User “How does bipartite matching differ from a minimum vertex cover?” → {"title":"Bipartite Matching and Vertex Covers","topic_established":true}
+User “Hello”, assistant introduces the app → {"title":"Initial Conversation","topic_established":false}
 
 只返回 JSON 对象，恰好包含 title（纯文本标题）与 topic_established（布尔值）。不要输出 Markdown、引号装饰、解释或其他字段。"""
 
@@ -110,7 +113,12 @@ def summarize_conversation(payload, *, completion=None):
             from ai import _request_text_completion
             completion = _request_text_completion
         language = normalize_language(payload.get("language"))
-        prompt = _PROMPT + ("\n优先跟随用户实际文本所用的语言；只有内容全是符号、无法判断语言时使用英文。" if language == "en" else "\n跟随用户实际对话所用的语言生成标题，中文使用简体；无法判断语言时使用中文。")
+        fallback_language = "English" if language == "en" else "Simplified Chinese"
+        prompt = _PROMPT + (
+            "\nTITLE LANGUAGE: Follow the user's substantive messages. English user messages require an English title; "
+            "Chinese user messages require a Simplified Chinese title. The system prompt's language does not choose the title language. "
+            f"Use {fallback_language} only when the user sends symbols with no inferable language."
+        )
         try:
             response = completion([
                 {"role": "system", "content": prompt},

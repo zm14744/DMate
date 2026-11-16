@@ -1,8 +1,8 @@
 import json
 import unittest
 
-from math_diagram import MathDiagramError, build_document, generate_diagram
-from finite_algebra_diagrams import AlgebraStructureError, group_structure, ring_structure
+from math_diagram import MathDiagramError, build_document, generate_diagram, _require_discrete_scope
+from finite_algebra_diagrams import AlgebraStructureError, group_structure, ring_structure, ideal_structure, semigroup_cayley_structure
 
 
 class MathDiagramStructureTests(unittest.TestCase):
@@ -451,12 +451,12 @@ class FiniteAlgebraDiagramTests(unittest.TestCase):
                     self.fail("Out-of-scope requests must not invoke the model")
                 with self.assertRaises(MathDiagramError) as caught:
                     generate_diagram({"requirement": requirement}, completion=completion)
-                self.assertEqual(caught.exception.code, "outside_discrete_math_scope")
+                self.assertIn(caught.exception.code, ("outside_discrete_math_scope", "excluded_math_diagram"))
                 self.assertEqual(caught.exception.status, 422)
 
-    def test_explicit_adjacency_and_finite_mapping_remain_in_scope(self):
+    def test_explicit_adjacency_remains_in_scope(self):
         path = MathDiagramRequirementTests.graph_spec(3, [(0, 1), (1, 2)])
-        for requirement in ("A -> B -> C", "画三个点和两条边", "有限映射 A={1,2} 到 B={a,b}，1映到a，2映到b", "Draw a finite mapping f(x)=x mod 3"):
+        for requirement in ("A -> B -> C", "画三个点和两条边"):
             with self.subTest(requirement=requirement):
                 self.assertTrue(MathDiagramRequirementTests.generate(requirement, path)["ok"])
 
@@ -466,7 +466,7 @@ class FiniteAlgebraDiagramTests(unittest.TestCase):
             with self.subTest(requirement=requirement):
                 # Structure-specific checks still apply after scope admission;
                 # this test is specifically about not rejecting course terms.
-                self.assertTrue(MathDiagramRequirementTests.generate(requirement, graph)["ok"])
+                _require_discrete_scope(requirement)
 
     def test_limits_and_blank_requirements_are_rejected(self):
         for spec in (
@@ -480,6 +480,146 @@ class FiniteAlgebraDiagramTests(unittest.TestCase):
             with self.subTest(requirement=requirement), self.assertRaises(MathDiagramError) as caught:
                 generate_diagram({"requirement": requirement}, completion=lambda *a, **k: self.fail("No model call"))
             self.assertEqual(caught.exception.code, "empty_math_diagram_request")
+
+
+class ExtendedDiscreteDiagramTests(unittest.TestCase):
+    def test_excluded_diagrams_reject_before_model_even_when_finite(self):
+        cases = ("画有限映射 A={1,2} 到 B={a,b}，1映到a，2映到b", "Draw a finite mapping f(x)=x mod 3",
+                 "画函数的有向图", "Generate a truth table for p and q", "画Z4的乘法表", "画Venn diagram",
+                 "画集合A和B的韦恩图", "画邻接矩阵", "根据给定乘法表画Cayley图，并附上乘法表",
+                 "Draw a Cayley graph using a multiplication table and include the table", "画function graph",
+                 "画mapping graph", "画table graph", "画sin(x)的graph")
+        for requirement in cases:
+            with self.subTest(requirement=requirement), self.assertRaises(MathDiagramError) as error:
+                generate_diagram({"requirement": requirement}, completion=lambda *a, **k: self.fail("No model call"))
+            self.assertIn(error.exception.code, ("excluded_math_diagram", "outside_discrete_math_scope"))
+
+    def test_algebra_and_adjacency_tables_are_still_allowed_as_source_data(self):
+        for requirement in ("根据给定乘法表画Cayley图", "给定邻接矩阵，画无向图", "使用下面的关系矩阵画关系图",
+                            "Draw a Cayley graph from the given multiplication table",
+                            "Draw the two-sided ideal lattice of the matrix ring M2(F2)", "不要韦恩图，画布尔格B3",
+                            "Draw K5, no functions or tables", "画K5，不要函数、表格和韦恩图"):
+            with self.subTest(requirement=requirement):
+                _require_discrete_scope(requirement)
+
+    def test_model_numeric_ids_are_canonicalized_in_every_reference_field(self):
+        vertices = [{"id": str(index), "label": str(index)} for index in (1, 2, 3)]
+        cases = (("画有向图1到2到3", {"kind": "graph", "graph_family": "general", "directed": True, "weighted": False,
+                                     "edges": [{"from": "1", "to": "2"}, {"from": "2", "to": "3"}]}, 2),
+                 ("画整除关系哈斯图", {"kind": "hasse", "order_relations": [["1", "2"], ["2", "3"], ["1", "3"]]}, 2),
+                 ("画根为1的根树", {"kind": "rooted_tree", "root": "1", "directed": True, "weighted": False,
+                                    "edges": [{"from": "1", "to": "2"}, {"from": "1", "to": "3"}]}, 2),
+                 ("画有限关系的传递闭包", {"kind": "relation_graph", "relation_pairs": [["1", "2"], ["2", "3"]], "relation_closure": "transitive"}, 3))
+        for requirement, fields, edge_count in cases:
+            with self.subTest(kind=fields["kind"]):
+                graph = MathDiagramRequirementTests.generate(requirement, {**fields, "vertices": vertices, "title": "Numeric elements"})["document"]["graphs"][0]
+                self.assertEqual([row["label"] for row in graph["vertices"]], ["1", "2", "3"])
+                self.assertEqual({row["id"] for row in graph["vertices"]}, {"v0", "v1", "v2"})
+                self.assertEqual(len(graph["edges"]), edge_count)
+        duplicate = {"kind": "graph", "title": "Bad", "vertices": [{"id": "1", "label": "A"}, {"id": "1", "label": "B"}], "edges": []}
+        with self.assertRaises(MathDiagramError):
+            MathDiagramRequirementTests.generate("画有向图", duplicate)
+        with self.assertRaises(MathDiagramError):
+            MathDiagramRequirementTests.generate("画有向图", {**duplicate, "vertices": vertices, "edges": [{"from": "1", "to": "missing"}]})
+
+    def test_numeric_relation_ids_are_reindexed_without_changing_elements(self):
+        spec = {"kind": "relation_graph", "title": "R+", "vertices": [{"id": str(i), "label": str(i)} for i in (1, 2, 3)],
+                "relation_pairs": [["1", "2"], ["2", "3"]], "relation_closure": "transitive"}
+        document, kind = build_document(spec)
+        graph = document["graphs"][0]
+        self.assertEqual(kind, "relation_graph")
+        self.assertEqual([row["label"] for row in graph["vertices"]], ["1", "2", "3"])
+        self.assertEqual({(edge["from"], edge["to"]) for edge in graph["edges"]}, {("r0", "r1"), ("r1", "r2"), ("r0", "r2")})
+        for change in ({"relation_pairs": [["1", "missing"]]}, {"vertices": [{"id": "1", "label": "A"}, {"id": "1", "label": "B"}]}):
+            with self.subTest(change=change), self.assertRaises(MathDiagramError):
+                build_document({**spec, **change})
+
+    def test_relation_closures_preserve_reflexive_cycles_and_equivalence_components(self):
+        base = {"kind": "relation_graph", "title": "R", "vertices": [{"id": i, "label": i} for i in "abc"],
+                "relation_pairs": [["a", "b"], ["b", "a"]]}
+        for closure, expected in (("none", {("a", "b"), ("b", "a")}),
+                                  ("transitive", {("a", "b"), ("b", "a"), ("a", "a"), ("b", "b")}),
+                                  ("equivalence", {("a", "b"), ("b", "a"), ("a", "a"), ("b", "b"), ("c", "c")})):
+            with self.subTest(closure=closure):
+                graph = build_document({**base, "relation_closure": closure})[0]["graphs"][0]
+                self.assertEqual({(edge["from"], edge["to"]) for edge in graph["edges"]}, expected)
+
+    def test_new_model_schema_constructs_actual_standard_and_course_structures(self):
+        cases = (("画完全图K5", "standard_graph", {"family": "complete", "order": 5}, 5, 10),
+                 ("画彼得森图", "standard_graph", {"family": "petersen"}, 10, 15),
+                 ("画超立方体Q3", "standard_graph", {"family": "hypercube", "dimension": 3}, 8, 12),
+                 ("画星图S4", "standard_graph", {"family": "star", "order": 5}, 5, 4),
+                 ("画轮图W4", "standard_graph", {"family": "wheel", "order": 5}, 5, 8),
+                 ("画高度3的满二叉树", "full_mary_tree", {"branching": 2, "height": 3}, 15, 14),
+                 ("画120的素因数分解树", "factor_tree", {"number": 120}, 9, 8),
+                 ("画选择树", "choice_tree", {"choices": [["a", "b"], ["1", "2", "3"]]}, 9, 8),
+                 ("画T(8)每次二分且有两个子问题的递归树", "recursion_tree", {"initial": 8, "branching": 2, "divisor": 2, "base": 1}, 15, 14),
+                 ("画三进制串禁用子串22的状态转移图", "word_transition_graph", {"alphabet": ["0", "1", "2"], "forbidden": ["22"]}, 2, 5))
+        for requirement, kind, structure, nodes, edges in cases:
+            with self.subTest(kind=kind, requirement=requirement):
+                result = MathDiagramRequirementTests.generate(requirement, {"kind": kind, "title": "结构图", "structure": structure})
+                graph = result["document"]["graphs"][0]
+                self.assertEqual((len(graph["vertices"]), len(graph["edges"])), (nodes, edges))
+        for requirement, spec in (("画彼得森图", {"kind": "standard_graph", "structure": {"family": "cycle", "order": 10}}),
+                                  ("画超立方体Q3", {"kind": "standard_graph", "structure": {"family": "hypercube", "dimension": 2}})):
+            MathDiagramRequirementTests().assert_mismatch(requirement, {**spec, "title": "Wrong"})
+
+    def test_rooted_trees_have_unique_reachable_parent_and_can_orient_given_undirected_edges(self):
+        spec = {"kind": "rooted_tree", "title": "Tree", "root": "b", "directed": False, "weighted": False,
+                "vertices": [{"id": i, "label": i} for i in "abc"], "edges": [{"from": "a", "to": "b"}, {"from": "a", "to": "c"}]}
+        document, kind = build_document(spec)
+        self.assertEqual(kind, "rooted_tree")
+        self.assertEqual({(edge["from"], edge["to"]) for edge in document["graphs"][0]["edges"]}, {("b", "a"), ("a", "c")})
+        for change in ({"root": "missing"}, {"root": []}, {"edges": spec["edges"] + [{"from": "c", "to": "b"}]}):
+            with self.subTest(change=change), self.assertRaises(MathDiagramError):
+                build_document({**spec, **change})
+
+    def test_logic_expression_tree_is_parsed_before_model_edges(self):
+        result = MathDiagramRequirementTests.generate("画命题公式¬p∧(q∨r)的语法树", {"kind": "logic_tree", "title": "Logic", "expression": "¬p∧(q∨r)"})
+        graph = result["document"]["graphs"][0]
+        self.assertEqual(result["kind"], "rooted_tree")
+        self.assertEqual((len(graph["vertices"]), len(graph["edges"])), (6, 5))
+        self.assertEqual({vertex["label"] for vertex in graph["vertices"]}, {"¬", "p", "∧", "q", "∨", "r"})
+
+    def test_trivial_groups_and_zero_ring_have_single_vertex_not_a_fabricated_loop(self):
+        for spec in ({"kind": "finite_group_cayley", "group": {"family": "cyclic", "parameter": 1}, "generators": []},
+                     {"kind": "finite_subgroup_lattice", "group": {"family": "table", "multiplication_table": [[0]]}},
+                     {"kind": "finite_ideal_lattice", "ring": {"family": "zn", "parameter": 1}}):
+            with self.subTest(spec=spec):
+                graph = build_document({**spec, "title": "Singleton"})[0]["graphs"][0]
+                self.assertEqual((len(graph["vertices"]), len(graph["edges"])), (1, 0))
+
+    def test_semigroup_and_monoid_do_not_incorrectly_require_inverses(self):
+        graph = build_document({"kind": "monoid_cayley", "title": "M4", "semigroup": {"family": "modular_multiplication", "parameter": 4}, "generators": ["0", "2", "3"]})[0]["graphs"][0]
+        self.assertEqual((len(graph["vertices"]), len(graph["edges"])), (4, 12))
+        self.assertTrue(any(edge["from"] == edge["to"] == "v0" for edge in graph["edges"]))
+        semigroup_cayley_structure({"family": "left_zero", "parameter": 2}, [0, 1])
+        with self.assertRaises(AlgebraStructureError):
+            semigroup_cayley_structure({"family": "left_zero", "parameter": 2}, [0, 1], require_identity=True)
+
+    def test_finite_fields_are_not_modular_integer_rings_of_composite_order(self):
+        for order in (4, 8, 9, 16):
+            with self.subTest(order=order):
+                _, multiplication, labels, zero = ring_structure({"family": "finite_field", "parameter": order})
+                one = labels.index("1")
+                self.assertTrue(all(any(multiplication[item][other] == one for other in range(order)) for item in range(order) if item != zero))
+                self.assertEqual(len(ideal_structure({"family": "finite_field", "parameter": order})[0]), 2)
+        self.assertEqual(len(ideal_structure({"family": "zn", "parameter": 4})[0]), 3)
+        MathDiagramRequirementTests().assert_mismatch("画有限域F4的理想格", {"kind": "finite_ideal_lattice", "title": "Wrong", "ring": {"family": "zn", "parameter": 4}})
+
+    def test_noncommutative_matrix_ring_ideals_use_both_sides(self):
+        bits = lambda value: [(value >> index) & 1 for index in range(4)]
+        def product(left, right):
+            a, b = bits(left), bits(right)
+            c = [(a[0]*b[0]+a[1]*b[2]) % 2, (a[0]*b[1]+a[1]*b[3]) % 2,
+                 (a[2]*b[0]+a[3]*b[2]) % 2, (a[2]*b[1]+a[3]*b[3]) % 2]
+            return sum(value << index for index, value in enumerate(c))
+        ring = {"family": "table", "addition_table": [[a ^ b for b in range(16)] for a in range(16)],
+                "multiplication_table": [[product(a, b) for b in range(16)] for a in range(16)]}
+        self.assertNotEqual(product(1, 2), product(2, 1))
+        self.assertEqual(len(ideal_structure(ring)[0]), 2)
+        with self.assertRaises(MathDiagramError):
+            build_document({"kind": "finite_zero_divisor_graph", "title": "Ambiguous", "ring": ring})
 
 
 if __name__ == "__main__":

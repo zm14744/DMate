@@ -8,6 +8,8 @@ on:
       - "app.py"
       - "math_diagram.py"
       - "finite_algebra_diagrams.py"
+      - "discrete_structure_diagrams.py"
+      - "logic_structure_diagrams.py"
       - "static/math-diagram.js"
       - "static/drawing-workspace.js"
       - "static/drawing-workspace.css"
@@ -15,6 +17,8 @@ on:
       - "static/vendor/viz-js-3.31.0/**"
       - "THIRD_PARTY_LICENSES.md"
       - "scripts/test_math_diagram.py"
+      - "scripts/test_discrete_structure_diagrams.py"
+      - "scripts/test_logic_structure_diagrams.py"
       - "scripts/test_math_diagram.cjs"
       - ".github/workflows/test-math-diagram.yml"
   pull_request:
@@ -22,6 +26,8 @@ on:
       - "app.py"
       - "math_diagram.py"
       - "finite_algebra_diagrams.py"
+      - "discrete_structure_diagrams.py"
+      - "logic_structure_diagrams.py"
       - "static/math-diagram.js"
       - "static/drawing-workspace.js"
       - "static/drawing-workspace.css"
@@ -29,6 +35,8 @@ on:
       - "static/vendor/viz-js-3.31.0/**"
       - "THIRD_PARTY_LICENSES.md"
       - "scripts/test_math_diagram.py"
+      - "scripts/test_discrete_structure_diagrams.py"
+      - "scripts/test_logic_structure_diagrams.py"
       - "scripts/test_math_diagram.cjs"
 
 jobs:
@@ -47,8 +55,10 @@ jobs:
           python -m pip install networkx jsonschema requests
       - name: Compile and test diagram structure generation
         run: |
-          python -m py_compile app.py math_diagram.py finite_algebra_diagrams.py
+          python -m py_compile app.py math_diagram.py finite_algebra_diagrams.py discrete_structure_diagrams.py logic_structure_diagrams.py
           PYTHONPATH=. python scripts/test_math_diagram.py
+          PYTHONPATH=. python scripts/test_discrete_structure_diagrams.py
+          PYTHONPATH=. python scripts/test_logic_structure_diagrams.py
       - name: Validate drawing workspace integration syntax
         run: |
           node --check static/math-diagram.js

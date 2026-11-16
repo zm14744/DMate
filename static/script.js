@@ -17386,6 +17386,12 @@ function renderSessions() {
         span.title = sessionDisplayName(session);
 
         const selectSession = () => {
+            // Keep the active title node in place so a second click can reach
+            // its rename handler instead of racing a redundant full render.
+            if (String(currentId) === String(session.id)) {
+                if (isMobileAppShell()) closeMobileShellDrawers();
+                return;
+            }
             if (currentId !== session.id) pauseOcrBatchRun(currentId);
             if (typingTimer) forceCompleteTyping();
             currentId = session.id;

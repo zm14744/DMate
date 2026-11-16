@@ -35,6 +35,21 @@ class ConversationTitleTests(unittest.TestCase):
         self.assertFalse(result["topic_established"])
         self.assertEqual(result["title"], "初次交流")
 
+    def test_title_language_follows_user_text_with_ui_language_only_as_fallback(self):
+        for ui_language, text, title, fallback in (
+            ("zh-CN", "How do bipartite matching and vertex cover differ?", "Matching and Vertex Covers", "Simplified Chinese"),
+            ("en", "环的理想和加法群的子群有什么区别？", "环理想与加法子群区别", "English"),
+        ):
+            observed = []
+            def completion(messages, **kwargs):
+                observed.extend(messages)
+                return completed(title)
+            result = summarize_conversation({"messages": [{"role": "user", "content": text}], "language": ui_language}, completion=completion)
+            self.assertEqual(result["title"], title)
+            self.assertIn("English user messages require an English title", observed[0]["content"])
+            self.assertIn("Chinese user messages require a Simplified Chinese title", observed[0]["content"])
+            self.assertIn(f"Use {fallback} only when", observed[0]["content"])
+
     def test_user_instructions_stay_inside_data_not_model_roles(self):
         observed = []
         def completion(messages, **kwargs):

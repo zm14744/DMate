@@ -243,7 +243,7 @@ async function pngDownload(page, mobile) {
   if (await historyToggle.getAttribute('aria-expanded') === 'true') await historyToggle.click();
   const downloading = page.waitForEvent('download');
   downloading.catch(() => {});
-  await page.locator('.ddw-page-actions button').nth(2).click();
+  await page.locator('[data-drawing-export]').click();
   if (mobile) {
     const preview = page.locator('.ddw-export-preview'); await preview.waitFor();
     await page.waitForFunction(() => document.querySelector('.ddw-export-image')?.naturalWidth > 64);
