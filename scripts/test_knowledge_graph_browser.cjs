@@ -173,9 +173,9 @@ async function checkPanelPresentation(browser, width) {
     for (const [language, expected] of [['en', 'Teaching videos'], ['zh-CN', '教学视频']]) {
       await page.evaluate(value => window.DMateI18n.setLanguage(value, false), language);
       await page.waitForFunction(text => document.querySelector('[data-kg-video-heading]')?.textContent === text, expected);
-      const copyLabel = language === 'en' ? 'Copy as image' : '以图片形式复制';
-      assert.equal(await page.locator('#knowledgeGraphCopyBtn').getAttribute('title'), copyLabel);
-      assert.equal(await page.locator('#knowledgeGraphCopyBtn').getAttribute('aria-label'), copyLabel);
+      const exportLabel = language === 'en' ? 'Export image' : '导出图片';
+      assert.equal(await page.locator('#knowledgeGraphCopyBtn').getAttribute('title'), exportLabel);
+      assert.equal(await page.locator('#knowledgeGraphCopyBtn').getAttribute('aria-label'), exportLabel);
       assert.equal(await page.locator('#knowledgeGraphModal').evaluate(modal => modal.classList.contains('hidden')), false);
       const styles = await page.evaluate(() => {
         const title = document.querySelector('[data-kg-video-heading]');

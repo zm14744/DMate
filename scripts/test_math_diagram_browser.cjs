@@ -141,6 +141,7 @@ async function pngDownload(page, mobile) {
 
 async function runCase(browser, width, language) {
   const page = await browser.newPage({ viewport: { width, height: 900 }, isMobile: width < 760, hasTouch: width < 760,
+    ...(width < 760 ? { userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36' } : {}),
     serviceWorkers: 'block' }); // keep paid endpoints entirely inside Playwright's route interception
   const errors = [], guideRequests = [];
   page.on('pageerror', error => errors.push(error.message));

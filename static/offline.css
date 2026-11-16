@@ -68,7 +68,7 @@ body.offline-workspace .offline-main.center { position:relative; display:flex !i
 .offline-library-select input[type="checkbox"]:focus-visible { outline:2px solid var(--accent); outline-offset:4px; }
 .offline-library-row > :is(.question-item,.concept-item) { flex:1 1 auto; min-width:0; width:0; padding:8px 6px; overflow-wrap:anywhere; }
 .offline-library-preview { display:none; }
-.offline-library-expand { display:inline-flex; align-items:center; justify-content:center; min-width:148px; min-height:44px; padding:10px 24px; border:1px solid var(--border-strong); border-radius:999px; background:var(--surface-2); color:var(--text-primary); font:inherit; font-size:15px; font-weight:600; cursor:pointer; }
+.offline-library-expand { display:inline-flex; align-items:center; justify-content:center; min-width:148px; min-height:44px; padding:5px 10px; border:1px solid var(--border-strong); border-radius:999px; background:var(--surface-2); color:var(--text-primary); font:inherit; font-size:15px; font-weight:700; line-height:1.2; box-shadow:0 4px 14px rgba(0,0,0,.18); cursor:pointer; }
 .offline-library-expand:disabled { cursor:default; opacity:.5; }
 .question-detail,.concept-detail { min-height:330px; padding:20px; }
 
@@ -194,8 +194,10 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
      through both list and main IDs so mobile sticky hover cannot paint a
      second rectangle inside the selected row. */
   body.offline-workspace[data-appearance-theme] #offlineMain :is(#questionList,#conceptList) .offline-library-row > :is(.question-item,.concept-item) { border:0 !important; border-radius:0 !important; background:transparent !important; background-image:none !important; box-shadow:none !important; filter:none !important; color:var(--text-primary) !important; -webkit-text-fill-color:currentColor !important; -webkit-tap-highlight-color:transparent; }
-  body.offline-workspace[data-appearance-theme] #offlineMain :is(#questionFullView,#conceptFullView) { background:var(--surface-2) !important; background-image:none !important; border:1px solid var(--border-strong) !important; box-shadow:none !important; color:var(--text-primary) !important; }
-  body.offline-workspace[data-appearance-theme] #offlineMain :is(#questionFullView,#conceptFullView):not(:disabled):is(:hover,:focus-visible) { background:var(--surface-3) !important; }
+  /* The library entries share the graph preview button's paint, typography
+     and interaction states instead of the generic raised-button theme. */
+  body.offline-workspace[data-appearance-theme] #offlineMain :is(#questionFullView,#conceptFullView) { background:var(--surface-2) !important; background-image:none !important; border:1px solid var(--border-strong) !important; box-shadow:0 4px 14px rgba(0,0,0,.18) !important; color:var(--text-primary) !important; transition:initial !important; }
+  body.offline-workspace[data-appearance-theme] #offlineMain :is(#questionFullView,#conceptFullView):is(:focus,:focus-visible) { box-shadow:none !important; }
 }
 /* The shared surface layer also paints navigation headers. Keep this header
    transparent so it follows the same canvas or wallpaper as the main area. */

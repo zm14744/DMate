@@ -306,23 +306,22 @@ function mount(host,options={}) {
   const target=document.createElement('div');target.style.cssText='position:fixed;left:-10000px;top:0;pointer-events:none';host.append(target);
   try{
    renderKnowledgeGraphSection(target,visibleNodes,categoryLabel(),countLabel(),{},{forCopy:true});
-   const source=target.querySelector('.kg-svg');if(!source)throw new Error('当前范围没有可复制的知识节点');
+   const source=target.querySelector('.kg-svg');if(!source)throw new Error(dmateUiText('当前范围没有可导出的知识节点','There are no knowledge nodes to export in this module.'));
    const clone=source.cloneNode(true),original=[source,...source.querySelectorAll('*')],copies=[clone,...clone.querySelectorAll('*')];
    const properties=['fill','stroke','stroke-width','stroke-linecap','stroke-linejoin','opacity','font-size','font-family','font-weight','text-anchor'];
    original.forEach((node,i)=>{const css=window.getComputedStyle(node);for(const key of properties){const value=css.getPropertyValue(key);if(value)copies[i].style.setProperty(key,value);}});
    return await root.DMateDrawingExport.pngBlob(clone,{background:window.getComputedStyle(canvas).backgroundColor});
   }finally{target.remove();}
  }
- function copyImage(){
+ async function exportImage(){
   if(copyButton.disabled)return;copyButton.disabled=true;
-  const image=exportPNG();
-  let copied=Promise.resolve(false);
   try{
-   if(window.ClipboardItem&&window.navigator.clipboard?.write)
-    copied=window.navigator.clipboard.write([new window.ClipboardItem({'image/png':image})]).then(()=>true,()=>false);
-  }catch(_){ /* Unsupported clipboard formats still use the same PNG download. */ }
-  Promise.all([image,copied]).then(([blob,ok])=>{if(!ok)root.DMateDrawingExport.download(blob,dmateUiText('知识图谱','Knowledge Graph'),document);options.onStatus?.(dmateUiText(ok?'已复制图谱图片':'图谱图片已导出',ok?'Graph image copied':'Graph image exported'));})
-   .catch(error=>options.onStatus?.(error.message||'图谱图片导出失败')).finally(()=>{copyButton.disabled=false;});
+   if(typeof root.DMateDrawingExport?.save!=='function')throw new Error(dmateUiText('导出模块未加载，请刷新后重试。','The export module is not loaded. Refresh and try again.'));
+   await root.DMateDrawingExport.save(await exportPNG(),dmateUiText('知识图谱','Knowledge Graph'),{
+    document,onStatus:message=>options.onStatus?.(message)
+   });
+  }catch(error){options.onStatus?.(error.message||dmateUiText('图谱图片导出失败，请重试','The graph image could not be exported. Try again.'));}
+  finally{copyButton.disabled=false;}
  }
  categorySelect.replaceChildren();for(const value of categories){const option=document.createElement('option');option.value=value;option.textContent=categoryOptionLabel(value);categorySelect.append(option);}
  categorySelect.addEventListener('change',()=>setCategory(categorySelect.value),{signal});
@@ -330,7 +329,7 @@ function mount(host,options={}) {
  document.getElementById('knowledgeGraphDesktopZoomOut').addEventListener('click',()=>setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale/1.2),{signal});
  document.getElementById('knowledgeGraphDesktopZoomIn').addEventListener('click',()=>setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale*1.2),{signal});
  document.getElementById('knowledgeGraphDesktopZoomFit').addEventListener('click',()=>{canvas.querySelector('.kg-desktop-viewport')?._kgBeginViewInteraction?.();fitKnowledgeGraphDesktop();},{signal});
- copyButton.addEventListener('click',copyImage,{signal});
+ copyButton.addEventListener('click',exportImage,{signal});
  canvas.addEventListener('wheel',event=>{if(!event.ctrlKey||isMobileAppShell())return;event.preventDefault();setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale*(event.deltaY<0?1.12:.89));},{signal,passive:false});
  document.addEventListener('keydown',event=>{
   if(event.key!=='Escape'||choice?.open||host.closest('#graphPanel')?.hidden||!host.getClientRects().length)return;

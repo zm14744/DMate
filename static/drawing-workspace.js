@@ -324,15 +324,30 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    exportPreview=el('section','ddw-export-preview');exportPreview.setAttribute('role','dialog');exportPreview.setAttribute('aria-modal','true');exportPreview.setAttribute('aria-label','导出绘图');
    const header=el('div','ddw-export-header'),close=button('',closeExportPreview,'ddw-export-close');close.setAttribute('aria-label','关闭图片预览');
    header.append(el('h3','','导出绘图'),close);
+   const tip=el('p','ddw-export-tip',uiText('网页无法直接写入手机相册。请长按图片保存，或选择系统分享/保存。','A website cannot write directly to Photos. Touch and hold the image to save it, or choose system share/save.'));
+   tip.style.cssText='margin:0;font-size:13px;line-height:1.5;color:var(--text-secondary)';
    const image=el('img','ddw-export-image');image.src=exportPreviewUrl;image.alt=uiText(pageName+'，绘图导出图片','Exported drawing: '+pageName);
-   const link=el('a','ddw-export-download','下载图片');link.href=exportPreviewUrl;link.download=pageName.replace(/[\\/:*?"<>|]/g,'_').slice(0,100)+'.png';
-   exportPreview.append(header,image,link);shell.append(exportPreview);
+   const link=el('a','ddw-export-download','下载图片');link.href=exportPreviewUrl;link.download=root.DMateDrawingExport.pngFilename(pageName);
+   link.addEventListener('click',()=>{tip.textContent=uiText('已发起图片下载','Image download started');});
+   exportPreview.append(header,tip,image,link);
+   if(typeof win.File==='function'&&typeof win.navigator.share==='function'){
+    const file=new win.File([blob],root.DMateDrawingExport.pngFilename(pageName),{type:'image/png'});
+    let supported=true;try{supported=typeof win.navigator.canShare!=='function'||win.navigator.canShare({files:[file]});}catch(_){supported=false;}
+    if(supported)exportPreview.append(button('系统分享/保存',async()=>{
+     try{await win.navigator.share({files:[file]});tip.textContent=uiText('请在系统操作中选择保存位置','Choose a save location in the system options.');}
+     catch(error){if(error?.name!=='AbortError')tip.textContent=uiText('系统分享不可用，请长按图片保存','System sharing is unavailable. Touch and hold the image to save it.');}
+    },'ddw-export-share'));
+   }
+   shell.append(exportPreview);
    exportPreview.addEventListener('keydown',event=>{
     if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeExportPreview();}
-    if(event.key==='Tab'){event.preventDefault();(doc.activeElement===close?link:close).focus();}
+    if(event.key==='Tab'){
+     const controls=[close,link,...exportPreview.querySelectorAll('.ddw-export-share')],index=controls.indexOf(doc.activeElement),direction=event.shiftKey?-1:1;
+     event.preventDefault();controls[(index+direction+controls.length)%controls.length].focus();
+    }
    });busy(exportBusy);close.focus({preventScroll:true});
   }
-  async function exportImage(){if(exportBusy)return;busy(true);try{collect();persist();const {blob}=await makeImage();if(destroyed)return;const metadata={name:caption(name.value)};if(typeof options.onExport==='function')await options.onExport(blob,metadata);else if(win.innerWidth<=760||win.matchMedia?.('(pointer: coarse)').matches)showExportPreview(blob,metadata.name);else root.DMateDrawingExport.download(blob,metadata.name,doc);setStatus('');}catch(error){if(!destroyed)setStatus(error?.message||'图片导出失败。');}finally{if(!destroyed)busy(false);}}
+  async function exportImage(){if(exportBusy)return;busy(true);try{collect();persist();const {blob}=await makeImage();if(destroyed)return;const metadata={name:caption(name.value)};if(typeof options.onExport==='function')await options.onExport(blob,metadata);else await root.DMateDrawingExport.save(blob,metadata.name,{document:doc,mobilePreview:showExportPreview});if(!destroyed)setStatus('');}catch(error){if(!destroyed)setStatus(error?.message||'图片导出失败。');}finally{if(!destroyed)busy(false);}}
   async function uploadImage(){
    if(!features.upload||exportBusy)return;busy(true);uploadBusy=true;
    try{if(typeof options.onUpload!=='function')throw new Error(uiText('上传功能未就绪，请刷新后重试。'));collect();persist();const pageName=caption(name.value),requirements=requirement,{blob,document}=await makeImage();if(destroyed)return;await options.onUpload(blob,{name:pageName,document,requirements});if(!destroyed){setStatus('');options.onClose?.();}}

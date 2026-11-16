@@ -11507,7 +11507,7 @@ function drawKnowledgeGraphRoundRect(ctx, x, y, width, height, radius) {
 async function renderKnowledgeGraphOffscreenPngBlob() {
     const context = getActiveKnowledgeContext();
     const nodes = knowledgeGraphDisplayedNodes(context);
-    if (!nodes?.length) throw new Error("当前范围没有可复制的知识节点");
+    if (!nodes?.length) throw new Error(dmateUiText("当前范围没有可导出的知识节点", "There are no knowledge nodes to export in this module."));
     const layout = knowledgeGraphExportLayout(nodes);
     const { width, height, positions, edges, outgoing, incoming, cellWidth, cellHeight, labels } = layout;
     const smallDevice = window.matchMedia?.("(max-width: 760px)")?.matches;
@@ -11694,22 +11694,37 @@ function downloadKnowledgeGraphPng(blob) {
     }
 }
 
-async function copyKnowledgeGraphVisual() {
-    // 不以 DOM 中是否存在图谱节点作为“有无知识图谱”的依据：
-    // 未进入完整查看时，移动端节点是故意不渲染的。
-    if (!knowledgeGraphData?.nodes?.length) {
-        try { await ensureKnowledgeGraphData(); } catch (_error) {}
-    }
-    if (!knowledgeGraphData?.nodes?.length) {
-        showCopyToast("知识图谱尚未加载完成，请稍后重试");
+async function exportKnowledgeGraphImage() {
+    const button = document.getElementById("knowledgeGraphCopyBtn");
+    if (button?.disabled) return false;
+    if (button) button.disabled = true;
+    try {
+        // A mobile preview deliberately has no rendered graph nodes. Export
+        // the current graph data without requiring the full view to be open.
+        if (!knowledgeGraphData?.nodes?.length) await ensureKnowledgeGraphData();
+        if (!knowledgeGraphData?.nodes?.length) {
+            throw new Error(dmateUiText("知识图谱尚未加载完成，请稍后重试", "The knowledge graph is not ready. Try again shortly."));
+        }
+        const exporter = window.DMateDrawingExport;
+        if (typeof exporter?.save !== "function") {
+            throw new Error(dmateUiText("导出模块未加载，请刷新后重试。", "The export module is not loaded. Refresh and try again."));
+        }
+        const pngPromise = prepareKnowledgeGraphPng();
+        if (!pngPromise) {
+            throw new Error(dmateUiText("图谱图片准备失败，请重试", "The graph image could not be prepared. Try again."));
+        }
+        await exporter.save(await pngPromise, `离散数学知识图谱-${knowledgeGraphFilter || "全部"}.png`, {
+            document,
+            onStatus: showCopyToast
+        });
+        return true;
+    } catch (error) {
+        console.warn("图谱图片导出失败", error);
+        showCopyToast(error?.message || dmateUiText("图谱图片导出失败，请重试", "The graph image could not be exported. Try again."));
         return false;
+    } finally {
+        if (button) button.disabled = false;
     }
-    const pngPromise = prepareKnowledgeGraphPng();
-    if (!pngPromise) {
-        showCopyToast("图谱图片准备失败，请重试");
-        return false;
-    }
-    return deliverRenderedPng(pngPromise, `离散数学知识图谱-${knowledgeGraphFilter || "全部"}.png`);
 }
 
 function selectionNodeElement(node) {
@@ -22760,7 +22775,7 @@ document.addEventListener(
         if (knowledgeGraphCopyBtn) {
             knowledgeGraphCopyBtn.addEventListener(
                 "click",
-                copyKnowledgeGraphVisual
+                exportKnowledgeGraphImage
             );
         }
 

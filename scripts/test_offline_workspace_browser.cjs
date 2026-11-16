@@ -771,7 +771,8 @@ async function disconnectWorkerNetwork(browser, page, workerURL) {
 async function runCase(browser, width, theme) {
   const label = width + '/' + theme;
   const context = await browser.newContext({ viewport: { width, height: 900 }, isMobile: width < 1101,
-    hasTouch: width < 1101, serviceWorkers: 'allow' });
+    hasTouch: width < 1101, serviceWorkers: 'allow',
+    ...(width < 760 ? { userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36' } : {}) });
   await context.addInitScript(value => {
     if (!localStorage.getItem('dmate:offline:appearance:v1')) {
       localStorage.setItem('dmate:offline:appearance:v1', JSON.stringify({ mode: value, accent: 'blue', panelOpacity: 100 }));
