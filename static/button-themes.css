@@ -590,6 +590,10 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         line-height:1!important;
     }
     body[data-appearance-theme] #knowledgeGraphCopyBtn { justify-self:end; }
+    /* Match the floating mobile bar's capsule without clipping focus rings. */
+    body[data-appearance-theme] #knowledgeGraphModal .kg-mobile-zoom-controls button {
+        border-radius:999px!important;
+    }
     body[data-appearance-theme] :is(.msg-actions > button,#knowledgeGraphCopyBtn) > svg {
         display:block!important;
         flex:0 0 20px!important;

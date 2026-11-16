@@ -79,8 +79,8 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     // Simulate the pinned stylesheet left by the previous offline shell.
     await page.goto(new URL('/health', baseURL).href);
     await page.evaluate(async () => {
-      const cache = await caches.open('dmate-offline-shell-v39');
-      await cache.put('/static/button-themes.css?v=29', new Response('/* obsolete shell before the right-aligned graph zoom toolbar */'));
+      const cache = await caches.open('dmate-offline-shell-v40');
+      await cache.put('/static/button-themes.css?v=29', new Response('/* obsolete shell before capsule-shaped mobile zoom feedback */'));
     });
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });
     await page.evaluate(async () => {
@@ -97,7 +97,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       if (canonical.length !== 1) throw new Error('Expected exactly one precached shared stylesheet');
       return { name: names[0], canonical: canonical[0].url };
     }, assetPath);
-    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 40, 'The right-aligned graph zoom toolbar requires the refreshed cache');
+    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 41, 'Capsule-shaped mobile zoom feedback requires the refreshed cache');
     assert.equal((await fetchAsset(page, current.canonical)).text, networkCSS,
       'The refreshed shell loads current frameless controls instead of the obsolete stylesheet');
     for (const asset of sharedAssets) {
