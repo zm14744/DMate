@@ -7146,6 +7146,7 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
     display:flex;
     flex:0 0 auto;
     align-items:center;
+    margin-left:auto;
     gap:6px;
     white-space:nowrap;
 }
