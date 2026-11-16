@@ -239,6 +239,8 @@ async function runCase(browser, width, theme, offline) {
       await offlineHeader(page);
     } else {
       await page.evaluate(mode => { appearanceSettings.mode = mode; applyAppearanceSettings({ save: false }); openKnowledgeGraph(); }, theme);
+      await page.waitForFunction(() => knowledgeGraphInitialized);
+      await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
       await page.waitForSelector('#knowledgeGraphCanvas .kg-section');
     }
     await moduleControls(page);

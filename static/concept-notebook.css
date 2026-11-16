@@ -9,6 +9,8 @@
 .dcn-dialog button:disabled{opacity:.5;cursor:default}
 .dcn-dialog button:focus-visible,.dcn-dialog input:focus-visible,.dcn-dialog textarea:focus-visible{outline:2px solid var(--accent,#2563eb);outline-offset:2px}
 .dcn-dialog .dcn-primary{background:var(--accent,#2563eb);border-color:var(--accent,#2563eb);color:#fff}
+.dcn-dialog button.dcn-new{display:inline-flex;align-items:center;justify-content:center;width:100%;min-height:44px;padding:10px;border:1px solid var(--border-strong,#cbd5e1);border-radius:10px;background:var(--surface-3,#f1f5f9);color:var(--text-primary,#334155);font-size:var(--font-base,16px);font-weight:400;line-height:normal;text-align:center;box-shadow:none}
+@media(max-width:1100px){.dcn-dialog button.dcn-new{min-height:44px;padding:10px 12px;font-size:14px}}
 .dcn-content{display:grid;grid-template-columns:minmax(180px,260px) minmax(0,1fr);gap:20px;flex:1 1 auto;min-height:0;overflow:hidden}
 .dcn-sidebar{display:flex;flex-direction:column;gap:10px;min-height:0;min-width:0;overflow:hidden}
 .dcn-dialog input:not([type=checkbox]),.dcn-dialog textarea{display:block;width:100%;min-width:0;max-width:100%;margin:6px 0 0;padding:10px;border:1px solid var(--border-strong,#cbd5e1);border-radius:9px;background:var(--surface-2,#f8fafc);color:var(--text-primary,#1e293b);font:inherit;font-size:14px;line-height:1.6;box-shadow:none}
@@ -32,7 +34,7 @@
 .dcn-dialog button.dcn-note-delete:focus{outline:none;box-shadow:none}
 .dcn-main{overflow:auto;overscroll-behavior:contain;min-width:0;min-height:0;padding:2px 5px 10px 2px}
 .dcn-editor{display:flex;flex-direction:column;gap:14px}
-.dcn-dialog label{display:block;font-size:14px;font-weight:600;line-height:1.5}
+.dcn-dialog label{display:block;color:var(--text-muted);font-family:inherit;font-size:14px;font-weight:600;line-height:1.6}
 .dcn-dialog textarea{resize:vertical;min-height:74px}
 .dcn-dialog .dcn-original{min-height:210px}
 .dcn-saved{flex:1 1 auto;color:var(--text-subtle,#64748b)}

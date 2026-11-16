@@ -23,7 +23,7 @@ function mount(options){
  const closeButton=action('',close,'dcn-close');closeButton.title='关闭笔记本';closeButton.setAttribute('aria-label','关闭笔记本');heading.append(headingText,closeButton);
  const content=el('div','dcn-content'),sidebar=el('aside','dcn-sidebar'),main=el('section','dcn-main');
  sidebar.setAttribute('aria-label','概念笔记列表');
- const newButton=action('新建概念',create,'dcn-primary'),search=el('input','dcn-search');search.type='search';search.placeholder='搜索';search.setAttribute('aria-label','搜索');
+ const newButton=action('＋ 新概念',create,'dcn-new'),search=el('input','dcn-search');search.type='search';search.placeholder='搜索';search.setAttribute('aria-label','搜索');
  const searchWrap=el('div','dcn-search-wrap'),searchClear=action('',()=>{search.value='';renderList();search.focus({preventScroll:true});},'dcn-search-clear');
  searchClear.setAttribute('aria-label','清空搜索');searchClear.title='清空搜索';searchClear.hidden=true;searchWrap.append(search,searchClear);
  const list=el('div','dcn-list'),selection=el('div','dcn-selection'),count=el('span');

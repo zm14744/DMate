@@ -9,6 +9,14 @@ const near = (actual, expected, message, tolerance = 1.5) =>
   assert.ok(Math.abs(actual - expected) <= tolerance,
     message + ': ' + actual + ' vs ' + expected);
 
+async function openFullGraph(page) {
+  await page.evaluate(() => openKnowledgeGraph());
+  await page.waitForFunction(() => knowledgeGraphInitialized
+    && document.getElementById('knowledgeGraphModal').dataset.graphView);
+  await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
+  await page.waitForSelector('#knowledgeGraphCanvas .kg-section');
+}
+
 async function settleGraph(page) {
   await page.waitForFunction(() => {
     const viewport = document.querySelector('.kg-mobile-viewport');
@@ -82,7 +90,7 @@ async function checkReturnPreservesView(browser, width) {
   const viewSelector = mobile ? '.kg-mobile-viewport' : '.kg-desktop-viewport';
   try {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
-    await page.evaluate(() => openKnowledgeGraph());
+    await openFullGraph(page);
     if (mobile) {
       await page.locator('.kg-mobile-expand').click();
       await settleGraph(page);
@@ -161,7 +169,7 @@ async function checkPanelPresentation(browser, width) {
   page.on('pageerror', error => errors.push(error.message));
   try {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
-    await page.evaluate(() => openKnowledgeGraph());
+    await openFullGraph(page);
     await page.waitForSelector('#knowledgeGraphCanvas .kg-section');
     assert.equal(await page.locator('#knowledgeGraphSummary, #knowledgeGraphModal .graph-summary').count(), 0,
       width + ': remove the whole summary row');
@@ -173,7 +181,7 @@ async function checkPanelPresentation(browser, width) {
     for (const [language, expected] of [['en', 'Teaching videos'], ['zh-CN', '教学视频']]) {
       await page.evaluate(value => window.DMateI18n.setLanguage(value, false), language);
       await page.waitForFunction(text => document.querySelector('[data-kg-video-heading]')?.textContent === text, expected);
-      const exportLabel = language === 'en' ? 'Export image' : '导出图片';
+      const exportLabel = language === 'en' ? 'Export as image' : '以图片形式导出';
       assert.equal(await page.locator('#knowledgeGraphCopyBtn').getAttribute('title'), exportLabel);
       assert.equal(await page.locator('#knowledgeGraphCopyBtn').getAttribute('aria-label'), exportLabel);
       assert.equal(await page.locator('#knowledgeGraphModal').evaluate(modal => modal.classList.contains('hidden')), false);
@@ -261,7 +269,7 @@ async function mobileCase(browser, width) {
   page.on('pageerror', error => errors.push(error.message));
   try {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
-    await page.evaluate(() => openKnowledgeGraph());
+    await openFullGraph(page);
     await page.waitForSelector('.kg-mobile-entry-only');
     assert.equal(await page.locator('.kg-mobile-stage').count(), 0, 'Preview should keep only the full-view entry');
     await page.locator('.kg-mobile-expand').click();
@@ -345,8 +353,8 @@ async function checkSelectionBorder(browser, theme) {
       await page.evaluate(value => {
         document.documentElement.dataset.appearanceTheme = value;
         document.body.dataset.appearanceTheme = value;
-        openKnowledgeGraph();
       }, theme);
+      await openFullGraph(page);
       await page.waitForSelector('#knowledgeGraphCanvas .kg-section');
       await page.evaluate(() => setKnowledgeGraphFilter('证明与归纳'));
     }
@@ -400,7 +408,7 @@ async function checkNodeGestures(browser, width) {
   page.on('pageerror', error => errors.push(error.message));
   try {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
-    await page.evaluate(() => openKnowledgeGraph());
+    await openFullGraph(page);
     await page.waitForSelector('.kg-mobile-entry-only');
     // Exercise the actual module picker before testing the graph's gesture area.
     await page.locator('#knowledgeGraphCategoryTrigger').tap();
@@ -503,7 +511,7 @@ async function checkNodeGestures(browser, width) {
     const page = await browser.newPage({ viewport: { width: 820, height: 844 } });
     try {
       await page.goto(baseURL, { waitUntil: 'networkidle' });
-      await page.evaluate(() => openKnowledgeGraph());
+      await openFullGraph(page);
       await page.waitForSelector('.kg-desktop-zoom-stage');
       assert.equal(await page.locator('.kg-mobile-stage').count(), 0);
       assert.ok(await page.locator('.kg-node-group').count() > 20);

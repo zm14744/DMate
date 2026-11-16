@@ -8,12 +8,12 @@ const { chromium } = require('playwright');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const settle = page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
-function fixture(kind, title) {
+function fixture(kind, title, cycle = false) {
   const count = kind === 'hasse' ? 3 : 5;
   const vertices = Array.from({ length: count }, (_, i) => ({ id: 'vertex-' + i, label: kind === 'hasse' ? String(2 ** i) : String(i) }));
   const edges = [];
   for (let i = 0; i < count; i++) for (let j = i + 1; j < count; j++) {
-    if (kind !== 'hasse' || j === i + 1) edges.push({ id: 'edge-' + edges.length,
+    if (kind === 'hasse' ? j === i + 1 : !cycle || j === i + 1 || (i === 0 && j === count - 1)) edges.push({ id: 'edge-' + edges.length,
       from: vertices[i].id, to: vertices[j].id, direction: 'undirected' });
   }
   return { ok: true, title, kind, document: { body_text: '', graphs: [{ id: 'G1', name: title,
@@ -37,7 +37,7 @@ async function state(page) {
 async function ai(page, requirement) {
   const historyToggle = page.locator('.ddw-page-actions button').nth(1);
   if (await historyToggle.getAttribute('aria-expanded') === 'true') await historyToggle.click();
-  const toggle = page.locator('.ddw-side-actions button').last();
+  const toggle = page.locator('[data-drawing-ai-guidance]');
   assert.equal(await toggle.isEnabled(), true, 'AI generation must be reachable even with an empty gallery');
   assert.equal(await toggle.evaluate(button => Boolean(button.closest('[inert]'))), false, 'AI entry must not inherit inert');
   if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
@@ -163,12 +163,24 @@ async function runCase(browser, width, language) {
     await page.locator('.dmate-delete-confirm-delete').click();
     await page.waitForFunction(() => ocrEditorController.getPages().length === 0);
     assert.deepEqual((await state(page)).pages, [], 'Deleting the last page keeps this open gallery empty');
-    const requirement = language === 'en' ? 'Draw the complete graph K5 with vertices 0,1,2,3,4.' : '生成完全图 K5，顶点为 0、1、2、3、4。';
-    await ai(page, '');
+    const starter = fixture('graph', 'C5', true), defaultRequest = mock.enqueue({ json: starter });
+    assert.equal(await page.locator('.ddw-side-panel [data-math-diagram-generate]').count(), 0,
+      'Generation is a direct rail action rather than a duplicate inside AI guidance');
     await page.locator('[data-math-diagram-generate]').click();
-    await notice(page, language === 'en' ? /Describe.*diagram/i : /先描述.*数学图/);
-    assert.equal(mock.requests.length, 0, 'Empty requests do not reach the API');
+    const defaultPayload = (await defaultRequest.started).payload;
+    assert.equal(defaultPayload.language, language);
+    assert.match(defaultPayload.requirement, /C5/, 'The optional empty request generates a concrete starter cycle');
+    assert.equal(await page.locator('.ddw-ai-requirement').count(), 0,
+      'AI generation is reachable without opening the guidance panel');
+    await notice(page, language === 'en' ? /diagram generated/i : /数学图已生成/);
+    const started = await checkDiagram(page, starter);
+    assert.equal(started.pages[0].requirement, '', 'The default prompt does not replace the user’s optional empty requirement');
+    await history(page);
+    await page.locator('.ddw-history-delete').click();
+    await page.locator('.dmate-delete-confirm-delete').click();
+    await page.waitForFunction(() => ocrEditorController.getPages().length === 0);
 
+    const requirement = language === 'en' ? 'Draw the complete graph K5 with vertices 0,1,2,3,4.' : '生成完全图 K5，顶点为 0、1、2、3、4。';
     const complete = fixture('graph', 'K5'), first = mock.enqueue({ json: complete });
     await (await ai(page, requirement)).click();
     assert.deepEqual((await first.started).payload, { requirement, language });
@@ -185,14 +197,14 @@ async function runCase(browser, width, language) {
     assert.deepEqual(generated.pages[0].document, original.document, 'Original mathematical drawing is preserved');
     assert.deepEqual(generated.pages[1].document, before.document, 'The existing blank page remains available');
     assert.deepEqual(await (await history(page)).allTextContents(), generated.pages.map(item => item.name));
-    console.log('CHECK ' + width + '/' + language + ': empty-gallery K5 and Hasse generation rendered with real WASM; previous pages retained');
+    console.log('CHECK ' + width + '/' + language + ': optional C5, empty-gallery K5 and Hasse generation rendered with real WASM; previous pages retained');
 
-    for (const action of ['edit', 'switch', 'close']) {
+    for (const action of ['edit', 'optional-edit', 'switch', 'close']) {
       const held = mock.enqueue({ json: fixture('graph', 'STALE ' + action) }, true);
-      await (await ai(page, 'K5 pending ' + action)).click(); await held.started;
+      await (await ai(page, action === 'optional-edit' ? '' : 'K5 pending ' + action)).click(); await held.started;
       assert.equal(await page.locator('[data-math-diagram-generate]').isDisabled(), true, 'Only one generation runs at a time');
       const count = (await state(page)).pages.length;
-      if (action === 'edit') await page.locator('.ddw-name').fill('Edited during generation');
+      if (action === 'edit' || action === 'optional-edit') await page.locator('.ddw-name').fill('Edited during ' + action);
       if (action === 'switch') await (await history(page)).first().click();
       if (action === 'close') {
         await page.locator('#graphEditorClose').click();
@@ -229,7 +241,7 @@ async function runCase(browser, width, language) {
     assert.deepEqual(mock.unexpected, [], 'Every generation request is mocked');
     assert.deepEqual(guideRequests, [], 'No paid guidance call is made');
     assert.deepEqual(errors, [], 'No page errors');
-    console.log('PASS ' + width + '/' + language + ': empty-gallery generation, real Graphviz K5/Hasse with hyphen IDs and retained SVG routes, stable pages, edit/switch/close cancellation, localized errors and PNG ' + JSON.stringify(png));
+    console.log('PASS ' + width + '/' + language + ': optional direct-rail C5 generation, real Graphviz K5/Hasse with hyphen IDs and retained SVG routes, stable pages, edit/switch/close cancellation, localized errors and PNG ' + JSON.stringify(png));
   } catch (error) {
     console.error('Drawing state at failure:', JSON.stringify(await state(page).catch(() => null)));
     if (process.env.OFFLINE_SCREENSHOT_DIR) {

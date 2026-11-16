@@ -20,3 +20,68 @@ body[data-appearance-theme] .input .manual-question-composer > #text:focus { pad
 .voice-input-status.voice-input-error { position:static!important; width:auto!important; height:auto!important; margin:6px 0 0!important; clip:auto!important; clip-path:none!important; white-space:normal!important; min-width:0; font-size:12px; line-height:1.5; color:var(--text-muted,#64748b); overflow-wrap:anywhere; }
 .voice-input-status[hidden] { display:none !important; }
 @media (max-width:600px) { .voice-input-button, #voiceInputBtn.voice-input-button { flex-basis:36px; width:36px; min-width:36px; } }
+
+/* Keep the native photo chooser mounted while its plus smoothly yields to a
+   separate cancel button. The red circle matches the AI stop control. */
+.voice-input-cancel { display:none !important; }
+body[data-appearance-theme] .input #imagePickerWrap > #imageBtn {
+    transition:opacity .16s ease,transform .22s cubic-bezier(.2,.8,.2,1),color .12s ease !important;
+    transform:scale(1) rotate(0deg);
+    transform-origin:center;
+}
+body[data-appearance-theme] .input #imagePickerWrap > #voiceCancelBtn {
+    display:block !important;
+    position:absolute !important;
+    z-index:3;
+    top:50% !important;
+    left:50% !important;
+    right:auto !important;
+    box-sizing:border-box !important;
+    width:38px !important;
+    min-width:38px !important;
+    max-width:38px !important;
+    height:38px !important;
+    min-height:38px !important;
+    max-height:38px !important;
+    margin:0 !important;
+    padding:0 !important;
+    border:0 !important;
+    border-radius:50% !important;
+    background:#ef4444 !important;
+    background-image:none !important;
+    box-shadow:none !important;
+    color:transparent !important;
+    font-size:0 !important;
+    opacity:0 !important;
+    visibility:hidden;
+    pointer-events:none;
+    transform:translate(-50%,-50%) scale(.55) rotate(-90deg);
+    transition:opacity .16s ease,transform .22s cubic-bezier(.2,.8,.2,1),visibility 0s linear .22s !important;
+}
+body[data-appearance-theme] .input #imagePickerWrap[data-voice-active="true"] > #imageBtn {
+    opacity:0 !important;
+    transform:scale(.55) rotate(90deg);
+    pointer-events:none !important;
+}
+body[data-appearance-theme] .input #imagePickerWrap[data-voice-active="true"] > #imageInput {
+    pointer-events:none !important;
+}
+body[data-appearance-theme] .input #imagePickerWrap[data-voice-active="true"] > #voiceCancelBtn {
+    opacity:1 !important;
+    visibility:visible;
+    pointer-events:auto;
+    transform:translate(-50%,-50%) scale(1) rotate(0deg);
+    transition:opacity .16s ease,transform .22s cubic-bezier(.2,.8,.2,1),visibility 0s !important;
+}
+@media(hover:hover) and (pointer:fine) {
+    body[data-appearance-theme] .input #imagePickerWrap > #voiceCancelBtn:hover { background:#dc2626 !important; }
+}
+@media(max-width:680px) {
+    body[data-appearance-theme] .input #imagePickerWrap > #voiceCancelBtn {
+        width:36px !important; min-width:36px !important; max-width:36px !important;
+        height:36px !important; min-height:36px !important; max-height:36px !important;
+    }
+}
+@media(prefers-reduced-motion:reduce) {
+    body[data-appearance-theme] .input #imagePickerWrap[data-voice-active] > :is(#imageBtn,#voiceCancelBtn) { transition:none !important; }
+}

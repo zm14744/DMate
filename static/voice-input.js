@@ -71,7 +71,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
     }
 
     function mount(options) {
-        const button = options.button, input = options.input, status = options.status;
+        const button = options.button, input = options.input, status = options.status, cancelButton = options.cancelButton;
         if (!button || !input) throw new Error(uiText('Voice input needs its microphone button and text field.'));
         const document = button.ownerDocument;
         const win = document.defaultView || root;
@@ -117,6 +117,20 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
             const label = state === 'recording' ? '结束录音并识别' : state === 'finishing' ? '正在收录尾音' : state === 'preparing' ? '正在启动麦克风' : state === 'transcribing' ? '正在识别语音' : state === 'requesting' ? '正在请求麦克风权限' : '语音输入';
             button.title = uiText(label); button.setAttribute('aria-label', uiText(label));
             button.disabled = ['requesting', 'preparing', 'finishing', 'transcribing'].includes(state) || state === 'idle' && busy();
+            if (cancelButton) {
+                const recording = state !== 'idle';
+                const hadCancelFocus = document.activeElement === cancelButton;
+                cancelButton.parentElement?.setAttribute('data-voice-active', String(recording));
+                cancelButton.disabled = !recording;
+                cancelButton.inert = !recording;
+                cancelButton.tabIndex = recording ? 0 : -1;
+                cancelButton.setAttribute('aria-hidden', String(!recording));
+                cancelButton.title = uiText('取消语音输入', 'Cancel voice input');
+                cancelButton.setAttribute('aria-label', cancelButton.title);
+                // Returning the plus control must not leave keyboard focus on
+                // the now inactive cancel layer.
+                if (!recording && hadCancelFocus && !button.disabled) button.focus({ preventScroll: true });
+            }
             if (changed) options.onStateChange?.(state);
         }
         function releaseCapture(op) {
@@ -245,22 +259,23 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
             }
         }
         const click = () => { if (state === 'recording') void finish(); else if (state === 'idle') void start(); };
+        const cancelClick = event => { event.preventDefault(); event.stopPropagation(); cancel(); };
         const escape = event => { if (event.key === 'Escape' && active) { event.preventDefault(); cancel(); } };
         const hidden = () => { if (document.hidden && active) cancel('页面已切换到后台，语音输入已取消。'); };
         const pagehide = () => { if (active) cancel('页面已关闭，语音输入已取消。'); };
         const languageChanged=()=>{if(!disposed){render(state);if(status)status.textContent=uiText(lastNotice);}};
         win.addEventListener('dmate:languagechange',languageChanged);
-        button.addEventListener('click', click); document.addEventListener('keydown', escape);
+        button.addEventListener('click', click); cancelButton?.addEventListener('click', cancelClick); document.addEventListener('keydown', escape);
         document.addEventListener('visibilitychange', hidden); win.addEventListener('pagehide', pagehide);
         const observer = new win.MutationObserver(() => { if (active && busy()) cancel('输入状态已改变，语音输入已取消。'); else if (state === 'idle') render('idle'); });
         observer.observe(input, { attributes: true, attributeFilter: ['disabled', 'readonly'] });
         render('idle'); notice('');
         return {
-            cancel, get state() { return state; }, refresh() { if (state === 'idle') render('idle'); else if (active && busy()) cancel('输入状态已改变，语音输入已取消。'); },
+            cancel, get state() { return state; }, refresh() { if (state === 'idle') render('idle'); else if (active && (!current(active) || busy())) cancel('输入状态已改变，语音输入已取消。'); },
             dispose() {
                 if (disposed) return; cancel(''); disposed = true; observer.disconnect();
                 win.removeEventListener('dmate:languagechange',languageChanged);
-                button.removeEventListener('click', click); document.removeEventListener('keydown', escape);
+                button.removeEventListener('click', click); cancelButton?.removeEventListener('click', cancelClick); document.removeEventListener('keydown', escape);
                 document.removeEventListener('visibilitychange', hidden); win.removeEventListener('pagehide', pagehide);
             }
         };

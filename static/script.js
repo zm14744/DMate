@@ -998,7 +998,7 @@ function initAppearanceSystem() {
 }
 
 
-let wrongBookFilter = "all";
+let wrongBookFilter = "pending";
 let wrongBookSearch = "";
 let wrongBookSort = "recent";
 let currentWrongEditId = null;
@@ -1150,7 +1150,7 @@ function clearLoggedOutWorkspace() {
     const input = document.getElementById("text");
     if (input) input.value = "";
 
-    wrongBookFilter = "all";
+    wrongBookFilter = "pending";
     wrongBookSearch = "";
     wrongBookSort = "recent";
     knowledgeGraphHistoryMessageIndex = null;
@@ -3956,6 +3956,7 @@ function refreshInputAvailability() {
     const recognizing = Boolean(ocrReviewInProgress);
     const stoppingAllowed = !recognizing && Boolean(waitingReply || typingNow);
     const visibleMode = recognizing ? "ocr" : stoppingAllowed ? "ai" : "idle";
+    const voiceActive = visibleMode === "idle" && Boolean(window.dmateVoiceInput?.state && window.dmateVoiceInput.state !== "idle");
 
     function setInputControlVisible(element, visible) {
         if (!element) return;
@@ -3980,11 +3981,13 @@ function refreshInputAvailability() {
         }
     }
     if (imageBtn) {
-        imageBtn.disabled = visibleMode !== "idle" || ocrActiveCount() >= OCR_MAX_CONCURRENT;
+        imageBtn.disabled = visibleMode !== "idle" || voiceActive || ocrActiveCount() >= OCR_MAX_CONCURRENT;
         setInputControlVisible(imageBtn, visibleMode === "idle");
+        imageBtn.setAttribute("aria-hidden", String(visibleMode !== "idle" || voiceActive));
     }
     if (imageInput) {
-        imageInput.disabled = visibleMode !== "idle" || ocrActiveCount() >= OCR_MAX_CONCURRENT;
+        imageInput.disabled = visibleMode !== "idle" || voiceActive || ocrActiveCount() >= OCR_MAX_CONCURRENT;
+        imageInput.setAttribute("aria-hidden", String(visibleMode !== "idle" || voiceActive));
     }
     if (typeof ocrBatchPreparing !== "undefined" && ocrBatchPreparing) {
         if (sendBtn && !imageBatchActive) sendBtn.disabled = true;
@@ -7419,14 +7422,8 @@ function setWrongBookFilter(filter) {
         return;
     }
 
-    // 不再单独放“全部”按钮：
-    // 未选择任何状态时就是“全部”；
-    // 再点一次当前筛选即可取消筛选。
-    wrongBookFilter = (
-        wrongBookFilter === filter
-            ? "all"
-            : filter
-    );
+    // Keep one status selected, including when its active button is clicked.
+    wrongBookFilter = filter;
 
     renderWrongBook();
 }
@@ -7521,13 +7518,9 @@ function getWrongBookQuestionCounts(items) {
 }
 
 function getFilteredWrongBookItems() {
-    let items = [...learningState.wrongQuestions];
-
-    if (wrongBookFilter !== "all") {
-        items = items.filter(
-            item => wrongBookStatus(item).key === wrongBookFilter
-        );
-    }
+    let items = learningState.wrongQuestions.filter(
+        item => wrongBookStatus(item).key === wrongBookFilter
+    );
 
     if (wrongBookSearch) {
         items = items.filter(
@@ -7568,7 +7561,7 @@ function updateWrongBookToolbar(allItems) {
     ).length;
     if (stats) {
         stats.textContent =
-            `共 ${total} 道　待处理 ${pending}　已订正 ${corrected}`;
+            `共 ${total} 道　待订正 ${pending}　已订正 ${corrected}`;
     }
 
     for (const button of filterButtons) {
@@ -7577,6 +7570,7 @@ function updateWrongBookToolbar(allItems) {
             "active",
             value === wrongBookFilter
         );
+        button.setAttribute("aria-pressed", String(value === wrongBookFilter));
     }
     const sortSelect = document.getElementById("wrongBookSort");
     const sortTrigger = document.getElementById("wrongBookSortTrigger");
@@ -7806,7 +7800,7 @@ function openWrongRetestReview(id) {
     const item = learningState.wrongQuestions.find(entry => entry.id === id);
     const modal = document.getElementById("wrongRetestReviewModal");
     const list = document.getElementById("wrongRetestReviewList");
-    if (!item || !modal || !list) return;
+    if (!item?.corrected || !modal || !list) return;
     list.replaceChildren();
     const history = getWrongRetestSessions(item);
     const selected = new Set((item.passedRetestSessionIds || []).map(String));
@@ -8130,7 +8124,7 @@ function startWrongQuestionRetest(id) {
 
     if (!entry) return;
 
-    if (!entry.corrected && !entry.retestPassed) {
+    if (!entry.corrected) {
         window.alert("请先完成这道错题的订正，再进行复测");
         return;
     }
@@ -9518,7 +9512,7 @@ function renderWrongBook() {
         } else if (wrongBookSearch) {
             empty.textContent = "没有找到匹配的错题";
         } else if (wrongBookFilter === "pending") {
-            empty.textContent = "目前没有待处理的错题";
+            empty.textContent = "目前没有待订正的错题";
         } else if (wrongBookFilter === "corrected") {
             empty.textContent = "目前没有已完成订正的错题";
         } else {
@@ -9777,8 +9771,9 @@ function renderWrongBook() {
         const actions = document.createElement("div");
         actions.className = "wrong-actions";
 
-        actions.appendChild(createSmartCopyButton(() =>
-            copyRenderedImageToClipboard(() => card.cloneNode(true))
+        actions.appendChild(createSmartCopyButton(
+            () => exportRenderedImage(() => card.cloneNode(true), "DMate-错题.png"),
+            { iconOnly: true }
         ));
 
         if (!item.analysis) {
@@ -9810,30 +9805,26 @@ function renderWrongBook() {
             actions.appendChild(correctedButton);
         }
 
-        const retestButton = document.createElement("button");
-        retestButton.type = "button";
-        retestButton.className = item.corrected || item.retestPassed
-            ? ""
-            : "secondary";
-        retestButton.textContent = item.retestPassed
-            ? "再测一次"
-            : "再测一道";
-        retestButton.disabled = !item.corrected && !item.retestPassed;
-        retestButton.title = retestButton.disabled
-            ? "先完成订正，再进行同知识点复测"
-            : "生成一道同知识点、难度相近的新题进行验证";
-        retestButton.onclick = () => (
-            startWrongQuestionRetest(item.id)
-        );
-        actions.appendChild(retestButton);
+        if (item.corrected) {
+            const retestButton = document.createElement("button");
+            retestButton.type = "button";
+            retestButton.textContent = item.retestPassed
+                ? "再测一次"
+                : "再测一道";
+            retestButton.title = "生成一道同知识点、难度相近的新题进行验证";
+            retestButton.onclick = () => (
+                startWrongQuestionRetest(item.id)
+            );
+            actions.appendChild(retestButton);
 
-        const passButton = document.createElement("button");
-        passButton.type = "button";
-        passButton.className = "secondary";
-        passButton.textContent = "查看复测";
-        passButton.title = "查看每一次复测题并选择通过记录";
-        passButton.onclick = () => openWrongRetestReview(item.id);
-        actions.appendChild(passButton);
+            const passButton = document.createElement("button");
+            passButton.type = "button";
+            passButton.className = "secondary";
+            passButton.textContent = "查看复测";
+            passButton.title = "查看每一次复测题并选择通过记录";
+            passButton.onclick = () => openWrongRetestReview(item.id);
+            actions.appendChild(passButton);
+        }
 
         const editButton = document.createElement("button");
         editButton.type = "button";
@@ -11123,79 +11114,50 @@ function showMobilePngSaveDialog(blob, filename) {
 }
 
 async function deliverRenderedPng(pngPromise, filename = "DMate-公式与题目.png") {
-    const isPhone = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "")
-        || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    // Prefer verified native album saving over sharing/downloading inside the APK.
-    if (window.DMateGallery?.postMessage) {
-        try {
-            const result = await savePngToAndroidGallery(await pngPromise, filename);
-            showCopyToast(result?.message || (result?.ok ? "已保存到相册" : "保存到相册失败"));
-            return Boolean(result?.ok);
-        } catch (error) {
-            console.warn("Android 原生保存异常：", error);
-            showCopyToast("保存到相册失败，请重试");
-            return false;
-        }
-    }
-    if (isPhone) {
-        try {
-            showMobilePngSaveDialog(await pngPromise, filename);
-            return true; // Preview opened, not a claim that Photos was modified.
-        } catch (error) {
-            console.warn("手机端图片预览失败：", error);
-            showCopyToast("生成图片失败，请重试");
-            return false;
-        }
-    }
-    // Keep the already-working Windows/Linux/macOS ClipboardItem path untouched.
-    if (navigator.clipboard?.write && window.ClipboardItem) {
-        try {
-            await navigator.clipboard.write([new ClipboardItem({ "image/png": pngPromise })]);
-            showCopyToast("图片已复制，可粘贴至微信等应用");
-            return true;
-        } catch (firstError) {
-            console.warn("图片剪贴板即时写入失败：", firstError);
-            try {
-                const blob = await pngPromise;
-                await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-                showCopyToast("图片已复制，可粘贴至微信等应用");
-                return true;
-            } catch (secondError) {
-                console.warn("图片剪贴板写入失败：", secondError);
-            }
-        }
-    }
     try {
-        if (downloadRenderedCopyPng(await pngPromise)) {
-            showCopyToast("无法直接复制图片，已发起 PNG 下载");
-            return true;
+        const blob = await pngPromise;
+        const exporter = window.DMateDrawingExport;
+        if (typeof exporter?.save !== "function") {
+            throw new Error(dmateUiText("导出模块未加载，请刷新后重试。", "The export module is not loaded. Refresh and try again."));
         }
+        await exporter.save(blob, filename, { document, onStatus: showCopyToast });
+        return true;
     } catch (error) {
-        console.warn("渲染复制图片失败：", error);
+        console.warn("图片导出失败：", error);
+        showCopyToast(error?.message || dmateUiText("图片导出失败，请重试", "The image could not be exported. Try again."));
+        return false;
     }
-    showCopyToast("图片复制失败，请重试");
-    return false;
 }
 
+async function exportRenderedImage(makeContent, filename = "DMate-公式与题目.png") {
+    return deliverRenderedPng(renderContentAsPngBlob(makeContent), filename);
+}
+
+// Retain the old entry point for stored cards while routing every image to export.
 async function copyRenderedImageToClipboard(makeContent) {
-    return deliverRenderedPng(renderContentAsPngBlob(makeContent));
+    return exportRenderedImage(makeContent);
 }
 
-// Existing cards keep their label; chat actions use the compact image icon.
-function createSmartCopyButton(onCopy, { iconOnly = false } = {}) {
+function createSmartCopyButton(onExport) {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "rich-copy-smart";
-    if (iconOnly) {
-        button.classList.add("chat-image-copy");
-        button.appendChild(createChatActionIcon("image"));
-    } else {
-        button.textContent = "以图片形式复制";
-    }
-    button.title = "以图片形式复制";
-    button.setAttribute("aria-label", "以图片形式复制");
-    button.addEventListener("click", () => {
-        Promise.resolve(onCopy()).catch(error => console.warn("复制失败：", error));
+    button.className = "rich-copy-smart chat-image-copy";
+    button.appendChild(createChatActionIcon("image"));
+    button.title = dmateUiText("以图片形式导出", "Export as image");
+    button.setAttribute("aria-label", button.title);
+    button.addEventListener("click", async () => {
+        if (button.disabled) return;
+        button.disabled = true;
+        button.setAttribute("aria-busy", "true");
+        try {
+            await onExport();
+        } catch (error) {
+            console.warn("图片导出失败：", error);
+            showCopyToast(error?.message || dmateUiText("图片导出失败，请重试", "The image could not be exported. Try again."));
+        } finally {
+            button.disabled = false;
+            button.removeAttribute("aria-busy");
+        }
     });
     return button;
 }
@@ -11226,7 +11188,7 @@ function effectiveElementBackground(element) {
 
 function buildKnowledgeGraphImageCopyTarget() {
     const canvas = document.getElementById("knowledgeGraphCanvas");
-    if (!canvas) return null;
+    if (!canvas || !knowledgeGraphDisplayedNodes().length) return null;
 
     // 手机端默认只显示“完整查看”入口，不会预先创建 .kg-mobile-stage。
     // 用户直接点复制时，在屏幕外临时构建同一份图谱，避免要求先点完整查看。
@@ -11369,6 +11331,8 @@ let knowledgeGraphPreparedPngPromise = null;
 let knowledgeGraphPreparedPngKey = "";
 
 function knowledgeGraphCopyKey() {
+    const displayedNodes = knowledgeGraphDisplayedNodes();
+    if (!displayedNodes.length) return "";
     const canvas = document.getElementById("knowledgeGraphCanvas");
     const mobileStage = canvas?.querySelector?.(".kg-mobile-stage");
     const svg = canvas?.querySelector?.(".kg-svg");
@@ -11378,7 +11342,7 @@ function knowledgeGraphCopyKey() {
         if (!shouldDrawKnowledgeGraphOffscreen()
                 || !knowledgeGraphData?.nodes?.length) return "";
         return [knowledgeGraphFilter || "全部", knowledgeGraphViewMode,
-            knowledgeGraphScope, knowledgeGraphData.nodes.length,
+            knowledgeGraphScope, displayedNodes.map(node => node.id).join(","),
             knowledgeGraphSelectedNodeId || ""].join("|");
     }
 
@@ -11575,6 +11539,9 @@ async function renderKnowledgeGraphOffscreenPngBlob() {
 }
 
 async function renderKnowledgeGraphPngBlob() {
+    if (!knowledgeGraphDisplayedNodes().length) {
+        throw new Error(dmateUiText("当前范围没有可导出的知识节点", "There are no knowledge nodes to export in this module."));
+    }
     if (shouldDrawKnowledgeGraphOffscreen()) {
         return renderKnowledgeGraphOffscreenPngBlob();
     }
@@ -11664,7 +11631,7 @@ function prepareKnowledgeGraphPng(force = false) {
 
 function scheduleKnowledgeGraphPngPreparation() {
     const prepare = () => {
-        prepareKnowledgeGraphPng().catch(() => {});
+        prepareKnowledgeGraphPng()?.catch(() => {});
     };
 
     if (typeof window.requestIdleCallback === "function") {
@@ -11704,6 +11671,9 @@ async function exportKnowledgeGraphImage() {
         if (!knowledgeGraphData?.nodes?.length) await ensureKnowledgeGraphData();
         if (!knowledgeGraphData?.nodes?.length) {
             throw new Error(dmateUiText("知识图谱尚未加载完成，请稍后重试", "The knowledge graph is not ready. Try again shortly."));
+        }
+        if (!knowledgeGraphDisplayedNodes().length) {
+            throw new Error(dmateUiText("当前范围没有可导出的知识节点", "There are no knowledge nodes to export in this module."));
         }
         const exporter = window.DMateDrawingExport;
         if (typeof exporter?.save !== "function") {
@@ -12906,43 +12876,45 @@ function refreshSessionNameDisplays() {
         name.textContent = sessionDisplayName(session);
         name.title = sessionDisplayName(session);
     }
-    refreshMobileConversationTitle();
+    refreshConversationTitle();
 }
 
-function deriveSessionName(text, source = "text") {
-    let value = String(text || "")
-        .replace(/【题目文字】/g, "")
-        .replace(/【图形信息】/g, "")
-        .replace(/\[图片识题\]/g, "")
-        .replace(/[#*_`>]/g, "")
-        .trim();
+function deriveSessionName(text, source = "text", teaching = null) {
+    return window.DMateConversationTitles.summarize(text, { source, teaching }).title;
+}
 
-    const firstUsefulLine = value
-        .split(/\r?\n/)
-        .map(line => line.trim())
-        .find(line => (
-            line
-            && !/^[-—=]{2,}$/.test(line)
-        ));
+function firstSessionNamingMessage(session) {
+    const users = (session.messages || []).filter(message => message?.role === "user"
+        && typeof message.text === "string" && message.text.trim());
+    return users.find(message => window.DMateConversationTitles.summarize(message.text, {
+        source: message.source || "text"
+    }).useful) || users[0] || null;
+}
 
-    value = firstUsefulLine || value;
+function canRefreshAutoSessionName(session, message) {
+    if (isDefaultSessionName(session)) return true;
+    if (!message || !["content", "ocr"].includes(session.nameSource) || session.retest) return false;
+    const titles = window.DMateConversationTitles;
+    const source = message.source || "text";
+    const firstInput = session.messages?.find(item => item?.role === "user" && typeof item.text === "string" && item.text.trim());
+    // Recognize only names actually produced from this first useful input.
+    // A stale provenance flag cannot overwrite an unrelated custom title.
+    return session.name === titles.legacyName(message.text, source)
+        || firstInput && session.name === titles.legacyName(firstInput.text, firstInput.source || "text")
+        || session.name === deriveSessionName(message.text, source)
+        || session.nameSource === "ocr" && session.name === "图片识题";
+}
 
-    if (!value) {
-        return source === "ocr"
-            ? "图片识题"
-            : "新对话";
-    }
-
-    value = value
-        .replace(/\s+/g, " ")
-        .replace(/^题目[:：]\s*/, "")
-        .trim();
-
-    const maxLength = 15;
-
-    return value.length > maxLength
-        ? `${value.slice(0, maxLength)}…`
-        : value;
+function refineFirstSessionName(session, teaching, userMessage) {
+    const message = firstSessionNamingMessage(session);
+    if (!message || message !== userMessage || !canRefreshAutoSessionName(session, message)) return false;
+    const source = message.source || "text";
+    if (window.DMateConversationTitles.summarize(message.text, { source }).specificity > 0) return false;
+    const summary = window.DMateConversationTitles.summarize(message.text, { source, teaching });
+    if (!summary.useful || summary.specificity === 0 || summary.title === session.name) return false;
+    session.name = summary.title;
+    session.nameSource = "content";
+    return true;
 }
 
 function maybeAutoNameSession(
@@ -12975,30 +12947,26 @@ function refreshUnnamedSessionNames() {
 
     for (const session of sessions) {
         if (
-            !isDefaultSessionName(session)
-            || !Array.isArray(session.messages)
+            !Array.isArray(session.messages)
+            || session.nameSource === "user"
+            || session.retest
         ) {
             continue;
         }
 
-        const firstUser = session.messages.find(
-            message => (
-                message
-                && message.role === "user"
-                && typeof message.text === "string"
-                && message.text.trim()
-            )
-        );
+        const firstUser = firstSessionNamingMessage(session);
 
         if (
             firstUser
-            && maybeAutoNameSession(
-                session,
-                firstUser.text,
-                firstUser.source || "text"
-            )
+            && canRefreshAutoSessionName(session, firstUser)
         ) {
-            changed = true;
+            const source = firstUser.source || "text";
+            const name = deriveSessionName(firstUser.text, source, firstUser.questionTeaching);
+            if (name !== "新对话" && name !== session.name) {
+                session.name = name;
+                session.nameSource = source === "ocr" && name === "图片识题" ? "ocr" : "content";
+                changed = true;
+            }
         }
     }
 
@@ -14059,6 +14027,7 @@ async function requestAiReply(session, options = {}) {
                     returnedTeaching
                 );
                 const latestUser = getLatestUserMessage(session);
+                refineFirstSessionName(session, normalizedReturnedTeaching, latestUser);
                 const activeCandidate = activeQuestionCandidateFromHistory(
                     session
                 );
@@ -14301,7 +14270,9 @@ function send() {
                 || message.manualIsQuestion !== true) return;
             // 以原有模型返回的有效难度为准；不通过文字长度猜难度。
             message.questionTeaching = teaching;
+            const titleChanged = refineFirstSessionName(session, teaching, message);
             saveState();
+            if (titleChanged) renderSessions();
             if (getCurrent()?.id === session.id) {
                 renderChat();
                 renderInfo();
@@ -15985,10 +15956,11 @@ function initializeVoiceInput() {
     const button = document.getElementById("voiceInputBtn"), input = document.getElementById("text");
     if (!button || !input) return;
     window.dmateVoiceInput = window.DMateVoiceInput.mount({ button, input,
+        cancelButton: document.getElementById("voiceCancelBtn"),
         status: document.getElementById("voiceInputStatus"), endpoint: "/voice/transcribe",
         onError: message => showCurrentError(message),
         onStateChange: () => refreshInputAvailability(),
-        getContextKey: () => String(currentId ?? ""),
+        getContextKey: () => `${accountState.authenticated ? "account:" + accountState.username : "guest"}:${currentId ?? ""}`,
         isBusy: () => Boolean(ocrReviewInProgress || ocrBatchPreparing || ocrTasks.size > 0 || isSessionBusy(currentId)
             || isSessionPendingAiStart(currentId) || isCurrentSessionTyping()) });
 }
@@ -17036,6 +17008,11 @@ function renderChat(preparedReply = null) {
         const actions = document.createElement("div");
         actions.className = "msg-actions";
 
+        // 双矩形按钮：每条聊天（用户/AI、题目/讲解/追问）均可复制文本。
+        actions.appendChild(createChatTextCopyButton(
+            () => copyChatMessageText(message, content)
+        ));
+
         if (
             shouldShowChatCopyButton(
                 message,
@@ -17048,11 +17025,6 @@ function renderChat(preparedReply = null) {
                 { iconOnly: true }
             ));
         }
-
-        // 双矩形按钮：每条聊天（用户/AI、题目/讲解/追问）均可复制文本。
-        actions.appendChild(createChatTextCopyButton(
-            () => copyChatMessageText(message, content)
-        ));
 
         if (
             shouldOfferWrongBookAction(
@@ -17201,7 +17173,7 @@ function renameSession(session) {
             saveState();
             renderSessions();
             renderInfo();
-            refreshMobileConversationTitle();
+            refreshConversationTitle();
         }
         close();
     };
@@ -17241,6 +17213,7 @@ function renderSessions() {
     }
 
     refreshUnnamedSessionNames();
+    refreshConversationTitle();
     box.innerHTML = "";
 
     for (const session of sessions) {
@@ -18750,22 +18723,6 @@ function knowledgeContextFromHistoryItem(item) {
     };
 }
 
-function knowledgeHistorySourceLabel(item) {
-    if (!item) {
-        return "题目";
-    }
-
-    if (item.role === "ai") {
-        return "AI 出题";
-    }
-
-    if (item.source === "ocr") {
-        return "图片识题";
-    }
-
-    return "手动输入";
-}
-
 function knowledgeHistoryPreview(text, limit = 78) {
     const value = String(text || "")
         .replace(/\s+/g, " ")
@@ -18802,7 +18759,11 @@ function getActiveKnowledgeContext() {
         return getConversationKnowledgeContext();
     }
 
-    const current = getCurrentKnowledgeContext();
+    // A saved teaching snapshot alone is not a current question. In particular,
+    // an empty or ordinary chat must not revive nodes from a previous question.
+    const current = activeQuestionCandidateFromHistory(getCurrent())
+        ? getCurrentKnowledgeContext()
+        : { category: "", focusPoints: [], knowledgePoints: [], prerequisitePoints: [], knowledgePath: [] };
 
     return {
         ...current,
@@ -19462,13 +19423,10 @@ function openKnowledgeGraph() {
                 getCurrent()
             );
 
-            const context = getCurrentKnowledgeContext();
-            // 有具体题目时突出题目相关，没有题目时直接显示全部知识。
+            // 最近一题关联没有有效题目时显示“无”；全部知识由用户单独选择。
             if (!knowledgeGraphInitialized) {
                 knowledgeGraphFilter = "全部";
-                knowledgeGraphViewMode = (
-                    context.focusPoints?.length || context.knowledgePoints?.length
-                ) ? "focus" : "full";
+                knowledgeGraphViewMode = "focus";
                 knowledgeGraphInitialized = true;
             }
 
@@ -19515,6 +19473,7 @@ function renderKnowledgeGraphLoading(message) {
     }
 
     if (detailTitle) {
+        detailTitle.hidden = false;
         detailTitle.textContent = "节点详情";
     }
 
@@ -19894,7 +19853,7 @@ function knowledgeGraphFocusedNodes(category, context) {
         .filter(name => byName.has(name));
 
     if (!currentNames.length) {
-        return categoryNodes;
+        return [];
     }
 
     const included = new Set(currentNames);
@@ -20829,14 +20788,7 @@ function renderKnowledgeGraphHistory() {
         number.className = "kg-history-number";
         number.textContent = `第 ${item.order} 题`;
 
-        const source = document.createElement("span");
-        source.className = "kg-history-source";
-        source.textContent = knowledgeHistorySourceLabel(
-            item
-        );
-
         top.appendChild(number);
-        top.appendChild(source);
 
         const preview = document.createElement("div");
         preview.className = "kg-history-preview ai-content";
@@ -20971,6 +20923,20 @@ function renderKnowledgeGraphDetail() {
 
     if (!title || !detail || !knowledgeGraphData) return;
 
+    const context = getActiveKnowledgeContext();
+    const displayedNodes = knowledgeGraphDisplayedNodes(context);
+    if (knowledgeGraphViewMode === "focus" && !displayedNodes.length) {
+        knowledgeGraphSelectedNodeId = "";
+        title.hidden = true;
+        title.textContent = "";
+        const empty = document.createElement("div");
+        empty.className = "graph-detail-empty";
+        empty.textContent = dmateUiText("无", "None");
+        detail.replaceChildren(empty);
+        return;
+    }
+    title.hidden = false;
+
     const node = findKnowledgeGraphNodeById(
         knowledgeGraphSelectedNodeId
     );
@@ -20983,7 +20949,6 @@ function renderKnowledgeGraphDetail() {
         return;
     }
 
-    const context = getActiveKnowledgeContext();
     const state = knowledgeGraphNodeState(
         node.name,
         context
@@ -20991,7 +20956,6 @@ function renderKnowledgeGraphDetail() {
 
     // 和当前画布使用同一批节点：仅列出实际能画出关系线的两端。
     // 跨模块前置关系仍保存在完整数据中，选择「全部知识→全部」时完整显示。
-    const displayedNodes = knowledgeGraphDisplayedNodes(getActiveKnowledgeContext());
     const namesOnCanvas = new Set(displayedNodes.map(item => item.name));
     const visiblePrerequisites = node.prerequisites.filter(name => namesOnCanvas.has(name));
     const nextNodes = displayedNodes
@@ -21220,6 +21184,19 @@ function renderKnowledgeGraph() {
         context
     );
 
+    if (knowledgeGraphViewMode === "focus" && !visibleNodes.length) {
+        canvas.querySelectorAll(".kg-mobile-viewport,.kg-desktop-viewport").forEach(viewport => viewport._kgDispose?.());
+        // Keep the remembered camera/full-view preference, but expose the
+        // normal toolbar and empty detail instead of an empty fullscreen pane.
+        modal.classList.remove("graph-fullscreen-view");
+        const empty = document.createElement("div");
+        empty.className = "kg-empty";
+        empty.textContent = dmateUiText("无", "None");
+        canvas.replaceChildren(empty);
+        renderKnowledgeGraphSide();
+        return;
+    }
+
     const description = (
         knowledgeGraphViewMode === "focus"
             ? (
@@ -21237,9 +21214,7 @@ function renderKnowledgeGraph() {
                                     : "这道历史题暂时没有识别到可显示的知识点"
                             )
                             : (
-                                visibleNodes.length < fullNodes.length
-                                    ? `最近一题关联 ${visibleNodes.length} 个知识点`
-                                    : "当前没有可进一步收缩的题目上下文，显示全部知识"
+                                `最近一题关联 ${visibleNodes.length} 个知识点`
                             )
                     )
             )
@@ -21249,6 +21224,9 @@ function renderKnowledgeGraph() {
     );
 
     const mobileGraph = window.matchMedia?.("(max-width: 760px)")?.matches;
+    if (mobileGraph && knowledgeGraphMobileFullscreen) {
+        modal.classList.add("graph-fullscreen-view");
+    }
 
     // 离线构造 DOM，完成后一次性替换，避免清空画布导致布局横跳。
     const fragment = document.createDocumentFragment();
@@ -21277,7 +21255,7 @@ function renderKnowledgeGraph() {
         viewKey, knowledgeGraphViewMemory, mobileGraph);
 
     renderKnowledgeGraphSide();
-    // 不预先生成高分辨率 PNG。只有点“以图片形式复制”才渲染，
+    // 不预先生成高分辨率 PNG。只有点“以图片形式导出”才渲染，
     // 否则每次切换模块会触发 html2canvas 占用主线程，并临时撑开页面宽度。
 }
 
@@ -21454,14 +21432,15 @@ function settleMobileDrawerGesture(kind, shouldOpen) {
     });
 }
 
-function refreshMobileConversationTitle() {
-    const title = document.getElementById("mobileConversationTitle");
+function refreshConversationTitle() {
+    const title = document.getElementById("desktopConversationTitle");
     if (!title) return;
 
     const session = getCurrent();
     const name = sessionDisplayName(session).trim();
     title.setAttribute("data-i18n-content", "");
     title.textContent = name || "DMate";
+    title.title = name || "DMate";
 }
 
 
@@ -21966,7 +21945,7 @@ function initMobileAppShell() {
         }
     });
 
-    refreshMobileConversationTitle();
+    refreshConversationTitle();
 }
 
 
@@ -22154,7 +22133,7 @@ function renderAll() {
     renderLearningSummary();
     renderKnowledgeGraph();
     refreshInputAvailability();
-    refreshMobileConversationTitle();
+    refreshConversationTitle();
 }
 
 window.addEventListener("dmate:languagechange", () => {

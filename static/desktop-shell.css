@@ -2,6 +2,14 @@
 .desktop-chat-toolbar,
 .desktop-shell-button { display:none; }
 
+@media(max-width:1100px) {
+    .mobile-topbar { grid-template-columns:auto minmax(0,1fr) auto !important; }
+    .mobile-topbar-start { gap:2px; }
+    .mobile-topbar-actions { grid-column:3; }
+    #mobileNewChatBtn { flex:none; }
+    body.mobile-left-open #mobileNewChatBtn { display:none; }
+}
+
 @media(min-width:1101px) {
     body[data-appearance-theme] {
         --dmate-sidebar-width:280px;
@@ -49,6 +57,20 @@
         position:relative; z-index:12; display:flex;
         align-items:center; justify-content:space-between;
         flex:0 0 56px; min-height:56px; padding:8px 16px;
+        gap:12px;
+    }
+    .desktop-chat-toolbar-start {
+        display:flex; align-items:center; gap:4px;
+        flex:1 1 auto; min-width:0;
+    }
+    .desktop-conversation-title {
+        min-width:0; margin-left:8px;
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+        font-size:16px; font-weight:600; line-height:1.5;
+        color:var(--text-primary);
+    }
+    html[data-desktop-sidebar="expanded"] .desktop-conversation-title {
+        margin-left:0;
     }
     body[data-appearance-theme] .desktop-shell-button {
         display:inline-flex; align-items:center; justify-content:center; flex:none;
@@ -69,8 +91,7 @@
         stroke-width:2; stroke-linecap:round; stroke-linejoin:round;
     }
     body[data-appearance-theme] #desktopSidebarToggle { position:absolute; top:15px; right:10px; }
-    body[data-appearance-theme] #desktopSidebarOpen { visibility:hidden; pointer-events:none; }
-    html[data-desktop-sidebar="collapsed"] body[data-appearance-theme] #desktopSidebarOpen { visibility:visible; pointer-events:auto; }
+    html[data-desktop-sidebar="expanded"] body[data-appearance-theme] :is(#desktopSidebarOpen,#desktopNewChatBtn) { display:none; }
     body[data-appearance-theme] #desktopToolsBtn { margin-left:auto !important; }
 
     body[data-appearance-theme] .center > #chat {

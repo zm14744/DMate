@@ -222,11 +222,12 @@ async function drawingReference(page) {
   assert.equal(await workspace.locator('[data-drawing-guide],[data-math-diagram-generate]').count(), 2,
     'Online guidance and mathematical generation remain available');
   await workspace.getByRole('button', { name: 'AI指导', exact: true }).click();
-  // Remove only the two intentionally unavailable controls from this reference
+  // Remove the intentionally unavailable controls from this reference
   // page, after proving the real online UI provides both capabilities.
   await workspace.evaluate(node => {
     node.querySelector('.ddw-upload-button').remove();
-    [...node.querySelectorAll('.ddw-side-actions>button')].find(button => button.textContent === 'AI指导').remove();
+    node.querySelectorAll('.ddw-side-actions>[data-drawing-ai-guidance],.ddw-side-actions>[data-math-diagram-generate]')
+      .forEach(button => button.remove());
   });
   await workspace.getByRole('button', { name: '新建空白页', exact: true }).click();
   const result = { inner: await drawingSnapshot(page, '#graphEditorMount'), outer: await drawingShellStyle(page, '#graphEditorDialog') };
@@ -637,7 +638,7 @@ async function drawing(page, reference) {
   assert.deepEqual(await drawingShellStyle(page, '#drawingPanel'), reference.outer,
     'Online/offline drawing shell background, outline, typography, padding and heading match');
   assert.equal(await page.locator('#drawingPanel .offline-intro').count(), 0, 'The old standalone drawing introduction is removed');
-  assert.equal(await workspace.getByRole('button', { name: /AI指导|上传|生成数学图/ }).count(), 0);
+  assert.equal(await workspace.getByRole('button', { name: /AI指导|上传|AI生成/ }).count(), 0);
   assert.equal(await workspace.locator('.ddw-ai-requirement,.ddw-ai-label,.ddw-ai-actions,.ddw-ai-answer,'
     + '[data-drawing-guide],[data-math-diagram-generate],.ddw-upload-button,input[type="file"]').count(), 0,
   'Unavailable AI/upload functionality has no controls or request form in the offline DOM');

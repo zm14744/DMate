@@ -160,6 +160,8 @@ async function onlineReference(browser, width, theme, available) {
       document.body.dataset.appearanceTheme = theme;
       openKnowledgeGraph();
     }, theme);
+    await page.waitForFunction(() => knowledgeGraphInitialized);
+    await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
     await frame(page).locator('.kg-section').waitFor();
     await removeOnlineOnly(page);
     await settle(page);

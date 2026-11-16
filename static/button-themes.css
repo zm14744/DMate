@@ -47,6 +47,13 @@ body[data-appearance-theme="navy"] {
 @layer dmate-button-themes {
     /* Separate the light conversation rail and its actions from the canvas. */
     @media(min-width:1101px) {
+        /* The notebook's creation action follows the sidebar's New chat palette. */
+        body[data-appearance-theme="light"]:not(.has-custom-background) #conceptNotebookDialog .dcn-new {
+            --dm-control-bg:#ffffff;
+            --dm-control-hover-bg:#f3f7fc;
+            --dm-control-border:#c3d1e2;
+            --dm-control-hover-border:#91a9c2;
+        }
         body[data-appearance-theme="light"]:not(.has-custom-background) .left {
             --dm-control-bg:#ffffff;
             --dm-control-hover-bg:#f3f7fc;
@@ -658,6 +665,66 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
     body[data-appearance-theme] #downloadModal .download-actions > a:focus-visible {
         outline:2px solid var(--dm-selected-ring)!important;
         outline-offset:2px!important;
+    }
+}
+
+/* Wrong-book actions share the message toolbar's quiet hover/focus feedback. */
+@layer dmate-button-themes {
+    body[data-appearance-theme] #wrongBookModal .wrong-actions > button {
+        border:0!important;
+        border-radius:8px!important;
+        background:transparent!important;
+        background-image:none!important;
+        box-shadow:none!important;
+        color:var(--dm-icon-rest,var(--text-secondary))!important;
+        -webkit-text-fill-color:currentColor!important;
+        filter:none!important;
+        transition:var(--dm-control-transition);
+    }
+    body[data-appearance-theme] #wrongBookModal .wrong-actions > .chat-image-copy {
+        display:inline-flex!important;
+        align-items:center!important;
+        justify-content:center!important;
+        box-sizing:border-box!important;
+        width:32px!important;
+        min-width:32px!important;
+        height:32px!important;
+        min-height:32px!important;
+        margin:0!important;
+        padding:6px!important;
+        line-height:1!important;
+    }
+    body[data-appearance-theme] #wrongBookModal .wrong-actions > .chat-image-copy > svg {
+        display:block!important;
+        flex:0 0 20px!important;
+        width:20px!important;
+        min-width:20px!important;
+        height:20px!important;
+        min-height:20px!important;
+        color:inherit!important;
+        pointer-events:none;
+    }
+    @media(hover:hover) {
+        body[data-appearance-theme] #wrongBookModal .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):hover {
+            background:var(--dm-nav-hover,var(--dm-selected-hover))!important;
+            color:var(--dm-icon-emphasis,var(--text-primary))!important;
+        }
+    }
+    body[data-appearance-theme] #wrongBookModal .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):is(:focus-visible,:active) {
+        background:var(--dm-nav-hover,var(--dm-selected-hover))!important;
+        color:var(--dm-icon-emphasis,var(--text-primary))!important;
+    }
+    body[data-appearance-theme] #wrongBookModal .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):focus-visible {
+        outline:2px solid var(--dm-selected-ring)!important;
+        outline-offset:2px!important;
+    }
+    body[data-appearance-theme] #wrongBookModal .wrong-actions > button.danger,
+    body[data-appearance-theme] #wrongBookModal .wrong-actions > button.danger:not(:disabled):not([aria-disabled="true"]):is(:hover,:focus-visible,:active) {
+        color:var(--dm-danger-text,#ef4444)!important;
+    }
+    body[data-appearance-theme] #wrongBookModal .wrong-actions > button:is(:disabled,[aria-disabled="true"]) {
+        opacity:.45!important;
+        cursor:not-allowed;
     }
 }
 

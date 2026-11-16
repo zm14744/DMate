@@ -255,14 +255,28 @@ async function viewportAndPopoverChecks(page, mobile, label, online = true) {
   for (const language of ['en', 'zh-CN']) {
     await page.evaluate(language => DMateI18n.setLanguage(language, false), language);
     await settle(page);
+    const expectedLabels = language === 'en'
+      ? ['Drawing settings', 'Graph information', 'AI guidance', 'AI generation']
+      : ['绘图设置', '图形信息', 'AI指导', 'AI生成'];
     const labels = await page.locator('.ddw-side-actions>button').evaluateAll(buttons => {
       const frame = document.querySelector('.ddw-canvas-frame').getBoundingClientRect();
       return buttons.map(button => {
-        const rect = button.getBoundingClientRect();
-        return { text: button.textContent, overflow: button.scrollWidth - button.clientWidth,
+        const rect = button.getBoundingClientRect(), style = getComputedStyle(button);
+        return { text: button.textContent.trim(), overflow: button.scrollWidth - button.clientWidth,
+          style: Object.fromEntries(['fontSize', 'fontWeight', 'lineHeight', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+            'borderRadius', 'borderTopWidth', 'borderTopStyle', 'borderTopColor', 'backgroundColor', 'color', 'minHeight']
+            .map(key => [key, style[key]])),
           left: rect.left - frame.left, right: frame.right - rect.right };
       });
     });
+    assert.deepEqual(labels.map(item => item.text), online ? expectedLabels : expectedLabels.slice(0, 2),
+      label + '/' + language + ': online generation follows guidance; offline keeps its two local controls');
+    if (online) {
+      assert.deepEqual(labels[3].style, labels[2].style,
+        label + '/' + language + ': AI generation uses the same rail button styling as AI guidance');
+      assert.equal(await page.locator('.ddw-side-actions>[data-math-diagram-generate]').count(), 1,
+        'AI generation belongs to the shared canvas control rail');
+    }
     for (const item of labels) {
       assert.ok(item.overflow <= 1, label + '/' + language + ': button label must remain complete: ' + JSON.stringify(item));
       assert.ok(item.left >= 0 && item.right >= 0, 'Button remains within the canvas frame');
@@ -320,10 +334,17 @@ async function viewportAndPopoverChecks(page, mobile, label, online = true) {
     ['information', '.ddw-side-actions>button:nth-child(2)', '.dge-float-panel[data-panel-key="results"][open]>.dge-float-content'],
     ['history', '.ddw-page-actions>button:nth-child(2)', '.ddw-side-panel:not([hidden])'],
   ];
-  if (online) popovers.push(['ai', '.ddw-side-actions>button:last-child', '.ddw-side-panel:not([hidden])']);
+  if (online) popovers.push(['ai', '.ddw-side-actions>[data-drawing-ai-guidance]', '.ddw-side-panel:not([hidden])']);
   const metrics = {};
   for (const [name, trigger, panel] of popovers) {
     await page.locator(trigger).click(); await page.locator(panel).waitFor(); await settle(page);
+    if (name === 'ai') {
+      assert.equal(await page.locator(panel + ' [data-math-diagram-generate]').count(), 0,
+        'The guidance panel does not duplicate the rail generation action');
+      const requirementLabel = await page.locator(panel + ' .ddw-ai-label').innerText();
+      assert.match(requirementLabel, /可选|optional/i, 'Drawing requirements are optional');
+      assert.doesNotMatch(requirementLabel, /必填|required/i, 'Optional drawing requirements never claim to be required');
+    }
     try { metrics[name] = await compactPanel(page, panel, mobile); }
     catch (error) {
       if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/viewport-' + label + '-' + name + '-failure.png' });

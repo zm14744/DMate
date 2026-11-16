@@ -297,7 +297,11 @@ async function runCase(browser, width, offline) {
       const toggle = page.locator(width <= 760 ? '#offlineNavToggle' : '#offlineDesktopSidebarOpen');
       if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
       await page.locator('.offline-nav-item[data-panel="graph"]').click();
-    } else await page.evaluate(() => openKnowledgeGraph());
+    } else {
+      await page.evaluate(() => openKnowledgeGraph());
+      await page.waitForFunction(() => knowledgeGraphInitialized);
+      await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
+    }
     await page.locator('#knowledgeGraphCanvas .kg-section').waitFor();
     await page.evaluate(installProbe);
     const categories = await page.locator('#knowledgeGraphCategory option').evaluateAll(options => options.map(option => option.value));

@@ -239,6 +239,8 @@ async function onlineCase(browser, width, theme) {
   try {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
     await page.evaluate(mode => { appearanceSettings.mode = mode; applyAppearanceSettings({ save: false }); openKnowledgeGraph(); }, theme);
+    await page.waitForFunction(() => knowledgeGraphInitialized);
+    await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
     await page.waitForSelector('#knowledgeGraphCanvas .kg-section');
     assert.equal(await page.locator('#knowledgeGraphCategory option').first().textContent(), '全部模块');
     await checkNativeStyle(page);

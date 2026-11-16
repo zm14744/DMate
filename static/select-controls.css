@@ -50,7 +50,8 @@
    Reuse the button layer so its generic important hover fill cannot raise it. */
 @layer dmate-button-themes {
     @media(max-width:1100px) {
-        body[data-appearance-theme] #knowledgeGraphModal #knowledgeGraphCategoryTrigger {
+        body[data-appearance-theme] #knowledgeGraphModal #knowledgeGraphCategoryTrigger,
+        body[data-appearance-theme] #wrongBookModal #wrongBookSortTrigger {
             box-sizing:border-box;
             min-height:38px!important;
             padding:9px 10px!important;
@@ -64,7 +65,8 @@
             -webkit-text-fill-color:currentColor!important;
             font-size:14px!important;
         }
-        body[data-appearance-theme] #knowledgeGraphModal #knowledgeGraphCategoryTrigger:focus-visible {
+        body[data-appearance-theme] #knowledgeGraphModal #knowledgeGraphCategoryTrigger:focus-visible,
+        body[data-appearance-theme] #wrongBookModal #wrongBookSortTrigger:focus-visible {
             border-color:var(--dm-selected-ring,var(--text-primary))!important;
             box-shadow:inset 0 0 0 1px var(--dm-selected-ring,var(--text-primary))!important;
         }

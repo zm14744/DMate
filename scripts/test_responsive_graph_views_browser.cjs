@@ -60,6 +60,10 @@ async function pageFixture(browser, kind, offline, startingMode) {
       stopCloudLivePolling(); accountState.authenticated = true; accountState.username = username;
     }, username);
     await page.evaluate(kind => kind === 'drawing' ? openGraphDrawing() : openKnowledgeGraph(), kind);
+    if (kind === 'graph') {
+      await page.waitForFunction(() => knowledgeGraphInitialized);
+      await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
+    }
   }
   return { page, context, errors, calls: () => modelCalls };
 }

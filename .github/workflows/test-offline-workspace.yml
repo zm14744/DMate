@@ -23,6 +23,7 @@ on:
       - 'scripts/test_favicon_consistency.py'
       - 'scripts/test_offline_workspace_browser.cjs'
       - 'scripts/test_knowledge_graph_browser.cjs'
+      - 'scripts/test_graph_empty_recent_browser.cjs'
       - 'scripts/test_offline_graph_browser.cjs'
       - 'scripts/test_graph_labels_browser.cjs'
       - 'scripts/test_composer_motion_browser.cjs'
@@ -35,6 +36,12 @@ on:
       - 'scripts/test_mobile_drawers_browser.cjs'
       - 'scripts/test_service_worker_cache_browser.cjs'
       - 'scripts/test_image_export_browser.cjs'
+      - 'scripts/test_mistake_action_chrome_browser.cjs'
+      - 'scripts/test_conversation_header_browser.cjs'
+      - 'scripts/test_conversation_titles_browser.cjs'
+      - 'scripts/test_conversation_titles.cjs'
+      - 'scripts/test_voice_input_controls_browser.cjs'
+      - 'scripts/test_wrongbook_filters_browser.cjs'
       - 'scripts/test_scrollbar_visibility_browser.cjs'
       - 'scripts/test_select_controls_browser.cjs'
       - 'scripts/test_search_controls_browser.cjs'
@@ -71,6 +78,7 @@ on:
       - 'scripts/test_favicon_consistency.py'
       - 'scripts/test_offline_workspace_browser.cjs'
       - 'scripts/test_knowledge_graph_browser.cjs'
+      - 'scripts/test_graph_empty_recent_browser.cjs'
       - 'scripts/test_offline_graph_browser.cjs'
       - 'scripts/test_graph_labels_browser.cjs'
       - 'scripts/test_composer_motion_browser.cjs'
@@ -83,6 +91,12 @@ on:
       - 'scripts/test_mobile_drawers_browser.cjs'
       - 'scripts/test_service_worker_cache_browser.cjs'
       - 'scripts/test_image_export_browser.cjs'
+      - 'scripts/test_mistake_action_chrome_browser.cjs'
+      - 'scripts/test_conversation_header_browser.cjs'
+      - 'scripts/test_conversation_titles_browser.cjs'
+      - 'scripts/test_conversation_titles.cjs'
+      - 'scripts/test_voice_input_controls_browser.cjs'
+      - 'scripts/test_wrongbook_filters_browser.cjs'
       - 'scripts/test_scrollbar_visibility_browser.cjs'
       - 'scripts/test_select_controls_browser.cjs'
       - 'scripts/test_search_controls_browser.cjs'
@@ -133,11 +147,13 @@ jobs:
           node --check static/offline-knowledge-graph.js
           node --check static/knowledge-graph-labels.js
           node --check static/script.js
+          node --check static/conversation-titles.js
           node --check static/math-markdown.js
           node --check static/ai-answer-renderer.js
           node --check scripts/test_offline_study_browser.cjs
           node --check scripts/test_offline_workspace_browser.cjs
           node --check scripts/test_knowledge_graph_browser.cjs
+          node --check scripts/test_graph_empty_recent_browser.cjs
           node --check scripts/test_offline_graph_browser.cjs
           node --check scripts/test_graph_labels_browser.cjs
           node --check scripts/test_composer_motion_browser.cjs
@@ -150,6 +166,12 @@ jobs:
           node --check scripts/test_mobile_drawers_browser.cjs
           node --check scripts/test_service_worker_cache_browser.cjs
           node --check scripts/test_image_export_browser.cjs
+          node --check scripts/test_mistake_action_chrome_browser.cjs
+          node --check scripts/test_conversation_header_browser.cjs
+          node --check scripts/test_conversation_titles_browser.cjs
+          node --check scripts/test_conversation_titles.cjs
+          node --check scripts/test_voice_input_controls_browser.cjs
+          node --check scripts/test_wrongbook_filters_browser.cjs
           node --check scripts/test_scrollbar_visibility_browser.cjs
           node --check scripts/test_select_controls_browser.cjs
           node --check scripts/test_search_controls_browser.cjs
@@ -165,6 +187,8 @@ jobs:
           node --check scripts/test_math_diagram_browser.cjs
       - name: Test math startup, rendering queue and proof endings
         run: node --test scripts/test_math_markdown.cjs
+      - name: Test local conversation title summaries
+        run: node --test scripts/test_conversation_titles.cjs
       - name: Verify offline styles match the online workspace
         run: |
           python scripts/sync_offline_styles.py --check
@@ -245,6 +269,11 @@ jobs:
           node scripts/test_offline_data_migration_browser.cjs
           node scripts/test_service_worker_cache_browser.cjs
           node scripts/test_image_export_browser.cjs
+          node scripts/test_mistake_action_chrome_browser.cjs
+          node scripts/test_conversation_header_browser.cjs
+          node scripts/test_conversation_titles_browser.cjs
+          node scripts/test_voice_input_controls_browser.cjs
+          node scripts/test_wrongbook_filters_browser.cjs
           node scripts/test_scrollbar_visibility_browser.cjs
           node scripts/test_select_controls_browser.cjs
           node scripts/test_search_controls_browser.cjs
@@ -256,6 +285,7 @@ jobs:
           node scripts/test_library_detail_view_browser.cjs
           node scripts/test_mobile_drawers_browser.cjs
           node scripts/test_knowledge_graph_browser.cjs
+          node scripts/test_graph_empty_recent_browser.cjs
           node scripts/test_offline_graph_browser.cjs
           node scripts/test_graph_labels_browser.cjs
           node scripts/test_composer_motion_browser.cjs

@@ -56,6 +56,8 @@ async function fixture(browser, { offline = false, width = 1440, ua, nativeBridg
   else {
     await page.waitForFunction(() => typeof openKnowledgeGraph === 'function');
     await page.evaluate(() => openKnowledgeGraph());
+    await page.waitForFunction(() => knowledgeGraphInitialized);
+    await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
     await page.locator('#knowledgeGraphCanvas .kg-section').waitFor();
   }
   await smallModule(page);
@@ -72,7 +74,7 @@ async function smallModule(page) {
 }
 
 async function exportLabels(page) {
-  for (const [language, label] of [['en', 'Export image'], ['zh-CN', '导出图片']]) {
+  for (const [language, label] of [['en', 'Export as image'], ['zh-CN', '以图片形式导出']]) {
     await page.evaluate(value => window.DMateI18n.setLanguage(value, false), language);
     await settle(page);
     assert.equal(await page.locator('#knowledgeGraphCopyBtn').getAttribute('title'), label);
