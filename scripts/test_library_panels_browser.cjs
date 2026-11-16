@@ -35,7 +35,25 @@ async function settle(page) {
   });
 }
 
+async function closeLibraryDetail(page) {
+  if (await page.locator('#libraryDetailDialog').evaluate(dialog => dialog.open)) {
+    await page.locator('#libraryDetailClose').click();
+    await page.locator('#libraryDetailDialog').waitFor({ state: 'hidden' });
+    await settle(page);
+  }
+}
+
+async function openLibraryDetail(page, kind) {
+  if (mobile(page) && !await page.locator('#libraryDetailDialog').evaluate(dialog => dialog.open)) {
+    await page.locator(kind === 'concepts' ? '#conceptFullView' : '#questionFullView').click();
+    await page.locator('#libraryDetailDialog').waitFor({ state: 'visible' });
+  }
+  await page.locator(kind === 'concepts' ? '#conceptDetail' : '#questionDetail').waitFor({ state: 'visible' });
+  await settle(page);
+}
+
 async function navigate(page, panel) {
+  await closeLibraryDetail(page);
   if (mobile(page) && !await page.evaluate(() => document.body.classList.contains('offline-nav-open'))) {
     await page.locator('#offlineNavToggle').tap();
   }
@@ -61,12 +79,14 @@ async function noOverflow(page, panel) {
 }
 
 async function openConcept(page, concept) {
+  await closeLibraryDetail(page);
   if (!await page.locator('#conceptsPanel').isVisible()) await navigate(page, 'concepts');
   await page.locator('#conceptSearch').fill(concept.title);
   const entry = page.locator('#conceptList .concept-item[data-concept-id="' + concept.id + '"]');
   await entry.click();
   await page.waitForFunction(id => document.querySelector('#conceptList .concept-item.active')?.dataset.conceptId === id, concept.id);
   await page.locator('#conceptSearch').fill('');
+  await openLibraryDetail(page, 'concepts');
   await page.waitForFunction(() => !document.querySelector('#conceptDetail [data-dmate-render-state="pending"]'));
   await settle(page);
 }
@@ -110,6 +130,10 @@ async function gestureScroll(page, selector) {
 }
 
 async function independentScroll(page, panel, kind) {
+  if (mobile(page)) {
+    if (kind === 'list') await closeLibraryDetail(page);
+    else await openLibraryDetail(page, panel);
+  }
   const prefix = panel === 'concepts' ? 'concept' : 'question';
   const selector = '#' + prefix + (kind === 'list' ? 'List' : 'Detail');
   const other = '#' + prefix + (kind === 'list' ? 'Detail' : 'List');
@@ -138,6 +162,7 @@ async function independentScroll(page, panel, kind) {
 }
 
 async function checkConceptSections(page, concept, language = 'zh-CN') {
+  await openLibraryDetail(page, 'concepts');
   const headings = await page.locator('#conceptDetail h3').allTextContents();
   assert.ok(!headings.some(heading => heading === '典型例题' || /typical examples?/i.test(heading)), 'Removed examples section stays absent');
   assert.ok(!headings.includes('所属图谱知识点') && !headings.includes('关联知识点'), 'Old headings are gone');
@@ -253,9 +278,10 @@ async function runCase(browser, width, height) {
     await independentScroll(page, 'concepts', 'list');
     await noOverflow(page, 'concepts');
     await navigate(page, 'questions');
-    await page.locator('#questionSearch').fill(longQuestion.id);
+    await page.locator('#questionSearch').fill(longQuestion.title);
     await page.locator('#questionList .question-item[data-question-id="' + longQuestion.id + '"]').click();
     await page.locator('#questionSearch').fill('');
+    await openLibraryDetail(page, 'questions');
     await page.locator('#questionDetail .question-actions .offline-primary').click();
     await page.waitForFunction(() => !document.querySelector('#questionDetail [data-dmate-render-state="pending"]'));
     await settle(page);
@@ -264,7 +290,8 @@ async function runCase(browser, width, height) {
     await noOverflow(page, 'questions');
     await libraryFeatures(page);
     assert.deepEqual(errors, [], 'No library panel script errors');
-    console.log('PASS ' + width + 'x' + height + ': independent wheel/touch panes, fixed toolbar, graph round-trip and bilingual related exercises');
+    console.log('PASS ' + width + 'x' + height + ': ' + (mobile(page) ? 'extended list and full-view detail scrolling' : 'independent wheel/touch panes')
+      + ', fixed toolbar, graph round-trip and bilingual related exercises');
   } finally { await context.close(); }
 }
 

@@ -38,7 +38,25 @@ async function settle(page) {
   });
 }
 
+async function closeLibraryDetail(page) {
+  if (await page.locator('#libraryDetailDialog').evaluate(dialog => dialog.open)) {
+    await page.locator('#libraryDetailClose').click();
+    await page.locator('#libraryDetailDialog').waitFor({ state: 'hidden' });
+    await settle(page);
+  }
+}
+
+async function openLibraryDetail(page, kind) {
+  if (mobile(page) && !await page.locator('#libraryDetailDialog').evaluate(dialog => dialog.open)) {
+    await page.locator(kind === 'concepts' ? '#conceptFullView' : '#questionFullView').click();
+    await page.locator('#libraryDetailDialog').waitFor({ state: 'visible' });
+  }
+  await page.locator(kind === 'concepts' ? '#conceptDetail' : '#questionDetail').waitFor({ state: 'visible' });
+  await settle(page);
+}
+
 async function navigate(page, panel) {
+  await closeLibraryDetail(page);
   if (mobile(page) && !await page.evaluate(() => document.body.classList.contains('offline-nav-open'))) await page.locator('#offlineNavToggle').tap();
   await page.locator('.offline-nav-item[data-panel="' + panel + '"]').click();
   await page.locator('#' + panel + 'Panel').waitFor({ state: 'visible' });
@@ -46,6 +64,7 @@ async function navigate(page, panel) {
 }
 
 async function choose(page, selector, value) {
+  await closeLibraryDetail(page);
   const select = page.locator(selector);
   if (await select.inputValue() === value) return;
   if (mobile(page)) {
@@ -74,9 +93,9 @@ async function clearFilters(page, kind) {
 
 async function openQuestion(page, question) {
   await clearFilters(page, 'questions');
-  await page.locator('#questionSearch').fill(question.id);
+  await page.locator('#questionSearch').fill(question.title);
   await item(page, 'questions', question.id).click();
-  await settle(page);
+  await openLibraryDetail(page, 'questions');
 }
 
 async function assertRows(page, kind, expected, message) {
@@ -145,7 +164,7 @@ async function questionCombinedFilters(page) {
   await choose(page, '#questionCategory', letterQuestion.category);
   await choose(page, '#questionDifficulty', level(letterQuestion.difficulty));
   await choose(page, '#questionSelection', 'selected');
-  await page.locator('#questionSearch').fill(letterQuestion.id);
+  await page.locator('#questionSearch').fill(letterQuestion.title);
   await assertRows(page, 'questions', [letterQuestion], 'Type, chapter, difficulty, selection and search combine');
   await choose(page, '#questionSelection', 'unselected');
   assert.equal(await item(page, 'questions', letterQuestion.id).count(), 0);
@@ -163,12 +182,15 @@ async function answers(page, english = false) {
     assert.equal(await answer.locator('mjx-container,em,i').count(), 0, 'Choice answer letters have no math or italic rendering');
     assert.equal(await answer.evaluate(element => getComputedStyle(element).fontStyle), 'normal');
     if (question === letterQuestion) {
+      await closeLibraryDetail(page);
       await page.locator('#questionSearch').fill('');
       const other = questions.find(value => !selectedQuestions.some(selected => selected.id === value.id));
       const control = checkbox(page, 'questions', other.id);
       await control.check(); await settle(page);
       assert.equal(await page.locator('#questionList .question-item.active').getAttribute('data-question-id'), letterQuestion.id);
-      assert.equal(await page.locator('#questionDetail .answer-panel').isVisible(), true, 'Checking another row retains the revealed answer');
+      await openLibraryDetail(page, 'questions');
+      assert.equal(await page.locator('#questionDetail .answer-panel').isVisible(), true, 'Closing the detail and checking another row retains the revealed answer');
+      await closeLibraryDetail(page);
       await control.uncheck();
     }
   }
@@ -241,10 +263,12 @@ async function linksClearConflicts(page) {
   assert.equal(await checkbox(page, 'concepts', linkedChild.id).isChecked(), false);
   await conflictPracticeFilters(page);
   await navigate(page, 'concepts');
+  await openLibraryDetail(page, 'concepts');
   await page.locator('#conceptDetail .concept-related-exercises [data-question-id="' + linkedQuestion.id + '"]').click();
   await assertLinkedQuestion(page);
   await conflictPracticeFilters(page);
   await navigate(page, 'concepts');
+  await openLibraryDetail(page, 'concepts');
   await page.locator('#conceptDetail .concept-graph-module [data-graph-node-id="' + linkedChild.graph_node_id + '"]').click();
   await page.locator('#graphPanel').waitFor({ state: 'visible' });
   if (await page.locator('#knowledgeGraphModal').evaluate(modal => modal.classList.contains('graph-fullscreen-view'))) {

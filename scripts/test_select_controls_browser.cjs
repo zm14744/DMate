@@ -174,12 +174,12 @@ async function conceptFilters(page) {
   await expectConceptRows(page, graph);
   await page.locator('#conceptList .concept-item[data-concept-id="graph_basic__simple_graph"]').click();
   await page.locator('#conceptSearch').fill('简单图');
-  const simple = graph.filter(item => [item.title, item.category, item.summary, item.definition].join(' ').includes('简单图'));
+  const simple = graph.filter(item => [item.title, translations.concepts[item.id].title].some(title => title.includes('简单图')));
   await expectConceptRows(page, simple);
   assert.equal(await page.locator('#conceptList .concept-item.active').getAttribute('data-concept-id'), 'graph_basic__simple_graph',
     'Search preserves the selected concept while it remains a match');
   await page.locator('#conceptSearch').fill('欧拉');
-  const euler = graph.filter(item => [item.title, item.category, item.summary, item.definition].join(' ').includes('欧拉'));
+  const euler = graph.filter(item => [item.title, translations.concepts[item.id].title].some(title => title.includes('欧拉')));
   assert.ok(euler.length > 0 && euler.length < graph.length);
   await expectConceptRows(page, euler);
   await page.evaluate(() => window.DMateI18n.setLanguage('en', false));
@@ -269,7 +269,7 @@ async function disconnectedCase(browser) {
     await expectConceptRows(page, concepts.filter(item => item.category === '图论'));
     await page.locator('#conceptSearch').fill('欧拉');
     const expected = concepts.filter(item => item.category === '图论'
-      && [item.title, item.category, item.summary, item.definition].join(' ').includes('欧拉'));
+      && [item.title, translations.concepts[item.id].title].some(title => title.includes('欧拉')));
     await expectConceptRows(page, expected);
     console.log('PASS disconnected reload: cached mobile chooser and concept chapter-search filter work');
   } finally { await context.close(); }

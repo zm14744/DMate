@@ -112,7 +112,23 @@ async function onlineReference(browser, width) {
   } finally { await context.close(); }
 }
 
+async function closeLibraryDetail(page) {
+  if (await page.locator('#libraryDetailDialog').evaluate(dialog => dialog.open)) {
+    await page.locator('#libraryDetailClose').click();
+    await page.locator('#libraryDetailDialog').waitFor({ state: 'hidden' });
+  }
+}
+
+async function openLibraryDetail(page, panel) {
+  if (page.viewportSize().width > 1100) return;
+  if (!await page.locator('#libraryDetailDialog').evaluate(dialog => dialog.open)) {
+    await page.locator(panel === 'concepts' ? '#conceptFullView' : '#questionFullView').click();
+  }
+  await page.locator(panel === 'concepts' ? '#conceptDetail' : '#questionDetail').waitFor({ state: 'visible' });
+}
+
 async function navigation(page, panel) {
+  await closeLibraryDetail(page);
   const toggle = page.locator(page.viewportSize().width <= 1100 ? '#offlineNavToggle' : '#offlineDesktopSidebarOpen');
   if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
   await page.locator('.offline-nav-item[data-panel="' + panel + '"]').click();
@@ -120,6 +136,9 @@ async function navigation(page, panel) {
 }
 
 async function languageChoice(page, language) {
+  const reopen = await page.locator('#libraryDetailDialog').evaluate(dialog => dialog.open
+    ? (dialog.querySelector('#conceptDetail') ? 'concepts' : 'questions') : null);
+  await closeLibraryDetail(page);
   const opener = page.locator(page.viewportSize().width <= 1100 ? '#offlineNavToggle' : '#offlineDesktopSidebarOpen');
   if (await opener.getAttribute('aria-expanded') !== 'true') await opener.click();
   await page.locator('#offlineAppearanceBtn').click();
@@ -128,6 +147,7 @@ async function languageChoice(page, language) {
   await page.waitForFunction(value => document.documentElement.dataset.uiLanguage === value, language);
   await page.locator('#appearanceClose').click();
   await page.locator('#appearanceModal').waitFor({ state: 'hidden' });
+  if (reopen) await openLibraryDetail(page, reopen);
 }
 
 async function hookRenderer(page) {
@@ -352,6 +372,7 @@ async function run(browser, width) {
     await languageChoice(page, 'zh-CN'); await setTheme(page, 'light'); await navigation(page, 'concepts');
     await page.locator('#conceptSearch').fill(data.concept.query);
     await page.locator('#conceptList [data-concept-id="' + data.concept.id + '"]').click();
+    await openLibraryDetail(page, 'concepts');
     assert.equal(await page.locator('#conceptDetail').getByRole('heading', {name:/^(典型例题|Worked example)$/}).count(), 0,
       'Worked examples are now exercises rather than an embedded concept section');
     let checkedChineseProbe = false;
@@ -389,6 +410,7 @@ async function run(browser, width) {
     await learning.locator('.graph-related-exercises [data-question-id="' + data.example.id + '"]').click();
     await page.locator('#questionsPanel').waitFor({state:'visible'});
     assert.equal(await page.locator('#questionList .question-item.active').getAttribute('data-question-id'), data.example.id);
+    await openLibraryDetail(page, 'questions');
     await page.locator('#questionDetail .question-actions button').click();
     for (const language of ['en', 'zh-CN']) {
       await languageChoice(page, language); await setTheme(page, 'light');
@@ -402,9 +424,11 @@ async function run(browser, width) {
     }
     await setTheme(page, 'light'); await navigation(page, 'questions');
     for (const [index, question] of data.questions.entries()) {
+      await closeLibraryDetail(page);
       await page.locator('#questionCategory').selectOption(question.category);
       await page.locator('#questionDifficulty').selectOption(question.difficulty);
       await page.locator('#questionList [data-question-id="' + question.id + '"]').click();
+      await openLibraryDetail(page, 'questions');
       await page.locator('#questionDetail .question-actions button').click();
       for (const language of ['en', 'zh-CN']) {
         await languageChoice(page, language); await setTheme(page, 'light');

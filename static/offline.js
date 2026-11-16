@@ -3,6 +3,9 @@
   const $ = id => document.getElementById(id);
   const DB_NAME = "dmate-offline-workspace";
   const DB_VERSION = 2;
+  const libraryMobile = window.matchMedia("(max-width:1100px)");
+  const libraryScroll = {concepts:0, questions:0};
+  let libraryDetail = null;
   const state = {
     db: null, concepts: [], questions: [], graph: null, translations: {concepts:{},questions:{}},
     panel: "graph", selectedQuestion: null, selectedConcept: null,
@@ -242,8 +245,66 @@
     $("returnOnline").removeAttribute("title");
   }
 
+  function syncLibraryFullView(kind) {
+    const concepts = kind === "concepts";
+    const record = concepts ? state.selectedConcept : state.selectedQuestion;
+    const entry = $(concepts ? "conceptFullView" : "questionFullView");
+    const recordId = record?.id || "";
+    if (entry.dataset.recordId !== recordId) libraryScroll[kind] = 0;
+    entry.dataset.recordId = recordId;
+    entry.disabled = !record;
+    entry.textContent = tr("完整查看", "Full view");
+    entry.setAttribute("aria-label", concepts ? tr("完整查看概念详情", "View complete concept details")
+      : tr("完整查看练习详情", "View complete exercise details"));
+    entry.setAttribute("aria-expanded", String(libraryDetail?.kind === kind && $("libraryDetailDialog").open));
+    if (libraryDetail?.kind === kind) {
+      $("libraryDetailTitle").textContent = concepts ? tr("概念详情", "Concept details") : tr("练习详情", "Exercise details");
+      if (!record) closeLibraryDetail(false);
+    }
+  }
+
+  function closeLibraryDetail(restoreFocus = true) {
+    const current = libraryDetail;
+    if (!current) return;
+    libraryDetail = null;
+    libraryScroll[current.kind] = current.article.scrollTop;
+    if ($("libraryDetailDialog").open) $("libraryDetailDialog").close();
+    current.origin.replaceWith(current.article);
+    current.article.scrollTop = libraryScroll[current.kind];
+    const entry = $(current.kind === "concepts" ? "conceptFullView" : "questionFullView");
+    entry.setAttribute("aria-expanded", "false");
+    if (restoreFocus) {
+      const target = current.trigger?.isConnected && current.trigger.getClientRects().length ? current.trigger : entry;
+      if (target.getClientRects().length) target.focus({preventScroll:true});
+    }
+  }
+
+  function openLibraryDetail(kind, trigger = null) {
+    if (!libraryMobile.matches || !["concepts", "questions"].includes(kind)) return;
+    const record = kind === "concepts" ? state.selectedConcept : state.selectedQuestion;
+    if (!record) return;
+    const dialog = $("libraryDetailDialog");
+    if (libraryDetail?.kind === kind && dialog.open) return;
+    closeLibraryDetail(false);
+    const article = $(kind === "concepts" ? "conceptDetail" : "questionDetail");
+    const entry = $(kind === "concepts" ? "conceptFullView" : "questionFullView");
+    const origin = document.createComment("library detail origin");
+    article.before(origin);
+    libraryDetail = {kind, article, origin, trigger:trigger || entry};
+    $("libraryDetailHost").append(article);
+    $("libraryDetailTitle").textContent = kind === "concepts" ? tr("概念详情", "Concept details") : tr("练习详情", "Exercise details");
+    dialog.showModal();
+    article.scrollTop = libraryScroll[kind];
+    entry.setAttribute("aria-expanded", "true");
+    $("libraryDetailClose").focus({preventScroll:true});
+    requestAnimationFrame(() => {
+      if (libraryDetail?.article === article && dialog.open) article.scrollTop = libraryScroll[kind];
+    });
+  }
+
   function switchPanel(name) {
     if (!panelMeta[name]) return;
+    closeLibraryDetail(false);
     if (name !== "graph" && state.graphController) {
       state.graphController.destroy(); state.graphController = null;
     }
@@ -315,6 +376,8 @@
     }
     switchPanel("concepts");
     $("conceptDetail").scrollTop = 0;
+    libraryScroll.concepts = 0;
+    openLibraryDetail("concepts");
   }
 
   function openGraphModule(node) {
@@ -341,6 +404,8 @@
     state.revealed = false;
     switchPanel("questions");
     $("questionDetail").scrollTop = 0;
+    libraryScroll.questions = 0;
+    openLibraryDetail("questions");
   }
 
   function questionGraphNodes(question) {
@@ -410,26 +475,18 @@
     return wrapper;
   }
 
-  function searchText(value) {
-    if (value === null || value === undefined) return "";
-    if (Array.isArray(value)) return value.map(searchText).join(" ");
-    if (typeof value === "object") return Object.values(value).map(searchText).join(" ");
-    return ["string", "number", "boolean"].includes(typeof value) ? String(value) : "";
-  }
-
   function normalizedSearch(value) {
     return String(value ?? "").normalize("NFKC").trim().toLocaleLowerCase();
   }
 
-  function questionMatchesSearch(question, query) {
+  function titleMatchesSearch(record, collection, query) {
     if (!query) return true;
-    const translated = state.translations.questions[question.id] || {};
-    const fields = ["id", "title", "statement", "options", "answer", "answer_text", "explanation", "grading_criteria", "category", "difficulty", "type", "knowledge_points"];
-    const searchable = [fields.map(key => question[key]), fields.map(key => translated[key]),
-      window.DMateKnowledgeLanguage?.labels?.[question.category],
-      difficultyName(question.difficulty), window.DMateLanguageCatalog?.exact?.[difficultyName(question.difficulty)],
-      questionTypeLabels[question.type], tr(question.category), tr(question.type)];
-    return normalizedSearch(searchText(searchable)).includes(query);
+    const translated = state.translations[collection][record.id];
+    return [record.title, translated?.title].some(title => normalizedSearch(title).includes(query));
+  }
+
+  function questionMatchesSearch(question, query) {
+    return titleMatchesSearch(question, "questions", query);
   }
 
   function renderQuestions() {
@@ -464,6 +521,7 @@
       state.revealed = false;
       $("questionDetail").replaceChildren(el("div","offline-empty",tr("没有符合条件的题目。", "No matching exercises.")));
     }
+    syncLibraryFullView("questions");
   }
 
   function selectQuestion(question) {
@@ -518,8 +576,10 @@
 
     const actions = el("div", "question-actions wrong-actions");
     actions.append(action(state.revealed ? tr("收起参考答案", "Hide reference answer") : tr("查看参考答案", "View reference answer"), "offline-primary", () => {
+      const restoreFocus = actions.contains(document.activeElement);
       state.revealed = !state.revealed;
       renderQuestionDetail(question);
+      if (restoreFocus) detail.querySelector(".question-actions button")?.focus({preventScroll:true});
     }));
     detail.append(actions);
 
@@ -536,6 +596,7 @@
       }
       detail.append(answer);
     }
+    syncLibraryFullView("questions");
   }
 
   function fillConceptDetail(concept) {
@@ -583,19 +644,19 @@
     if (concept.id !== concept.graph_node_id) {
       detail.append(relatedExercisesSection(concept.related_questions, "concept-related-exercises"));
     }
+    syncLibraryFullView("concepts");
   }
 
   function renderConcepts() {
     state.conceptCategory = fillChapterFilter($("conceptCategory"), state.conceptCategory);
     state.conceptSelection = fillSelectionFilter($("conceptSelection"), state.conceptSelection);
-    const query = $("conceptSearch").value.trim().toLocaleLowerCase();
+    const query = normalizedSearch($("conceptSearch").value);
     state.conceptQuery = $("conceptSearch").value;
     window.DMateSearchControls?.refresh?.($("conceptSearch"));
     const rows = state.concepts.filter(c => {
-      const translated = state.translations.concepts[c.id] || {};
       return (!state.conceptCategory || c.category === state.conceptCategory)
         && matchesLibrarySelection("concepts", c.id, state.conceptSelection)
-        && (!query || [c.title,c.category,c.summary,c.definition,translated.title,translated.summary,translated.definition,tr(c.category)].join(" ").toLocaleLowerCase().includes(query));
+        && titleMatchesSearch(c, "concepts", query);
     });
     $("conceptCount").textContent = tr(rows.length + " 个概念", rows.length + (rows.length === 1 ? " concept" : " concepts"));
     const list = $("conceptList"); list.replaceChildren();
@@ -616,6 +677,7 @@
       state.selectedConcept = null;
       $("conceptDetail").replaceChildren(el("div","offline-empty",tr("没有找到匹配的概念。", "No matching concepts.")));
     }
+    syncLibraryFullView("concepts");
   }
 
   function renderGraph() {
@@ -699,6 +761,8 @@
       "按章节筛选":"Filter by topic", "按难度筛选":"Filter by difficulty", "全部章节":"All topics", "全部难度":"All difficulties",
       "按题型筛选":"Filter by question type", "全部题型":"All question types", "按选择状态筛选":"Filter by selection",
       "已选择":"Selected", "未选择":"Unselected", "全部":"All",
+      "完整查看":"Full view", "完整查看概念详情":"View complete concept details", "完整查看练习详情":"View complete exercise details",
+      "关闭详情":"Close details",
       "题目、答案与解析":"Questions, answers and explanations", "定义、解释与例题":"Definitions, explanations and examples",
       "定义、解释与易错点":"Definitions, explanations and common mistakes",
       "查看定义、解释、公式和易错点。":"View definitions, explanations, formulas and common mistakes.",
@@ -714,6 +778,21 @@
     $("conceptCategory").addEventListener("change", event => { state.conceptCategory=event.target.value; renderConcepts(); });
     $("conceptSelection").addEventListener("change", event => { state.conceptSelection=event.target.value; renderConcepts(); });
     $("conceptSearch").addEventListener("input", renderConcepts);
+    $("questionFullView").addEventListener("click", event => openLibraryDetail("questions", event.currentTarget));
+    $("conceptFullView").addEventListener("click", event => openLibraryDetail("concepts", event.currentTarget));
+    $("libraryDetailClose").addEventListener("click", () => closeLibraryDetail());
+    $("libraryDetailDialog").addEventListener("cancel", event => { event.preventDefault(); closeLibraryDetail(); });
+    $("libraryDetailDialog").addEventListener("close", () => {
+      // A related link can close and reopen this dialog in one event. Its old
+      // queued close event must not move the newly opened detail back inline.
+      if (!$("libraryDetailDialog").open) closeLibraryDetail();
+    });
+    libraryMobile.addEventListener("change", event => {
+      if (event.matches || !libraryDetail) return;
+      const article = libraryDetail.article;
+      closeLibraryDetail(false);
+      article.focus({preventScroll:true});
+    });
     $("returnOnline").addEventListener("click", returnOnline);
     window.addEventListener("online", setNetworkStatus);
     window.addEventListener("offline", setNetworkStatus);

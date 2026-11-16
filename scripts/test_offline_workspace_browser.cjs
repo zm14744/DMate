@@ -8,7 +8,23 @@ const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const panels = ['graph', 'concepts', 'questions', 'drawing'];
 const iconReferences = { drawing: '#graphDrawingBtn svg', graph: '#knowledgeGraphBtn svg' };
 
+async function closeLibraryDetail(page) {
+  if (await page.locator('#libraryDetailDialog').evaluate(dialog => dialog.open)) {
+    await page.locator('#libraryDetailClose').click();
+    await page.locator('#libraryDetailDialog').waitFor({ state: 'hidden' });
+  }
+}
+
+async function openLibraryDetail(page, panel) {
+  if (page.viewportSize().width > 1100) return;
+  if (!await page.locator('#libraryDetailDialog').evaluate(dialog => dialog.open)) {
+    await page.locator(panel === 'concepts' ? '#conceptFullView' : '#questionFullView').click();
+  }
+  await page.locator(panel === 'concepts' ? '#conceptDetail' : '#questionDetail').waitFor({ state: 'visible' });
+}
+
 async function navigate(page, panel) {
+  await closeLibraryDetail(page);
   const graphClose = page.locator('#knowledgeGraphClose');
   if (await graphClose.isVisible()) await graphClose.click();
   const item = page.locator('.offline-nav-item[data-panel="' + panel + '"]');
@@ -229,7 +245,7 @@ async function noOverflow(page, panel) {
       top: bounds.top, bottom: bounds.bottom, viewportHeight: innerHeight,
       outerOverflow: getComputedStyle(node).overflowY, outerHeight: node.clientHeight, outerScroll: node.scrollHeight,
       panes: ['concepts', 'questions'].includes(id) ? [...node.querySelectorAll(id === 'concepts'
-        ? '#conceptList,#conceptDetail' : '#questionList,#questionDetail')].map(pane => ({
+        ? '#conceptList,#conceptDetail' : '#questionList,#questionDetail')].filter(pane => pane.getClientRects().length).map(pane => ({
           id: pane.id, overflow: getComputedStyle(pane).overflowY,
           height: pane.clientHeight, top: pane.getBoundingClientRect().top, bottom: pane.getBoundingClientRect().bottom })) : [] };
   }, panel);
@@ -240,10 +256,11 @@ async function noOverflow(page, panel) {
   if (['concepts', 'questions'].includes(panel)) {
     assert.ok(['hidden', 'clip'].includes(state.outerOverflow), panel + ': the outer panel is not a scroll owner');
     assert.ok(state.outerScroll <= state.outerHeight + 1, panel + ': independent panes fit their outer panel');
-    assert.equal(state.panes.length, 2);
+    assert.equal(state.panes.length, page.viewportSize().width <= 1100 ? 1 : 2,
+      'Mobile devotes the inline viewport to its list; desktop retains independent list/detail panes');
     for (const pane of state.panes) {
       assert.ok(['auto', 'scroll'].includes(pane.overflow) && pane.height > 0,
-        pane.id + ': list and detail each own a bounded scrolling viewport');
+        pane.id + ': visible library content owns a bounded scrolling viewport');
       assert.ok(pane.top >= state.top - 1 && pane.bottom <= state.bottom + 1, pane.id + ': pane remains inside the panel');
     }
   }
@@ -392,7 +409,9 @@ async function practice(page) {
   });
   const detail = page.locator('#questionDetail');
   const select = async question => {
+    await closeLibraryDetail(page);
     await page.locator('#questionList [data-question-id="' + question.id + '"]').click();
+    await openLibraryDetail(page, 'questions');
     await studyOutput(detail.locator('.detail-title'), question.title);
     assert.equal(await detail.locator('textarea,input,select,[contenteditable="true"],#questionResponse').count(), 0,
       question.type + ': the question detail has no answer input');
@@ -475,8 +494,10 @@ async function concepts(page) {
   await page.locator('#conceptSearch').fill('等价关系');
   assert.ok(await page.locator('#conceptList .concept-item').count() > 0);
   await page.locator('#conceptList .concept-item').first().click();
+  await openLibraryDetail(page, 'concepts');
   assert.match(await page.locator('#conceptDetail').textContent(), /等价关系/);
   assert.match(await page.locator('#conceptDetail').textContent(), /基本定义/);
+  await closeLibraryDetail(page);
   await page.locator('#conceptSearch').fill('不存在的概念 xyzzy');
   assert.equal(await page.locator('#conceptList .concept-item').count(), 0);
   assert.match(await page.locator('#conceptDetail').textContent(), /没有找到/);
@@ -507,6 +528,7 @@ async function curriculum(page) {
     categories.add(topic.category);
     await navigate(page, 'concepts');
     await page.locator('#conceptList [data-concept-id="' + topic.id + '"]').click();
+    await openLibraryDetail(page, 'concepts');
     const overview = concepts.find(item => item.id === topic.id);
     assert.equal(await page.locator('#conceptDetail .concept-related-exercises').count(), 0,
       'Broad overview concepts keep their detailed concepts without duplicating graph exercise links');

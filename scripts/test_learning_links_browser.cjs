@@ -38,7 +38,25 @@ async function settle(page) {
   });
 }
 
+async function closeLibraryDetail(page) {
+  if (await page.locator('#libraryDetailDialog').evaluate(dialog => dialog.open)) {
+    await page.locator('#libraryDetailClose').click();
+    await page.locator('#libraryDetailDialog').waitFor({ state: 'hidden' });
+    await settle(page);
+  }
+}
+
+async function openLibraryDetail(page, kind) {
+  if (mobile(page) && !await page.locator('#libraryDetailDialog').evaluate(dialog => dialog.open)) {
+    await page.locator(kind === 'concepts' ? '#conceptFullView' : '#questionFullView').click();
+    await page.locator('#libraryDetailDialog').waitFor({ state: 'visible' });
+  }
+  await page.locator(kind === 'concepts' ? '#conceptDetail' : '#questionDetail').waitFor({ state: 'visible' });
+  await settle(page);
+}
+
 async function navigate(page, panel) {
+  await closeLibraryDetail(page);
   if (mobile(page) && !await page.evaluate(() => document.body.classList.contains('offline-nav-open'))) {
     await page.locator('#offlineNavToggle').tap();
   }
@@ -48,6 +66,7 @@ async function navigate(page, panel) {
 }
 
 async function choose(page, selector, value) {
+  await closeLibraryDetail(page);
   const select = page.locator(selector);
   if (await select.inputValue() === value) return;
   if (mobile(page)) {
@@ -63,10 +82,10 @@ async function openQuestion(page, question) {
   await navigate(page, 'questions');
   await choose(page, '#questionCategory', '');
   await choose(page, '#questionDifficulty', '');
-  await page.locator('#questionSearch').fill(question.id);
+  await page.locator('#questionSearch').fill(question.title);
   await page.locator('#questionList [data-question-id="' + question.id + '"]').click();
   await page.waitForFunction(id => document.querySelector('#questionList .question-item.active')?.dataset.questionId === id, question.id);
-  await settle(page);
+  await openLibraryDetail(page, 'questions');
 }
 
 async function openConcept(page, concept) {
@@ -75,7 +94,7 @@ async function openConcept(page, concept) {
   await page.locator('#conceptSearch').fill(concept.title);
   await page.locator('#conceptList [data-concept-id="' + concept.id + '"]').click();
   await page.locator('#conceptSearch').fill('');
-  await settle(page);
+  await openLibraryDetail(page, 'concepts');
 }
 
 async function language(page, value) {
@@ -85,6 +104,7 @@ async function language(page, value) {
 }
 
 async function checkQuestionLinks(page, question, lang) {
+  await openLibraryDetail(page, 'questions');
   const section = page.locator('#questionDetail .question-parent-concepts');
   assert.equal((await section.locator('h3').innerText()).trim(), lang === 'en' ? 'Related concepts' : '所属概念');
   const conceptIds = [...new Set(question.knowledge_points)].filter(id => conceptMap.has(id));
@@ -145,6 +165,8 @@ async function checkGraphLinks(page, node, lang) {
 }
 
 async function clickModule(page, selector, node) {
+  if (selector.startsWith('#conceptDetail')) await openLibraryDetail(page, 'concepts');
+  if (selector.startsWith('#questionDetail')) await openLibraryDetail(page, 'questions');
   await page.locator(selector + '[data-graph-node-id="' + node.id + '"]').click();
   await checkGraphSelection(page, node);
   await settle(page);
@@ -252,7 +274,7 @@ async function graphPracticeRoundTrip(page, lang) {
   await clickModule(page, '#questionDetail .question-graph-modules ', module);
   await exitFullGraph(page);
   await page.locator('.graph-related-exercises [data-question-id="' + matched.id + '"]').click();
-  assert.equal(await page.locator('#questionSearch').inputValue(), matched.id);
+  assert.equal(await page.locator('#questionSearch').inputValue(), matched.title);
   assert.equal(await page.locator('#questionList .question-item.active').getAttribute('data-question-id'), matched.id);
 }
 

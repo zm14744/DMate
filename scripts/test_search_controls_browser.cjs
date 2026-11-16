@@ -109,7 +109,11 @@ async function choose(page, id, value) {
 async function checkQuestionResults(page, base, language = 'zh-CN', exact = false) {
   const ids = await page.locator('#questionList .question-item').evaluateAll(items => items.map(item => item.dataset.questionId));
   assert.ok(ids.every(id => base.some(question => question.id === id)), 'Search results stay inside chapter and difficulty');
-  if (exact) assert.deepEqual(ids, base.map(question => question.id));
+  const query = await page.locator('#questionSearch').inputValue();
+  const normalized = text => String(text || '').normalize('NFKC').trim().toLocaleLowerCase();
+  const expected = exact ? base : base.filter(question => !normalized(query)
+    || [question.title, translations.questions[question.id].title].some(title => normalized(title).includes(normalized(query))));
+  assert.deepEqual(ids, expected.map(question => question.id), 'Only bilingual white titles participate in exercise search');
   assert.equal(await page.locator('#questionCount').innerText(), language === 'en'
     ? ids.length + (ids.length === 1 ? ' exercise' : ' exercises') : ids.length + ' 道题目');
   if (ids.length) {
@@ -141,6 +145,13 @@ async function offlineSearches(page) {
   assert.ok(ids.includes('graph_euler') && ids.length < concepts.length, 'Existing concept filtering still works');
   await clearSearch(concept);
   assert.equal(await page.locator('#conceptList .concept-item').count(), concepts.length);
+  const definitionOnly = concepts.find(item => item.definition.length > 70 && !item.definition.includes('\n'));
+  await concept.fill(definitionOnly.definition);
+  assert.equal(await page.locator('#conceptList .concept-item').count(), 0, 'Definitions are excluded from concept title search');
+  await clearSearch(concept);
+  await concept.fill(definitionOnly.id);
+  assert.equal(await page.locator('#conceptList .concept-item').count(), 0, 'Concept IDs are excluded from title search');
+  await clearSearch(concept);
 
   await navigate(page, 'questions');
   const search = page.locator('#questionSearch');
@@ -153,14 +164,14 @@ async function offlineSearches(page) {
   await checkQuestionResults(page, base, 'zh-CN', true);
   await search.fill(target.title);
   let result = await checkQuestionResults(page, base);
-  assert.ok(result.includes(target.id) && result.length < base.length, 'Chinese exercise content is searchable');
+  assert.ok(result.includes(target.id) && result.length < base.length, 'Chinese exercise titles are searchable');
   await expectClear(search, true);
   await clearSearch(search);
   await checkQuestionResults(page, base, 'zh-CN', true);
   const englishTitle = translations.questions[target.id].title;
   await search.fill(englishTitle);
   result = await checkQuestionResults(page, base);
-  assert.ok(result.includes(target.id), 'English study content is searchable before changing UI language');
+  assert.ok(result.includes(target.id), 'English titles remain searchable before changing UI language');
   await page.evaluate(() => window.DMateI18n.setLanguage('en', false));
   await page.waitForFunction(() => document.getElementById('questionSearch').placeholder === 'Search');
   assert.equal(await search.inputValue(), englishTitle, 'Live language change retains the search');
@@ -171,14 +182,17 @@ async function offlineSearches(page) {
   await clearSearch(search);
   await checkQuestionResults(page, base, 'en', true);
   await search.fill(target.id);
-  assert.ok((await checkQuestionResults(page, base, 'en')).includes(target.id), 'Canonical exercise ID is searchable');
+  assert.deepEqual(await checkQuestionResults(page, base, 'en'), [], 'Exercise IDs are not visible titles and are not searched');
+  await search.fill(target.statement);
+  assert.deepEqual(await checkQuestionResults(page, base, 'en'), [], 'Question body text cannot produce title-search matches');
+  await search.fill(englishTitle);
   await choose(page, 'questionDifficulty', '困难');
   await checkQuestionResults(page, [], 'en', true);
   await clearSearch(search);
   const hard = questions.filter(question => question.category === target.category && difficulty(question.difficulty) === '困难');
   await checkQuestionResults(page, hard, 'en', true);
   await choose(page, 'questionDifficulty', difficulty(target.difficulty));
-  await search.fill(target.id);
+  await search.fill(englishTitle);
   await choose(page, 'questionCategory', '图论');
   await checkQuestionResults(page, [], 'en', true);
   await clearSearch(search);

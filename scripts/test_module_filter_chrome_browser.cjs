@@ -146,7 +146,23 @@ async function offlineHeader(page, wallpaper = false) {
   if (wallpaper) assert.equal(result.ownBackground, result.mainBackground, 'Wallpaper uses the same transparent background through the header');
 }
 
+async function closeLibraryDetail(page) {
+  if (await page.locator('#libraryDetailDialog').evaluate(dialog => dialog.open)) {
+    await page.locator('#libraryDetailClose').click();
+    await page.locator('#libraryDetailDialog').waitFor({ state: 'hidden' });
+  }
+}
+
+async function openLibraryDetail(page, panel) {
+  if (page.viewportSize().width > 1100) return;
+  if (!await page.locator('#libraryDetailDialog').evaluate(dialog => dialog.open)) {
+    await page.locator(panel === 'concepts' ? '#conceptFullView' : '#questionFullView').click();
+  }
+  await page.locator(panel === 'concepts' ? '#conceptDetail' : '#questionDetail').waitFor({ state: 'visible' });
+}
+
 async function navigate(page, panel) {
+  await closeLibraryDetail(page);
   if (mobile(page) && !await page.evaluate(() => document.body.classList.contains('offline-nav-open'))) await page.locator('#offlineNavToggle').tap();
   await page.locator('.offline-nav-item[data-panel="' + panel + '"]').click();
   await page.locator('#' + panel + 'Panel').waitFor({ state: 'visible' });
@@ -172,17 +188,20 @@ async function studyMetadata(page) {
   });
   await navigate(page, 'questions');
   const question = questions.find(question => question.id === 'q01');
-  await page.locator('#questionSearch').fill(question.id);
+  await page.locator('#questionSearch').fill(question.title);
   const entry = page.locator('#questionList .question-item[data-question-id="' + question.id + '"]');
   await entry.click();
+  await openLibraryDetail(page, 'questions');
   const expected = [question.category, difficulty(question.difficulty), question.type].join(' ');
   assert.equal(normalize(await entry.locator('small').textContent()), expected, 'List metadata uses readable spaces');
   assert.equal(normalize(await page.locator('#questionDetail .detail-kicker').textContent()), expected, 'Detail metadata uses readable spaces');
   for (const mathematical of [questions.find(question => question.statement.includes('/')),
     questions.find(question => /[·⋅]/.test(question.statement))]) {
     assert.ok(mathematical, 'The source pack includes authored division and multiplication examples');
-    await page.locator('#questionSearch').fill(mathematical.id);
+    await closeLibraryDetail(page);
+    await page.locator('#questionSearch').fill(mathematical.title);
     await page.locator('#questionList .question-item[data-question-id="' + mathematical.id + '"]').click();
+    await openLibraryDetail(page, 'questions');
     const source = await page.locator('#questionDetail .wrong-question').evaluate((node, authored) => ({
       actual: window.__moduleFilterSources.get(node), expected: window.DMateMathMarkdown.prepareStudyText(authored)
     }), mathematical.statement);
@@ -191,6 +210,7 @@ async function studyMetadata(page) {
   await navigate(page, 'concepts');
   await page.locator('#conceptSearch').fill('命题与真值');
   await page.locator('#conceptList .concept-item[data-concept-id="logic_truth"]').click();
+  await openLibraryDetail(page, 'concepts');
   assert.equal(await page.locator('#conceptDetail .concept-related-exercises').count(), 0,
     'The broad overview keeps exercise links on its graph topic');
   await page.locator('#conceptDetail .concept-graph-module [data-graph-node-id="logic_truth"]').click();

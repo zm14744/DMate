@@ -67,6 +67,9 @@ body.offline-workspace .offline-main.center { position:relative; display:flex !i
 .offline-library-select input[type="checkbox"]:checked { background:var(--accent); border-color:var(--accent); }
 .offline-library-select input[type="checkbox"]:focus-visible { outline:2px solid var(--accent); outline-offset:4px; }
 .offline-library-row > :is(.question-item,.concept-item) { flex:1 1 auto; min-width:0; width:0; padding:8px 6px; overflow-wrap:anywhere; }
+.offline-library-preview { display:none; }
+.offline-library-expand { display:inline-flex; align-items:center; justify-content:center; min-width:148px; min-height:44px; padding:10px 24px; border:1px solid var(--border-strong); border-radius:999px; background:var(--surface-2); color:var(--text-primary); font:inherit; font-size:15px; font-weight:600; cursor:pointer; }
+.offline-library-expand:disabled { cursor:default; opacity:.5; }
 .question-detail,.concept-detail { min-height:330px; padding:20px; }
 
 /* Library controls stay in place while the list and selected record scroll
@@ -104,9 +107,23 @@ body.offline-workspace :is(#questionList,#conceptList) {
 body.offline-workspace :is(#questionList,#conceptList) > button { flex-shrink:0; }
 @media(max-width:1100px) {
   body.offline-workspace :is(#questionsPanel,#conceptsPanel) > :is(.question-layout,.concept-layout) {
-    grid-template-rows:minmax(0,min(190px,26%)) minmax(0,1fr);
+    grid-template-rows:minmax(0,1fr) auto;
   }
+  body.offline-workspace :is(.question-layout,.concept-layout) > :is(#questionDetail,#conceptDetail) { display:none; }
+  .offline-library-preview { display:flex; align-items:center; justify-content:center; min-width:0; padding-top:12px; border-top:1px solid var(--surface-3); }
 }
+
+/* Full details reuse the selected article, with its own scroll area and no
+   second card nested inside the full-screen sheet. */
+body.offline-workspace .offline-library-dialog { box-sizing:border-box; position:fixed; inset:0; width:100vw; height:100vh; height:100dvh; max-width:none; max-height:none; margin:0; padding:0; border:0; border-radius:0; overflow:hidden; background:rgba(var(--surface-2-rgb),var(--panel-alpha,1)); color:var(--text-primary); }
+body.offline-workspace .offline-library-dialog:not([open]) { display:none; }
+body.offline-workspace .offline-library-dialog[open] { display:flex; flex-direction:column; }
+.offline-library-dialog::backdrop { background:rgba(0,0,0,.46); }
+.offline-library-dialog-card { display:flex; flex-direction:column; flex:1 1 0; width:100%; min-width:0; min-height:0; overflow:hidden; }
+.offline-library-dialog-card > .modal-head { flex:0 0 auto; gap:12px; padding-top:max(14px,env(safe-area-inset-top)); padding-inline:max(16px,env(safe-area-inset-left)) max(16px,env(safe-area-inset-right)); }
+.offline-library-dialog-card > .modal-head > :first-child { min-width:0; font-size:15px; font-weight:600; }
+.offline-library-dialog-body { display:flex; flex:1 1 0; min-width:0; min-height:0; overflow:hidden; }
+body.offline-workspace #libraryDetailHost > :is(#questionDetail,#conceptDetail) { flex:1 1 0; width:100%; min-width:0; min-height:0; max-height:none; margin:0; padding:18px max(18px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left)); border:0; border-radius:0; background:transparent; overflow:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
 
 .detail-kicker { margin-bottom:9px; color:var(--text-muted); font-size:12px; }
 .detail-title { margin:0 0 16px; font-size:18px; font-weight:600; line-height:1.5; }
@@ -143,8 +160,6 @@ body.offline-workspace :is(.question-parent-concepts,.question-graph-modules,.of
 /* Tablet-width landscape keeps the two graph columns inside the short page.
    Their original minimum heights otherwise clip the detail's scrollport. */
 @media(min-width:761px) and (max-width:1100px) and (max-height:550px) {
-  /* Leave enough list space to reach each circular selection control. */
-  body.offline-workspace :is(#questionsPanel,#conceptsPanel) > :is(.question-layout,.concept-layout) { grid-template-rows:minmax(44px,min(190px,26%)) minmax(0,1fr); }
   body.offline-workspace #knowledgeGraphModal.offline-graph-inline:not(.graph-fullscreen-view) .knowledge-graph-layout { grid-template-rows:minmax(0,1fr); }
   body.offline-workspace #knowledgeGraphModal.offline-graph-inline:not(.graph-fullscreen-view) :is(.knowledge-graph-main,.knowledge-graph-side) { min-height:0!important; }
 }
@@ -171,11 +186,16 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
   body.offline-workspace[data-appearance-theme] #offlineSidebar :is(.offline-nav-item,.offline-return) { display:flex !important; align-items:center !important; justify-content:flex-start !important; gap:12px !important; min-height:44px !important; margin:0 !important; padding:10px 12px !important; border:0 !important; border-radius:10px !important; background:transparent !important; background-image:none !important; color:var(--text-primary) !important; box-shadow:none !important; text-align:left !important; }
   body.offline-workspace[data-appearance-theme] #offlineSidebar .offline-nav-item.active { background:var(--dm-selected-bg,var(--surface-3)) !important; font-weight:500; }
   body.offline-workspace[data-appearance-theme] #offlineSidebar :is(.offline-nav-item,.offline-return):hover { background:var(--dm-nav-hover,var(--surface-3)) !important; }
-  body.offline-workspace[data-appearance-theme] #offlineMain .offline-primary { background:var(--accent) !important; border-color:var(--accent) !important; color:#fff !important; -webkit-text-fill-color:#fff !important; }
+  body.offline-workspace[data-appearance-theme] :is(#offlineMain,#libraryDetailDialog) .offline-primary { background:var(--accent) !important; border-color:var(--accent) !important; color:#fff !important; -webkit-text-fill-color:#fff !important; }
   body.offline-workspace[data-appearance-theme] :is(#offlineDesktopSidebarToggle,#offlineDesktopSidebarOpen,#offlineNavToggle):is(.offline-icon-button,.mobile-topbar-button) { border:0 !important; background:transparent !important; box-shadow:none !important; color:var(--text-primary) !important; }
   body.offline-workspace[data-appearance-theme] #offlineMain :is(.question-item,.concept-item) { background:transparent !important; border-color:transparent !important; box-shadow:none !important; color:var(--text-primary) !important; }
   body.offline-workspace[data-appearance-theme] #offlineMain :is(.question-item.active,.concept-item.active) { background:var(--dm-selected-bg,var(--surface-3)) !important; }
-  body.offline-workspace[data-appearance-theme] #offlineMain .offline-library-row > :is(.question-item,.concept-item) { background:transparent !important; }
+  /* The global button hover rule includes an ID in :not(). Scope this reset
+     through both list and main IDs so mobile sticky hover cannot paint a
+     second rectangle inside the selected row. */
+  body.offline-workspace[data-appearance-theme] #offlineMain :is(#questionList,#conceptList) .offline-library-row > :is(.question-item,.concept-item) { border:0 !important; border-radius:0 !important; background:transparent !important; background-image:none !important; box-shadow:none !important; filter:none !important; color:var(--text-primary) !important; -webkit-text-fill-color:currentColor !important; -webkit-tap-highlight-color:transparent; }
+  body.offline-workspace[data-appearance-theme] #offlineMain :is(#questionFullView,#conceptFullView) { background:var(--surface-2) !important; background-image:none !important; border:1px solid var(--border-strong) !important; box-shadow:none !important; color:var(--text-primary) !important; }
+  body.offline-workspace[data-appearance-theme] #offlineMain :is(#questionFullView,#conceptFullView):not(:disabled):is(:hover,:focus-visible) { background:var(--surface-3) !important; }
 }
 /* The shared surface layer also paints navigation headers. Keep this header
    transparent so it follows the same canvas or wallpaper as the main area. */
