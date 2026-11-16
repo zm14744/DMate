@@ -5537,6 +5537,11 @@ body[data-appearance-theme="light"] .input input {
         will-change:transform;
     }
 
+    /* A graph opens at its final camera and position in the first frame. */
+    #knowledgeGraphModal:not(.hidden) > .graph-modal-card {
+        animation:none !important;
+    }
+
     .modal.hidden .modal-card {
         animation:none !important;
         transform:translate3d(0,0,0) !important;

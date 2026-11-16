@@ -43,8 +43,13 @@ async function category(page, name) {
 }
 
 async function fullGraph(page) {
-  if (mobile(page) && !await view(page).count()) {
-    await frame(page).locator('.kg-mobile-expand').click();
+  if (mobile(page)) {
+    // A viewport resize can return before its media-query renderer runs.
+    // Wait for that renderer, then avoid clicking an already restored exit.
+    await frame(page).locator('.kg-mobile-section').waitFor({ state: 'attached' });
+    if (!await frame(page).evaluate(root => root.classList.contains('graph-fullscreen-view'))) {
+      await frame(page).locator('.kg-mobile-expand').click();
+    }
   }
   await view(page).waitFor();
   await page.waitForFunction(() => {

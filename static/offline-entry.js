@@ -1,6 +1,7 @@
 (() => {
   "use strict";
   const button = document.getElementById("offlineWorkspaceBtn");
+  let opening = false;
   async function prepareCurrentAccountData() {
     try {
       let snapshot = window.DMateOfflineBridge?.snapshot ? await window.DMateOfflineBridge.snapshot() : null;
@@ -36,19 +37,20 @@
     }
   }
   async function openOfflineWorkspace() {
+    if (opening) return;
+    opening = true;
     if (button) {
       button.disabled = true;
-      const label = button.querySelector(".dmate-ui-label");
-      if (label) label.textContent = "准备中…";
+      button.setAttribute("aria-busy", "true");
     }
     await prepareCurrentAccountData();
     if ("serviceWorker" in navigator && window.isSecureContext) {
       try {
-        await navigator.serviceWorker.register("/offline-service-worker.js", {scope:"/"});
-        await Promise.race([
-          navigator.serviceWorker.ready,
-          new Promise((_, reject) => setTimeout(() => reject(new Error("离线资源准备超时")), 15000))
-        ]);
+        // Cache installation continues across the navigation. Enter the real
+        // workspace without showing a preparation screen or waiting for every
+        // offline asset to finish downloading.
+        void navigator.serviceWorker.register("/offline-service-worker.js", {scope:"/"})
+          .catch(error => console.warn("离线资源尚未完全准备：", error));
       } catch (error) {
         console.warn("离线资源尚未完全准备：", error);
       }
@@ -61,6 +63,14 @@
     button.removeAttribute("title");
     button.addEventListener("click", () => { void openOfflineWorkspace(); });
   }
+  window.addEventListener("pageshow", event => {
+    if (!event.persisted) return;
+    opening = false;
+    if (button) {
+      button.disabled = false;
+      button.removeAttribute("aria-busy");
+    }
+  });
   if (!("serviceWorker" in navigator) || !window.isSecureContext) {
     return;
   }

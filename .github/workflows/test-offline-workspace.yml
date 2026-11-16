@@ -24,6 +24,7 @@ on:
       - 'scripts/test_offline_workspace_browser.cjs'
       - 'scripts/test_knowledge_graph_browser.cjs'
       - 'scripts/test_graph_empty_recent_browser.cjs'
+      - 'scripts/test_graph_open_stability_browser.cjs'
       - 'scripts/test_offline_graph_browser.cjs'
       - 'scripts/test_graph_labels_browser.cjs'
       - 'scripts/test_composer_motion_browser.cjs'
@@ -79,6 +80,7 @@ on:
       - 'scripts/test_offline_workspace_browser.cjs'
       - 'scripts/test_knowledge_graph_browser.cjs'
       - 'scripts/test_graph_empty_recent_browser.cjs'
+      - 'scripts/test_graph_open_stability_browser.cjs'
       - 'scripts/test_offline_graph_browser.cjs'
       - 'scripts/test_graph_labels_browser.cjs'
       - 'scripts/test_composer_motion_browser.cjs'
@@ -154,6 +156,7 @@ jobs:
           node --check scripts/test_offline_workspace_browser.cjs
           node --check scripts/test_knowledge_graph_browser.cjs
           node --check scripts/test_graph_empty_recent_browser.cjs
+          node --check scripts/test_graph_open_stability_browser.cjs
           node --check scripts/test_offline_graph_browser.cjs
           node --check scripts/test_graph_labels_browser.cjs
           node --check scripts/test_composer_motion_browser.cjs
@@ -286,6 +289,7 @@ jobs:
           node scripts/test_mobile_drawers_browser.cjs
           node scripts/test_knowledge_graph_browser.cjs
           node scripts/test_graph_empty_recent_browser.cjs
+          node scripts/test_graph_open_stability_browser.cjs
           node scripts/test_offline_graph_browser.cjs
           node scripts/test_graph_labels_browser.cjs
           node scripts/test_composer_motion_browser.cjs

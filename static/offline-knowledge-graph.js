@@ -282,6 +282,7 @@ function mount(host,options={}) {
  }
  function renderKnowledgeGraph(){
   if(destroyed)return;
+  host.dataset.ready='false';host.dataset.graphReady='false';
   disposeViews();visibleNodes=allNodes.filter(n=>category==='全部'||n.category===category);
   if(!visibleNodes.some(n=>String(n.id)===knowledgeGraphSelectedNodeId))knowledgeGraphSelectedNodeId=String(visibleNodes[0]?.id||'');
   host.dataset.graphView='full';categorySelect.value=category;
@@ -299,8 +300,11 @@ function mount(host,options={}) {
   });
   const mobileGraph=isMobileAppShell();
   const viewKey=[mobileGraph?'mobile':'desktop',dmateUiLanguage(),visibleNodes.map(node=>node.id).join(',')].join('|');
-  installKnowledgeGraphViewMemory(canvas.querySelector('.kg-mobile-viewport,.kg-desktop-viewport'),viewKey,viewMemory,mobileGraph);
-  renderDetail();root.DMateI18n?.translate(host);host.dataset.ready='true';
+  renderDetail();root.DMateI18n?.translate(host);
+  const viewport=canvas.querySelector('.kg-mobile-viewport,.kg-desktop-viewport');
+  const ready=()=>{if(!destroyed&&(!viewport||canvas.contains(viewport))){host.dataset.ready='true';host.dataset.graphReady='true';}};
+  if(viewport)installKnowledgeGraphViewMemory(viewport,viewKey,viewMemory,mobileGraph,ready);
+  else ready();
  }
  async function exportPNG(){
   const target=document.createElement('div');target.style.cssText='position:fixed;left:-10000px;top:0;pointer-events:none';host.append(target);
@@ -354,14 +358,16 @@ function mount(host,options={}) {
   const node=canvas.querySelector(`[data-node-id="${CSS.escape(knowledgeGraphSelectedNodeId)}"]`);
   selectKnowledgeGraphNode(knowledgeGraphSelectedNodeId,node);
   if(reveal)revealSelectedGraphNode();
- },destroy(){destroyed=true;disposeViews();fontObserver.disconnect();controller.abort();observer.disconnect();window.cancelAnimationFrame(resizeFrame);closeChoice();restoreInline();canvas.replaceChildren();delete host.dataset.ready;}};
+ },destroy(){destroyed=true;disposeViews();fontObserver.disconnect();controller.abort();observer.disconnect();window.cancelAnimationFrame(resizeFrame);closeChoice();restoreInline();canvas.replaceChildren();delete host.dataset.ready;delete host.dataset.graphReady;}};
 // A responsive renderer has a different layout, so keep its own camera. The
 // cache outlives rebuilt DOM; scroll/zoom snapshots precede breakpoint changes.
-function installKnowledgeGraphViewMemory(viewport, key, memory, mobile) {
+function installKnowledgeGraphViewMemory(viewport, key, memory, mobile, onReady) {
     if (!viewport) return;
     const stage = viewport.querySelector(mobile ? '.kg-mobile-stage' : '.kg-desktop-zoom-stage');
     const surface = viewport.querySelector(mobile ? '.kg-mobile-zoom-surface' : '.kg-desktop-zoom-surface');
     if (!stage || !surface) return;
+    viewport.style.visibility = 'hidden';
+    viewport.dataset.kgReady = 'false';
     let initialized = false, applying = false, disposed = false, frame = 0, releaseFrame = 0;
     let width = 0, height = 0;
     const active = () => window.matchMedia('(max-width:760px)').matches === mobile;
@@ -384,13 +390,25 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile) {
         if (saved) {
             if (mobile) viewport._kgRestoreScale?.(saved.scale);
             else setKnowledgeGraphDesktopScale(saved.scale, false);
+            width = viewport.clientWidth; height = viewport.clientHeight;
             const view = viewport.getBoundingClientRect(), bounds = stage.getBoundingClientRect();
             viewport.scrollLeft += bounds.left + saved.x * scale() - (view.left + viewport.clientLeft + width / 2);
             viewport.scrollTop += bounds.top + saved.y * scale() - (view.top + viewport.clientTop + height / 2);
-            viewport.style.visibility = '';
-        } else if (mobile) viewport._kgFit?.();
-        else fitKnowledgeGraphDesktop();
+        } else {
+            // Fitting can remove a scrollbar. Settle the resulting available
+            // dimensions now, before the first visible frame or zoom label.
+            for (let attempt = 0; attempt < 3; attempt++) {
+                width = viewport.clientWidth; height = viewport.clientHeight;
+                if (mobile) viewport._kgFit?.();
+                else fitKnowledgeGraphDesktop();
+                if (viewport.clientWidth === width && viewport.clientHeight === height) break;
+            }
+        }
+        width = viewport.clientWidth; height = viewport.clientHeight;
         initialized = true;
+        viewport.dataset.kgReady = 'true';
+        viewport.style.visibility = '';
+        onReady?.();
         // Scroll events produced by restoring/clamping arrive asynchronously.
         // Keep the saved graph point until actual user input changes the view.
         cancelAnimationFrame(releaseFrame);
@@ -432,6 +450,9 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile) {
         viewport.removeEventListener('keydown', beginInteraction, {capture:true});
         previousDispose?.();
     };
+    // The graph and its details are connected before installing the camera.
+    // Complete fit/restore in this task; deferred calls only retry hidden views.
+    initialize();
     requestAnimationFrame(() => requestAnimationFrame(() => viewport._kgInitializeView?.()));
 }
 

@@ -5642,6 +5642,11 @@ body[data-appearance-theme="light"] .input input {
         will-change:transform;
     }
 
+    /* A graph opens at its final camera and position in the first frame. */
+    #knowledgeGraphModal:not(.hidden) > .graph-modal-card {
+        animation:none !important;
+    }
+
     .modal.hidden .modal-card {
         animation:none !important;
         transform:translate3d(0,0,0) !important;
@@ -9629,9 +9634,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 
         <div class="knowledge-graph-layout">
             <div class="knowledge-graph-main">
-                <div id="knowledgeGraphCanvas" class="knowledge-graph-canvas">
-                    <div class="wrong-empty">知识图谱加载中…</div>
-                </div>
+                <div id="knowledgeGraphCanvas" class="knowledge-graph-canvas"></div>
             </div>
 
             <div class="knowledge-graph-side">

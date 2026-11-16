@@ -49,3 +49,8 @@
   border-radius:0!important;
 }
 #knowledgeGraphModal .offline-graph-concept-button { margin-top:12px; }
+
+/* Keep the zoom value aligned with the first fitted/restored graph frame. */
+#knowledgeGraphModal.offline-graph-inline[data-graph-ready="false"] :is(.kg-desktop-zoom-controls,.kg-mobile-zoom-controls) {
+  visibility:hidden;
+}
