@@ -5,8 +5,7 @@
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
-const historySelectors = '#knowledgeGraphHistoryTab,#knowledgeGraphHistoryWrap,#knowledgeGraphHistory,'
-  + '#knowledgeGraphModal .kg-history-item,#knowledgeGraphModal .kg-history-refresh';
+const historyCards = '#knowledgeGraphModal .kg-history-item';
 
 async function settle(page) {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
@@ -74,7 +73,7 @@ async function expectDestination(page, id, category, label) {
   assert.equal(await page.locator('#knowledgeGraphDetailTitle').innerText(), await nodeLabel(page, id),
     label + ': target details are selected');
   assert.equal(await page.locator('#knowledgeGraphFocusBtn').getAttribute('aria-pressed'), 'true', label + ': all-knowledge mode is active');
-  assert.equal(await page.locator(historySelectors).count(), 0, label + ': graph history is absent');
+  assert.equal(await page.locator('#knowledgeGraphHistoryTab').count(), 1, label + ': all-knowledge mode retains its question-history entry');
   const visible = await page.evaluate(id => {
     const canvas = document.getElementById('knowledgeGraphCanvas');
     const node = canvas.querySelector('.selected[data-knowledge-node-id="' + id + '"]');
@@ -111,7 +110,9 @@ async function checkCase(browser, width, language) {
       return JSON.stringify(session.messages);
     }, language);
     await page.waitForFunction(() => knowledgeGraphInitialized && document.getElementById('knowledgeGraphModal').dataset.graphReady === 'true');
-    assert.equal(await page.locator(historySelectors).count(), 0, label + ': recent-question view contains no history entry/content');
+    assert.equal(await page.locator('#knowledgeGraphHistoryTab').isVisible(), false, label + ': recent-question view hides the history entry');
+    assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(), false, label + ': recent-question view hides history content');
+    assert.equal(await page.locator(historyCards).count(), 0, label + ': recent-question view renders no history cards');
     await checkDecoration(page, true, label + '/recent');
 
     await page.locator('#knowledgeGraphFocusBtn').click();
@@ -169,7 +170,7 @@ async function checkCase(browser, width, language) {
     assert.equal(await page.evaluate(() => JSON.stringify(getCurrent().messages)), before, label + ': navigation leaves the real conversation untouched');
     assert.deepEqual(modelCalls, [], label + ': graph navigation/export invokes no model');
     assert.deepEqual(errors, [], label + ': browser errors');
-    console.log('PASS ' + label + ': relation tags navigate modules by click/Enter, same-module camera stays, full mode/export omit question decoration and history');
+    console.log('PASS ' + label + ': relation tags navigate modules by click/Enter, same-module camera stays, full mode/export omit question decoration while retaining the full-only history entry');
   } finally { await context.close(); }
 }
 

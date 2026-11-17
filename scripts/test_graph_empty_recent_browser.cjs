@@ -1,4 +1,4 @@
-/* Graph empty-state and removed question-history chrome regressions. */
+/* Empty recent graphs and full-only question-history chrome regressions. */
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
@@ -161,7 +161,7 @@ async function checkEmptyRecent(browser, width) {
   } finally { await page.close(); }
 }
 
-async function checkHistoryRemoval(browser, width) {
+async function checkHistoryModes(browser, width) {
   const page = await browser.newPage({ viewport: { width, height: 844 },
     ...(width <= 760 ? { isMobile: true, hasTouch: true } : {}) });
   const errors = [];
@@ -193,11 +193,19 @@ async function checkHistoryRemoval(browser, width) {
       for (const mode of ['focus', 'full', 'focus']) {
         await page.evaluate(value => selectKnowledgeGraphDisplayMode(value), mode);
         await nextFrames(page);
-        assert.equal(await page.locator('#knowledgeGraphHistoryTab,#knowledgeGraphHistoryWrap,#knowledgeGraphHistory,'
-          + '#knowledgeGraphModal .kg-history-item,#knowledgeGraphModal .kg-history-refresh').count(), 0,
-        width + '/' + language + '/' + mode + ': graph has no question-history entry or content');
-        assert.equal(await page.locator('#knowledgeGraphModal').getByText(/^(题目历史|Question history)(?:\s*\(.*\))?$/).count(), 0,
-          width + '/' + language + '/' + mode + ': history label is absent');
+        if (mode === 'focus') {
+          assert.equal(await page.locator('#knowledgeGraphHistoryTab').isVisible(), false,
+            width + '/' + language + ': recent-question view hides history');
+          assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(), false,
+            width + '/' + language + ': recent-question view hides history content');
+          assert.equal(await page.locator('#knowledgeGraphModal .kg-history-item').count(), 0,
+            width + '/' + language + ': recent-question view renders no history cards');
+        } else {
+          assert.equal(await page.locator('#knowledgeGraphHistoryTab').isVisible(), true,
+            width + '/' + language + ': all-knowledge view exposes history');
+          assert.match(await page.locator('#knowledgeGraphHistoryTab').innerText(), /(?:题目历史|Question history).*3/,
+            width + '/' + language + ': all three question sources are counted');
+        }
         assert.equal(await page.locator('#knowledgeGraphDetailTitle').evaluate(title => title.hidden), false,
           width + ': latest-question node details remain available');
         assert.equal(await page.evaluate(() => JSON.stringify(getCurrent().messages)), metadataBefore,
@@ -206,12 +214,14 @@ async function checkHistoryRemoval(browser, width) {
     }
     await page.evaluate(() => { closeKnowledgeGraph(); openKnowledgeGraph(); });
     await page.waitForFunction(() => document.getElementById('knowledgeGraphModal').dataset.graphReady === 'true');
-    assert.equal(await page.locator('#knowledgeGraphHistoryTab,#knowledgeGraphHistoryWrap,#knowledgeGraphHistory').count(), 0,
-      width + ': reopening does not recreate graph history');
+    assert.equal(await page.locator('#knowledgeGraphHistoryTab').isVisible(), false,
+      width + ': reopening in recent-question mode keeps history hidden');
+    assert.equal(await page.locator('#knowledgeGraphModal .kg-history-item').count(), 0,
+      width + ': recent-question mode does not restore old history cards');
     assert.equal(await page.evaluate(() => JSON.stringify(getCurrent().messages)), metadataBefore,
       width + ': manual/OCR/generated source, classification, type and difficulty remain in actual messages');
     assert.deepEqual(errors, [], width + ': browser errors');
-    console.log('PASS ' + width + ': graph history removed in both modes/languages, original manual/OCR/AI chat metadata retained');
+    console.log('PASS ' + width + ': history shown only in all-knowledge mode in both languages; original manual/OCR/AI metadata retained');
   } finally { await page.close(); }
 }
 
@@ -220,7 +230,7 @@ async function checkHistoryRemoval(browser, width) {
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
     for (const width of [1440, 390]) await checkEmptyRecent(browser, width);
-    for (const width of [1440, 390]) await checkHistoryRemoval(browser, width);
+    for (const width of [1440, 390]) await checkHistoryModes(browser, width);
   }
   finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
