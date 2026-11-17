@@ -229,14 +229,14 @@ async function notebookAiActions(page, newButton) {
   assert.equal(await actions.count(), 2);
   assert.equal(await actions.nth(0).isDisabled(), true, 'No selected concepts disables explanation');
   assert.equal(await actions.nth(1).isDisabled(), true, 'No selected concepts disables relation analysis');
-  const quiet = async button => {
+  const filled = async button => {
     const paint = await aiActionPaint(button);
-    assert.equal(paint.background, 'rgba(0, 0, 0, 0)', 'Notebook AI actions have no idle fill');
+    assert.notEqual(paint.background, 'rgba(0, 0, 0, 0)', 'Notebook AI actions have the shared filled surface');
     assert.equal(paint.image, 'none'); assert.equal(paint.border, '0px'); assert.equal(paint.shadow, 'none');
     return paint;
   };
   await page.mouse.move(0, 0); await page.locator('#conceptNotebookTitle').focus(); await settle(page);
-  for (const button of await actions.all()) await quiet(button);
+  for (const button of await actions.all()) await filled(button);
   await page.locator('#conceptNotebookDialog .dcn-note input[type="checkbox"]').first().check();
   assert.equal(await actions.nth(0).isEnabled(), true, 'One selected concept enables explanation');
   assert.equal(await actions.nth(1).isDisabled(), true, 'Relation analysis still requires two concepts');
@@ -248,7 +248,7 @@ async function notebookAiActions(page, newButton) {
   for (const button of await actions.all()) {
     if (await button.isDisabled()) continue;
     await page.mouse.move(0, 0); await page.locator('#conceptNotebookTitle').focus(); await settle(page);
-    const idle = await quiet(button);
+    const idle = await filled(button);
     if (!mobile(page)) {
       await button.hover(); await settle(page);
       assert.notDeepEqual(await aiActionPaint(button), idle, 'Enabled notebook AI action has hover feedback');
@@ -309,7 +309,7 @@ async function runCase(browser, width, theme) {
     await conversationLifecycle(page, width, theme);
     await notebookButton(page);
     assert.deepEqual(modelRequests, [], 'No AI endpoint calls'); assert.deepEqual(errors, [], 'No browser script errors');
-    console.log('PASS ' + width + '/' + theme + ': blank/header lifecycle, shared conversation tooltips, sidebar state, live language and quiet notebook AI actions');
+    console.log('PASS ' + width + '/' + theme + ': blank/header lifecycle, shared conversation tooltips, sidebar state, live language and filled notebook AI actions');
   } finally { await context.close(); }
 }
 

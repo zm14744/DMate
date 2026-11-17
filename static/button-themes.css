@@ -1,6 +1,16 @@
 /* Button surfaces have their own palette; panel and page colors stay intact. */
 body[data-appearance-theme] {
     --dm-control-transition:background-color .12s ease,border-color .12s ease,color .12s ease;
+    --dm-filled-bg:var(--dm-selected-bg);
+    --dm-filled-hover-bg:var(--dm-selected-hover);
+    --dm-filled-text:var(--text-primary);
+    --dm-filled-radius:8px;
+    --dm-filled-padding:8px 12px;
+    --dm-filled-min-height:36px;
+    --dm-filled-font-family:var(--dmate-font-ui,system-ui);
+    --dm-filled-font-size:calc(14px * var(--font-scale,1));
+    --dm-filled-font-weight:400;
+    --dm-filled-line-height:normal;
 }
 body[data-appearance-theme="light"] {
     --dm-control-bg:#e2e8f0;
@@ -752,25 +762,93 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
     }
 }
 
-/* Appearance actions use filled surfaces without an outlined edge. */
-@layer dmate-button-themes {
-    body[data-appearance-theme] #appearanceModal :is(#appearanceBackgroundRemove,#appearanceReset) {
-        --dm-control-bg:var(--dm-selected-bg);
-        --dm-control-hover-bg:var(--dm-selected-hover);
-        --dm-control-text:var(--text-primary);
-    }
-    body[data-appearance-theme] #appearanceModal :is(
-        #appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone
-    ) {
+/* Filled text actions share the appearance controls' borderless geometry. */
+@layer dmate-delete-confirm-actions {
+    body[data-appearance-theme] #accountModal #accountDeleteConfirm.danger {
+        min-height:var(--dm-filled-min-height)!important;
+        padding:var(--dm-filled-padding)!important;
         border:0!important;
-        background:var(--dm-control-bg)!important;
-        background-image:none!important;
-        color:var(--dm-control-text)!important;
+        border-radius:var(--dm-filled-radius)!important;
+        background:var(--dm-filled-bg)!important;
+        color:var(--dm-filled-text)!important;
+        -webkit-text-fill-color:currentColor!important;
+        font-family:var(--dm-filled-font-family)!important;
+        font-size:var(--dm-filled-font-size)!important;
+        font-weight:var(--dm-filled-font-weight)!important;
+        line-height:var(--dm-filled-line-height)!important;
         box-shadow:none!important;
     }
-    body[data-appearance-theme] #appearanceModal :is(
-        #appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone
-    ):not(:disabled):is(:hover,:focus-visible,:active) {
-        background:var(--dm-control-hover-bg)!important;
+    body[data-appearance-theme] #accountModal #accountDeleteConfirm.danger:not(:disabled):not([aria-disabled="true"]):is(:hover,:focus-visible,:active) {
+        background:var(--dm-filled-hover-bg)!important;
+    }
+}
+@layer dmate-button-themes {
+    body[data-appearance-theme] #accountModal {
+        --dm-filled-min-height:44px;
+    }
+    body[data-appearance-theme] #knowledgeGraphModal .graph-detail-term {
+        display:inline-flex!important;
+        align-items:center!important;
+        max-width:100%;
+        overflow-wrap:anywhere;
+    }
+    body[data-appearance-theme] :is(
+        #appearanceModal button.primary,
+        #accountModal .account-body button:is(.primary,.danger),
+        #conceptNotebookDialog .dcn-ai-actions > button.dcn-primary
+    ) {
+        --dm-filled-bg:var(--dm-control-bg);
+        --dm-filled-hover-bg:var(--dm-control-hover-bg);
+        --dm-filled-text:var(--dm-control-text);
+    }
+    body[data-appearance-theme] :is(
+        #appearanceModal :is(#appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone),
+        #knowledgeGraphModal .kg-history-refresh,
+        #knowledgeGraphModal .kg-history-actions > button,
+        #knowledgeGraphModal .graph-detail-term,
+        #downloadModal .download-actions > a,
+        #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel),
+        #accountModal .account-body button
+    ) {
+        box-sizing:border-box!important;
+        min-height:var(--dm-filled-min-height)!important;
+        padding:var(--dm-filled-padding)!important;
+        border:0!important;
+        border-radius:var(--dm-filled-radius)!important;
+        background:var(--dm-filled-bg)!important;
+        background-image:none!important;
+        color:var(--dm-filled-text)!important;
+        -webkit-text-fill-color:currentColor!important;
+        font-family:var(--dm-filled-font-family)!important;
+        font-size:var(--dm-filled-font-size)!important;
+        font-weight:var(--dm-filled-font-weight)!important;
+        line-height:var(--dm-filled-line-height)!important;
+        letter-spacing:normal!important;
+        text-decoration:none!important;
+        box-shadow:none!important;
+        transition:var(--dm-control-transition);
+    }
+    body[data-appearance-theme] :is(
+        #appearanceModal :is(#appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone),
+        #knowledgeGraphModal .kg-history-refresh,
+        #knowledgeGraphModal .kg-history-actions > button,
+        #downloadModal .download-actions > a,
+        #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel),
+        #accountModal .account-body button
+    ):not(:disabled):not([aria-disabled="true"]):is(:hover,:focus-visible,:active) {
+        background:var(--dm-filled-hover-bg)!important;
+    }
+    body[data-appearance-theme] :is(
+        #appearanceModal :is(#appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone),
+        #knowledgeGraphModal .kg-history-refresh,
+        #knowledgeGraphModal .kg-history-actions > button,
+        #downloadModal .download-actions > a,
+        #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel),
+        #accountModal .account-body button
+    ):is(:disabled,[aria-disabled="true"]) {
+        --dm-filled-bg:var(--dm-selected-bg);
+        --dm-filled-text:var(--text-muted);
+        opacity:.45!important;
+        cursor:not-allowed;
     }
 }

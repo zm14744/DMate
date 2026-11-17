@@ -152,6 +152,32 @@ html[data-ui-language="en"] .question-option{line-height:var(--dmate-reading-lin
 .concept-detail .detail-section { padding-top:14px; border-top:1px solid var(--surface-3); }
 .prereq-list { display:flex; gap:7px; flex-wrap:wrap; }
 .prereq-list button { min-height:34px; padding:7px 10px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface-2); color:var(--text-primary); font:inherit; font-size:13px; }
+/* Related concepts, modules and exercises share the filled action surface.
+   Keep these article links scoped so navigation rows and graph nodes retain
+   their own selection treatment. */
+@layer dmate-button-themes {
+  body.offline-workspace :is(#questionDetail,#conceptDetail,#knowledgeGraphDetail) .prereq-list > button {
+    box-sizing:border-box;
+    min-height:var(--dm-filled-min-height,36px)!important;
+    padding:var(--dm-filled-padding,8px 12px)!important;
+    border:0!important;
+    border-radius:var(--dm-filled-radius,8px)!important;
+    background:var(--dm-filled-bg,var(--dm-selected-bg))!important;
+    background-image:none!important;
+    color:var(--dm-filled-text,var(--text-primary))!important;
+    box-shadow:none!important;
+    font:var(--dm-filled-font-weight,400) var(--dm-filled-font-size,calc(14px * var(--font-scale,1))) var(--dm-filled-font-family,var(--dmate-font-ui,system-ui))!important;
+    line-height:var(--dm-filled-line-height,normal)!important;
+    transition:var(--dm-control-transition);
+  }
+  body.offline-workspace :is(#questionDetail,#conceptDetail,#knowledgeGraphDetail) .prereq-list > button:not(:disabled):not([aria-disabled="true"]):is(:hover,:focus-visible,:active) {
+    background:var(--dm-filled-hover-bg,var(--dm-selected-hover))!important;
+  }
+  body.offline-workspace :is(#questionDetail,#conceptDetail,#knowledgeGraphDetail) .prereq-list > button:focus-visible {
+    outline:2px solid var(--dm-selected-ring)!important;
+    outline-offset:2px!important;
+  }
+}
 /* New library relations use the concept detail's section separators. Long
    exercise titles wrap inside a narrow graph sidebar without shrinking rows. */
 body.offline-workspace :is(.question-parent-concepts,.question-graph-modules,.offline-graph-learning-links > .detail-section) { min-width:0; margin-top:18px; padding-top:14px; border-top:1px solid var(--surface-3); }
