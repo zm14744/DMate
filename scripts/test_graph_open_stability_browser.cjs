@@ -137,7 +137,7 @@ async function fixture(browser, width, offline = false) {
     newChat();
     const question = '判断命题 p 与 q 的合取在什么情况下为真。';
     const teaching = { category: '命题逻辑', knowledge_points: ['逻辑联结词'], focus_points: ['逻辑联结词'],
-      question_graph: { version: 1, sources: { question, solution: '' },
+      question_graph: { version: 1,classifier_revision:'catalog-semantic-v5',classification_status:'semantic',classification_source:'catalog_semantic',needs_review:false, sources: { question, solution: '' },
         nodes: [{ id: 'logic_connectives', evidence: [{ source: 'question', quote: '合取' }] }], edges: [] } };
     getCurrent().messages = [{ role: 'user', text: question, manualIsQuestion: true, questionTeaching: teaching }];
     getCurrent().teaching = teaching; getCurrent().learningQuestion = null;

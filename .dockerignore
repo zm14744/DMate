@@ -32,6 +32,7 @@ android
 browser-extension
 offline-content
 scripts/test_*
+scripts/fixtures
 scripts/native
 *.log
 *.db

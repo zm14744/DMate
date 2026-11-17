@@ -1,0 +1,2217 @@
+{
+  "schema_version": 1,
+  "provenance": {
+    "capture_kind": "Actual accepted semantic-service outputs, before task-fact reconciliation; not handwritten model mocks.",
+    "model_prompt_revision": "catalog-semantic-v4",
+    "provider_model_version": null,
+    "provider_model_version_note": "The original capture report does not record the provider model version.",
+    "source_capture_sha256": "ce0a807c75918f84c7f4316ad5387e9820a3d0346c339a208cc55b6e475c8e6b",
+    "gold_fixture_sha256": "de253fa6b9d5f0cb332947042ee581fbd40b64834c6ddddb21aba038504f214c",
+    "accepted_graphs_sha256": "5887b01966d742227efb55bf58302ef425b259bc942371bd042ba7704a6009d8",
+    "accepted_graphs_hash_encoding": "UTF-8 JSON of captures; ensure_ascii=false, sort_keys=true, separators=(comma,colon).",
+    "captured_status_counts": {
+      "semantic": 41,
+      "partial": 4
+    },
+    "new_api_calls_for_fixture_creation": 0,
+    "scope": "Deterministic offline replay of fixed actual outputs. This does not replace unseen evaluation or establish a population accuracy rate.",
+    "configured_model_alias": "deepseek-flash",
+    "configured_model_alias_evidence": "正在调用DeepSeek deepseek-flash（非思考，第 1/1 次）",
+    "runtime_log_sha256": "4a463a089dd44149a851e5e0a36a875f8d4a76d739cd878b435e578a81c4986a"
+  },
+  "captures": [
+    {
+      "id": "logic_01",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "已知p为真、q为假、r为真，求(p→q)∨¬r的真假，并说明每一步。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "logic_truth",
+            "usage": "assessed",
+            "reason": "题目给定各命题变量的真值，要求判断复合命题的真假，涉及命题真值概念。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "已知p为真、q为假、r为真"
+              }
+            ]
+          },
+          {
+            "id": "logic_connectives",
+            "usage": "assessed",
+            "reason": "需要按蕴含和否定的真值规则计算(p→q)∨¬r，实际考查逻辑联结词的真值语义。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "求(p→q)∨¬r的真假"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "partial",
+        "needs_review": true,
+        "unresolved": "缺少解答，无法确认是否使用真值逐步计算的方法；但题目明确指出‘说明每一步’，这暗示需要逐步应用联结词规则，属于命题逻辑基本计算，不构成实质未决。",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "logic_02",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "For every Boolean assignment to p and q, do ¬(p→q) and p∧¬q have the same value? Justify your answer.",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "logic_connectives",
+            "usage": "assessed",
+            "reason": "两个公式都使用否定、蕴含、合取等联结词，需要按真值规则计算。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "do ¬(p→q) and p∧¬q have the same value?"
+              }
+            ]
+          },
+          {
+            "id": "logic_equivalence",
+            "usage": "assessed",
+            "reason": "题目问对所有布尔赋值两公式是否同值，即判断逻辑等价。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "For every Boolean assignment to p and q, do ¬(p→q) and p∧¬q have the same value?"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "partial",
+        "needs_review": true,
+        "unresolved": "缺少解答，无法确认是否使用真值表；但等价性判断本身明确，不构成实质未决。",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "logic_03",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "已知p→q、q→r和¬r都成立，能否必然推出¬p？给出从前提到结论的步骤。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "logic_connectives",
+            "usage": "assessed",
+            "reason": "前提和结论使用蕴含与否定联结词，需理解其真值语义。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "已知p→q、q→r和¬r都成立"
+              }
+            ]
+          },
+          {
+            "id": "logic_reasoning",
+            "usage": "assessed",
+            "reason": "从三个前提推出¬p，要求给出从前提到结论的推理步骤，判断推理有效性。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "给出从前提到结论的步骤"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "partial",
+        "needs_review": true,
+        "unresolved": "缺少解答，无法确认具体使用的推理规则；但推理任务明确，不构成实质未决。",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "logic_04",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "我昨天做过真值表题；这次不要列表。把p→(q∧r)改写成若干括号的合取，每个括号内只能是文字的析取，文字指p、q、r或它们的否定。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "logic_equivalence",
+            "usage": "assessed",
+            "reason": "把蕴含式改写成合取范式，势必要用逻辑等价变换（如p→A≡¬p∨A、分配律等）。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "把p→(q∧r)改写成若干括号的合取"
+              }
+            ]
+          },
+          {
+            "id": "logic_normal_form",
+            "usage": "assessed",
+            "reason": "题目要求化为合取范式（每个括号内是文字的析取），明确考查范式。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "每个括号内只能是文字的析取，文字指p、q、r或它们的否定"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "predicate_01",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "在整数范围内，把‘每个x都能找到一个y使y>x’写成符号式，再否定整个式子，并把否定号一直移到y>x之前。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "predicate_quantifier",
+            "usage": "assessed",
+            "reason": "需将自然语言量词表述‘每个x都能找到一个y’符号化，涉及全称与存在量词及其顺序。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "把‘每个x都能找到一个y使y>x’写成符号式"
+              }
+            ]
+          },
+          {
+            "id": "predicate_reasoning",
+            "usage": "assessed",
+            "reason": "要求否定整个量化式并将否定号深入至原子公式前，实际使用量词否定等价律。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "再否定整个式子，并把否定号一直移到y>x之前"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "partial",
+        "needs_review": true,
+        "unresolved": "缺少解答，无法确认具体符号化结果；但考点明确，不构成实质未决。",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "predicate_02",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "In (∀x P(x,y)) ∨ (∃y Q(y,z)), which occurrences of x, y and z are controlled by a quantifying symbol, and which depend on an outside assignment? Explain why the two occurrences of y behave differently.",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "predicate_variable",
+            "usage": "assessed",
+            "reason": "需要判断量词辖域内哪些变元出现是约束的、哪些是自由的，并解释两个y出现行为不同。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "which occurrences of x, y and z are controlled by a quantifying symbol, and which depend on an outside assignment?"
+              }
+            ]
+          },
+          {
+            "id": "predicate_quantifier",
+            "usage": "assessed",
+            "reason": "需要识别全称量词和存在量词及其辖域，理解量词控制变元的范围。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "(∀x P(x,y)) ∨ (∃y Q(y,z))"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "predicate_03",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "设论域非空。将(∀x P(x))∨(∃y Q(y))改写为所有∀、∃符号都在最前面、后面不再出现这些符号的等价式，并说明哪些变元条件允许这样移动。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "predicate_prenex",
+            "usage": "assessed",
+            "reason": "题目要求将公式改写为所有量词都在最前面的等价式，即前束范式，并说明允许移动的变元条件。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "将(∀x P(x))∨(∃y Q(y))改写为所有∀、∃符号都在最前面、后面不再出现这些符号的等价式，并说明哪些变元条件允许这样移动。"
+              }
+            ]
+          },
+          {
+            "id": "predicate_quantifier",
+            "usage": "assessed",
+            "reason": "识别公式中全称量词和存在量词的含义与辖域，才能正确外提量词。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "将(∀x P(x))∨(∃y Q(y))改写为所有∀、∃符号都在最前面"
+              }
+            ]
+          },
+          {
+            "id": "predicate_variable",
+            "usage": "assessed",
+            "reason": "题目要求说明哪些变元条件允许移动量词，涉及约束变元、自由变元及避免变量捕获的条件。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "并说明哪些变元条件允许这样移动。"
+              }
+            ]
+          },
+          {
+            "id": "logic_reasoning",
+            "usage": "assessed",
+            "reason": "改写需保持逻辑等价，即推理双向有效；题目要求的是等价式。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "改写为所有∀、∃符号都在最前面、后面不再出现这些符号的等价式"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "predicate_04",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "Consider ∀x ∃y (xy=1). Is it true when x,y range over all integers? Is it true when they range over nonzero rational numbers? Explain exactly how the choice of allowed objects changes the answer.",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "predicate_domain",
+            "usage": "assessed",
+            "reason": "题目分别考虑整数集和非零有理数集作为个体域，判断全称存在命题的真假，并解释论域选择如何改变答案。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Consider ∀x ∃y (xy=1). Is it true when x,y range over all integers? Is it true when they range over nonzero rational numbers? Explain exactly how the choice of allowed objects changes the answer."
+              }
+            ]
+          },
+          {
+            "id": "predicate_quantifier",
+            "usage": "assessed",
+            "reason": "需要解释全称量词∀与存在量词∃的语义，以及∃y对∀x的依赖关系，判断命题真假。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Consider ∀x ∃y (xy=1)."
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "proof_01",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "设a、b都是奇整数。不假设结论为假，直接从a=2u+1、b=2v+1出发，证明ab也是奇整数。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "proof_direct_contradiction",
+            "usage": "assessed",
+            "reason": "题目明确要求直接证明，从a=2u+1、b=2v+1出发推出ab为奇数，属于直接证明法。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "不假设结论为假，直接从a=2u+1、b=2v+1出发，证明ab也是奇整数。"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "proof_02",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "证明1+3+⋯+(2n−1)=n²对每个n≥1成立。必须先验证n=1，再只假定n=k时的等式，推出n=k+1时的等式；写清这两个环节。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "proof_induction",
+            "usage": "assessed",
+            "reason": "题目要求用数学归纳法证明等式，须验证n=1的基始步骤并仅假定n=k时等式成立推出n=k+1。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "证明1+3+⋯+(2n−1)=n²对每个n≥1成立。必须先验证n=1，再只假定n=k时的等式，推出n=k+1时的等式；写清这两个环节。"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "proof_03",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "Prove every integer n≥2 is a product of primes. In the step for n, assume the statement is already known for every m with 2≤m<n; if n=ab with 1<a,b<n, apply those earlier statements to both factors.",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "proof_strong_induction",
+            "usage": "assessed",
+            "reason": "题目指明对n时假设对所有2≤m<n命题已成立，属于强归纳法的归纳步骤。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "assume the statement is already known for every m with 2≤m<n; if n=ab with 1<a,b<n, apply those earlier statements to both factors."
+              }
+            ]
+          },
+          {
+            "id": "number_prime",
+            "usage": "assessed",
+            "reason": "题目证明每个大于等于2的整数可分解为素数乘积，涉及素数与合数的定义及乘积分解。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Prove every integer n≥2 is a product of primes."
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "relation_01",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "设A={1,2,3,5}、B={2,4,5}、C={1,4}。求(A∪B)−C及(A−C)∩B。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "set_operation",
+            "usage": "assessed",
+            "reason": "题目要求计算并集、差集和交集，均属集合基本运算。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "求(A∪B)−C及(A−C)∩B。"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "relation_02",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "Let A={1,2,3}, R={(1,2),(2,3)} and S={(2,1),(3,2)} be subsets of A×A. List every ordered pair in S∘R, where (a,c) belongs exactly when some b has (a,b) in R and (b,c) in S; also list R⁻¹.",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "relation_cartesian",
+            "usage": "assessed",
+            "reason": "题目给出A×A的子集作为二元关系，需要理解其有序对元素。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "R={(1,2),(2,3)} and S={(2,1),(3,2)} be subsets of A×A."
+              }
+            ]
+          },
+          {
+            "id": "relation_operation",
+            "usage": "assessed",
+            "reason": "要求按定义计算关系合成S∘R及逆关系R⁻¹。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "List every ordered pair in S∘R"
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "relation_cartesian",
+            "to": "relation_operation",
+            "reason": "先识别关系为笛卡尔积子集，再按其有序对计算合成与逆。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "R={(1,2),(2,3)} and S={(2,1),(3,2)} be subsets of A×A. List every ordered pair in S∘R"
+              }
+            ]
+          }
+        ],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "relation_03",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "在整数上定义xRy当且仅当x−y能被3整除。验证xRx、xRy⇒yRx以及(xRy且yRz)⇒xRz；再分别写出与0、1、2满足R的全部整数组成的集合。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "relation_property",
+            "usage": "assessed",
+            "reason": "需要验证整除差所定义的整数关系具有自反、对称、传递性质。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "验证xRx、xRy⇒yRx以及(xRy且yRz)⇒xRz"
+              }
+            ]
+          },
+          {
+            "id": "relation_equivalence",
+            "usage": "assessed",
+            "reason": "由上述三条性质得出等价关系，并求各元素的等价类。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "再分别写出与0、1、2满足R的全部整数组成的集合。"
+              }
+            ]
+          },
+          {
+            "id": "number_congruence",
+            "usage": "assessed",
+            "reason": "x−y能被3整除即模3同余，等价类按最小非负余数分类。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "在整数上定义xRy当且仅当x−y能被3整除。"
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "number_congruence",
+            "to": "relation_equivalence",
+            "reason": "模3同余关系的性质验证和等价类划分依赖同余定义。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "在整数上定义xRy当且仅当x−y能被3整除。验证xRx、xRy⇒yRx以及(xRy且yRz)⇒xRz；再分别写出与0、1、2满足R的全部整数组成的集合。"
+              }
+            ]
+          }
+        ],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "relation_04",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "在{1,2,3,6,12}上规定a≼b表示a整除b。判断它是否自反、反对称、传递，再找出整个集合的最小元和最大元，以及子集{2,3}在该集合内的最小上界。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "relation_property",
+            "usage": "assessed",
+            "reason": "判断整除关系在给定集合上是否自反、反对称、传递。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "判断它是否自反、反对称、传递"
+              }
+            ]
+          },
+          {
+            "id": "relation_order",
+            "usage": "assessed",
+            "reason": "整除关系构成偏序，并求最小元、最大元及子集的最小上界。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "再找出整个集合的最小元和最大元，以及子集{2,3}在该集合内的最小上界。"
+              }
+            ]
+          },
+          {
+            "id": "number_prime",
+            "usage": "assessed",
+            "reason": "整除定义a∣b是描述关系及比较元素的基础。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "在{1,2,3,6,12}上规定a≼b表示a整除b。"
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "number_prime",
+            "to": "relation_order",
+            "reason": "用整除定义偏序关系并据此判断界。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "在{1,2,3,6,12}上规定a≼b表示a整除b。判断它是否自反、反对称、传递，再找出整个集合的最小元和最大元，以及子集{2,3}在该集合内的最小上界。"
+              }
+            ]
+          }
+        ],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "relation_05",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "在A={1,2,3,4}上已有配对(1,2)、(2,3)、(3,4)。只许添加配对，不许删除，至少还要加入哪些配对，才能保证只要(a,b)、(b,c)都在其中，(a,c)也在其中？",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "relation_property",
+            "usage": "assessed",
+            "reason": "题目条件“只要(a,b)、(b,c)都在其中，(a,c)也在其中”正是传递性要求。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "才能保证只要(a,b)、(b,c)都在其中，(a,c)也在其中？"
+              }
+            ]
+          },
+          {
+            "id": "relation_closure",
+            "usage": "assessed",
+            "reason": "只许添加配对且保持传递所要求的最小添加集合，即求传递闭包。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "只许添加配对，不许删除，至少还要加入哪些配对"
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "relation_property",
+            "to": "relation_closure",
+            "reason": "目标性质是传递性，所添加的最小配对集合构成传递闭包。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "只许添加配对，不许删除，至少还要加入哪些配对，才能保证只要(a,b)、(b,c)都在其中，(a,c)也在其中？"
+              }
+            ]
+          }
+        ],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "function_01",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "一张对应表把A={a,b,c}中的a连到1，b同时连到1和2，c没有连到任何数；目标集合是{1,2}。这张表能否给每个A中的元素唯一指定一个输出？指出所有违反条件的地方。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "function_mapping",
+            "usage": "assessed",
+            "reason": "需检查对应表是否对定义域每个元素唯一指定输出，涉及函数定义的两个条件。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "这张表能否给每个A中的元素唯一指定一个输出？指出所有违反条件的地方。"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "function_02",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "Let f: Z→{0,1,2,…} be f(x)=x². Can distinct inputs have the same output? Is every element of the target set reached? Give a counterexample whenever the answer is negative.",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "function_mapping",
+            "usage": "assessed",
+            "reason": "题目给定f:Z→{0,1,2,…}，需要确认其作为函数的输入输出关系。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Let f: Z→{0,1,2,…} be f(x)=x²."
+              }
+            ]
+          },
+          {
+            "id": "function_injection",
+            "usage": "assessed",
+            "reason": "分别考查是否存在不同输入得到相同输出（单射）以及陪域中每个元素是否被达到（满射）。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Can distinct inputs have the same output? Is every element of the target set reached?"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "function_03",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "我上一题研究过逆函数；这次不求任何逆。已知f(x)=2x+1、g(x)=x²，x取实数。分别求g(f(x))与f(g(x))，比较在x=2时的值。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "function_composition",
+            "usage": "assessed",
+            "reason": "题目要求分别计算两个复合函数 g(f(x)) 与 f(g(x)) 并在 x=2 时比较其值，直接考查复合函数的定义与运算。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "分别求g(f(x))与f(g(x))，比较在x=2时的值。"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "function_04",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "The machine sends each real input x to y=3x−4. Find a second rule h that recovers x from every output y, and verify both h(3x−4)=x and 3h(y)−4=y.",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "function_inverse",
+            "usage": "assessed",
+            "reason": "题目要求从输出 y 恢复输入 x 的规则 h，并验证两个方向的复合为恒等，实际考查逆函数的构造与双侧逆验证。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Find a second rule h that recovers x from every output y, and verify both h(3x−4)=x and 3h(y)−4=y."
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "number_01",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "对252和198，反复做带余除法，直到余数为0。求能同时整除这两个数的最大正整数，再把它写成252u+198v的形式，其中u、v为整数。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "number_gcd",
+            "usage": "assessed",
+            "reason": "题目要求用反复带余除法求两数的最大公因数，并写成整数线性组合，直接考查欧几里得算法及其扩展形式。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "对252和198，反复做带余除法，直到余数为0。求能同时整除这两个数的最大正整数，再把它写成252u+198v的形式"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "number_02",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "Find every integer x for which dividing 14x by 30 leaves remainder 8. Express all answers as x=a+bk with k any integer, and verify that no residue class is missing.",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "number_congruence",
+            "usage": "assessed",
+            "reason": "题目以“除以30余8”的整除余数表述同余关系，需要转化为同余方程并求同余类解。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Find every integer x for which dividing 14x by 30 leaves remainder 8."
+              }
+            ]
+          },
+          {
+            "id": "number_linear_congruence",
+            "usage": "assessed",
+            "reason": "题目实质为求解线性同余方程 14x≡8 (mod 30)，并要求给出全部整数解 x=a+bk 且验证无遗漏同余类。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Express all answers as x=a+bk with k any integer, and verify that no residue class is missing."
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "number_03",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "一批物品，每3件一组余2件，每5件一组余3件，每7件一组余2件。求最少有多少件，并说明所有可能数量相差的固定周期。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "number_congruence",
+            "usage": "assessed",
+            "reason": "题目给出的三个“每m件一组余r件”条件需转化为同余方程组求解。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "每3件一组余2件，每5件一组余3件，每7件一组余2件"
+              }
+            ]
+          },
+          {
+            "id": "number_inverse_crt",
+            "usage": "assessed",
+            "reason": "模数3、5、7两两互素，要求最少数量及所有可能数量的固定周期，即为用中国剩余定理求唯一模105解。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "求最少有多少件，并说明所有可能数量相差的固定周期。"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "number_04",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "Let a be any integer not divisible by 13. Show that multiplication by a rearranges the twelve nonzero residues modulo 13, then compare their products to prove a¹²≡1 (mod 13).",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "number_congruence",
+            "usage": "assessed",
+            "reason": "题目在模13下讨论非零剩余类的乘法重排与乘积比较，使用同余运算与剩余类。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "multiplication by a rearranges the twelve nonzero residues modulo 13"
+              }
+            ]
+          },
+          {
+            "id": "number_euler_fermat",
+            "usage": "assessed",
+            "reason": "题目要求证明 a¹²≡1 (mod 13)，正是费马小定理（p=13）的证明。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "compare their products to prove a¹²≡1 (mod 13)"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "number_05",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "甲选秘密素数p=5、q=11，公开n=pq和e=3；消息m编码为c=m^e除以n的余数。求0<d<40使ed除以40余1，再用m=9求c，并解释为什么用c^d除以n的余数能恢复消息。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "number_rsa",
+            "usage": "assessed",
+            "reason": "题目给出RSA式参数p、q、e、n与模幂编码，要求求私钥d并解释c^d模n恢复消息，属于RSA公钥密码的模幂过程与密钥构造。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "甲选秘密素数p=5、q=11，公开n=pq和e=3；消息m编码为c=m^e除以n的余数。求0<d<40使ed除以40余1，再用m=9求c，并解释为什么用c^d除以n的余数能恢复消息。"
+              }
+            ]
+          },
+          {
+            "id": "number_prime",
+            "usage": "assessed",
+            "reason": "题设明确选择两个秘密素数p=5、q=11，需要用到素数及乘积n的构造。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "甲选秘密素数p=5、q=11"
+              }
+            ]
+          },
+          {
+            "id": "number_congruence",
+            "usage": "assessed",
+            "reason": "编码c为m^e除以n的余数，并需求d满足ed除以40余1，实际使用模运算与同余。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "消息m编码为c=m^e除以n的余数。求0<d<40使ed除以40余1"
+              }
+            ]
+          },
+          {
+            "id": "number_euler_fermat",
+            "usage": "assessed",
+            "reason": "解释c^d模n恢复消息依赖模幂周期，即φ(n)=(p−1)(q−1)=40及欧拉定理给出的互素情形周期。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "求0<d<40使ed除以40余1，再用m=9求c，并解释为什么用c^d除以n的余数能恢复消息。"
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "number_prime",
+            "to": "number_rsa",
+            "reason": "RSA的n由两个秘密素数相乘得到，密钥构造依赖素数选择。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "甲选秘密素数p=5、q=11，公开n=pq和e=3"
+              }
+            ]
+          },
+          {
+            "from": "number_congruence",
+            "to": "number_rsa",
+            "reason": "RSA的加密与解密均为模n幂运算，私钥d由同余ed≡1(mod 40)确定。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "求0<d<40使ed除以40余1，再用m=9求c"
+              }
+            ]
+          },
+          {
+            "from": "number_euler_fermat",
+            "to": "number_rsa",
+            "reason": "解释解密正确性需要欧拉定理/模幂周期说明c^d模n可还原m。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "解释为什么用c^d除以n的余数能恢复消息"
+              }
+            ]
+          }
+        ],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "count_01",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "8名学生中选3名组成队伍，再从这3人中指定一名队长，共有多少种结果？",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "count_perm_comb",
+            "usage": "assessed",
+            "reason": "先从不重复的8人中选3人组成队伍，再在3人中指定队长，组合选队与有序角色指定共同计数。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "8名学生中选3名组成队伍，再从这3人中指定一名队长，共有多少种结果？"
+              }
+            ]
+          },
+          {
+            "id": "count_basic",
+            "usage": "assessed",
+            "reason": "整体结果可按“选队后指定队长”的分步选择计数，使用乘法原理。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "8名学生中选3名组成队伍，再从这3人中指定一名队长，共有多少种结果？"
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "count_perm_comb",
+            "to": "count_basic",
+            "reason": "先算选3人的组合数，再乘每队3种队长选择，分步相乘得到总数。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "8名学生中选3名组成队伍，再从这3人中指定一名队长"
+              }
+            ]
+          }
+        ],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "count_02",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "从1到60取出31个不同整数。把每个整数写成2^k乘一个奇数，按这个奇数分组，证明有两个数属于同组，从而其中一个整除另一个。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "count_pigeonhole",
+            "usage": "assessed",
+            "reason": "把31个整数按写成奇数部分后的奇数分组，需用鸽巢原理断言至少两数同组。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "从1到60取出31个不同整数。把每个整数写成2^k乘一个奇数，按这个奇数分组，证明有两个数属于同组"
+              }
+            ]
+          },
+          {
+            "id": "number_prime",
+            "usage": "assessed",
+            "reason": "将整数唯一写成2的幂乘奇数并用该奇数分组，涉及整数的奇偶因子结构；最终推出其中一个整除另一个。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "把每个整数写成2^k乘一个奇数，按这个奇数分组，证明有两个数属于同组，从而其中一个整除另一个。"
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "count_pigeonhole",
+            "to": "number_prime",
+            "reason": "鸽巢原理给出同组两数，再利用其2^k乘奇数表示说明较小者整除较大者。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "按这个奇数分组，证明有两个数属于同组，从而其中一个整除另一个"
+              }
+            ]
+          }
+        ],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "count_03",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "A class has 40 students. Exactly 22 study French, 19 study German, and 8 study both. How many study at least one of these languages, and how many study neither? Explain how you correct double counting.",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "count_inclusion",
+            "usage": "assessed",
+            "reason": "已知法语22、德语19、两者8，求至少一种语言人数并修正重复计数，正是两集合容斥原理。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Exactly 22 study French, 19 study German, and 8 study both. How many study at least one of these languages, and how many study neither? Explain how you correct double counting."
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "count_04",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "设F(x)=(1+x)^8(1+x+x²+x³+⋯)，把它当作形式幂级数。先写出(1+x)^8中x^k的系数公式，再由两部分相乘求F(x)中x³的系数。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "count_generating",
+            "usage": "assessed",
+            "reason": "把F(x)=(1+x)^8(1+x+x²+…)视为形式幂级数，并由两部分乘积的系数求x³系数，属于形式幂级数乘法与系数提取。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "设F(x)=(1+x)^8(1+x+x²+x³+⋯)，把它当作形式幂级数。先写出(1+x)^8中x^k的系数公式，再由两部分相乘求F(x)中x³的系数。"
+              }
+            ]
+          },
+          {
+            "id": "count_binomial",
+            "usage": "assessed",
+            "reason": "要求写出(1+x)^8中x^k的系数公式，即二项式系数。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "先写出(1+x)^8中x^k的系数公式"
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "count_binomial",
+            "to": "count_generating",
+            "reason": "利用(1+x)^8的二项式系数与几何级数系数相乘，求形式幂级数F(x)中x³的系数。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "先写出(1+x)^8中x^k的系数公式，再由两部分相乘求F(x)中x³的系数"
+              }
+            ]
+          }
+        ],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "recurrence_01",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "数列满足a₀=2、a₁=3，且n≥2时aₙ=3aₙ₋₁−2aₙ₋₂。求只含n的aₙ表达式，写明两个已知首项如何决定其中的常数。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "recurrence_homogeneous",
+            "usage": "assessed",
+            "reason": "递推aₙ=3aₙ₋₁−2aₙ₋₂是常系数线性齐次递推，需由特征方程求只含n的通项表达式。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "且n≥2时aₙ=3aₙ₋₁−2aₙ₋₂。求只含n的aₙ表达式"
+              }
+            ]
+          },
+          {
+            "id": "recurrence_initial",
+            "usage": "assessed",
+            "reason": "题给a₀=2、a₁=3，并要求写明两个已知首项如何决定通式中的常数，实际使用初始条件确定解。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "数列满足a₀=2、a₁=3，且n≥2时aₙ=3aₙ₋₁−2aₙ₋₂。求只含n的aₙ表达式，写明两个已知首项如何决定其中的常数。"
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "recurrence_homogeneous",
+            "to": "recurrence_initial",
+            "reason": "先由齐次递推的通解形式得到待定常数，再用两个初始条件确定常数。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "求只含n的aₙ表达式，写明两个已知首项如何决定其中的常数"
+              }
+            ]
+          }
+        ],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "recurrence_02",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "Let a_0=0 and a_n=2a_(n−1)+1 for n≥1. Find a formula with no earlier a-terms in it, and show how the added constant 1 affects your calculation.",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "recurrence_nonhomogeneous",
+            "usage": "assessed",
+            "reason": "题给带非零常数项1的一阶线性非齐次递推，并求闭式公式。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Let a_0=0 and a_n=2a_(n−1)+1 for n≥1."
+              }
+            ]
+          },
+          {
+            "id": "recurrence_initial",
+            "usage": "assessed",
+            "reason": "初始值a_0=0用于确定递推解。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Let a_0=0 and a_n=2a_(n−1)+1 for n≥1."
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "recurrence_03",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "长度为n的0、1字符串中不允许两个1相邻。设数量为aₙ，空串也计入。按末尾是0还是1分类，把aₙ用较短字符串的数量表示，并写出最初两个值；不用求通项。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "recurrence_model",
+            "usage": "assessed",
+            "reason": "要求按末尾字符分类，用较短长度字符串的数量表示a_n，建立递推模型。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "按末尾是0还是1分类，把aₙ用较短字符串的数量表示"
+              }
+            ]
+          },
+          {
+            "id": "recurrence_initial",
+            "usage": "assessed",
+            "reason": "题目要求写出最初两个值作为递推的初始条件。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "并写出最初两个值"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "recurrence_04",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "Let a₀=1 and aₙ=3aₙ₋₁ for n≥1. Define the formal series A(x)=Σ(n≥0)aₙxⁿ. Multiply the recurrence by xⁿ, sum over n≥1, and derive an equation for A(x) before extracting its coefficients.",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "count_generating",
+            "usage": "assessed",
+            "reason": "要求构造形式幂级数A(x)，通过乘x^n并求和推导函数方程。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Define the formal series A(x)=Σ(n≥0)aₙxⁿ. Multiply the recurrence by xⁿ, sum over n≥1, and derive an equation for A(x)"
+              }
+            ]
+          },
+          {
+            "id": "recurrence_homogeneous",
+            "usage": "assessed",
+            "reason": "题给常系数线性齐次递推a_n=3a_{n-1}，其解将通过生成函数求得。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Let a₀=1 and aₙ=3aₙ₋₁ for n≥1."
+              }
+            ]
+          },
+          {
+            "id": "recurrence_initial",
+            "usage": "assessed",
+            "reason": "初始值a_0=1用于确定生成函数方程中的初始项。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Let a₀=1"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "graph_01",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "五个地点A、B、C、D、E之间的双向道路为AB、BC、CA、CD、DE、EC。能否从某地出发，每条道路恰好走一次并回到出发地？若能，写出路线。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "graph_euler",
+            "usage": "assessed",
+            "reason": "询问是否存在经过每条边恰好一次并回到起点的闭路线，即欧拉回路判定与构造。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "能否从某地出发，每条道路恰好走一次并回到出发地？若能，写出路线。"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "graph_02",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "An undirected network has vertices A,B,C,D and edges AB,BC,CD,DA,AC. Can a closed route visit each vertex exactly once before returning to its start? Give one if possible. There is no requirement to use every edge.",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "graph_hamilton",
+            "usage": "assessed",
+            "reason": "要求找经过每个顶点恰好一次后回到起点的闭路线，即哈密顿回路。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Can a closed route visit each vertex exactly once before returning to its start?"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "graph_03",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "一个有9个站点的双向网络任意两站可达，且没有简单圈。以站点r为根后，每个非根站点的父亲是通往r的唯一简单路线上的下一站。问道路共有多少条，并说明为什么每个非根站点的父亲唯一。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "tree_basic",
+            "usage": "assessed",
+            "reason": "题设连通且无简单圈，确定该图为树，并问树中道路总数。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "一个有9个站点的双向网络任意两站可达，且没有简单圈。"
+              }
+            ]
+          },
+          {
+            "id": "tree_rooted",
+            "usage": "assessed",
+            "reason": "指定根r并用父亲定义，要求说明每个非根站点的父亲唯一，涉及根树中父子结构。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "以站点r为根后，每个非根站点的父亲是通往r的唯一简单路线上的下一站。问道路共有多少条，并说明为什么每个非根站点的父亲唯一。"
+              }
+            ]
+          },
+          {
+            "id": "graph_connectivity",
+            "usage": "assessed",
+            "reason": "用任意两站可达刻画连通，并结合无简单圈识别树结构。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "一个有9个站点的双向网络任意两站可达"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "graph_04",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "四个村庄之间可铺电缆的费用是AB=1、AC=4、AD=7、BC=2、BD=5、CD=3。选一些连接使所有村庄互通，且总费用最少。写出选择及总费用，并说明为什么不会选择成圈的多余连接。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "graph_weighted",
+            "usage": "assessed",
+            "reason": "题目给出各对村庄间铺电缆的费用，即带权无向图，需要按边权累加比较方案。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "四个村庄之间可铺电缆的费用是AB=1、AC=4、AD=7、BC=2、BD=5、CD=3。"
+              }
+            ]
+          },
+          {
+            "id": "graph_connectivity",
+            "usage": "assessed",
+            "reason": "要求所选连接使所有村庄互通，涉及无向图连通性。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "选一些连接使所有村庄互通"
+              }
+            ]
+          },
+          {
+            "id": "tree_spanning",
+            "usage": "assessed",
+            "reason": "要在连通全部顶点且不选成圈多余连接的条件下列出保留全部顶点、恰好足够的连接方案，即生成树。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "并说明为什么不会选择成圈的多余连接。"
+              }
+            ]
+          },
+          {
+            "id": "tree_mst",
+            "usage": "assessed",
+            "reason": "题目目标是使全部村庄互通且总费用最少，即求最小生成树并给出总费用。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "选一些连接使所有村庄互通，且总费用最少。写出选择及总费用"
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "tree_mst",
+            "to": "tree_spanning",
+            "reason": "最小生成树是在生成树中按总边权取得最小者，解题需依赖生成树结构。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "选一些连接使所有村庄互通，且总费用最少。"
+              }
+            ]
+          },
+          {
+            "from": "tree_mst",
+            "to": "graph_weighted",
+            "reason": "比较总费用需要累加各条连接的边权。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "四个村庄之间可铺电缆的费用是AB=1、AC=4、AD=7、BC=2、BD=5、CD=3。"
+              }
+            ]
+          }
+        ],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "graph_05",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "Workers u1,u2,u3 can do jobs v1,v2,v3 as follows: u1:{v1,v2}, u2:{v2}, u3:{v2,v3}. Assign distinct jobs to as many workers as possible, with no worker or job used twice. Draw the two groups and the allowed links, then give the maximum assignment.",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "graph_bipartite",
+            "usage": "assessed",
+            "reason": "工人与工作分为两侧，允许关系只跨两侧，需要画出两部分及允许连线。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Draw the two groups and the allowed links"
+              }
+            ]
+          },
+          {
+            "id": "graph_matching",
+            "usage": "assessed",
+            "reason": "给尽可能多的工人分配不同工作且工人和工作均不重复使用，正是求二部图最大匹配。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Assign distinct jobs to as many workers as possible, with no worker or job used twice."
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "graph_matching",
+            "to": "graph_bipartite",
+            "reason": "最大分配在由工人和工作两侧及允许边构成的二部图上进行。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Workers u1,u2,u3 can do jobs v1,v2,v3 as follows: u1:{v1,v2}, u2:{v2}, u3:{v2,v3}."
+              }
+            ]
+          }
+        ],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "graph_06",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "有向线路的时间为s→a:2，s→b:7，a→b:1，a→t:8，b→t:3。求从s到t耗时最少的路线和耗时，并比较它与直接按最少经过边数选出的路线。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "graph_weighted",
+            "usage": "assessed",
+            "reason": "有向线路带有时间权值，需要按边权累加比较路线。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "有向线路的时间为s→a:2，s→b:7，a→b:1，a→t:8，b→t:3。"
+              }
+            ]
+          },
+          {
+            "id": "graph_shortest",
+            "usage": "assessed",
+            "reason": "求从s到t耗时最少的路线及耗时，是最短路问题，并与按边数选择路线作比较。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "求从s到t耗时最少的路线和耗时，并比较它与直接按最少经过边数选出的路线。"
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "graph_shortest",
+            "to": "graph_weighted",
+            "reason": "最短路比较的是各边时间权值之和，需在带权有向图上进行。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "有向线路的时间为s→a:2，s→b:7，a→b:1，a→t:8，b→t:3。"
+              }
+            ]
+          }
+        ],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "graph_07",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "G按顶点a,b,c,d记录的0-1表为[[0,1,0,1],[1,0,1,0],[0,1,0,1],[1,0,1,0]]，表中1表示对应两点相连。H的点是1,2,3,4，边为12、24、43、31。找出从G到H的点的一一对应，使相连当且仅当像也相连，并写出按像的顺序重排后的表。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "graph_basic",
+            "usage": "assessed",
+            "reason": "题目用顶点与边描述两个无向简单图，并说明0-1表中1表示两点相连。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "H的点是1,2,3,4，边为12、24、43、31。"
+              }
+            ]
+          },
+          {
+            "id": "graph_adjacency",
+            "usage": "assessed",
+            "reason": "G以按顶点顺序记录的0-1邻接矩阵给出，并要求写出按像的顺序重排后的表。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "G按顶点a,b,c,d记录的0-1表为[[0,1,0,1],[1,0,1,0],[0,1,0,1],[1,0,1,0]]"
+              }
+            ]
+          },
+          {
+            "id": "graph_isomorphism",
+            "usage": "assessed",
+            "reason": "要求找一一对应使相连当且仅当像相连，即判断并构造两图之间的同构映射。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "找出从G到H的点的一一对应，使相连当且仅当像也相连"
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "graph_isomorphism",
+            "to": "graph_adjacency",
+            "reason": "构造同构并把G的邻接表按像的顺序重排，需要依据邻接矩阵读取邻接关系。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "并写出按像的顺序重排后的表"
+              }
+            ]
+          }
+        ],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "graph_08",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "四项工作A、B、C、D的先后要求为A完成后才能做B和C，B和C完成后才能做D。把要求画成有向箭头，列出所有满足要求的完成顺序，再解释若增加D必须在A之前完成会发生什么。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "graph_topological",
+            "usage": "assessed",
+            "reason": "先后要求形成有向无环图，列出所有满足先后条件的完成顺序即求全部拓扑序；增加D在A前会导致有向回路。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "把要求画成有向箭头，列出所有满足要求的完成顺序，再解释若增加D必须在A之前完成会发生什么。"
+              }
+            ]
+          }
+        ],
+        "edges": [],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "algebra_01",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "在{1,2,3,4}上规定a*b为ab除以5的余数。验证(a*b)*c=a*(b*c)，找e使e*a=a*e=a，并为每个a找b使a*b=b*a=e。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "number_congruence",
+            "usage": "assessed",
+            "reason": "运算定义为两数乘积除以5的余数，实际使用模5同余的乘法。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "在{1,2,3,4}上规定a*b为ab除以5的余数。"
+              }
+            ]
+          },
+          {
+            "id": "algebra_system",
+            "usage": "assessed",
+            "reason": "在集合{1,2,3,4}上定义一个二元运算，并验证结合律。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "验证(a*b)*c=a*(b*c)"
+              }
+            ]
+          },
+          {
+            "id": "algebra_group",
+            "usage": "assessed",
+            "reason": "求单位元e并为每个元素找逆元，配合已验证的结合律，正是验证该运算构成群。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "找e使e*a=a*e=a，并为每个a找b使a*b=b*a=e。"
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "algebra_group",
+            "to": "algebra_system",
+            "reason": "群是在给定集合与二元运算的代数系统上讨论，需先明确运算并检验结合律。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "在{1,2,3,4}上规定a*b为ab除以5的余数。验证(a*b)*c=a*(b*c)"
+              }
+            ]
+          },
+          {
+            "from": "algebra_group",
+            "to": "number_congruence",
+            "reason": "乘法结果取模5的余数用于计算单位元和逆元。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "为每个a找b使a*b=b*a=e"
+              }
+            ]
+          }
+        ],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "algebra_02",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "Let φ send each integer n to its remainder class modulo 6. Show φ(a+b)=φ(a)+φ(b), where the right addition is reduced modulo 6. Find every input sent to 0, and decide whether φ is one-to-one and whether every target class is reached.",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "function_mapping",
+            "usage": "assessed",
+            "reason": "题目要求判断映射φ是否为一一对应（one-to-one）以及每个目标类是否被取到，属于对映射单射性与满射性的考查，同时也是函数映射的基本对象。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "decide whether φ is one-to-one and whether every target class is reached."
+              }
+            ]
+          },
+          {
+            "id": "function_injection",
+            "usage": "assessed",
+            "reason": "判断φ是否单射以及是否满射（每个目标类是否被达到），直接考查单射满射双射概念。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "decide whether φ is one-to-one and whether every target class is reached."
+              }
+            ]
+          },
+          {
+            "id": "number_congruence",
+            "usage": "assessed",
+            "reason": "φ把整数映到模6剩余类，并要求右端加法按模6约化，核心是模运算与同余类。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Let φ send each integer n to its remainder class modulo 6. Show φ(a+b)=φ(a)+φ(b), where the right addition is reduced modulo 6."
+              }
+            ]
+          },
+          {
+            "id": "algebra_homomorphism",
+            "usage": "assessed",
+            "reason": "证明φ(a+b)=φ(a)+φ(b)即验证映射保持加法运算，是群同态的定义性质。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Show φ(a+b)=φ(a)+φ(b), where the right addition is reduced modulo 6."
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "number_congruence",
+            "to": "algebra_homomorphism",
+            "reason": "利用模6同余类的加法运算来验证φ保持加法，从而得到同态性质。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "Show φ(a+b)=φ(a)+φ(b), where the right addition is reduced modulo 6."
+              }
+            ]
+          }
+        ],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "algebra_03",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "在{0,1,2,3,4,5}上，加法和乘法都取除以6的余数。比较2与3的乘积，找出哪些非零元素有乘法逆元，并据此判断是否每个非零元素都能做除数；同时说明乘法对加法是否分配。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "number_congruence",
+            "usage": "assessed",
+            "reason": "题目在模6剩余类上定义加法和乘法，需要计算2与3的乘积并考察非零元素的乘法逆元，属于模运算。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "在{0,1,2,3,4,5}上，加法和乘法都取除以6的余数。比较2与3的乘积，找出哪些非零元素有乘法逆元"
+              }
+            ]
+          },
+          {
+            "id": "algebra_ring_field",
+            "usage": "assessed",
+            "reason": "题目判断哪些非零元素可作除数（即乘法可逆），并检验乘法对加法的分配律，实际考查环与域的性质：模6是否构成域、分配律是否成立。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "找出哪些非零元素有乘法逆元，并据此判断是否每个非零元素都能做除数；同时说明乘法对加法是否分配。"
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "number_congruence",
+            "to": "algebra_ring_field",
+            "reason": "先由模6乘法找出有逆元的非零元素，再据此判断该结构是否为域。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "找出哪些非零元素有乘法逆元，并据此判断是否每个非零元素都能做除数；同时说明乘法对加法是否分配。"
+              }
+            ]
+          }
+        ],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    },
+    {
+      "id": "algebra_04",
+      "question_graph": {
+        "version": 1,
+        "sources": {
+          "question": "令U={a,b}，考虑它的全部子集。以包含为顺序，以交和并为两个运算。对X={a}、Y={b}求最小共同上界、最大共同下界及X的补集，并检验X∩(Y∪Z)=(X∩Y)∪(X∩Z)对任意Z⊆U成立。",
+          "solution": ""
+        },
+        "nodes": [
+          {
+            "id": "set_operation",
+            "usage": "assessed",
+            "reason": "题目要求求X的补集，并用交、并验证分配律，直接使用集合的交、并、补运算。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "以交和并为两个运算。对X={a}、Y={b}求最小共同上界、最大共同下界及X的补集，并检验X∩(Y∪Z)=(X∩Y)∪(X∩Z)对任意Z⊆U成立。"
+              }
+            ]
+          },
+          {
+            "id": "relation_order",
+            "usage": "assessed",
+            "reason": "以包含关系为顺序求最小共同上界和最大共同下界，需要在偏序集中识别上界、下界、最小上界和最大下界。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "以包含为顺序，以交和并为两个运算。对X={a}、Y={b}求最小共同上界、最大共同下界"
+              }
+            ]
+          },
+          {
+            "id": "algebra_lattice_bool",
+            "usage": "assessed",
+            "reason": "在幂集上以包含为偏序、交并为上下确界，并检验分配律及补集，正是格与布尔代数的结构考查。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "令U={a,b}，考虑它的全部子集。以包含为顺序，以交和并为两个运算。对X={a}、Y={b}求最小共同上界、最大共同下界及X的补集，并检验X∩(Y∪Z)=(X∩Y)∪(X∩Z)对任意Z⊆U成立。"
+              }
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "set_operation",
+            "to": "relation_order",
+            "reason": "用集合的交、并（以及包含关系）确定最小共同上界与最大共同下界。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "以交和并为两个运算。对X={a}、Y={b}求最小共同上界、最大共同下界"
+              }
+            ]
+          },
+          {
+            "from": "relation_order",
+            "to": "algebra_lattice_bool",
+            "reason": "在包含偏序下识别交并为上下确界，从而将该幂集结构作为格/布尔代数来检验分配律与补集。",
+            "evidence": [
+              {
+                "source": "question",
+                "quote": "以包含为顺序，以交和并为两个运算。对X={a}、Y={b}求最小共同上界、最大共同下界及X的补集，并检验X∩(Y∪Z)=(X∩Y)∪(X∩Z)对任意Z⊆U成立。"
+              }
+            ]
+          }
+        ],
+        "classifier_revision": "catalog-semantic-v4",
+        "catalog_revision": "c29506b9bd0d171270e400fb838056f7c3eeb0d94d0f78e1ad83bafe8fe56c95",
+        "classification_source": "catalog_semantic",
+        "classification_status": "semantic",
+        "needs_review": false,
+        "unresolved": "",
+        "validation_issues": {}
+      }
+    }
+  ]
+}

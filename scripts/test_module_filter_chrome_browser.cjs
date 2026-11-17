@@ -91,6 +91,66 @@ async function triggerPaint(page) {
   assert.deepEqual(await read(), idle, 'Hover does not turn the selector into a raised button');
 }
 
+async function graphNavigationPaint(page) {
+  const ids = ['knowledgeGraphFocusBtn', 'knowledgeGraphScopeBtn', 'knowledgeGraphHistoryBtn'];
+  const read = id => page.locator('#' + id).evaluate(button => {
+    const css = getComputedStyle(button);
+    return Object.fromEntries(['backgroundColor', 'backgroundImage', 'borderTopColor', 'borderTopWidth',
+      'borderTopStyle', 'boxShadow', 'borderRadius', 'fontFamily', 'fontSize', 'fontWeight',
+      'lineHeight', 'padding', 'minHeight', 'color', 'opacity', 'outlineStyle', 'outlineWidth', 'outlineOffset']
+      .map(name => [name, css[name]]));
+  });
+  const assertMatching = async (label, focused = false) => {
+    const styles = [];
+    for (const id of ids) {
+      if (focused) { await page.locator('#' + id).focus(); await settle(page); }
+      styles.push(await read(id));
+    }
+    for (const style of styles.slice(1)) assert.deepEqual(style, styles[0], label + ': all three graph pages use the same button parameters');
+    assert.equal(styles[0].borderTopColor, 'rgba(0, 0, 0, 0)', label + ': no visible button border');
+    assert.equal(styles[0].boxShadow, 'none', label + ': no raised surface');
+    assert.equal(styles[0].backgroundImage, 'none', label + ': no image fill');
+    return styles[0];
+  };
+  await page.mouse.move(0, 0);
+  try {
+    for (const state of ['idle', 'active', 'disabled']) {
+      await page.evaluate(({ids, state}) => {
+        for (const id of ids) {
+          const button = document.getElementById(id);
+          button.classList.toggle('active', state === 'active');
+          button.setAttribute('aria-pressed', String(state === 'active'));
+          button.disabled = state === 'disabled';
+          button.blur();
+        }
+      }, {ids, state});
+      await settle(page);
+      const style = await assertMatching(state);
+      if (state !== 'active') assert.equal(style.backgroundColor, 'rgba(0, 0, 0, 0)', state + ': inactive choices remain transparent');
+      else assert.notEqual(style.backgroundColor, 'rgba(0, 0, 0, 0)', 'Selected choices keep a visible filled surface');
+    }
+    await page.evaluate(ids => ids.forEach(id => { document.getElementById(id).disabled = false; }), ids);
+    await page.keyboard.press('Tab');
+    const focused = await assertMatching('keyboard focus', true);
+    assert.equal(focused.outlineStyle, 'solid');
+    assert.equal(focused.outlineWidth, '2px', 'Frameless choices retain visible keyboard focus');
+    if (await page.evaluate(() => matchMedia('(hover:hover)').matches)) {
+      const hovered = [];
+      for (const id of ids) {
+        await page.locator('#' + id).evaluate(button => button.blur());
+        await page.locator('#' + id).hover(); await settle(page);
+        hovered.push(await read(id));
+      }
+      for (const style of hovered.slice(1)) assert.deepEqual(style, hovered[0], 'Hover paint matches all graph page choices');
+      assert.equal(hovered[0].borderTopColor, 'rgba(0, 0, 0, 0)', 'Hover keeps the frame transparent');
+    }
+  } finally {
+    await page.mouse.move(0, 0);
+    await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
+    await settle(page);
+  }
+}
+
 async function moduleControls(page) {
   assert.equal(await page.locator('label[for="knowledgeGraphCategory"]').count(), 0, 'No outside Module label remains');
   const first = page.locator('#knowledgeGraphCategory option').first();
@@ -242,6 +302,7 @@ async function runCase(browser, width, theme, offline) {
       await page.waitForFunction(() => knowledgeGraphInitialized);
       await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
       await page.waitForSelector('#knowledgeGraphCanvas .kg-section');
+      await graphNavigationPaint(page);
     }
     await moduleControls(page);
     if (offline) {
@@ -288,7 +349,8 @@ async function disconnectedCase(browser) {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
-    for (const [width, theme] of [[390, 'dark'], [1440, 'light']]) for (const offline of [false, true]) await runCase(browser, width, theme, offline);
+    for (const width of [390, 1440]) for (const theme of ['dark', 'light']) await runCase(browser, width, theme, false);
+    for (const [width, theme] of [[390, 'dark'], [1440, 'light']]) await runCase(browser, width, theme, true);
     await runCase(browser, 820, 'light', true);
     await disconnectedCase(browser);
   } finally { await browser.close(); }

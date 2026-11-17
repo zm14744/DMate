@@ -1038,6 +1038,7 @@ let knowledgeGraphScope = "current";
 let knowledgeGraphQuestionReference = null;
 let knowledgeGraphRenderedQuestion = null;
 const knowledgeGraphQuestionAnalyses = new WeakMap();
+const KNOWLEDGE_GRAPH_CLASSIFIER_REVISION = "catalog-semantic-v5";
 let knowledgeGraphSelectedNodeId = "";
 let knowledgeGraphSideMode = "detail";
 let knowledgeGraphLoading = false;
@@ -4144,12 +4145,30 @@ function normalizeQuestionKnowledgeGraph(value) {
         .map(row => ({source:row.source, quote:row.quote}));
     return {
         version:1,
+        classifier_revision:typeof value.classifier_revision === "string" ? value.classifier_revision : "",
+        catalog_revision:typeof value.catalog_revision === "string" ? value.catalog_revision : "",
+        classification_source:typeof value.classification_source === "string" ? value.classification_source : "",
+        classification_status:typeof value.classification_status === "string" ? value.classification_status : "legacy",
+        reconciliation_source:typeof value.reconciliation_source === "string" ? value.reconciliation_source : "",
+        task_structure_ids:Array.isArray(value.task_structure_ids)
+            ? value.task_structure_ids.filter(id => typeof id === "string").slice(0, 68) : [],
+        scope_exclusions:value.scope_exclusions?.logic_reasoning === "quantified_transform_without_propositional_argument"
+            ? {logic_reasoning:"quantified_transform_without_propositional_argument"} : {},
+        validation_issues:Object.fromEntries(Object.entries(value.validation_issues || {})
+            .filter(([key, count]) => /^[a-z_]{1,64}$/.test(key) && Number.isInteger(count) && count > 0 && count <= 4096).slice(0, 32)),
+        unresolved:typeof value.unresolved === "string" ? value.unresolved.slice(0, 800) : "",
+        needs_review:value.needs_review !== false,
         sources:{question:typeof value.sources?.question === "string" ? value.sources.question : "",
             solution:typeof value.sources?.solution === "string" ? value.sources.solution : ""},
         nodes:value.nodes.filter(node => node && typeof node.id === "string").slice(0, 256)
-            .map(node => ({id:node.id, evidence:evidence(node.evidence)})),
+            .map(node => ({id:node.id, evidence:evidence(node.evidence),
+                reason:typeof node.reason === "string" ? node.reason.slice(0, 2000) : "",
+                structural_reason:typeof node.structural_reason === "string" ? node.structural_reason.slice(0, 2000) : "",
+                usage:["assessed", "used"].includes(node.usage) ? node.usage : "",
+                origin:["task_structure", "catalog_semantic", "semantic", "term_candidate"].includes(node.origin) ? node.origin : ""})),
         edges:value.edges.filter(edge => edge && typeof edge.from === "string" && typeof edge.to === "string").slice(0, 4096)
-            .map(edge => ({from:edge.from, to:edge.to, evidence:evidence(edge.evidence)}))
+            .map(edge => ({from:edge.from, to:edge.to, evidence:evidence(edge.evidence),
+                reason:typeof edge.reason === "string" ? edge.reason.slice(0, 2000) : ""}))
     };
 }
 
@@ -4168,11 +4187,25 @@ function questionGraphMatchesQuestion(graph, questionText, message = null) {
 function mergeQuestionTeaching(previous, incoming, questionText, message = null) {
     const next = normalizeTeaching(incoming);
     if (!next) return normalizeTeaching(previous);
-    const prior = normalizeTeaching(previous)?.question_graph;
+    const priorTeaching = normalizeTeaching(previous);
+    const prior = priorTeaching?.question_graph;
+    const sameQuestion = questionGraphMatchesQuestion(prior, questionText, message);
+    const sameSources = sameQuestion && questionGraphMatchesQuestion(next.question_graph, questionText, message)
+        && prior.sources.solution === next.question_graph.sources.solution;
+    const reviewed = graph => graph?.classifier_revision === KNOWLEDGE_GRAPH_CLASSIFIER_REVISION
+        && graph.classification_source === "catalog_semantic"
+        && graph.classification_status === "semantic" && graph.needs_review === false;
     // A background question-only classification must not erase relations from
     // an answer that finished while it was running.
-    if (prior?.sources.solution && questionGraphMatchesQuestion(prior, questionText, message)
-        && !next.question_graph?.sources.solution) next.question_graph = prior;
+    if ((sameSources && reviewed(prior) && !reviewed(next.question_graph))
+        || (sameQuestion && prior.sources.solution && !next.question_graph?.sources.solution
+            && !reviewed(next.question_graph))) {
+        next.question_graph = prior;
+        for (const key of ["category", "related_categories", "knowledge_points", "related_knowledge_points",
+            "focus_points", "classification_revision", "classification_status", "classification_source", "needs_review"]) {
+            next[key] = priorTeaching[key];
+        }
+    }
     return next;
 }
 
@@ -4185,18 +4218,17 @@ function normalizeTeaching(value) {
         typeof input === "string" ? input.trim() : ""
     );
 
-    const asTextList = input => (
+    const asTextList = (input, limit = 68) => (
         Array.isArray(input)
-            ? input
+            ? [...new Set(input
                 .filter(item => typeof item === "string" && item.trim())
-                .map(item => item.trim())
-                .slice(0, 4)
+                .map(item => item.trim()))].slice(0, limit)
             : []
     );
 
     return {
         category: asText(value.category) || "待识别",
-        related_categories: asTextList(value.related_categories),
+        related_categories: asTextList(value.related_categories, 10),
         knowledge_points: asTextList(value.knowledge_points),
         related_knowledge_points: asTextList(value.related_knowledge_points),
         focus_points: asTextList(value.focus_points).slice(0, 2),
@@ -4211,6 +4243,9 @@ function normalizeTeaching(value) {
         mode_label: asText(value.mode_label) || "提示引导",
         confidence: asText(value.confidence) || "低",
         classification_source: asText(value.classification_source),
+        classification_revision: asText(value.classification_revision),
+        classification_status: asText(value.classification_status),
+        needs_review: value.needs_review !== false,
         input_source: asText(value.input_source) || "文本输入"
     };
 }
@@ -7809,12 +7844,10 @@ async function refreshWrongBookClassifications() {
                 if (["简单", "中等", "困难"].includes(detected.difficulty)) {
                     item.difficulty = detected.difficulty;
                 }
-                // 低可信本地判断仍允许下次打开错题本时重试语义复核；
-                // 避免模型暂时不可用就永久锁定错误分类。
-                const pendingReview = detected.classification_source !== "AI语义复核"
-                    && (detected.confidence === "低"
-                        || (detected.confidence === "中"
-                            && detected.related_categories.length >= 2));
+                // 未完成复核的判断允许下次打开时重试，不能由本地置信度
+                // 决定是否永久保留某次归类。
+                const pendingReview = detected.needs_review !== false
+                    || detected.classification_status !== "semantic";
                 item.classificationVersion = pendingReview ? 2 : 3;
                 changed = true;
             }
@@ -14367,6 +14400,14 @@ async function requestAiReply(session, options = {}) {
                 );
             }
 
+            if (!supportingImagesOnly) {
+                const reviewedCandidate = localGeneratedQuestion
+                    ? collectConversationQuestionCandidates(session).find(candidate => candidate.role === "ai"
+                        && candidate.text === localGeneratedQuestion)
+                    : (requestTargetCandidate || activeQuestionCandidateFromHistory(session));
+                queueQuestionCatalogReview(session, reviewedCandidate);
+            }
+
             const graphModal = document.getElementById("knowledgeGraphModal");
             if (graphModal && !graphModal.classList.contains("hidden")) {
                 if (knowledgeGraphViewMode === "focus" && knowledgeGraphScope === "current"
@@ -18783,7 +18824,7 @@ async function analyzeSingleQuestionTeaching(
             const response = await fetch("/analyze-questions", {
                 method: "POST", signal:controller.signal,
                 headers: { "Content-Type":"application/json" },
-                body: JSON.stringify({ questions:[{key,text,
+                body: JSON.stringify({ ...(options.semanticReview ? {semantic_fallback:true} : {}), questions:[{key,text,
                     ...(typeof options.solutionText === "string" && options.solutionText
                         ? {solution:options.solutionText} : {})}] })
             });
@@ -19257,6 +19298,17 @@ function knowledgeGraphQuestionContext(session, item, reference) {
     const graph = normalizeQuestionKnowledgeGraph(teaching.question_graph);
     const questionGraph = questionGraphMatchesQuestion(graph, item.text, message) ? graph : null;
     const solutionSources = [];
+    let reviewSolutionText = "";
+    if (item.role === "ai") {
+        const answer = String(message.generatedAnswer || "");
+        const text = String(message.text || ""), question = String(message.generatedQuestion || "");
+        const position = question ? text.indexOf(question) : -1;
+        const tail = position >= 0 ? text.slice(position + question.length) : "";
+        const heading = /(?:^|\n)\s*(?:【解析】|\[Explanation\])\s*\n/i.exec(tail);
+        const explanation = heading ? tail.slice(heading.index + heading[0].length)
+            .split(/\n\s*(?:【涉及知识点】|\[Topics\])\s*\n/i)[0].trim() : "";
+        reviewSolutionText = [answer, explanation].filter(Boolean).join("\n\n");
+    }
     {
         // Validate against actual stored answers belonging to this question,
         // rather than accepting the graph's own claimed solution as evidence.
@@ -19277,7 +19329,10 @@ function knowledgeGraphQuestionContext(session, item, reference) {
                 : answer.targetQuestionFingerprint
                     ? uniqueLegacyOwner && answer.targetQuestionFingerprint === reference.fingerprint
                     : owner?.index === item.index;
-            if (belongs && answer.text) solutionSources.push(String(answer.text));
+            if (belongs && answer.text) {
+                solutionSources.push(String(answer.text));
+                if (!answer.generatedExercise && index !== item.index) reviewSolutionText = String(answer.text);
+            }
         }
     }
     const solutionText = solutionSources.join("\n\n");
@@ -19286,7 +19341,7 @@ function knowledgeGraphQuestionContext(session, item, reference) {
         focusPoints:canonicalNames(teaching.focus_points), knowledgePoints:canonicalNames(teaching.knowledge_points),
         relatedPoints:canonicalNames(teaching.related_knowledge_points), prerequisitePoints:canonicalNames(teaching.prerequisite_points),
         knowledgePath:canonicalNames(teaching.knowledge_path), questionCount:1,
-        questionGraph, questionText:item.text, solutionText,
+        questionGraph, questionText:item.text, solutionText, reviewSolutionText,
         questionReference:reference, questionOrder:item.order || 0
     };
 }
@@ -19313,8 +19368,25 @@ function getKnowledgeGraphQuestionSubject() {
     return {reference, context:knowledgeGraphQuestionContext(session, item, reference)};
 }
 
+function isReviewedKnowledgeGraph(context) {
+    const graph = context?.questionGraph;
+    return graph?.classifier_revision === KNOWLEDGE_GRAPH_CLASSIFIER_REVISION
+        && graph.classification_source === "catalog_semantic"
+        && graph.classification_status === "semantic" && graph.needs_review === false
+        && graph.sources.solution === (context.reviewSolutionText || "");
+}
+
+function queueQuestionCatalogReview(session, candidate) {
+    if (!candidate || !sessions.includes(session)) return "unavailable";
+    ensureSessionMessageIds(session);
+    const reference = {sessionId:String(session.id), messageId:session.messages[candidate.index]?.messageId || "",
+        index:candidate.index, fingerprint:wrongQuestionFingerprint(candidate.text)};
+    return queueKnowledgeGraphQuestionAnalysis({reference,
+        context:knowledgeGraphQuestionContext(session, candidate, reference)});
+}
+
 function queueKnowledgeGraphQuestionAnalysis(subject) {
-    if (!subject || subject.context.questionGraph) return "ready";
+    if (!subject || isReviewedKnowledgeGraph(subject.context)) return "ready";
     const session = sessions.find(value => String(value.id) === String(subject.reference.sessionId));
     if (!session) return "unavailable";
     const candidate = collectConversationQuestionCandidates(session).find(value =>
@@ -19324,21 +19396,37 @@ function queueKnowledgeGraphQuestionAnalysis(subject) {
     const message = candidate && session.messages[candidate.index];
     if (!message) return "unavailable";
     const version = cloudSyncContextVersion, previous = knowledgeGraphQuestionAnalyses.get(message);
-    if (previous?.questionText === candidate.text && previous.version === version
-        && (previous.status === "pending" || previous.openRevision === knowledgeGraphOpenRevision)) return previous.status;
-    const operation = {questionText:candidate.text, version, openRevision:knowledgeGraphOpenRevision, status:"pending"};
+    const solutionText = subject.context.reviewSolutionText || "";
+    if (previous?.questionText === candidate.text && previous.solutionText === solutionText
+        && previous.revision === KNOWLEDGE_GRAPH_CLASSIFIER_REVISION && previous.version === version
+        && (previous.status === "pending" || previous.openRevision === knowledgeGraphOpenRevision
+            || Date.now() - previous.completedAt < 60000)) return previous.status;
+    const operation = {questionText:candidate.text, solutionText, revision:KNOWLEDGE_GRAPH_CLASSIFIER_REVISION,
+        version, openRevision:knowledgeGraphOpenRevision, status:"pending", completedAt:0};
     knowledgeGraphQuestionAnalyses.set(message, operation);
     operation.promise = analyzeSingleQuestionTeaching(candidate.text, candidate.key,
-        {solutionText:subject.context.solutionText}).then(teaching => {
+        {solutionText, semanticReview:true}).then(teaching => {
         operation.status = "unavailable";
         if (version !== cloudSyncContextVersion || knowledgeGraphQuestionAnalyses.get(message) !== operation) return;
         const current = resolveQuestionAnalysisCandidate(session, candidate, message);
         if (!current || !teaching?.question_graph) return;
+        const currentContext = knowledgeGraphQuestionContext(session, current, subject.reference);
+        if ((currentContext.reviewSolutionText || "") !== solutionText) return;
+        const graph = teaching.question_graph;
+        if (!questionGraphMatchesQuestion(graph, candidate.text, message) || graph.sources.solution !== solutionText) return;
         const field = candidate.role === "ai" ? "generatedTeaching" : "questionTeaching";
         message[field] = mergeQuestionTeaching(message[field], teaching, candidate.text, message);
-        operation.status = "ready";
+        operation.status = isReviewedKnowledgeGraph({...currentContext, questionGraph:message[field].question_graph})
+            ? "ready" : "unavailable";
+        const active = activeQuestionCandidateFromHistory(session);
+        if (active && session.messages[active.index] === message && active.text === candidate.text) {
+            applyQuestionCandidateAsCurrent(session, current, message[field]);
+        }
         saveState();
+        if (getCurrent() === session) renderInfo();
     }).finally(() => {
+        operation.completedAt = Date.now();
+        if (operation.status === "pending") operation.status = "unavailable";
         const modal = document.getElementById("knowledgeGraphModal");
         if (version !== cloudSyncContextVersion || modal?.classList.contains("hidden")) return;
         const current = getKnowledgeGraphQuestionSubject();
@@ -20235,6 +20323,12 @@ function createSvgElement(tag, attrs = {}) {
 }
 
 function knowledgeGraphFocusedNodes(_category, context) {
+    const graph = context?.questionGraph;
+    // Local recognizers supply candidates to review, not final purple nodes.
+    if (graph?.classifier_revision !== KNOWLEDGE_GRAPH_CLASSIFIER_REVISION
+        || graph.classification_source !== "catalog_semantic"
+        || !["semantic", "partial"].includes(graph.classification_status)
+        || graph.sources.solution !== (context.reviewSolutionText || "")) return [];
     return window.DMateQuestionKnowledgeGraph.build(knowledgeGraphData?.nodes || [], context).nodes;
 }
 
@@ -21606,8 +21700,8 @@ function renderKnowledgeGraph() {
         empty.textContent = !knowledgeGraphRenderedQuestion
             ? (knowledgeGraphViewMode === "history" ? dmateUiText("请选择一道历史题目", "Select a past question") : dmateUiText("无", "None"))
             : questionAnalysis === "pending"
-            ? dmateUiText("正在识别本题知识关系", "Identifying this question's knowledge relations")
-            : dmateUiText("暂无有依据的题目知识关系", "No evidenced knowledge relations for this question");
+            ? dmateUiText("正在核对本题知识点", "Reviewing this question's knowledge points")
+            : dmateUiText("知识点归类暂未完成", "Knowledge point classification is not complete yet");
         canvas.replaceChildren(empty);
         renderKnowledgeGraphSide();
         return;
@@ -21618,11 +21712,16 @@ function renderKnowledgeGraph() {
         ? (knowledgeGraphScope === "history"
             ? dmateUiText("历史题目关联", "Historical question connections") : dmateUiText("最近一题关联", "Related to latest question"))
         : displayCategory;
-    const description = questionView
+    let description = questionView
         ? (knowledgeGraphScope === "history"
             ? dmateUiText(`历史题目关联 ${visibleNodes.length} 个知识点`, `Historical question connections ${visibleNodes.length} concepts`)
             : `最近一题关联 ${visibleNodes.length} 个知识点`)
         : dmateUiText(`${fullNodes.length} 个知识点`, `${fullNodes.length} concepts`);
+    if (questionView && questionAnalysis === "pending") {
+        description += dmateUiText(" · 正在核对知识点", " · Reviewing knowledge points");
+    } else if (questionView && context.questionGraph?.needs_review !== false) {
+        description += dmateUiText(" · 初步识别", " · Preliminary classification");
+    }
 
     const mobileGraph = window.matchMedia?.("(max-width: 760px)")?.matches;
     if (mobileGraph && knowledgeGraphMobileFullscreen) {

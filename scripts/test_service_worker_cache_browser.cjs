@@ -61,7 +61,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     assert.equal(reference.status(), 200, 'The server must provide the shared stylesheet');
     const networkCSS = await reference.text();
     assert.ok(networkCSS.trim().length, 'The shared stylesheet must not be empty');
-    const sharedAssets = await Promise.all(['/static/dmate-main.css?v=59', '/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
+    const sharedAssets = await Promise.all(['/static/dmate-main.css?v=59', '/static/button-themes.css?v=60', '/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
       '/static/select-controls.css?v=42', '/static/mobile-select.js?v=26', '/static/offline.css?v=51',
       '/static/drawing-workspace.css?v=50', '/static/graph-editor.js?v=53', '/static/graph-editor-overlay.js?v=35', '/static/drawing-workspace.js?v=53', '/static/drawing-export.js?v=39',
       '/static/modal-chrome.css', '/static/modal-text.js?v=53', '/static/delete-confirm.js', '/static/guest-session.js?v=53', '/static/language.js?v=59',
@@ -82,8 +82,8 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     // Simulate the pinned stylesheet left by the previous offline shell.
     await page.goto(new URL('/health', baseURL).href);
     await page.evaluate(async () => {
-      const cache = await caches.open('dmate-offline-shell-v58');
-      await cache.put('/static/button-themes.css?v=43', new Response('/* obsolete shell before neutral notebook and appearance actions */'));
+      const cache = await caches.open('dmate-offline-shell-v59');
+      await cache.put('/static/button-themes.css?v=54', new Response('/* obsolete graph navigation button styles */'));
     });
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });
     await page.evaluate(async () => {
@@ -100,7 +100,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       if (canonical.length !== 1) throw new Error('Expected exactly one precached shared stylesheet');
       return { name: names[0], canonical: canonical[0].url };
     }, assetPath);
-    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 59, 'Graph navigation and clamped zoom need the refreshed offline cache');
+    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 60, 'Matching graph navigation buttons need the refreshed offline cache');
     assert.equal((await fetchAsset(page, current.canonical)).text, networkCSS,
       'The refreshed shell loads current frameless controls instead of the obsolete stylesheet');
     for (const asset of sharedAssets) {
@@ -151,7 +151,8 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     for (const asset of sharedAssets) {
       const offlineAsset = await fetchAsset(page, asset.path);
       assert.equal(offlineAsset.status, 200);
-      assert.equal(offlineAsset.text, asset.text, 'Shared controls remain available offline: ' + asset.path);
+      const expected = new URL(asset.path, baseURL).pathname === assetPath ? canonicalSentinel : asset.text;
+      assert.equal(offlineAsset.text, expected, 'Shared controls retain their current cache entry offline: ' + asset.path);
     }
     console.log('PASS the previous shell cache upgrades and shared UI resources remain available offline');
     const exactOffline = await fetchAsset(page, revision);

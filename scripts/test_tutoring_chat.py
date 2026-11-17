@@ -88,8 +88,12 @@ class TutoringChatTests(unittest.TestCase):
 
     def post(self, payload, result=None, *, expected_mode=None, reference_allowed=False,
              expected_status=200, exercise=False):
-        with patch.object(self.runtime, "ask_ai", return_value=result or SUCCESS) as ask:
+        with patch.object(self.runtime, "ask_ai", return_value=result or SUCCESS) as ask, patch.object(
+            self.runtime, "classify_catalog_questions",
+            side_effect=AssertionError("/chat must not make a serial topic-review call"),
+        ) as review:
             response = self.client.post("/chat", json=payload)
+        review.assert_not_called()
         self.addCleanup(response.close)
         self.assertEqual(response.status_code, expected_status, response.get_data(as_text=True))
         self.assertTrue(response.is_json)
@@ -376,6 +380,154 @@ class TutoringChatTests(unittest.TestCase):
             self.assertEqual(graphs[key]["edges"], [])
         self.assertEqual(graphs["long"]["sources"]["solution"], prefix)
         self.assertEqual(graphs["long"]["edges"], [])
+
+    def semantic_teaching(self, question, solution, node_id="count_perm_comb"):
+        """A transport fixture, not an assertion about a real model's accuracy."""
+        node = next(node for node in self.runtime.KNOWLEDGE_GRAPH_DATA["nodes"] if node["id"] == node_id)
+        teaching = dict(self.runtime.analyze_question(question))
+        teaching.update({"category": node["category"], "knowledge_points": [node["name"]],
+                         "focus_points": [node["name"]], "related_categories": [],
+                         "classification_revision": "catalog-semantic-v2",
+                         "classification_source": "AI语义复核", "classification_status": "semantic",
+                         "needs_review": False, "confidence": "中"})
+        teaching["question_graph"] = {
+            "version": 1, "sources": {"question": question, "solution": solution},
+            "classifier_revision": "catalog-semantic-v2", "classification_status": "semantic",
+            "classification_source": "catalog_semantic", "needs_review": False,
+            "nodes": [{"id": node_id, "usage": "assessed", "reason": "根据完整数学任务归入现有目录",
+                       "evidence": [{"source": "question", "quote": question[:100]}]}], "edges": [],
+        }
+        return teaching
+
+    def test_local_batch_does_not_invoke_the_semantic_model(self):
+        question = "从10名学生中选出3名组成小组，有多少种不同选法"
+        with patch.object(self.runtime, "classify_catalog_questions",
+                          side_effect=AssertionError("Local classification must not call a remote review")) as review:
+            response = self.client.post("/analyze-questions", json={"questions": [{"key": "q", "text": question}]})
+        self.addCleanup(response.close)
+        self.assertEqual(response.status_code, 200)
+        review.assert_not_called()
+        self.assertEqual(response.get_json()["results"][0]["teaching"]["question_graph"]["sources"],
+                         {"question": question, "solution": ""})
+
+    def test_catalog_review_installs_the_validated_graph_without_rebuilding_local_rules(self):
+        question = "从10名学生中选出3名组成小组，有多少种不同选法"
+        solution = "无序选择三个人，得到120种"
+        expected = self.semantic_teaching(question, solution)
+
+        def classify(entries, *, allow_remote):
+            self.assertTrue(allow_remote)
+            self.assertEqual(len(entries), 1)
+            row_id, actual_question, actual_solution, local = entries[0]
+            self.assertEqual((actual_question, actual_solution), (question, solution))
+            self.assertEqual(local["question_graph"]["sources"], expected["question_graph"]["sources"])
+            return {row_id: expected}
+
+        with patch.object(self.runtime, "classify_catalog_questions", side_effect=classify) as review:
+            response = self.client.post("/analyze-questions", json={"semantic_fallback": True,
+                "questions": [{"key": "client-key", "text": question, "solution": solution}]})
+        self.addCleanup(response.close)
+        self.assertEqual(response.status_code, 200)
+        review.assert_called_once()
+        result = response.get_json()["results"][0]
+        self.assertEqual(result["key"], "client-key")
+        self.assertEqual(result["teaching"], expected)
+        self.assertEqual(result["teaching"]["knowledge_points"], ["排列与组合"])
+
+    def test_catalog_review_uses_unique_rows_when_client_keys_are_missing_or_repeated(self):
+        questions = ["从8人中选择3人", "判断f(x)=x²是否存在相同输出", "", "使用真值表验证逻辑等价", "研究欧拉图"]
+        solutions = ["答案为56", "f(1)=f(-1)", "", "", ""]
+        node_ids = ["count_perm_comb", "function_injection", None, "logic_equivalence", "graph_euler"]
+        expected = {}
+
+        def classify(entries, *, allow_remote):
+            self.assertTrue(allow_remote)
+            self.assertEqual(len(entries), 4)
+            self.assertEqual(len({entry[0] for entry in entries}), 4)
+            for row_id, question, solution, _local in entries:
+                index = questions.index(question)
+                self.assertEqual(solution, solutions[index])
+                expected[row_id] = self.semantic_teaching(question, solution, node_ids[index])
+            return expected
+
+        with patch.object(self.runtime, "classify_catalog_questions", side_effect=classify):
+            response = self.client.post("/analyze-questions", json={"semantic_fallback": True, "questions": [
+                {"key": "repeated", "text": questions[0], "solution": solutions[0]},
+                {"key": "repeated", "text": questions[1], "solution": solutions[1]},
+                {"text": ""}, {"text": questions[3]}, questions[4],
+            ]})
+        self.addCleanup(response.close)
+        self.assertEqual(response.status_code, 200)
+        results = response.get_json()["results"]
+        self.assertEqual([item["key"] for item in results], ["repeated", "repeated", "", "", ""])
+        self.assertIsNone(results[2]["teaching"])
+        for index in (0, 1, 3, 4):
+            graph = results[index]["teaching"]["question_graph"]
+            self.assertEqual(graph["sources"], {"question": questions[index], "solution": solutions[index]})
+            self.assertEqual([node["id"] for node in graph["nodes"]], [node_ids[index]])
+
+    def test_catalog_review_never_installs_foreign_sources_or_catalog_nodes(self):
+        question, solution = "从10人中选出3人", "120"
+        for defect in ("question", "solution", "unknown_node", "node_type", "edge_endpoint", "version"):
+            invalid = self.semantic_teaching(question, solution)
+            graph = invalid["question_graph"]
+            if defect in ("question", "solution"):
+                graph["sources"][defect] = "another problem's private source"
+            elif defect == "unknown_node":
+                graph["nodes"][0]["id"] = "invented-outside-catalog"
+            elif defect == "node_type":
+                graph["nodes"][0]["id"] = []
+            elif defect == "edge_endpoint":
+                graph["edges"] = [{"from": "count_perm_comb", "to": "number_gcd"}]
+            else:
+                graph["version"] = 99
+            with self.subTest(defect=defect), patch.object(self.runtime, "classify_catalog_questions",
+                    side_effect=lambda entries, **_kwargs: {entries[0][0]: invalid}):
+                response = self.client.post("/analyze-questions", json={"semantic_fallback": True,
+                    "questions": [{"text": question, "solution": solution}]})
+                self.addCleanup(response.close)
+                self.assertEqual(response.status_code, 200)
+                result = response.get_json()["results"][0]["teaching"]
+                self.assertEqual(result["classification_status"], "invalid")
+                self.assertTrue(result["needs_review"])
+                self.assertTrue(result["question_graph"]["needs_review"])
+                self.assertEqual(result["question_graph"]["sources"], {"question": question, "solution": solution})
+                self.assertNotIn("invented-outside-catalog", repr(result))
+                self.assertNotIn("another problem's private source", repr(result))
+
+    def test_catalog_review_failure_returns_explicit_unavailable_local_result(self):
+        question = "证明p∧q与q∧p等价"
+        for failure in (RuntimeError("review unavailable"), None):
+            options = {"side_effect": failure} if isinstance(failure, Exception) else {"return_value": {}}
+            with self.subTest(failure=type(failure).__name__), patch.object(self.runtime, "classify_catalog_questions", **options):
+                response = self.client.post("/analyze-questions", json={"semantic_fallback": True,
+                    "questions": [{"text": question}]})
+                self.addCleanup(response.close)
+                self.assertEqual(response.status_code, 200)
+                result = response.get_json()["results"][0]["teaching"]
+                self.assertEqual(result["classification_status"], "unavailable")
+                self.assertTrue(result["needs_review"])
+                self.assertEqual(result["question_graph"]["sources"], {"question": question, "solution": ""})
+
+    def test_catalog_review_quota_preserves_local_result_and_exact_cached_semantic_result(self):
+        question, solution = "从10人中选出3人", "120"
+        for cached in (False, True):
+            def classify(entries, *, allow_remote):
+                self.assertFalse(allow_remote)
+                row_id, q, answer, local = entries[0]
+                return {row_id: self.semantic_teaching(q, answer) if cached else
+                        self.runtime.local_catalog_classification(local, q, answer, status="disabled")}
+            with self.subTest(cached=cached), patch.object(self.runtime, "_check_rate_limit", return_value=False), patch.object(
+                    self.runtime, "classify_catalog_questions", side_effect=classify) as review:
+                response = self.client.post("/analyze-questions", json={"semantic_fallback": True,
+                    "questions": [{"text": question, "solution": solution}]})
+                self.addCleanup(response.close)
+                self.assertEqual(response.status_code, 200)
+                review.assert_called_once()
+                result = response.get_json()["results"][0]["teaching"]
+                self.assertEqual(result["classification_status"], "semantic" if cached else "rate_limited")
+                self.assertEqual(result["needs_review"], not cached)
+                self.assertEqual(result["question_graph"]["sources"], {"question": question, "solution": solution})
 
 
 if __name__ == "__main__":

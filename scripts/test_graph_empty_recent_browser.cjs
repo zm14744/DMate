@@ -135,7 +135,7 @@ async function checkEmptyRecent(browser, width) {
       const session = getCurrent();
       const question = '判断命题 p 与 q 的合取在什么情况下为真。';
       const teaching = { category: '命题逻辑', knowledge_points: ['逻辑联结词'], focus_points: ['逻辑联结词'],
-        question_graph: { version: 1, sources: { question, solution: '' },
+        question_graph: { version: 1,classifier_revision:'catalog-semantic-v5',classification_status:'semantic',classification_source:'catalog_semantic',needs_review:false, sources: { question, solution: '' },
           nodes: [{ id: 'logic_connectives', evidence: [{ source: 'question', quote: '合取' }] }], edges: [] } };
       session.messages = [{ role: 'user', text: question, manualIsQuestion: true, questionTeaching: teaching }];
       session.teaching = teaching;
@@ -162,12 +162,12 @@ async function checkEmptyRecent(browser, width) {
     await page.evaluate(() => {
       const session = getCurrent();
       session.messages[0].questionTeaching = { category: '命题逻辑', knowledge_points: ['图谱中不存在的概念'],
-        question_graph: { version: 1, sources: { question: session.messages[0].text, solution: '' },
+        question_graph: { version: 1,classifier_revision:'catalog-semantic-v5',classification_status:'semantic',classification_source:'catalog_semantic',needs_review:false, sources: { question: session.messages[0].text, solution: '' },
           nodes: [{ id: 'unknown-concept', evidence: [{ source: 'question', quote: '合取' }] }], edges: [] } };
       session.teaching = session.messages[0].questionTeaching;
       renderKnowledgeGraph();
     });
-    await assertEmpty(page, '暂无有依据的题目知识关系', width + '/unmatched question concepts');
+    await assertEmpty(page, '知识点归类暂未完成', width + '/unmatched question concepts');
     if (process.env.KG_SCREENSHOT_DIR) await page.screenshot({ path: process.env.KG_SCREENSHOT_DIR + '/graph-empty-recent-' + width + '.png' });
     assert.deepEqual(errors, [], width + ': browser errors');
     console.log('PASS ' + width + ': empty recent graph/detail, live language, export guard, full camera memory and valid-question recovery');
@@ -186,7 +186,7 @@ async function checkHistoryModes(browser, width) {
     await page.waitForFunction(() => knowledgeGraphInitialized);
     const metadataBefore = await page.evaluate(() => {
       const teaching = (point, difficulty, type, question, id, quote) => ({ category: '命题逻辑', knowledge_points: [point], focus_points: [point],
-        difficulty, question_type: type, question_graph: { version: 1, sources: { question, solution: '' },
+        difficulty, question_type: type, question_graph: { version: 1,classifier_revision:'catalog-semantic-v5',classification_status:'semantic',classification_source:'catalog_semantic',needs_review:false, sources: { question, solution: '' },
           nodes: [{ id, evidence: [{ source: 'question', quote }] }], edges: [] } });
       const generatedQuestion = '证明命题 p 的双重否定与 p 等价。';
       getCurrent().messages = [
@@ -284,7 +284,7 @@ async function checkConversationModes(browser, width) {
     await page.evaluate(() => {
       const conversation = (id, question, quote) => {
         const teaching = { category: '命题逻辑', knowledge_points: ['逻辑联结词'], focus_points: ['逻辑联结词'],
-          question_graph: { version: 1, sources: { question, solution: '' },
+          question_graph: { version: 1,classifier_revision:'catalog-semantic-v5',classification_status:'semantic',classification_source:'catalog_semantic',needs_review:false, sources: { question, solution: '' },
             nodes: [{ id: 'logic_connectives', evidence: [{ source: 'question', quote }] }], edges: [] } };
         return { id, name: id, nameSource: 'user', learningQuestion: null, teaching,
           messages: [{ messageId: id + '-question', role: 'user', text: question, manualIsQuestion: true, questionTeaching: teaching }] };

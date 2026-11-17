@@ -7,6 +7,7 @@ from pathlib import Path
 from exercise_intent import classify_exercise_request, is_generic_continuation, resolve_exercise_request
 from exercise_relation_check import is_routine_small_relation_question
 from question_knowledge_graph import build_question_graph
+from question_topic_structure import structural_topic_ids
 from server_i18n import topic_label
 from tutoring_intent import classify_tutoring_request
 
@@ -107,14 +108,14 @@ def _knowledge_path(points, limit=5):
 
 def _question_graph_structural_points(text):
     points = [point for _category, point in _structural_topic_evidence(text)]
-    # The classifier also reads formulas whose specific topic is more precise
-    # than the broad structural signal (e.g. a recurrence's nonzero forcing).
-    categories = {category for category, _point in _structural_topic_evidence(text)}
-    if "递推关系" in categories:
-        points.extend(_extract_points(text, "递推关系"))
     if "关系" in text and re.search(r"(?<![a-z0-9_])r\s*(?:\^\s*\{?\s*\d+\s*\}?|[²³⁴⁵⁶⁷⁸⁹])", text, re.I):
         points.append("关系运算")
     return list(dict.fromkeys(points))
+
+
+def _question_graph_task_points(text):
+    by_id = {node["id"]: node for node in _KNOWLEDGE_GRAPH.get("nodes", [])}
+    return [by_id[identifier]["name"] for identifier in structural_topic_ids(text) if identifier in by_id]
 
 
 def enrich_question_graph(result, question_text, solution_text=""):
@@ -135,7 +136,29 @@ def enrich_question_graph(result, question_text, solution_text=""):
         _english_analysis_aliases,
         source_categories,
         _QUESTION_GRAPH_ENGLISH_LABELS,
+        task_structural_evidence=_question_graph_task_points,
     )
+    result.update(classification_revision="catalog-structure/2", classification_source="local_structure",
+                  classification_status="local", needs_review=True)
+    result["question_graph"].update(classifier_revision="catalog-structure/2", classification_source="local_structure",
+                                    classification_status="local", needs_review=True)
+    catalog_by_id = {node["id"]: node for node in _KNOWLEDGE_GRAPH.get("nodes", [])}
+    actual = [catalog_by_id[node["id"]] for node in result["question_graph"]["nodes"]]
+    if actual:
+        categories = list(dict.fromkeys(node["category"] for node in actual))
+        primary = result.get("category") if result.get("category") in categories else categories[0]
+        result["category"] = primary
+        result["related_categories"] = [category for category in categories if category != primary]
+        result["knowledge_points"] = [node["name"] for node in actual if node["category"] == primary]
+        result["related_knowledge_points"] = [node["name"] for node in actual if node["category"] != primary]
+        result["focus_points"] = result["knowledge_points"][:2]
+    else:
+        result["knowledge_points"] = []
+        result["related_knowledge_points"] = []
+        result["focus_points"] = []
+        if result.get("mode") != "exercise" and result.get("category", "") not in str(question_text):
+            result["category"] = "待识别"
+            result["related_categories"] = []
     # Legacy prompt fields cannot carry static course ancestry as if it was
     # established for the actual problem. Per-node dependencies are in the graph.
     result["prerequisite_points"] = []
@@ -1602,6 +1625,17 @@ def _structural_topic_evidence(text):
                  r"(?:群|环|域).{0,25}(?:公理|封闭|逆元|单位元|结合)", value):
         matches.append(("代数结构", "群与子群" if "群" in value else "代数系统"))
 
+    # Recognize mathematical tasks over their complete source as well as the
+    # legacy notation patterns. IDs are resolved exclusively in this catalog.
+    by_id = {node["id"]: node for node in _KNOWLEDGE_GRAPH.get("nodes", [])}
+    task_topics = structural_topic_ids(text)
+    for identifier in task_topics:
+        node = by_id.get(identifier)
+        if node:
+            matches.append((node["category"], node["name"]))
+    if task_topics.intersection({"recurrence_homogeneous", "recurrence_nonhomogeneous"}):
+        if not re.search(r"建立|建模|根据末尾|按末尾|写出递推", str(text)):
+            matches = [item for item in matches if item[1] != "递推关系建模"]
     return list(dict.fromkeys(matches))
 
 def _score_categories(text):

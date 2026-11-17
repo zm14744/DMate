@@ -1,0 +1,991 @@
+{
+  "schema_version": 1,
+  "title": "Independent mathematical content benchmark for the existing knowledge catalog",
+  "annotation_policy": "Required IDs describe mathematical content directly requested, not the entire prerequisite chain. A solution method is required only when the question constrains it or directly requests the theorem's mathematical assertion. Optional IDs are defensible ancillary content or alternative methods. Forbidden IDs identify explicitly irrelevant background or a mathematically distinct task. Unlisted IDs require review and are reported separately. This hand-written regression corpus does not estimate population accuracy or guarantee recognition of every possible question.",
+  "gold_provenance": "Written from knowledge_graph.json IDs/names and independent mathematical reasoning before running these cases against the implementation. The earlier 12-question blind audit supplied some seed questions. Neither new implementation nor existing classifier tests were read to derive expected labels.",
+  "cases": [
+    {
+      "id": "logic_01",
+      "modules": [
+        "命题逻辑"
+      ],
+      "question": "已知p为真、q为假、r为真，求(p→q)∨¬r的真假，并说明每一步。",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "logic_truth",
+        "logic_connectives"
+      ],
+      "permitted_optional_ids": [
+        "logic_truth_table"
+      ],
+      "forbidden_ids": [
+        "predicate_quantifier",
+        "predicate_prenex"
+      ],
+      "topic_reason": "给定命题真值后解释蕴含、析取和否定；不涉及带个体变元的量化。答案为假。"
+    },
+    {
+      "id": "logic_02",
+      "modules": [
+        "命题逻辑"
+      ],
+      "question": "For every Boolean assignment to p and q, do ¬(p→q) and p∧¬q have the same value? Justify your answer.",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "logic_connectives",
+        "logic_equivalence"
+      ],
+      "permitted_optional_ids": [
+        "logic_truth",
+        "logic_truth_table"
+      ],
+      "forbidden_ids": [
+        "predicate_quantifier",
+        "predicate_reasoning"
+      ],
+      "topic_reason": "要求判断两个命题公式在所有赋值下是否等价。两者均仅在p真q假时为真；列全表只是可选方法。"
+    },
+    {
+      "id": "logic_03",
+      "modules": [
+        "命题逻辑"
+      ],
+      "question": "已知p→q、q→r和¬r都成立，能否必然推出¬p？给出从前提到结论的步骤。",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "logic_reasoning"
+      ],
+      "permitted_optional_ids": [
+        "logic_connectives",
+        "logic_equivalence",
+        "logic_truth_table",
+        "proof_direct_contradiction"
+      ],
+      "forbidden_ids": [
+        "predicate_reasoning",
+        "proof_induction"
+      ],
+      "topic_reason": "直接检验命题前提到结论的有效推演；两次拒取式得到¬q和¬p，不含量化或整数归纳。"
+    },
+    {
+      "id": "logic_04",
+      "modules": [
+        "命题逻辑"
+      ],
+      "question": "我昨天做过真值表题；这次不要列表。把p→(q∧r)改写成若干括号的合取，每个括号内只能是文字的析取，文字指p、q、r或它们的否定。",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "logic_normal_form",
+        "logic_equivalence"
+      ],
+      "permitted_optional_ids": [
+        "logic_connectives"
+      ],
+      "forbidden_ids": [
+        "logic_truth_table",
+        "predicate_prenex"
+      ],
+      "topic_reason": "当前任务明确要求合取范式且排除列表法；结果(¬p∨q)∧(¬p∨r)。历史真值表背景不是当前考点。"
+    },
+    {
+      "id": "predicate_01",
+      "modules": [
+        "谓词逻辑"
+      ],
+      "question": "在整数范围内，把‘每个x都能找到一个y使y>x’写成符号式，再否定整个式子，并把否定号一直移到y>x之前。",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "predicate_quantifier",
+        "predicate_reasoning"
+      ],
+      "permitted_optional_ids": [
+        "predicate_domain",
+        "predicate_variable",
+        "logic_connectives"
+      ],
+      "forbidden_ids": [
+        "logic_truth_table",
+        "predicate_prenex"
+      ],
+      "topic_reason": "须表达∀x∃y并将其否定为∃x∀y¬(y>x)；量词对偶是当前任务本身，不是仅可选解法。"
+    },
+    {
+      "id": "predicate_02",
+      "modules": [
+        "谓词逻辑"
+      ],
+      "question": "In (∀x P(x,y)) ∨ (∃y Q(y,z)), which occurrences of x, y and z are controlled by a quantifying symbol, and which depend on an outside assignment? Explain why the two occurrences of y behave differently.",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "predicate_variable"
+      ],
+      "permitted_optional_ids": [
+        "predicate_quantifier",
+        "predicate_domain",
+        "logic_connectives"
+      ],
+      "forbidden_ids": [
+        "predicate_prenex",
+        "logic_truth_table"
+      ],
+      "topic_reason": "直接辨认约束变元、自由变元及辖域；P中y自由，Q中y受∃y约束，z自由。没有要求移动量词。"
+    },
+    {
+      "id": "predicate_03",
+      "modules": [
+        "谓词逻辑"
+      ],
+      "question": "设论域非空。将(∀x P(x))∨(∃y Q(y))改写为所有∀、∃符号都在最前面、后面不再出现这些符号的等价式，并说明哪些变元条件允许这样移动。",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "predicate_prenex",
+        "predicate_reasoning",
+        "predicate_variable"
+      ],
+      "permitted_optional_ids": [
+        "predicate_quantifier",
+        "predicate_domain",
+        "logic_connectives"
+      ],
+      "forbidden_ids": [
+        "logic_normal_form",
+        "logic_truth_table"
+      ],
+      "topic_reason": "要求前置全部量词且检查自由变元条件，即前束化；可得∀x∃y(P(x)∨Q(y))。这里不是命题公式的析取/合取范式。"
+    },
+    {
+      "id": "predicate_04",
+      "modules": [
+        "谓词逻辑"
+      ],
+      "question": "Consider ∀x ∃y (xy=1). Is it true when x,y range over all integers? Is it true when they range over nonzero rational numbers? Explain exactly how the choice of allowed objects changes the answer.",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "predicate_domain",
+        "predicate_quantifier"
+      ],
+      "permitted_optional_ids": [
+        "predicate_reasoning",
+        "number_prime",
+        "algebra_group"
+      ],
+      "forbidden_ids": [
+        "function_inverse",
+        "predicate_prenex"
+      ],
+      "topic_reason": "当前明确比较同一量化句在两个个体域中的真值。整数域取x=0即假，非零有理数取y=1/x即真；没有请求某个函数的逆。"
+    },
+    {
+      "id": "proof_01",
+      "modules": [
+        "证明与归纳",
+        "初等数论"
+      ],
+      "question": "设a、b都是奇整数。不假设结论为假，直接从a=2u+1、b=2v+1出发，证明ab也是奇整数。",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "proof_direct_contradiction",
+        "number_prime"
+      ],
+      "permitted_optional_ids": [
+        "logic_reasoning"
+      ],
+      "forbidden_ids": [
+        "proof_induction",
+        "proof_strong_induction"
+      ],
+      "topic_reason": "题面约束直接构造证明：ab=2(2uv+u+v)+1，奇偶性是整除2的内容。节点合并了直接证明与反证，所以不能因排除反证而禁止该合并节点。"
+    },
+    {
+      "id": "proof_02",
+      "modules": [
+        "证明与归纳"
+      ],
+      "question": "证明1+3+⋯+(2n−1)=n²对每个n≥1成立。必须先验证n=1，再只假定n=k时的等式，推出n=k+1时的等式；写清这两个环节。",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "proof_induction"
+      ],
+      "permitted_optional_ids": [
+        "proof_direct_contradiction",
+        "logic_reasoning"
+      ],
+      "forbidden_ids": [
+        "proof_strong_induction",
+        "recurrence_model",
+        "recurrence_homogeneous"
+      ],
+      "topic_reason": "步骤被明确限定为基例和单步归纳。虽有n，任务并未建立或求解数列递推，也不使用所有更小命题作假设。"
+    },
+    {
+      "id": "proof_03",
+      "modules": [
+        "证明与归纳",
+        "初等数论"
+      ],
+      "question": "Prove every integer n≥2 is a product of primes. In the step for n, assume the statement is already known for every m with 2≤m<n; if n=ab with 1<a,b<n, apply those earlier statements to both factors.",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "proof_strong_induction",
+        "number_prime"
+      ],
+      "permitted_optional_ids": [
+        "proof_induction",
+        "proof_direct_contradiction",
+        "logic_reasoning"
+      ],
+      "forbidden_ids": [
+        "number_euler_fermat",
+        "recurrence_homogeneous"
+      ],
+      "topic_reason": "明确要求使用所有更小整数的命题，且证明内容是素数分解存在性。普通单步归纳可作为前置，但不能代替强归纳标签。"
+    },
+    {
+      "id": "relation_01",
+      "modules": [
+        "集合与关系"
+      ],
+      "question": "设A={1,2,3,5}、B={2,4,5}、C={1,4}。求(A∪B)−C及(A−C)∩B。",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "set_operation"
+      ],
+      "permitted_optional_ids": [],
+      "forbidden_ids": [
+        "relation_operation",
+        "relation_property",
+        "count_inclusion"
+      ],
+      "topic_reason": "仅计算集合并、差、交，分别得{2,3,5}与{2,5}。没有二元关系或计数容斥任务。"
+    },
+    {
+      "id": "relation_02",
+      "modules": [
+        "集合与关系"
+      ],
+      "question": "Let A={1,2,3}, R={(1,2),(2,3)} and S={(2,1),(3,2)} be subsets of A×A. List every ordered pair in S∘R, where (a,c) belongs exactly when some b has (a,b) in R and (b,c) in S; also list R⁻¹.",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "relation_cartesian",
+        "relation_operation"
+      ],
+      "permitted_optional_ids": [
+        "set_operation"
+      ],
+      "forbidden_ids": [
+        "function_composition",
+        "function_inverse",
+        "relation_closure"
+      ],
+      "topic_reason": "显式考察关系的有序对表示、复合和逆；S∘R={(1,1),(2,2)}，R⁻¹={(2,1),(3,2)}。字母R、S为关系，并非题目给定的函数。"
+    },
+    {
+      "id": "relation_03",
+      "modules": [
+        "集合与关系",
+        "初等数论"
+      ],
+      "question": "在整数上定义xRy当且仅当x−y能被3整除。验证xRx、xRy⇒yRx以及(xRy且yRz)⇒xRz；再分别写出与0、1、2满足R的全部整数组成的集合。",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "relation_property",
+        "relation_equivalence",
+        "number_prime"
+      ],
+      "permitted_optional_ids": [
+        "relation_cartesian",
+        "number_congruence",
+        "proof_direct_contradiction",
+        "number_linear_congruence"
+      ],
+      "forbidden_ids": [
+        "relation_order"
+      ],
+      "topic_reason": "明确验证自反、对称、传递并构造等价类3Z、3Z+1、3Z+2。模3同余本身直接相关；写出各类也可看成解系数为1的一次同余，允许这些附加标签。"
+    },
+    {
+      "id": "relation_04",
+      "modules": [
+        "集合与关系",
+        "初等数论"
+      ],
+      "question": "在{1,2,3,6,12}上规定a≼b表示a整除b。判断它是否自反、反对称、传递，再找出整个集合的最小元和最大元，以及子集{2,3}在该集合内的最小上界。",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "relation_order",
+        "relation_property",
+        "number_prime"
+      ],
+      "permitted_optional_ids": [
+        "relation_cartesian",
+        "proof_direct_contradiction",
+        "algebra_lattice_bool"
+      ],
+      "forbidden_ids": [
+        "relation_equivalence",
+        "graph_topological"
+      ],
+      "topic_reason": "直接检验偏序公理并求序论元素。最小元1、最大元12、{2,3}的最小上界6；未要求对有向图执行排序。"
+    },
+    {
+      "id": "relation_05",
+      "modules": [
+        "集合与关系"
+      ],
+      "question": "在A={1,2,3,4}上已有配对(1,2)、(2,3)、(3,4)。只许添加配对，不许删除，至少还要加入哪些配对，才能保证只要(a,b)、(b,c)都在其中，(a,c)也在其中？",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "relation_closure",
+        "relation_property"
+      ],
+      "permitted_optional_ids": [
+        "relation_cartesian",
+        "relation_operation",
+        "graph_connectivity"
+      ],
+      "forbidden_ids": [
+        "relation_equivalence",
+        "graph_shortest"
+      ],
+      "topic_reason": "要求最小传递扩张，添加(1,3)、(2,4)、(1,4)。并未要求自反或对称，因此不应升级为等价关系。"
+    },
+    {
+      "id": "function_01",
+      "modules": [
+        "函数"
+      ],
+      "question": "一张对应表把A={a,b,c}中的a连到1，b同时连到1和2，c没有连到任何数；目标集合是{1,2}。这张表能否给每个A中的元素唯一指定一个输出？指出所有违反条件的地方。",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "function_mapping"
+      ],
+      "permitted_optional_ids": [
+        "relation_cartesian"
+      ],
+      "forbidden_ids": [
+        "function_injection",
+        "function_inverse",
+        "function_composition"
+      ],
+      "topic_reason": "先检验函数的存在唯一性定义，b多值且c无值；并非询问一个已成立函数是否单射或满射。"
+    },
+    {
+      "id": "function_02",
+      "modules": [
+        "函数"
+      ],
+      "question": "Let f: Z→{0,1,2,…} be f(x)=x². Can distinct inputs have the same output? Is every element of the target set reached? Give a counterexample whenever the answer is negative.",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "function_injection"
+      ],
+      "permitted_optional_ids": [
+        "function_mapping"
+      ],
+      "forbidden_ids": [
+        "function_inverse",
+        "function_composition",
+        "count_perm_comb"
+      ],
+      "topic_reason": "直接考察单射和满射：1和−1同像，目标2无原像。函数本身已明确定义，映射基础标签可选；题目未要求构造逆函数。"
+    },
+    {
+      "id": "function_03",
+      "modules": [
+        "函数"
+      ],
+      "question": "我上一题研究过逆函数；这次不求任何逆。已知f(x)=2x+1、g(x)=x²，x取实数。分别求g(f(x))与f(g(x))，比较在x=2时的值。",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "function_composition"
+      ],
+      "permitted_optional_ids": [
+        "function_mapping"
+      ],
+      "forbidden_ids": [
+        "function_inverse",
+        "function_injection"
+      ],
+      "topic_reason": "当前仅复合并代值：(2x+1)²与2x²+1，在2处为25和9。逆函数只出现在被明确排除的背景中。"
+    },
+    {
+      "id": "function_04",
+      "modules": [
+        "函数"
+      ],
+      "question": "The machine sends each real input x to y=3x−4. Find a second rule h that recovers x from every output y, and verify both h(3x−4)=x and 3h(y)−4=y.",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "function_inverse",
+        "function_composition"
+      ],
+      "permitted_optional_ids": [
+        "function_mapping",
+        "function_injection"
+      ],
+      "forbidden_ids": [
+        "relation_closure",
+        "number_linear_congruence"
+      ],
+      "topic_reason": "要求构造逆规则h(y)=(y+4)/3，并验证双向复合恒等；实数域等式不是模方程。"
+    },
+    {
+      "id": "number_01",
+      "modules": [
+        "初等数论"
+      ],
+      "question": "对252和198，反复做带余除法，直到余数为0。求能同时整除这两个数的最大正整数，再把它写成252u+198v的形式，其中u、v为整数。",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "number_gcd",
+        "number_prime"
+      ],
+      "permitted_optional_ids": [
+        "number_congruence"
+      ],
+      "forbidden_ids": [
+        "number_inverse_crt",
+        "number_rsa"
+      ],
+      "topic_reason": "题面明确要求欧几里得运算及贝祖表示，gcd=18=4×252−5×198。不是多个模条件联立。"
+    },
+    {
+      "id": "number_02",
+      "modules": [
+        "初等数论"
+      ],
+      "question": "Find every integer x for which dividing 14x by 30 leaves remainder 8. Express all answers as x=a+bk with k any integer, and verify that no residue class is missing.",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "number_linear_congruence",
+        "number_congruence"
+      ],
+      "permitted_optional_ids": [
+        "number_gcd",
+        "number_prime"
+      ],
+      "forbidden_ids": [
+        "number_inverse_crt",
+        "number_euler_fermat"
+      ],
+      "topic_reason": "本身是一次同余14x≡8 mod30的全体解，答案x=7+15k。欧几里得算法可用但不是唯一求法。"
+    },
+    {
+      "id": "number_03",
+      "modules": [
+        "初等数论"
+      ],
+      "question": "一批物品，每3件一组余2件，每5件一组余3件，每7件一组余2件。求最少有多少件，并说明所有可能数量相差的固定周期。",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "number_inverse_crt",
+        "number_congruence"
+      ],
+      "permitted_optional_ids": [
+        "number_linear_congruence",
+        "number_gcd",
+        "number_prime"
+      ],
+      "forbidden_ids": [
+        "number_rsa",
+        "count_inclusion"
+      ],
+      "topic_reason": "直接对象是互素模数3、5、7的联立剩余条件及其唯一周期105；最小正解23。中国剩余节点描述这一任务，即使枚举也能得答案。"
+    },
+    {
+      "id": "number_04",
+      "modules": [
+        "初等数论"
+      ],
+      "question": "Let a be any integer not divisible by 13. Show that multiplication by a rearranges the twelve nonzero residues modulo 13, then compare their products to prove a¹²≡1 (mod 13).",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "number_euler_fermat",
+        "number_congruence"
+      ],
+      "permitted_optional_ids": [
+        "number_prime",
+        "number_gcd",
+        "function_injection",
+        "proof_direct_contradiction",
+        "algebra_group"
+      ],
+      "forbidden_ids": [
+        "number_rsa",
+        "count_perm_comb"
+      ],
+      "topic_reason": "直接要求证明费马小定理在素数13下的断言，并限定非零剩余类置换证明；不是仅计算可用快速幂的单个幂。"
+    },
+    {
+      "id": "number_05",
+      "modules": [
+        "初等数论"
+      ],
+      "question": "甲选秘密素数p=5、q=11，公开n=pq和e=3；消息m编码为c=m^e除以n的余数。求0<d<40使ed除以40余1，再用m=9求c，并解释为什么用c^d除以n的余数能恢复消息。",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "number_rsa",
+        "number_congruence",
+        "number_linear_congruence"
+      ],
+      "permitted_optional_ids": [
+        "number_euler_fermat",
+        "number_gcd",
+        "number_prime",
+        "number_inverse_crt",
+        "function_inverse"
+      ],
+      "forbidden_ids": [
+        "count_generating"
+      ],
+      "topic_reason": "完整公钥幂加密与私钥指数恢复任务，即RSA；d=27、c=14。求私钥直接解3d≡1 mod40；解密也可解释为加密映射的逆，允许该附加概念。"
+    },
+    {
+      "id": "count_01",
+      "modules": [
+        "计数与组合"
+      ],
+      "question": "8名学生中选3名组成队伍，再从这3人中指定一名队长，共有多少种结果？",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "count_perm_comb",
+        "count_basic"
+      ],
+      "permitted_optional_ids": [
+        "count_binomial",
+        "count_generating"
+      ],
+      "forbidden_ids": [],
+      "topic_reason": "组合选人再乘3指定队长，C(8,3)×3=168。也可用8x(1+x)^7的x^3系数建模，因此二项式与生成函数是可选方法而非必需内容。"
+    },
+    {
+      "id": "count_02",
+      "modules": [
+        "计数与组合",
+        "初等数论"
+      ],
+      "question": "从1到60取出31个不同整数。把每个整数写成2^k乘一个奇数，按这个奇数分组，证明有两个数属于同组，从而其中一个整除另一个。",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "count_pigeonhole",
+        "number_prime"
+      ],
+      "permitted_optional_ids": [
+        "count_basic",
+        "proof_direct_contradiction"
+      ],
+      "forbidden_ids": [
+        "count_inclusion",
+        "count_binomial"
+      ],
+      "topic_reason": "题面已限定31个对象分入30个奇数部分的盒子这一证明步骤，故鸽巢并非从多种自由解法中擅自指定。整数同奇数部分时幂次可比较从而整除。"
+    },
+    {
+      "id": "count_03",
+      "modules": [
+        "计数与组合",
+        "集合与关系"
+      ],
+      "question": "A class has 40 students. Exactly 22 study French, 19 study German, and 8 study both. How many study at least one of these languages, and how many study neither? Explain how you correct double counting.",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "count_inclusion"
+      ],
+      "permitted_optional_ids": [
+        "count_basic",
+        "set_operation"
+      ],
+      "forbidden_ids": [
+        "count_perm_comb",
+        "count_pigeonhole"
+      ],
+      "topic_reason": "直接要求修正交集重复计数，22+19−8=33，均不学7人。不是选取排列组合。"
+    },
+    {
+      "id": "count_04",
+      "modules": [
+        "计数与组合"
+      ],
+      "question": "设F(x)=(1+x)^8(1+x+x²+x³+⋯)，把它当作形式幂级数。先写出(1+x)^8中x^k的系数公式，再由两部分相乘求F(x)中x³的系数。",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "count_binomial",
+        "count_generating"
+      ],
+      "permitted_optional_ids": [
+        "count_perm_comb",
+        "count_basic"
+      ],
+      "forbidden_ids": [
+        "recurrence_model",
+        "recurrence_homogeneous"
+      ],
+      "topic_reason": "分别直接要求二项式系数公式及形式生成级数乘积取系数；答案Σ(k=0..3)C(8,k)=93。没有待求递推。"
+    },
+    {
+      "id": "recurrence_01",
+      "modules": [
+        "递推关系"
+      ],
+      "question": "数列满足a₀=2、a₁=3，且n≥2时aₙ=3aₙ₋₁−2aₙ₋₂。求只含n的aₙ表达式，写明两个已知首项如何决定其中的常数。",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "recurrence_homogeneous",
+        "recurrence_initial"
+      ],
+      "permitted_optional_ids": [
+        "count_generating",
+        "proof_induction"
+      ],
+      "forbidden_ids": [
+        "recurrence_nonhomogeneous",
+        "recurrence_model"
+      ],
+      "topic_reason": "给定二阶常系数齐次递推和两初值，解为1+2^n；不需要从情境建立递推，亦无额外非齐次项。"
+    },
+    {
+      "id": "recurrence_02",
+      "modules": [
+        "递推关系"
+      ],
+      "question": "Let a_0=0 and a_n=2a_(n−1)+1 for n≥1. Find a formula with no earlier a-terms in it, and show how the added constant 1 affects your calculation.",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "recurrence_nonhomogeneous",
+        "recurrence_initial"
+      ],
+      "permitted_optional_ids": [
+        "recurrence_homogeneous",
+        "proof_induction",
+        "count_generating"
+      ],
+      "forbidden_ids": [
+        "recurrence_model"
+      ],
+      "topic_reason": "给出的递推含外加项1，且初值决定答案2^n−1；平移b_n=a_n+1转为齐次是允许的解法，但不能漏掉原问题的非齐次性。"
+    },
+    {
+      "id": "recurrence_03",
+      "modules": [
+        "递推关系",
+        "计数与组合"
+      ],
+      "question": "长度为n的0、1字符串中不允许两个1相邻。设数量为aₙ，空串也计入。按末尾是0还是1分类，把aₙ用较短字符串的数量表示，并写出最初两个值；不用求通项。",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "recurrence_model",
+        "recurrence_initial",
+        "count_basic"
+      ],
+      "permitted_optional_ids": [
+        "recurrence_homogeneous",
+        "count_perm_comb",
+        "count_generating"
+      ],
+      "forbidden_ids": [
+        "recurrence_nonhomogeneous"
+      ],
+      "topic_reason": "要求按互斥类别建立a_n=a_(n−1)+a_(n−2)，a_0=1,a_1=2。生成函数可辅助描述计数，但未要求此方法，也无需解通项。"
+    },
+    {
+      "id": "recurrence_04",
+      "modules": [
+        "递推关系",
+        "计数与组合"
+      ],
+      "question": "Let a₀=1 and aₙ=3aₙ₋₁ for n≥1. Define the formal series A(x)=Σ(n≥0)aₙxⁿ. Multiply the recurrence by xⁿ, sum over n≥1, and derive an equation for A(x) before extracting its coefficients.",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "recurrence_homogeneous",
+        "recurrence_initial",
+        "count_generating"
+      ],
+      "permitted_optional_ids": [],
+      "forbidden_ids": [
+        "recurrence_model",
+        "recurrence_nonhomogeneous",
+        "count_binomial"
+      ],
+      "topic_reason": "明确限定生成函数求解给定齐次递推，并利用a_0=1得A−1=3xA，A=1/(1−3x)，a_n=3^n。不是情境建模。"
+    },
+    {
+      "id": "graph_01",
+      "modules": [
+        "图论"
+      ],
+      "question": "五个地点A、B、C、D、E之间的双向道路为AB、BC、CA、CD、DE、EC。能否从某地出发，每条道路恰好走一次并回到出发地？若能，写出路线。",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "graph_euler"
+      ],
+      "permitted_optional_ids": [
+        "graph_basic",
+        "graph_connectivity"
+      ],
+      "forbidden_ids": [
+        "graph_hamilton",
+        "graph_shortest",
+        "tree_mst"
+      ],
+      "topic_reason": "直接对象是每边一次的闭合游走，A-B-C-D-E-C-A可行；不是每顶点一次，更没有最优化任务。"
+    },
+    {
+      "id": "graph_02",
+      "modules": [
+        "图论"
+      ],
+      "question": "An undirected network has vertices A,B,C,D and edges AB,BC,CD,DA,AC. Can a closed route visit each vertex exactly once before returning to its start? Give one if possible. There is no requirement to use every edge.",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "graph_hamilton"
+      ],
+      "permitted_optional_ids": [
+        "graph_basic",
+        "graph_connectivity"
+      ],
+      "forbidden_ids": [
+        "graph_euler",
+        "graph_shortest"
+      ],
+      "topic_reason": "直接要求逐顶点一次的圈，A-B-C-D-A即答案。题面明确指出无需遍历全部边，所以欧拉图不是当前考点。"
+    },
+    {
+      "id": "graph_03",
+      "modules": [
+        "图论"
+      ],
+      "question": "一个有9个站点的双向网络任意两站可达，且没有简单圈。以站点r为根后，每个非根站点的父亲是通往r的唯一简单路线上的下一站。问道路共有多少条，并说明为什么每个非根站点的父亲唯一。",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "tree_basic",
+        "tree_rooted",
+        "graph_connectivity"
+      ],
+      "permitted_optional_ids": [
+        "graph_basic",
+        "tree_spanning"
+      ],
+      "forbidden_ids": [
+        "tree_mst",
+        "graph_shortest"
+      ],
+      "topic_reason": "连通无简单圈刻画树，9点有8边；额外指定根及父亲关系，直接涉及根树。唯一简单路不等于带权最短路任务。"
+    },
+    {
+      "id": "graph_04",
+      "modules": [
+        "图论"
+      ],
+      "question": "四个村庄之间可铺电缆的费用是AB=1、AC=4、AD=7、BC=2、BD=5、CD=3。选一些连接使所有村庄互通，且总费用最少。写出选择及总费用，并说明为什么不会选择成圈的多余连接。",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "tree_mst",
+        "tree_spanning",
+        "graph_weighted"
+      ],
+      "permitted_optional_ids": [
+        "tree_basic",
+        "graph_basic",
+        "graph_connectivity"
+      ],
+      "forbidden_ids": [
+        "graph_shortest",
+        "graph_hamilton",
+        "tree_matrix_tree"
+      ],
+      "topic_reason": "目标是全网连通的最小总边权，不是两点最短距离；AB、BC、CD总费用6。没有要求生成树计数或拉普拉斯余子式。"
+    },
+    {
+      "id": "graph_05",
+      "modules": [
+        "图论"
+      ],
+      "question": "Workers u1,u2,u3 can do jobs v1,v2,v3 as follows: u1:{v1,v2}, u2:{v2}, u3:{v2,v3}. Assign distinct jobs to as many workers as possible, with no worker or job used twice. Draw the two groups and the allowed links, then give the maximum assignment.",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "graph_matching",
+        "graph_bipartite"
+      ],
+      "permitted_optional_ids": [
+        "graph_basic",
+        "relation_cartesian",
+        "count_basic",
+        "function_injection"
+      ],
+      "forbidden_ids": [
+        "graph_coloring",
+        "graph_euler"
+      ],
+      "topic_reason": "两组对象间找互不共享端点的最大边集，即二部匹配；可配u1-v1、u2-v2、u3-v3。也可将分配解释成单射，因此允许单射标签，但不能替代匹配。"
+    },
+    {
+      "id": "graph_06",
+      "modules": [
+        "图论"
+      ],
+      "question": "有向线路的时间为s→a:2，s→b:7，a→b:1，a→t:8，b→t:3。求从s到t耗时最少的路线和耗时，并比较它与直接按最少经过边数选出的路线。",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "graph_shortest",
+        "graph_weighted"
+      ],
+      "permitted_optional_ids": [
+        "graph_basic",
+        "graph_connectivity"
+      ],
+      "forbidden_ids": [
+        "tree_mst",
+        "tree_spanning",
+        "graph_euler"
+      ],
+      "topic_reason": "要求加权两点最短路径s-a-b-t，耗时6；两边路径耗时10。未要求全网最小连接。"
+    },
+    {
+      "id": "graph_07",
+      "modules": [
+        "图论"
+      ],
+      "question": "G按顶点a,b,c,d记录的0-1表为[[0,1,0,1],[1,0,1,0],[0,1,0,1],[1,0,1,0]]，表中1表示对应两点相连。H的点是1,2,3,4，边为12、24、43、31。找出从G到H的点的一一对应，使相连当且仅当像也相连，并写出按像的顺序重排后的表。",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "graph_isomorphism",
+        "graph_adjacency",
+        "graph_matrix"
+      ],
+      "permitted_optional_ids": [
+        "graph_basic",
+        "function_injection",
+        "algebra_homomorphism"
+      ],
+      "forbidden_ids": [
+        "graph_shortest",
+        "tree_matrix_tree"
+      ],
+      "topic_reason": "直接读取邻接矩阵并构造保邻接的顶点双射，例如a→1,b→2,c→4,d→3；图矩阵表示也被明确要求。非拉普拉斯余子式。"
+    },
+    {
+      "id": "graph_08",
+      "modules": [
+        "图论",
+        "集合与关系"
+      ],
+      "question": "四项工作A、B、C、D的先后要求为A完成后才能做B和C，B和C完成后才能做D。把要求画成有向箭头，列出所有满足要求的完成顺序，再解释若增加D必须在A之前完成会发生什么。",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "graph_topological"
+      ],
+      "permitted_optional_ids": [
+        "graph_basic",
+        "graph_connectivity",
+        "relation_order",
+        "count_basic",
+        "count_perm_comb"
+      ],
+      "forbidden_ids": [
+        "graph_shortest",
+        "graph_hamilton",
+        "tree_rooted"
+      ],
+      "topic_reason": "要求给出有向依赖的线性顺序并识别新增有向圈导致无合法顺序；答案ABCD或ACBD。未要求图中访问各点的圈。"
+    },
+    {
+      "id": "algebra_01",
+      "modules": [
+        "代数结构",
+        "初等数论"
+      ],
+      "question": "在{1,2,3,4}上规定a*b为ab除以5的余数。验证(a*b)*c=a*(b*c)，找e使e*a=a*e=a，并为每个a找b使a*b=b*a=e。",
+      "difficulty": "simple",
+      "expected_required_ids": [
+        "algebra_system",
+        "algebra_group",
+        "number_congruence"
+      ],
+      "permitted_optional_ids": [
+        "number_prime",
+        "proof_direct_contradiction"
+      ],
+      "forbidden_ids": [
+        "algebra_ring_field",
+        "function_inverse"
+      ],
+      "topic_reason": "直接考察单个二元运算的结合律、单位元和逆元，得到模5非零乘法群。没有第二种运算或分配律，不能仅因模素数就报整个域。"
+    },
+    {
+      "id": "algebra_02",
+      "modules": [
+        "代数结构",
+        "函数",
+        "初等数论"
+      ],
+      "question": "Let φ send each integer n to its remainder class modulo 6. Show φ(a+b)=φ(a)+φ(b), where the right addition is reduced modulo 6. Find every input sent to 0, and decide whether φ is one-to-one and whether every target class is reached.",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "algebra_homomorphism",
+        "function_injection",
+        "number_congruence"
+      ],
+      "permitted_optional_ids": [
+        "algebra_system",
+        "algebra_group",
+        "function_mapping",
+        "relation_equivalence"
+      ],
+      "forbidden_ids": [
+        "function_inverse",
+        "number_rsa"
+      ],
+      "topic_reason": "明确验证保运算映射、核6Z及非单射而满射。虽然有模数，未给加密过程；映射非单射也不要求逆函数。"
+    },
+    {
+      "id": "algebra_03",
+      "modules": [
+        "代数结构",
+        "初等数论"
+      ],
+      "question": "在{0,1,2,3,4,5}上，加法和乘法都取除以6的余数。比较2与3的乘积，找出哪些非零元素有乘法逆元，并据此判断是否每个非零元素都能做除数；同时说明乘法对加法是否分配。",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "algebra_ring_field",
+        "number_congruence"
+      ],
+      "permitted_optional_ids": [
+        "algebra_system",
+        "algebra_group",
+        "number_gcd",
+        "number_prime",
+        "number_linear_congruence"
+      ],
+      "forbidden_ids": [
+        "function_inverse",
+        "number_rsa"
+      ],
+      "topic_reason": "两个模6运算及分配律、零因子和非零可逆性直接区分环与域；2×3=0，仅1与5可逆，故为环但非域。找逆元可通过一次同余ax≡1求解，故允许该方法标签；不是给定函数求逆。"
+    },
+    {
+      "id": "algebra_04",
+      "modules": [
+        "代数结构",
+        "集合与关系"
+      ],
+      "question": "令U={a,b}，考虑它的全部子集。以包含为顺序，以交和并为两个运算。对X={a}、Y={b}求最小共同上界、最大共同下界及X的补集，并检验X∩(Y∪Z)=(X∩Y)∪(X∩Z)对任意Z⊆U成立。",
+      "difficulty": "hard",
+      "expected_required_ids": [
+        "algebra_lattice_bool",
+        "set_operation",
+        "relation_order"
+      ],
+      "permitted_optional_ids": [
+        "algebra_system",
+        "relation_property",
+        "logic_equivalence",
+        "proof_direct_contradiction"
+      ],
+      "forbidden_ids": [
+        "algebra_ring_field",
+        "graph_coloring"
+      ],
+      "topic_reason": "直接考察幂集包含序的交并格、补和分配性质，即布尔代数；上界U、下界空集、X补集{b}。交并并非此处的环加乘。"
+    }
+  ]
+}

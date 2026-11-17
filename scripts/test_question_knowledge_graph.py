@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from classification_semantic import _validated_update
 from question_knowledge_graph import MAX_EVIDENCE_CHARS, build_question_graph
+from question_topic_structure import mathematical_text
 from server_i18n import topic_label
 from teaching import _KNOWLEDGE_GRAPH, analyze_messages, analyze_question, enrich_question_graph
 
@@ -39,6 +40,184 @@ class QuestionKnowledgeGraphTests(unittest.TestCase):
                 self.assertEqual(result["prerequisite_points"], [])
                 self.assertEqual(result["knowledge_path"], [])
                 self.assert_sourced(graph)
+
+    def test_unnamed_choice_and_staged_assignment_are_structural_families(self):
+        for population, selected, unit in ((9, 4, "名学生"), (23, 6, "个零件"), (140, 3, "本书")):
+            with self.subTest(population=population, unit=unit):
+                question = f"从{population}{unit}中选出{selected}个组成不区分顺序的小组，有多少种不同选法？"
+                graph = analyze_question(question)["question_graph"]
+                self.assertEqual(ids(graph), {"count_perm_comb"})
+                staged = question.replace("有多少种", "再从其中指定一名队长，有多少种")
+                self.assertEqual(ids(analyze_question(staged)["question_graph"]), {"count_perm_comb", "count_basic"})
+
+    def test_unnamed_mathematical_tasks_span_existing_catalog_modules(self):
+        cases = [
+            ("判断¬(p→q)与p∧¬q的真假是否对所有赋值始终相同", {"logic_connectives", "logic_equivalence"}),
+            ("将每个整数x都存在整数y满足y>x写成符号表达式，再写出它的否定，否定号只出现在y>x之前", {"predicate_quantifier", "predicate_reasoning"}),
+            ("在整数集合上定义xRy当x-y能被7整除。验证xRx、xRy推出yRx、xRy且yRz推出xRz，并写出分别满足R形成的集合", {"number_prime", "relation_property", "relation_equivalence"}),
+            ("设f从整数集合映到非负整数集合，f(x)=x²。不同输入能给出相同输出吗？目标集合中的每一个数都能成为输出吗？", {"function_mapping", "function_injection"}),
+            ("求所有整数x，使18x除以42的余数为12", {"number_congruence", "number_linear_congruence"}),
+            ("双向道路AB、BC、CA连接几个地点。能否每条道路恰好走一次并回到出发地？", {"graph_euler"}),
+            ("集合上运算a*b满足(a*b)*c=a*(b*c)，找e使e*a=a*e=a，再为每个a找b使a*b=b*a=e", {"algebra_system", "algebra_group"}),
+        ]
+        for question, expected in cases:
+            with self.subTest(question=question):
+                graph = analyze_question(question)["question_graph"]
+                self.assertEqual(ids(graph), expected)
+                self.assert_sourced(graph)
+
+    def test_recurrence_notations_preserve_type_and_initial_conditions(self):
+        for question in (
+            "数列满足a₀=2，a₁=3，aₙ=3aₙ₋₁−2aₙ₋₂。求只含n的表达式。",
+            r"给定a_{0}=2,a_{1}=3,a_{n}=3a_{n-1}-2a_{n-2}，求通项公式",
+            r"a_0=2,a_1=3,a_n=3a_{n-1}-2a_{n-2}，求a_n",
+        ):
+            with self.subTest(question=question):
+                graph = analyze_question(question)["question_graph"]
+                self.assertEqual(ids(graph), {"recurrence_homogeneous", "recurrence_initial"})
+                self.assert_sourced(graph)
+        nonhomogeneous = analyze_question(r"a_0=1，a_n=2a_{n-1}+n，求a_n")["question_graph"]
+        self.assertEqual(ids(nonhomogeneous), {"recurrence_nonhomogeneous", "recurrence_initial"})
+
+    def test_modeling_task_joins_definition_and_goal_across_clauses(self):
+        question = "长度为n的0、1字符串不允许有两个1相邻。设有aₙ个，根据末尾是0还是1，把aₙ用前面较短字符串的数量表示，并写出最初两个值"
+        graph = analyze_question(question)["question_graph"]
+        self.assertEqual(ids(graph), {"recurrence_model", "recurrence_initial", "count_basic"})
+        self.assert_sourced(graph)
+
+    def test_excluded_mentions_cannot_erase_actual_formula_or_create_topics(self):
+        excluded = analyze_question("容斥原理不是本题的考点。计算15与35的最大公因数")["question_graph"]
+        self.assertEqual(ids(excluded), {"number_gcd", "number_prime"})
+        actual = analyze_question("不用真值表证明p∧q与q∧p等价")["question_graph"]
+        self.assertEqual(ids(actual), {"logic_connectives", "logic_equivalence"})
+
+    def test_optional_methods_require_actual_usage_or_independent_task_evidence(self):
+        question = "本题可用容斥原理或鸽巢原理任选一种。13个人分别出生在12个月份，证明至少有两人出生在同一月份。"
+        local = analyze_question(question)
+        self.assertEqual(ids(local["question_graph"]), {"count_pigeonhole"})
+        refined = enrich_question_graph(local, question, "使用鸽巢原理，将人分入十二个月份。至少有两人同月出生。")
+        self.assertEqual(ids(refined["question_graph"]), {"count_pigeonhole"})
+        self.assertNotIn("count_inclusion", ids(refined["question_graph"]))
+
+    def test_local_results_are_catalog_bounded_and_request_semantic_review(self):
+        result = analyze_question("从17名学生中选出5名组成小组，有多少种选法")
+        self.assertEqual(result["category"], "计数与组合")
+        self.assertEqual(result["knowledge_points"], ["排列与组合"])
+        self.assertEqual(result["classification_revision"], "catalog-structure/2")
+        self.assertEqual(result["classification_status"], "local")
+        self.assertTrue(result["needs_review"])
+        self.assertEqual(result["question_graph"]["classifier_revision"], "catalog-structure/2")
+
+    def test_specific_task_context_rejects_lexical_substrings_and_previous_topics(self):
+        cases = [
+            ("Let f: Z→{0,1,2,…} be f(x)=x². Can distinct inputs have the same output? Is every element of the target set reached? Explain where this happens.",
+             {"function_mapping", "function_injection"}, {"relation_property"}),
+            ("设论域非空。将(∀x P(x))∨(∃y Q(y))改写为所有∀、∃符号都在最前面的等价式，并说明变元条件。",
+             {"predicate_quantifier", "predicate_prenex", "predicate_reasoning", "predicate_variable"}, {"algebra_ring_field", "logic_equivalence"}),
+            ("我上一题研究过逆函数；这次不求任何逆。已知f(x)=2x+1，g(x)=x²，求g(f(x))与f(g(x))。",
+             {"function_composition"}, {"function_inverse"}),
+        ]
+        for question, required, forbidden in cases:
+            with self.subTest(question=question):
+                actual = ids(analyze_question(question)["question_graph"])
+                self.assertLessEqual(required, actual)
+                self.assertFalse(actual & forbidden)
+
+    def test_nonlinear_recurrence_is_not_labeled_as_linear_forcing(self):
+        graph = analyze_question(r"a_0=1，a_n=a_{n-1}^2+1，求a_n")["question_graph"]
+        self.assertFalse(ids(graph) & {"recurrence_homogeneous", "recurrence_nonhomogeneous"})
+
+    def test_task_origin_is_separate_from_names_and_legacy_patterns(self):
+        named = analyze_question("本题研究真值表")["question_graph"]
+        self.assertEqual(named["nodes"][0]["origin"], "term_candidate")
+        legacy = analyze_question("判断关系是否对称")["question_graph"]
+        self.assertTrue(legacy["nodes"])
+        self.assertTrue(all(node["origin"] == "term_candidate" for node in legacy["nodes"]))
+        concrete = analyze_question("从19名学生中选出4人组成小组，有多少种选法")["question_graph"]
+        self.assertEqual({node["id"] for node in concrete["nodes"] if node["origin"] == "task_structure"}, {"count_perm_comb"})
+        self.assert_sourced(concrete)
+
+    def test_actual_integer_divisibility_has_a_task_witness_without_ancestry(self):
+        cases = (
+            "在整数上定义xRy当且仅当x-y能被7整除，验证xRx。",
+            "在{1,2,4,8}中定义a≼b当a整除b，判断它是否满足传递。",
+            "求能同时整除105和63的最大正整数。",
+        )
+        for question in cases:
+            with self.subTest(question=question):
+                graph = analyze_question(question)["question_graph"]
+                witness = next(node for node in graph["nodes"] if node["id"] == "number_prime")
+                self.assertEqual(witness["origin"], "task_structure")
+                self.assert_sourced(graph)
+        named = analyze_question("本题研究最大公因数与欧几里得算法")["question_graph"]
+        self.assertNotIn("number_prime", ids(named), "A named topic alone cannot create an ancestor fact")
+
+    def test_declared_symbolic_coefficient_supports_linear_congruence(self):
+        for question in (
+            "已知u=7，求整数v使uv≡3(mod26)。",
+            "给定k=-2，求整数t，使kt除以17的余数为5。",
+            "e=3，求0<d<40使ed除以40余1。",
+        ):
+            with self.subTest(question=question):
+                graph = analyze_question(question)["question_graph"]
+                witness = next(node for node in graph["nodes"] if node["id"] == "number_linear_congruence")
+                self.assertEqual(witness["origin"], "task_structure")
+                self.assert_sourced(graph)
+        assigned = analyze_question("已知u=7、v=9，验证uv除以26的余数为11。")["question_graph"]
+        self.assertFalse(any(node["id"] == "number_linear_congruence" and node["origin"] == "task_structure" for node in assigned["nodes"]))
+
+    def test_task_origin_rejects_forged_and_excluded_claims(self):
+        question = "不用真值表证明p∧q与q∧p等价"
+        forged = {"question_graph": {"version": 1, "nodes": [{"id": "logic_truth_table", "origin": "task_structure"}], "edges": []}}
+        graph = enrich_question_graph(forged, question)["question_graph"]
+        self.assertNotIn("logic_truth_table", ids(graph))
+        self.assertTrue(all(node["origin"] == "task_structure" for node in graph["nodes"]))
+        self.assert_sourced(graph)
+
+    def test_unicode_powers_and_indices_keep_distinct_mathematical_roles(self):
+        normalized = mathematical_text("B⁴ z⁻¹ aₙ₋₂")
+        self.assertIn("b^{4}", normalized)
+        self.assertIn("z^{-1}", normalized)
+        self.assertIn("a_{n-2}", normalized)
+        self.assertNotIn("z_{-1}", normalized)
+
+    def test_binary_directed_table_and_monotone_expansion_use_generic_vertices(self):
+        for matrix_symbol, first, middle, last in (("B", "u", "v", "w"), ("C", "r", "s", "t")):
+            with self.subTest(symbol=matrix_symbol, vertices=(first, middle, last)):
+                question = (
+                    f"有向表{matrix_symbol}=[[0,1,0],[0,0,1],[0,0,0]]。"
+                    f"第{first}行、第{middle}列为1表示{first}直接到{middle}。"
+                    f"求{matrix_symbol}²，把每个正数改为1，解释两步路径的可达性。"
+                    f"只许把0改为1，求最少扩充使({first}→{middle}且{middle}→{last})⇒{first}→{last}。"
+                )
+                graph = analyze_question(question)["question_graph"]
+                tasks = {node["id"] for node in graph["nodes"] if node["origin"] == "task_structure"}
+                self.assertLessEqual({"graph_adjacency", "graph_matrix", "graph_connectivity", "relation_property", "relation_closure"}, tasks)
+                self.assertFalse(tasks & {"graph_shortest", "tree_matrix_tree"})
+                self.assert_sourced(graph)
+
+    def test_binary_table_requires_rectangular_data_and_edge_meaning(self):
+        malformed = "表B=[[0,1],[1]]，第u行第v列为1表示u直接到v，求B²。"
+        unrelated = "数据B=[[0,1],[1,0]]，第u行第v列为1表示一个人的答案正确。"
+        for question in (malformed, unrelated):
+            with self.subTest(question=question):
+                graph = analyze_question(question)["question_graph"]
+                tasks = {node["id"] for node in graph["nodes"] if node["origin"] == "task_structure"}
+                self.assertFalse(tasks & {"graph_adjacency", "graph_matrix", "graph_connectivity"})
+
+    def test_finite_operation_table_is_an_actual_task_not_a_course_ancestor(self):
+        for question in (
+            "Let S={id,u,v}; u sends 2 to 4 and v sends 4 to 2. Write the complete operation table on S under composition.",
+            "在T={1,a,b}上定义二元运算，补全T的运算表。",
+            "Let K={id,p,q}. Complete the Cayley table on K using the specified permutations.",
+        ):
+            with self.subTest(question=question):
+                graph = analyze_question(question)["question_graph"]
+                task = next(node for node in graph["nodes"] if node["id"] == "algebra_system")
+                self.assertEqual(task["origin"], "task_structure")
+                self.assert_sourced(graph)
+        optional = analyze_question("Let S={id,u,v}. You may write an operation table on S if you wish.")["question_graph"]
+        self.assertFalse(any(node["id"] == "algebra_system" and node["origin"] == "task_structure" for node in optional["nodes"]))
 
     def test_every_english_catalog_label_is_matched_before_generic_translation(self):
         for node in _KNOWLEDGE_GRAPH["nodes"]:

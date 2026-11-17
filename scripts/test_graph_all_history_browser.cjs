@@ -58,7 +58,7 @@ async function seedConversations(page) {
   return page.evaluate(() => {
     const teaching = (category, point, question, id, quote, difficulty='简单', type='判断题') => ({category,
       focus_points:[point],knowledge_points:[point],prerequisite_points:[],knowledge_path:[point],difficulty,question_type:type,
-      question_graph:{version:1,sources:{question,solution:''},nodes:[{id,evidence:[{source:'question',quote}]}],edges:[]}});
+      question_graph:{version:1,classifier_revision:'catalog-semantic-v5',classification_status:'semantic',classification_source:'catalog_semantic',needs_review:false,sources:{question,solution:''},nodes:[{id,evidence:[{source:'question',quote}]}],edges:[]}});
     const shared = '判断 p 与 q 的合取在什么情况下为真。';
     const generated = '证明命题 p 的双重否定与 p 等价。';
     const ocrQuestion = '计算集合 A={1,2}, B={2,3} 的并集。';
@@ -90,6 +90,21 @@ async function seedConversations(page) {
         {messageId:'lower-reply',role:'ai',text:'应当逐个检查这些子集'}
       ]};
     sessions=[top,empty,lower]; currentId=lower.id; deletedSessionIds=Object.create(null);
+    // Completed semantic fixtures bind their review to each question's actual
+    // latest answer rather than sharing one question-only snapshot across rows.
+    for(const session of sessions) {
+      const byIndex=new Map(getConversationQuestionHistory(session).map(item=>[item.index,item]));
+      let owner=null;
+      for(const [index,message] of session.messages.entries()) {
+        const item=byIndex.get(index);
+        if(item) {
+          const field=item.role==='ai'?'generatedTeaching':'questionTeaching';
+          message[field]=JSON.parse(JSON.stringify(message[field]));
+          owner=message[field]?.question_graph;
+          if(owner)owner.sources.solution=item.role==='ai'?String(message.generatedAnswer||''):'';
+        } else if(message.role==='ai'&&!message.generatedExercise&&owner)owner.sources.solution=message.text;
+      }
+    }
     renderAll();
     // Simulate a legacy generated-question record outside the current session.
     // Rendering an aggregate history must never "repair" it in place.
@@ -322,7 +337,7 @@ async function checkReplyRetention(browser) {
     const generated='证明对于任意命题 p，p 与 p 的合取和 p 等价。';
     const teaching={category:'命题逻辑',knowledge_points:['逻辑等价'],focus_points:['逻辑等价'],
       prerequisite_points:[],knowledge_path:['逻辑等价'],difficulty:'简单',question_type:'证明题',
-      question_graph:{version:1,sources:{question:generated,solution:''},nodes:[
+      question_graph:{version:1,classifier_revision:'catalog-semantic-v5',classification_status:'semantic',classification_source:'catalog_semantic',needs_review:false,sources:{question:generated,solution:''},nodes:[
         {id:'logic_connectives',evidence:[{source:'question',quote:'合取'}]},
         {id:'logic_equivalence',evidence:[{source:'question',quote:'等价'}]}],edges:[]}};
     await requests[0].fulfill({status:200,contentType:'text/event-stream',body:'event: final\ndata: '+JSON.stringify({

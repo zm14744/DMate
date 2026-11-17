@@ -64,7 +64,7 @@ except (ImportError, OSError) as _fusion_import_error:
     compare_pixel_vision = None
     review_direction_and_multiplicity = None
 from graph_ocr_cleanup import clean_graph_question_text, select_graph_question_text, ocr_is_label_dominated
-from classification_semantic import classify_ambiguous_questions
+from classification_semantic import classify_catalog_questions, local_catalog_classification
 from exercise_intent import (EXERCISE_INTENT_RULES, classify_exercise_request,
                              is_generic_continuation, resolve_exercise_request)
 from exercise_relation_check import verify_relation_closure_count
@@ -4685,7 +4685,7 @@ def _chat_response(on_delta=None, cancelled=None):
 
 @app.route("/analyze-questions", methods=["POST"])
 def analyze_questions_batch():
-    """批量本地分类；仅显式启用时进行受限的 AI 语义复核。"""
+    """Classify locally, with an explicit bounded review against the catalog."""
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return jsonify({"error": "题目列表格式不正确"}), 400
@@ -4696,13 +4696,13 @@ def analyze_questions_batch():
             "error": "题目列表格式不正确"
         }), 400
 
-    if data.get("semantic_fallback") is True and not _check_rate_limit(_get_client_ip(), "analyze_questions"):
-        return jsonify({"error": "题目复核请求过于频繁，请稍后再试"}), 429
+    review_requested = data.get("semantic_fallback") is True
+    remote_allowed = not review_requested or _check_rate_limit(_get_client_ip(), "analyze_questions")
 
     results = []
     fallback_entries = []
 
-    for item in items[:80]:
+    for index, item in enumerate(items[:80]):
         if isinstance(item, dict):
             key = str(item.get("key", ""))
             text = str(item.get("text", "")).strip()
@@ -4739,16 +4739,42 @@ def analyze_questions_batch():
             "teaching": teaching
         })
         if teaching is not None:
-            fallback_entries.append((key, text[:MAX_MESSAGE_CHARS], teaching))
+            # Caller keys can be missing or repeated. Opaque row identities
+            # keep one source's review from being attached to another result.
+            fallback_entries.append((str(index), text[:MAX_MESSAGE_CHARS], solution, teaching))
 
-    # 可选 AI 语义复核只在错题本的后台批量补全启用；普通 /chat
-    # 依旧仅调用本地分类，不串行增加一次模型请求。
-    if data.get("semantic_fallback") is True and fallback_entries:
-        refined = classify_ambiguous_questions(fallback_entries)
-        for result in results:
-            better = refined.get(result["key"])
-            if better:
-                result["teaching"] = better
+    # Reviews run only on this explicit background endpoint. /chat never waits
+    # for an additional inference call, and opening a history list reviews no
+    # questions by itself. The classifier may still serve a source-exact cache
+    # hit when the remote quota has been reached.
+    if review_requested and fallback_entries:
+        try:
+            refined = classify_catalog_questions(fallback_entries, allow_remote=remote_allowed)
+        except Exception as exc:
+            print("题目语义归类暂不可用：", type(exc).__name__)
+            refined = {}
+        refined = refined if isinstance(refined, dict) else {}
+        catalog_ids = {node["id"] for node in KNOWLEDGE_GRAPH_DATA.get("nodes", [])}
+        for row_id, question, solution, local in fallback_entries:
+            better = refined.get(row_id)
+            graph = better.get("question_graph") if isinstance(better, dict) else None
+            nodes = graph.get("nodes") if isinstance(graph, dict) else None
+            edges = graph.get("edges") if isinstance(graph, dict) else None
+            valid = (isinstance(graph, dict) and graph.get("version") == 1
+                     and graph.get("sources") == {"question": question, "solution": solution}
+                     and isinstance(nodes, list) and isinstance(edges, list)
+                     and all(isinstance(node, dict) and isinstance(node.get("id"), str)
+                             and node["id"] in catalog_ids for node in nodes))
+            node_ids = {node["id"] for node in nodes} if valid else set()
+            valid = valid and all(isinstance(edge, dict) and isinstance(edge.get("from"), str)
+                                  and isinstance(edge.get("to"), str) and edge["from"] in node_ids
+                                  and edge["to"] in node_ids for edge in edges)
+            if not valid:
+                better = local_catalog_classification(local, question, solution,
+                    status="invalid" if graph is not None else "unavailable")
+            elif not remote_allowed and better.get("classification_status") != "semantic":
+                better = local_catalog_classification(local, question, solution, status="rate_limited")
+            results[int(row_id)]["teaching"] = better
 
     return jsonify({
         "results": results

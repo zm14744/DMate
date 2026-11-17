@@ -140,7 +140,7 @@ async function checkCase(browser, width, language) {
       newChat();
       const question='先用命题推理建立归纳步骤，再用数学归纳法证明自然数求和公式';
       const teaching = { category: '证明与归纳', knowledge_points: ['数学归纳法','命题推理'], focus_points: ['数学归纳法'],
-        question_graph:{version:1,sources:{question,solution:''},nodes:[
+        question_graph:{version:1,classifier_revision:'catalog-semantic-v5',classification_status:'semantic',classification_source:'catalog_semantic',needs_review:false,sources:{question,solution:''},nodes:[
           {id:'logic_reasoning',evidence:[{source:'question',quote:'命题推理'}]},
           {id:'proof_induction',evidence:[{source:'question',quote:'数学归纳法'}]}],
           edges:[{from:'logic_reasoning',to:'proof_induction',evidence:[{source:'question',quote:question}]}]}};
