@@ -1148,6 +1148,7 @@ function computeChangedCloudParts(serverParts, localPartHashes) {
 }
 
 function clearLoggedOutWorkspace({ purgePersistent = true } = {}) {
+    cancelWrongQuestionGraphRetry();
     cancelAccountInteractions();
     window.DMateGuestSession?.reset();
     // 退出后进入真正的游客模式：页面清空，游客数据不落地。
@@ -4526,6 +4527,7 @@ function normalizeLearningState(value) {
                     )
                         ? item.sessionId
                         : null,
+                    sourceMessageId: typeof item.sourceMessageId === "string" ? item.sourceMessageId : "",
                     createdAt: Number.isFinite(item.createdAt)
                         ? item.createdAt
                         : Date.now(),
@@ -7246,20 +7248,92 @@ function wrongQuestionTeachingFromConversation(questionInfo, question) {
     const session = sessions.find(value => String(value.id) === String(questionInfo?.sessionId));
     if (!session) return null;
     ensureSessionMessageIds(session);
-    const candidates = collectConversationQuestionCandidates(session).filter(candidate =>
-        sanitizeStoredWrongQuestionText(candidate.text).trim() === String(question || "").trim());
     const sourceMessageId = typeof questionInfo?.sourceMessageId === "string" ? questionInfo.sourceMessageId : "";
-    const active = activeQuestionCandidateFromHistory(session);
-    const candidate = sourceMessageId
-        ? candidates.find(value => session.messages[value.index]?.messageId === sourceMessageId)
-        : candidates.find(value => value.index === active?.index) || (candidates.length === 1 ? candidates[0] : null);
+    // Conversation history intentionally deduplicates equal questions. Source
+    // reuse must inspect the actual message instead, including later copies.
+    const target = String(question || "").trim();
+    const candidates = [];
+    const sourceIndex = sourceMessageId ? session.messages.findIndex(message => message?.messageId === sourceMessageId) : -1;
+    if (sourceMessageId && sourceIndex < 0) return null;
+    const indices = sourceMessageId ? [sourceIndex] : session.messages.keys();
+    for (const index of indices) {
+        const message = session.messages[index];
+        if (!message || message.isError || message.isNotice || message.isRetestAnswer
+            || !["user", "ai"].includes(message.role)
+            || sourceMessageId && message.messageId !== sourceMessageId) continue;
+        if (message.role === "ai" && !message.generatedQuestion) {
+            recoverGeneratedQuestionFromAssistant(session, index, message);
+        }
+        if (message.role === "ai" && !message.generatedQuestion) continue;
+        const text = sanitizeStoredWrongQuestionText(extractQuestionOnlyFromMessage(message)).trim();
+        if (text === target) candidates.push({index, role:message.role, text,
+            key:`${index}:${wrongQuestionFingerprint(text)}`, source:message.source || ""});
+    }
+    // Old records without a stable source ID cannot choose between equal
+    // questions whose actual answers and methods may differ.
+    const candidate = candidates.length === 1 ? candidates[0] : null;
     if (!candidate) return null;
     const message = session.messages[candidate.index];
     const reference = {sessionId:String(session.id), messageId:message.messageId, index:candidate.index,
         fingerprint:wrongQuestionFingerprint(candidate.text)};
-    const context = knowledgeGraphQuestionContext(session, candidate, reference);
+    let actualSolution = "", hasActualSource = false, uncertainLaterAnswer = false;
+    if (candidate.role === "ai") {
+        const answer = String(message.generatedAnswer || "");
+        const text = String(message.text || ""), question = String(message.generatedQuestion || "");
+        const position = question ? text.indexOf(question) : -1;
+        const tail = position >= 0 ? text.slice(position + question.length) : "";
+        const heading = /(?:^|\n)\s*(?:【解析】|\[Explanation\])\s*\n/i.exec(tail);
+        const explanation = heading ? tail.slice(heading.index + heading[0].length)
+            .split(/\n\s*(?:【涉及知识点】|\[Topics\])\s*\n/i)[0].trim() : "";
+        actualSolution = [answer, explanation].filter(Boolean).join("\n\n");
+        hasActualSource = true;
+    }
+    for (let index = 0; index < session.messages.length; index++) {
+        const answer = session.messages[index];
+        if (index === candidate.index || answer?.role !== "ai" || answer.isError || answer.isNotice
+            || answer.generatedExercise || !answer.text) continue;
+        if (answer.targetQuestionMessageId === reference.messageId) {
+            actualSolution = String(answer.text);
+            hasActualSource = true;
+            uncertainLaterAnswer = false;
+        } else if (index > candidate.index && !answer.targetQuestionMessageId
+            && (!answer.targetQuestionFingerprint || answer.targetQuestionFingerprint === reference.fingerprint)) {
+            uncertainLaterAnswer = true;
+        }
+    }
+    // Explicit answer ownership needs no history extraction. An eligible later
+    // legacy answer may supersede it, so retain the existing ownership reader
+    // for that case instead of guessing from the earlier graph's own source.
+    const solution = hasActualSource && !uncertainLaterAnswer ? actualSolution
+        : knowledgeGraphQuestionContext(session, candidate, reference).reviewSolutionText || "";
     const teaching = candidate.role === "ai" ? message.generatedTeaching : message.questionTeaching;
-    return {teaching, question:candidate.text, solution:context.reviewSolutionText || ""};
+    return {teaching, question:candidate.text, solution,
+        sourceMessageId:message.messageId, referenceAnswer:String(message.generatedAnswer || "")};
+}
+
+function hydrateWrongQuestionGraph(entry) {
+    if (!entry || isWrongQuestionGraphReady(wrongQuestionGraphContext(entry, null))) return false;
+    const source = wrongQuestionTeachingFromConversation(entry, entry.question);
+    const graph = normalizeTeaching(source?.teaching)?.question_graph;
+    if (!source || !isWrongQuestionGraphReady({questionGraph:graph, reviewSolutionText:source.solution,
+        questionText:graph?.sources.question, solutionText:source.solution})) return false;
+    const analysis = String(entry.analysis || "").trim();
+    const answer = String(entry.referenceAnswer || entry.answer || "").trim();
+    if (analysis && analysis !== source.solution.trim()) return false;
+    if (!analysis && answer && answer !== source.solution.trim()) {
+        // A generated exercise may retain a short hidden answer alongside a
+        // reviewed proof. The unique or explicitly identified source must
+        // independently retain this exact hidden answer.
+        if (!source.referenceAnswer || answer !== source.referenceAnswer.trim()) return false;
+    }
+    if (!storeWrongQuestionGraphTeaching(entry, source.teaching, source.question, source.solution)) return false;
+    entry.sourceMessageId = source.sourceMessageId;
+    return true;
+}
+
+function isWrongQuestionGraphReady(context) {
+    if (!isReviewedKnowledgeGraph(context)) return false;
+    return !knowledgeGraphData?.nodes?.length || knowledgeGraphFocusedNodes("", context).length > 0;
 }
 
 function addWrongQuestion(questionInfo, feedback, source = "auto") {
@@ -7321,6 +7395,7 @@ function addWrongQuestion(questionInfo, feedback, source = "auto") {
         corrected: false,
         mistakeCount: source === "auto" ? 1 : 0,
         sessionId: info.sessionId,
+        sourceMessageId: typeof questionInfo?.sourceMessageId === "string" ? questionInfo.sourceMessageId : "",
         createdAt: now,
         updatedAt: now,
         lastWrongAt: now,
@@ -7852,10 +7927,21 @@ function updateWrongBookToolbar(allItems) {
 }
 
 let wrongBookClassificationInFlight = false;
+const wrongBookClassificationRequests = new Map();
+let wrongQuestionGraphRetry = null;
+
+function cancelWrongQuestionGraphRetry() {
+    if (!wrongQuestionGraphRetry) return;
+    const {timer, operation} = wrongQuestionGraphRetry;
+    window.clearTimeout(timer);
+    operation.waitingToRetry = false;
+    if (!operation.inFlight) operation.status = "unavailable";
+    wrongQuestionGraphRetry = null;
+}
 
 async function refreshWrongBookClassifications() {
     if (wrongBookClassificationInFlight) return;
-    const stale = learningState.wrongQuestions.filter(item => (
+    const stale = learningState.wrongQuestions.filter(item => !isWrongQuestionGraphReady(wrongQuestionGraphContext(item, null)) && (
         Number(item.classificationVersion || 0) < 3
         || isGenericTeachingCategory(item.category)
         || !Array.isArray(item.knowledgePoints)
@@ -7875,55 +7961,75 @@ async function refreshWrongBookClassifications() {
                 question: item.question,
                 solution: wrongQuestionGraphContext(item, null).reviewSolutionText
             }));
-            const response = await fetch("/analyze-questions", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    questions: batch.map(item => ({ key: item.id, text: item.question,
-                        ...(item.solution ? {solution:item.solution} : {}) })),
-                    semantic_fallback: true
-                })
+            const operations = batch.map(item => {
+                let resolve;
+                const operation = {...item, version:contextVersion, teaching:null,
+                    promise:new Promise(done => { resolve = done; }), resolve:() => resolve()};
+                wrongBookClassificationRequests.set(String(item.id), operation);
+                return operation;
             });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const controller = new AbortController();
+            const timeout = window.setTimeout(() => controller.abort(), 30000);
+            try {
+                const response = await fetch("/analyze-questions", {
+                    method: "POST", signal:controller.signal,
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        questions: batch.map(item => ({ key: item.id, text: item.question,
+                            ...(item.solution ? {solution:item.solution} : {}) })),
+                        semantic_fallback: true
+                    })
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-            const payload = await parseResponseJson(response);
-            if (contextVersion !== cloudSyncContextVersion) return;
-            const byId = new Map((payload?.results || []).map(item => [
-                String(item?.key || ""),
-                normalizeTeaching(item?.teaching)
-            ]));
-            let changed = false;
-            for (const oldItem of batch) {
-                const item = learningState.wrongQuestions.find(q => q.id === oldItem.id);
-                // 期间如果用户编辑了题目，不用旧题干的识别结果覆盖新内容。
-                if (!item || item.question !== oldItem.question
-                    || wrongQuestionGraphContext(item, null).reviewSolutionText !== oldItem.solution) continue;
-                const detected = byId.get(String(item.id));
-                if (!detected || isGenericTeachingCategory(detected.category)) continue;
-                item.category = detected.category;
-                item.relatedCategories = (detected.related_categories || []).slice(0, 3);
-                item.knowledgePoints = [...new Set([
-                    ...detected.knowledge_points.slice(0, 3),
-                    ...(detected.related_knowledge_points || []).slice(0, 2)
-                ])].slice(0, 4);
-                // 用户已有手动填写的“本题难点”时予以保留。
-                if (!Array.isArray(item.focusPoints) || !item.focusPoints.length) {
-                    item.focusPoints = detected.focus_points.slice(0, 2);
+                const payload = await parseResponseJson(response);
+                if (contextVersion !== cloudSyncContextVersion) return;
+                const byId = new Map((payload?.results || []).map(item => [
+                    String(item?.key || ""),
+                    normalizeTeaching(item?.teaching)
+                ]));
+                let changed = false;
+                for (const oldItem of operations) {
+                    const item = learningState.wrongQuestions.find(q => q.id === oldItem.id);
+                    // 期间如果用户编辑了题目，不用旧题干的识别结果覆盖新内容。
+                    if (!item || item.question !== oldItem.question
+                        || wrongQuestionGraphContext(item, null).reviewSolutionText !== oldItem.solution) continue;
+                    const detected = byId.get(String(item.id));
+                    oldItem.teaching = detected;
+                    if (isWrongQuestionGraphReady(wrongQuestionGraphContext(item, null))) continue;
+                    if (!detected || isGenericTeachingCategory(detected.category)) continue;
+                    item.category = detected.category;
+                    item.relatedCategories = (detected.related_categories || []).slice(0, 3);
+                    item.knowledgePoints = [...new Set([
+                        ...detected.knowledge_points.slice(0, 3),
+                        ...(detected.related_knowledge_points || []).slice(0, 2)
+                    ])].slice(0, 4);
+                    // 用户已有手动填写的“本题难点”时予以保留。
+                    if (!Array.isArray(item.focusPoints) || !item.focusPoints.length) {
+                        item.focusPoints = detected.focus_points.slice(0, 2);
+                    }
+                    if (["简单", "中等", "困难"].includes(detected.difficulty)) {
+                        item.difficulty = detected.difficulty;
+                    }
+                    const pendingReview = detected.needs_review !== false
+                        || detected.classification_status !== "semantic";
+                    item.classificationVersion = pendingReview ? 2 : 3;
+                    storeWrongQuestionGraphTeaching(item, detected, oldItem.question, oldItem.solution);
+                    changed = true;
                 }
-                if (["简单", "中等", "困难"].includes(detected.difficulty)) {
-                    item.difficulty = detected.difficulty;
+                if (changed) {
+                    saveLearningState();
+                    renderWrongBook();
+                    renderOpenWrongQuestionGraph();
                 }
-                // 未完成复核的判断允许下次打开时重试，不能由本地置信度
-                // 决定是否永久保留某次归类。
-                const pendingReview = detected.needs_review !== false
-                    || detected.classification_status !== "semantic";
-                item.classificationVersion = pendingReview ? 2 : 3;
-                storeWrongQuestionGraphTeaching(item, detected, oldItem.question, oldItem.solution);
-                changed = true;
-            }
-            if (changed) {
-                saveLearningState();
-                renderWrongBook();
+            } finally {
+                window.clearTimeout(timeout);
+                for (const operation of operations) {
+                    if (wrongBookClassificationRequests.get(String(operation.id)) === operation) {
+                        wrongBookClassificationRequests.delete(String(operation.id));
+                    }
+                    operation.resolve();
+                }
             }
         }
     } catch (error) {
@@ -9615,6 +9721,7 @@ async function generateWrongQuestionAnswer(
 
         saveLearningState();
         renderWrongBook();
+        renderOpenWrongQuestionGraph(entry);
         return true;
 
     } catch (error) {
@@ -9741,6 +9848,7 @@ async function generateWrongQuestionAnalysis(id) {
         wrongAnalysisExpandedIds.add(id);
         saveLearningState();
         renderWrongBook();
+        renderOpenWrongQuestionGraph(entry);
 
     } catch (error) {
         if (!isCurrent()) return;
@@ -19404,41 +19512,121 @@ function getWrongQuestionGraphSubject() {
     if (!reference || !isKnowledgeGraphHistoryOwnerCurrent(reference)) return null;
     const entry = learningState.wrongQuestions.find(item => String(item.id) === reference.id
         && item.question === reference.question && !learningState.deletedWrongQuestionIds?.[reference.id]);
+    if (entry && hydrateWrongQuestionGraph(entry)) saveLearningState();
     return entry ? {reference, context:wrongQuestionGraphContext(entry, reference)} : null;
 }
 
+function renderOpenWrongQuestionGraph(entry = null) {
+    if (isWrongKnowledgeGraphView()
+        && (!entry || knowledgeGraphWrongQuestionReference?.id === String(entry.id))
+        && !document.getElementById("knowledgeGraphModal")?.classList.contains("hidden")) renderKnowledgeGraph();
+}
+
+function isWrongQuestionGraphOperationCurrent(entry, reference, operation, visible = false) {
+    if (!isKnowledgeGraphHistoryOwnerCurrent(reference) || operation.version !== cloudSyncContextVersion
+        || !learningState.wrongQuestions.includes(entry) || entry.question !== operation.question
+        || knowledgeGraphWrongQuestionAnalyses.get(entry) !== operation
+        || wrongQuestionGraphContext(entry, reference).reviewSolutionText !== operation.solution) return false;
+    if (!visible) return true;
+    const current = getWrongQuestionGraphSubject();
+    return isWrongKnowledgeGraphView() && !document.getElementById("knowledgeGraphModal")?.classList.contains("hidden")
+        && current && knowledgeGraphReferenceKey(current.reference) === knowledgeGraphReferenceKey(reference);
+}
+
+function scheduleWrongQuestionGraphRetry(entry, reference, operation) {
+    if (operation.retryCount >= 4) return false;
+    if (!operation.retryAt) {
+        const status = operation.backendStatus;
+        let delay;
+        if (status === "pending" || status === "deferred") {
+            delay = [1000, 2000, 4000, 8000][operation.retryCount];
+            operation.retryKind = "pending";
+        } else if (status === "rate_limited" && !operation.rateRetryUsed) {
+            delay = 61000;
+            operation.retryKind = "rate";
+        } else if (["unavailable", "invalid"].includes(status) && !operation.failureRetryUsed) {
+            // Failed provider results are cached for 15 seconds. Wait until
+            // that cache expires rather than immediately repeating the miss.
+            delay = 16000;
+            operation.retryKind = "failure";
+        } else return false;
+        operation.retryAt = Date.now() + delay;
+    }
+    if (!isWrongQuestionGraphOperationCurrent(entry, reference, operation, true)) return false;
+    if (wrongQuestionGraphRetry?.operation === operation) return true;
+    cancelWrongQuestionGraphRetry();
+    operation.status = "pending";
+    operation.waitingToRetry = true;
+    const record = {operation, timer:null};
+    record.timer = window.setTimeout(() => {
+        if (wrongQuestionGraphRetry !== record) return;
+        wrongQuestionGraphRetry = null;
+        operation.waitingToRetry = false;
+        if (!isWrongQuestionGraphOperationCurrent(entry, reference, operation, true)) {
+            operation.status = "unavailable";
+            return;
+        }
+        operation.retryCount += 1;
+        if (operation.retryKind === "rate") operation.rateRetryUsed = true;
+        if (operation.retryKind === "failure") operation.failureRetryUsed = true;
+        operation.retryAt = 0;
+        startWrongQuestionGraphAnalysis(entry, reference, operation);
+        renderKnowledgeGraph();
+    }, Math.max(0, operation.retryAt - Date.now()));
+    wrongQuestionGraphRetry = record;
+    return true;
+}
+
+function startWrongQuestionGraphAnalysis(entry, reference, operation, batch = null) {
+    operation.status = "pending";
+    operation.inFlight = true;
+    const work = batch ? batch.promise.then(() => batch.teaching)
+        : analyzeSingleQuestionTeaching(operation.question, `wrong:${reference.id}`,
+            {solutionText:operation.solution, semanticReview:true});
+    operation.promise = work.then(teaching => {
+        if (!isWrongQuestionGraphOperationCurrent(entry, reference, operation)) return;
+        operation.backendStatus = teaching?.question_graph?.classification_status
+            || teaching?.classification_status || "unavailable";
+        if (!isWrongQuestionGraphReady(wrongQuestionGraphContext(entry, reference))
+            && storeWrongQuestionGraphTeaching(entry, teaching, operation.question, operation.solution)) saveLearningState();
+    }).catch(error => {
+        operation.backendStatus = "unavailable";
+        console.warn("错题知识点复核未完成：", error);
+    }).finally(() => {
+        operation.inFlight = false;
+        operation.completedAt = Date.now();
+        operation.status = "unavailable";
+        if (!isWrongQuestionGraphOperationCurrent(entry, reference, operation)) return;
+        if (isWrongQuestionGraphReady(wrongQuestionGraphContext(entry, reference))) {
+            operation.status = "ready";
+            operation.retryAt = 0;
+        } else scheduleWrongQuestionGraphRetry(entry, reference, operation);
+        if (isWrongQuestionGraphOperationCurrent(entry, reference, operation, true)) renderKnowledgeGraph();
+    });
+}
+
 function queueWrongQuestionGraphAnalysis(subject) {
-    if (!subject || isReviewedKnowledgeGraph(subject.context)) return "ready";
+    if (!subject || isWrongQuestionGraphReady(subject.context)) return "ready";
     const reference = subject.reference;
     if (!isKnowledgeGraphHistoryOwnerCurrent(reference)) return "unavailable";
     const entry = learningState.wrongQuestions.find(item => String(item.id) === reference.id && item.question === reference.question);
     if (!entry) return "unavailable";
     const question = entry.question, solution = subject.context.reviewSolutionText || "";
     const previous = knowledgeGraphWrongQuestionAnalyses.get(entry);
-    if (previous?.question === question && previous.solution === solution && previous.version === cloudSyncContextVersion
-        && (previous.status === "pending" || previous.openRevision === knowledgeGraphOpenRevision
-            || Date.now() - previous.completedAt < 60000)) return previous.status;
+    if (wrongQuestionGraphRetry && wrongQuestionGraphRetry.operation !== previous) cancelWrongQuestionGraphRetry();
+    if (previous?.question === question && previous.solution === solution && previous.version === cloudSyncContextVersion) {
+        if (previous.inFlight || previous.waitingToRetry) return "pending";
+        if (previous.retryAt && scheduleWrongQuestionGraphRetry(entry, reference, previous)) return "pending";
+        if (previous.openRevision === knowledgeGraphOpenRevision || Date.now() - previous.completedAt < 60000) return previous.status;
+    }
     const operation = {question, solution, version:cloudSyncContextVersion, openRevision:knowledgeGraphOpenRevision,
-        status:"pending", completedAt:0};
+        status:"pending", inFlight:false, waitingToRetry:false, completedAt:0, retryCount:0, retryAt:0,
+        backendStatus:"", rateRetryUsed:false, failureRetryUsed:false};
     knowledgeGraphWrongQuestionAnalyses.set(entry, operation);
-    operation.promise = analyzeSingleQuestionTeaching(question, `wrong:${reference.id}`,
-        {solutionText:solution, semanticReview:true}).then(teaching => {
-        operation.status = "unavailable";
-        if (!isKnowledgeGraphHistoryOwnerCurrent(reference) || !learningState.wrongQuestions.includes(entry)
-            || entry.question !== question || knowledgeGraphWrongQuestionAnalyses.get(entry) !== operation
-            || wrongQuestionGraphContext(entry, reference).reviewSolutionText !== solution) return;
-        if (!storeWrongQuestionGraphTeaching(entry, teaching, question, solution)) return;
-        operation.status = isReviewedKnowledgeGraph(wrongQuestionGraphContext(entry, reference)) ? "ready" : "unavailable";
-        saveLearningState();
-    }).finally(() => {
-        operation.completedAt = Date.now();
-        if (operation.status === "pending") operation.status = "unavailable";
-        const modal = document.getElementById("knowledgeGraphModal");
-        if (!isKnowledgeGraphHistoryOwnerCurrent(reference) || modal?.classList.contains("hidden")
-            || !isWrongKnowledgeGraphView()) return;
-        const current = getWrongQuestionGraphSubject();
-        if (current && knowledgeGraphReferenceKey(current.reference) === knowledgeGraphReferenceKey(reference)) renderKnowledgeGraph();
-    });
+    const pending = wrongBookClassificationRequests.get(String(entry.id));
+    const batch = pending?.version === cloudSyncContextVersion && pending.question === question && pending.solution === solution
+        ? pending : null;
+    startWrongQuestionGraphAnalysis(entry, reference, operation, batch);
     return operation.status;
 }
 
@@ -20306,15 +20494,6 @@ function restoreKnowledgeGraphAfterWrongView() {
     knowledgeGraphSelectedNodeId = valid ? previous.selected : "";
 }
 
-function updateWrongKnowledgeGraphButton() {
-    const button = document.getElementById("knowledgeGraphWrongBtn");
-    if (!button) return;
-    button.hidden = !isWrongKnowledgeGraphView();
-    button.textContent = dmateUiText("错题关联", "Wrong question connections");
-    button.classList.toggle("active", isWrongKnowledgeGraphView());
-    button.setAttribute("aria-pressed", String(isWrongKnowledgeGraphView()));
-}
-
 async function openKnowledgeGraph() {
     syncKnowledgeGraphWorkspaceDefault();
     const modal = document.getElementById(
@@ -20379,6 +20558,7 @@ async function openKnowledgeGraph() {
 }
 
 function closeKnowledgeGraph() {
+    cancelWrongQuestionGraphRetry();
     ++knowledgeGraphOpenRevision;
     restoreKnowledgeGraphAfterWrongView();
     knowledgeGraphRenderedQuestion = null;
@@ -21712,7 +21892,8 @@ function renderKnowledgeGraphDetail() {
         title.textContent = "";
         const empty = document.createElement("div");
         empty.className = "graph-detail-empty";
-        empty.textContent = document.querySelector("#knowledgeGraphCanvas > .kg-empty")?.textContent
+        empty.textContent = document.querySelector("#knowledgeGraphCanvas > .kg-empty .kg-empty-message")?.textContent
+            || document.querySelector("#knowledgeGraphCanvas > .kg-empty")?.textContent
             || dmateUiText("无", "None");
         detail.replaceChildren(empty);
         return;
@@ -21942,7 +22123,6 @@ function renderKnowledgeGraph() {
     fillKnowledgeGraphCategoryOptions();
     updateKnowledgeGraphScopeButton();
     updateKnowledgeGraphModeButton();
-    updateWrongKnowledgeGraphButton();
     modal.dataset.graphView = knowledgeGraphViewMode;
 
     knowledgeGraphRenderedQuestion = getKnowledgeGraphQuestionSubject();
@@ -21986,6 +22166,28 @@ function renderKnowledgeGraph() {
             : questionAnalysis === "pending"
             ? dmateUiText("正在核对本题知识点", "Reviewing this question's knowledge points")
             : dmateUiText("知识点归类暂未完成", "Knowledge point classification is not complete yet");
+        if (isWrongKnowledgeGraphView() && knowledgeGraphRenderedQuestion && questionAnalysis !== "pending") {
+            const message = document.createElement("span");
+            message.className = "kg-empty-message";
+            message.textContent = dmateUiText("暂时无法生成图谱", "The graph could not be generated yet");
+            const retry = document.createElement("button");
+            retry.type = "button";
+            retry.className = "secondary kg-empty-retry";
+            retry.textContent = dmateUiText("重试", "Retry");
+            const reference = knowledgeGraphRenderedQuestion.reference;
+            const revision = knowledgeGraphOpenRevision;
+            retry.addEventListener("click", () => {
+                const current = getWrongQuestionGraphSubject();
+                if (!isWrongKnowledgeGraphView() || revision !== knowledgeGraphOpenRevision || !current
+                    || knowledgeGraphReferenceKey(current.reference) !== knowledgeGraphReferenceKey(reference)) return;
+                const entry = learningState.wrongQuestions.find(item => String(item.id) === reference.id);
+                if (!entry) return;
+                cancelWrongQuestionGraphRetry();
+                knowledgeGraphWrongQuestionAnalyses.delete(entry);
+                renderKnowledgeGraph();
+            });
+            empty.replaceChildren(message, retry);
+        }
         canvas.replaceChildren(empty);
         renderKnowledgeGraphSide();
         return;

@@ -118,11 +118,9 @@ async function graphSnapshot(page) {
 }
 
 async function assertOnlyWrongNavigation(page, label) {
-  assert.equal(await page.locator('#knowledgeGraphWrongBtn').innerText(), '错题关联', label + ': dedicated wrong-question label');
-  assert.equal(await page.locator('#knowledgeGraphWrongBtn').getAttribute('aria-pressed'), 'true');
-  if (!await page.locator('#knowledgeGraphModal').evaluate(modal => modal.classList.contains('graph-fullscreen-view'))) {
-    assert.equal(await page.locator('#knowledgeGraphWrongBtn').isVisible(), true, label + ': the dedicated navigation is visible');
-  }
+  assert.equal(await page.locator('#knowledgeGraphWrongBtn').count(), 0, label + ': redundant wrong-question button is removed');
+  assert.equal(await page.locator('#knowledgeGraphModal .graph-toolbar-left').isVisible(), false,
+    label + ': wrong-question graph has no mode navigation');
   for (const id of ['knowledgeGraphFocusBtn', 'knowledgeGraphHistoryBtn', 'knowledgeGraphScopeBtn']) {
     assert.equal(await page.locator('#' + id).isVisible(), false, label + ': usual navigation is hidden: ' + id);
   }
@@ -188,9 +186,9 @@ async function checkWrongBookGraph(browser, width) {
     if (width <= 760) await page.locator('.kg-mobile-expand').click();
     await page.evaluate(() => DMateI18n.setLanguage('en', false));
     await settle(page);
-    assert.match(await page.locator('#knowledgeGraphWrongBtn').innerText(), /[A-Za-z]/,
-      label + ': dedicated navigation updates with the current language');
-    assert.doesNotMatch(await page.locator('#knowledgeGraphWrongBtn').innerText(), /错题/);
+    assert.match(await page.locator('#knowledgeGraphCanvas .kg-section-title').textContent(), /[A-Za-z]/,
+      label + ': graph heading updates with the current language');
+    assert.doesNotMatch(await page.locator('#knowledgeGraphCanvas .kg-section-title').textContent(), /错题/);
     assert.deepEqual((await graphSnapshot(page)).ids, EXPECTED, label + ': language changes preserve the exact source graph');
     await page.evaluate(() => DMateI18n.setLanguage('zh-CN', false));
     await locateAndExpect(page, 'wrong-corrected', 'corrected', conversation, label + '/corrected first');
@@ -256,7 +254,7 @@ async function checkWrongBookGraph(browser, width) {
     assert.deepEqual((await graphSnapshot(page)).ids, []);
     assert.deepEqual(modelCalls, [], label + ': reviewed graph opening, navigation and persistence request no model output');
     assert.deepEqual(errors, []);
-    console.log('PASS ' + width + ': wrong-card graph action, exact purple graph, dedicated navigation, corrected/oldest locator and source persistence');
+    console.log('PASS ' + width + ': wrong-card graph action, exact purple graph, no redundant navigation, corrected/oldest locator and source persistence');
   } finally { await context.close(); }
 }
 
