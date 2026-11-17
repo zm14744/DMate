@@ -1025,7 +1025,9 @@ const wrongAnalysisLoadingIds = new Set();
 
 let knowledgeGraphData = null;
 let knowledgeGraphFilter = "";
-let knowledgeGraphViewMode = "focus";
+let knowledgeGraphViewMode = "full";
+let knowledgeGraphWorkspaceContext = null;
+let knowledgeGraphWorkspaceWasHome = null;
 let knowledgeGraphDesktopScale = 1;
 const knowledgeGraphViewMemory = new Map();
 let knowledgeGraphInitialized = false;
@@ -11822,7 +11824,7 @@ function scheduleKnowledgeGraphPngPreparation() {
 
 function knowledgeGraphImageFilename() {
     const label = isKnowledgeGraphQuestionView()
-        ? (knowledgeGraphScope === "history" ? "所选题目关联" : "最近一题关联")
+        ? (knowledgeGraphScope === "history" ? "历史题目关联" : "最近一题关联")
         : (knowledgeGraphFilter || "全部");
     return `离散数学知识图谱-${label}.png`;
 }
@@ -14373,7 +14375,7 @@ async function requestAiReply(session, options = {}) {
                     if (context.category) knowledgeGraphFilter = context.category;
                 }
                 // A completed answer can add a question in any conversation.
-                // Keep full browsing and its history tab in the user's control.
+                // Incoming answers preserve the graph page selected by the user.
                 renderKnowledgeGraph();
             }
 
@@ -17407,6 +17409,7 @@ document.addEventListener("visibilitychange", () => {
 // 渲染聊天
 // -----------------------------
 function renderChat(preparedReply = null) {
+    syncKnowledgeGraphWorkspaceDefault();
     prepareChatMessageEditRender();
     const chat = document.getElementById("chat");
     if (!chat) return;
@@ -19229,7 +19232,7 @@ function getConversationQuestionHistory(
 }
 
 function isKnowledgeGraphQuestionView() {
-    return knowledgeGraphViewMode === "focus" || knowledgeGraphScope === "history";
+    return knowledgeGraphViewMode === "focus" || knowledgeGraphViewMode === "history";
 }
 
 function knowledgeGraphReferenceKey(reference) {
@@ -19509,13 +19512,15 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile) {
     viewport.dataset.kgReady = 'false';
     let initialized = false, applying = false, disposed = false, frame = 0, releaseFrame = 0;
     let width = 0, height = 0;
+    let outerWidth = 0, outerHeight = 0;
     const active = () => window.matchMedia('(max-width:760px)').matches === mobile;
     const scale = () => Number(mobile ? viewport._kgScale : surface.dataset.scale) || 1;
     const remember = () => {
-        // A breakpoint/resize can clamp scroll before its callback runs. Keep
-        // the last camera from the old dimensions rather than saving that clamp.
+        // A real resize can clamp scroll before its callback runs. Scrollbars
+        // created by zoom only change client dimensions, so they must still
+        // commit the new camera instead of restoring an older fitted scale.
         if (!initialized || applying || disposed || !active()
-            || !viewport.isConnected || viewport.clientWidth !== width || viewport.clientHeight !== height) return;
+            || !viewport.isConnected || viewport.offsetWidth !== outerWidth || viewport.offsetHeight !== outerHeight) return;
         const view = viewport.getBoundingClientRect(), bounds = stage.getBoundingClientRect(), zoom = scale();
         memory.set(key, {scale:zoom,
             x:(view.left + viewport.clientLeft + viewport.clientWidth / 2 - bounds.left) / zoom,
@@ -19543,6 +19548,7 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile) {
             }
             width = viewport.clientWidth; height = viewport.clientHeight;
         }
+        outerWidth = viewport.offsetWidth; outerHeight = viewport.offsetHeight;
         initialized = true;
         viewport.style.visibility = '';
         viewport.dataset.kgReady = 'true';
@@ -19564,7 +19570,7 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile) {
     };
     const resize = () => {
         if (disposed || !active() || !viewport.clientWidth || !viewport.clientHeight) return;
-        if (initialized && viewport.clientWidth === width && viewport.clientHeight === height) return;
+        if (initialized && viewport.offsetWidth === outerWidth && viewport.offsetHeight === outerHeight) return;
         cancelAnimationFrame(frame);
         frame = requestAnimationFrame(initialize);
     };
@@ -19577,7 +19583,7 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile) {
     viewport._kgResizeRememberedView = resize;
     viewport.addEventListener('scroll', remember, {passive:true});
     const observer = mobile ? null : new ResizeObserver(resize);
-    observer?.observe(viewport);
+    observer?.observe(viewport, {box:'border-box'});
     const previousDispose = viewport._kgDispose;
     viewport._kgDispose = () => {
         if (disposed) return;
@@ -19650,9 +19656,12 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     };
 
     const applyScale = (nextScale, anchor = null) => {
+        const scale = clampMobileGraphScale(nextScale, minimumScale);
+        // A clamped button/wheel zoom has no new camera to apply. Avoid
+        // reanchoring it or repainting the same graph at either limit.
+        if (anchor && viewport._kgScale === scale) return scale;
         if (anchor) viewport._kgBeginViewInteraction?.();
         const point = anchor ? graphPoint(anchor) : null;
-        const scale = clampMobileGraphScale(nextScale, minimumScale);
         fitted = false;
         viewport._kgScale = scale;
         surface.style.width = `${Math.ceil(baseWidth * scale)}px`;
@@ -19987,7 +19996,29 @@ function toggleKnowledgeGraphFullscreenView() {
     renderKnowledgeGraph();
 }
 
+function syncKnowledgeGraphWorkspaceDefault({returnedHome = false} = {}) {
+    const home = !getCurrent();
+    const changedOwner = knowledgeGraphWorkspaceContext !== cloudSyncContextVersion;
+    if (changedOwner || (home && (returnedHome || knowledgeGraphWorkspaceWasHome !== true))) {
+        knowledgeGraphViewMode = "full";
+        knowledgeGraphScope = "current";
+        knowledgeGraphQuestionReference = null;
+        knowledgeGraphRenderedQuestion = null;
+        knowledgeGraphSideMode = "detail";
+        knowledgeGraphFilter = "全部";
+        knowledgeGraphSelectedNodeId = "";
+        knowledgeGraphDesktopScale = 1;
+        knowledgeGraphMobileFullscreen = false;
+        knowledgeGraphViewMemory.clear();
+        knowledgeGraphPreparedPngPromise = null;
+        knowledgeGraphPreparedPngKey = "";
+    }
+    knowledgeGraphWorkspaceContext = cloudSyncContextVersion;
+    knowledgeGraphWorkspaceWasHome = home;
+}
+
 async function openKnowledgeGraph() {
+    syncKnowledgeGraphWorkspaceDefault();
     const modal = document.getElementById(
         "knowledgeGraphModal"
     );
@@ -20010,13 +20041,9 @@ async function openKnowledgeGraph() {
         if (revision !== knowledgeGraphOpenRevision) return false;
         if (!knowledgeGraphData?.nodes?.length) throw new Error("知识图谱数据为空");
 
-        knowledgeGraphScope = "current";
-        knowledgeGraphQuestionReference = null;
         knowledgeGraphRenderedQuestion = null;
-        // 最近一题关联没有有效题目时显示“无”；全部知识由用户单独选择。
         if (!knowledgeGraphInitialized) {
-            knowledgeGraphFilter = "全部";
-            knowledgeGraphViewMode = "focus";
+            if (!knowledgeGraphFilter) knowledgeGraphFilter = "全部";
             knowledgeGraphInitialized = true;
         }
 
@@ -20055,9 +20082,7 @@ async function openKnowledgeGraph() {
 
 function closeKnowledgeGraph() {
     ++knowledgeGraphOpenRevision;
-    knowledgeGraphQuestionReference = null;
     knowledgeGraphRenderedQuestion = null;
-    knowledgeGraphSideMode = "detail";
     document.getElementById("knowledgeGraphHistory")?.replaceChildren();
     const modal = document.getElementById(
         "knowledgeGraphModal"
@@ -20071,7 +20096,7 @@ function closeKnowledgeGraph() {
         modal.style.pointerEvents = "";
         modal.dataset.graphReady = "false";
     }
-
+    if (!getCurrent()) syncKnowledgeGraphWorkspaceDefault({returnedHome:true});
 }
 
 function renderKnowledgeGraphLoading(message) {
@@ -20131,13 +20156,15 @@ function updateKnowledgeGraphScopeButton() {
     if (legend) legend.textContent = "最近一题相关知识";
 }
 
-// 两个固定含义的按钮，不再套用「当前/本对话」和「聚焦/完整」两层切换。
+// Course browsing, the active question, and historical questions are independent pages.
 function selectKnowledgeGraphDisplayMode(mode) {
     if (!knowledgeGraphData) return;
-    knowledgeGraphScope = "current";
-    knowledgeGraphQuestionReference = null;
+    const nextMode = ["full", "focus", "history"].includes(mode) ? mode : "full";
+    if (nextMode !== "history" || knowledgeGraphViewMode !== "history") knowledgeGraphQuestionReference = null;
+    knowledgeGraphScope = nextMode === "history" ? "history" : "current";
     knowledgeGraphRenderedQuestion = null;
-    knowledgeGraphViewMode = mode === "full" ? "full" : "focus";
+    knowledgeGraphViewMode = nextMode;
+    knowledgeGraphSideMode = nextMode === "history" ? "history" : "detail";
     // 视图与模块筛选互不干扰，切换按钮不清除用户选中的模块。
     if (!knowledgeGraphFilter) knowledgeGraphFilter = "全部";
     knowledgeGraphSelectedNodeId = "";
@@ -20148,11 +20175,18 @@ function selectKnowledgeGraphDisplayMode(mode) {
 
 function updateKnowledgeGraphModeButton() {
     const button = document.getElementById("knowledgeGraphFocusBtn");
-    if (!button) return;
-    button.textContent = "全部知识";
-    button.title = "显示完整知识图谱的全部节点与关系线；可使用模块下拉框筛选";
-    button.classList.toggle("active", knowledgeGraphViewMode === "full");
-    button.setAttribute("aria-pressed", String(knowledgeGraphViewMode === "full"));
+    if (button) {
+        button.textContent = "全部知识";
+        button.title = "显示完整知识图谱的全部节点与关系线；可使用模块下拉框筛选";
+        button.classList.toggle("active", knowledgeGraphViewMode === "full");
+        button.setAttribute("aria-pressed", String(knowledgeGraphViewMode === "full"));
+    }
+    const history = document.getElementById("knowledgeGraphHistoryBtn");
+    if (history) {
+        history.textContent = dmateUiText("历史题目关联", "Historical question connections");
+        history.classList.toggle("active", knowledgeGraphViewMode === "history");
+        history.setAttribute("aria-pressed", String(knowledgeGraphViewMode === "history"));
+    }
 }
 
 
@@ -20678,12 +20712,15 @@ function setKnowledgeGraphDesktopScale(value, keepCenter = true) {
     const stage = surface?.querySelector(".kg-desktop-zoom-stage");
     const viewport = canvas?.querySelector(".kg-desktop-viewport");
     if (!canvas || !surface || !stage || !viewport) return;
-    if (keepCenter) viewport._kgBeginViewInteraction?.();
 
     const baseWidth = Number(stage.dataset.baseWidth) || 1;
     const baseHeight = Number(stage.dataset.baseHeight) || 1;
     const previous = Number(surface.dataset.scale) || 1;
     const next = Math.max(0.2, Math.min(2.5, Number(value) || 1));
+    // Only real zoom changes should touch the viewport. Reapplying a clamped
+    // scale resets its label and anchor and can restart resize/paint work.
+    if (keepCenter && previous === next) return;
+    if (keepCenter) viewport._kgBeginViewInteraction?.();
     const center = () => {
         const rect = viewport.getBoundingClientRect();
         return {
@@ -21127,7 +21164,7 @@ function isKnowledgeGraphHistoryOwnerCurrent(context) {
 function isKnowledgeGraphHistoryActionCurrent(context) {
     return isKnowledgeGraphHistoryOwnerCurrent(context)
         && context.openRevision === knowledgeGraphOpenRevision
-        && knowledgeGraphViewMode === "full" && knowledgeGraphSideMode === "history"
+        && knowledgeGraphViewMode === "history" && knowledgeGraphSideMode === "history"
         && !document.getElementById("knowledgeGraphModal")?.classList.contains("hidden");
 }
 
@@ -21139,7 +21176,7 @@ function viewKnowledgeGraphHistoryQuestion(reference, context) {
         index:reference.index, fingerprint:reference.fingerprint,
         version:context.version, authenticated:context.authenticated, username:context.username};
     knowledgeGraphScope = "history";
-    knowledgeGraphViewMode = "full";
+    knowledgeGraphViewMode = "history";
     knowledgeGraphRenderedQuestion = null;
     knowledgeGraphSideMode = "detail";
     knowledgeGraphSelectedNodeId = "";
@@ -21246,23 +21283,23 @@ function renderKnowledgeGraphHistory(groups) {
 }
 
 function setKnowledgeGraphSideMode(mode) {
-    knowledgeGraphSideMode = knowledgeGraphViewMode === "full" && mode === "history" ? "history" : "detail";
+    knowledgeGraphSideMode = knowledgeGraphViewMode === "history" && mode === "history" ? "history" : "detail";
     renderKnowledgeGraphSide();
 }
 
 function renderKnowledgeGraphSide({refreshHistory = true} = {}) {
-    const full = knowledgeGraphViewMode === "full";
-    if (!full) knowledgeGraphSideMode = "detail";
-    const history = full && knowledgeGraphSideMode === "history";
+    const historical = knowledgeGraphViewMode === "history";
+    if (!historical) knowledgeGraphSideMode = "detail";
+    const history = historical && knowledgeGraphSideMode === "history";
     const tabs = document.getElementById("knowledgeGraphSideTabs");
-    if (tabs) tabs.hidden = !full;
+    if (tabs) tabs.hidden = !historical;
     // Selecting a node cannot change questions. Keep the displayed count until
     // a data render or history opening refreshes it; history itself is always read fresh.
-    const groups = full ? (refreshHistory || history ? getKnowledgeGraphQuestionHistory() : null) : [];
+    const groups = historical ? (refreshHistory || history ? getKnowledgeGraphQuestionHistory() : null) : [];
     const historyTab = document.getElementById("knowledgeGraphHistoryTab");
     if (historyTab && groups !== null) {
         const count = groups.reduce((sum, group) => sum + group.items.length, 0);
-        historyTab.textContent = dmateUiText(`题目历史 (${count})`, `Question history (${count})`);
+        historyTab.textContent = dmateUiText(`历史题目 (${count})`, `Past questions (${count})`);
     }
     for (const [id, selected] of [["knowledgeGraphDetailTab", !history], ["knowledgeGraphHistoryTab", history]]) {
         const button = document.getElementById(id);
@@ -21340,7 +21377,7 @@ function renderKnowledgeGraphDetail() {
     if (subline.childNodes.length) detail.appendChild(subline);
 
     const subject = knowledgeGraphRenderedQuestion;
-    if (isKnowledgeGraphQuestionView() && subject) {
+    if (knowledgeGraphViewMode === "focus" && subject) {
         const actions = document.createElement("div");
         actions.className = "kg-history-actions kg-question-actions";
         const locate = document.createElement("button");
@@ -21525,8 +21562,7 @@ function renderKnowledgeGraph() {
 
     if (!knowledgeGraphData) return;
 
-    // 在两个模式下使用同一个属性控制桌面下拉框与移动端选择入口。
-    modal.dataset.graphView = isKnowledgeGraphQuestionView() ? "focus" : "full";
+    modal.dataset.graphView = knowledgeGraphViewMode;
     fillKnowledgeGraphCategoryOptions();
     updateKnowledgeGraphScopeButton();
     updateKnowledgeGraphModeButton();
@@ -21567,7 +21603,9 @@ function renderKnowledgeGraph() {
         modal.classList.remove("graph-fullscreen-view");
         const empty = document.createElement("div");
         empty.className = "kg-empty";
-        empty.textContent = !knowledgeGraphRenderedQuestion ? dmateUiText("无", "None") : questionAnalysis === "pending"
+        empty.textContent = !knowledgeGraphRenderedQuestion
+            ? (knowledgeGraphViewMode === "history" ? dmateUiText("请选择一道历史题目", "Select a past question") : dmateUiText("无", "None"))
+            : questionAnalysis === "pending"
             ? dmateUiText("正在识别本题知识关系", "Identifying this question's knowledge relations")
             : dmateUiText("暂无有依据的题目知识关系", "No evidenced knowledge relations for this question");
         canvas.replaceChildren(empty);
@@ -21578,11 +21616,11 @@ function renderKnowledgeGraph() {
     const questionView = isKnowledgeGraphQuestionView();
     const sectionTitle = questionView
         ? (knowledgeGraphScope === "history"
-            ? dmateUiText("所选题目关联", "Selected question") : dmateUiText("最近一题关联", "Related to latest question"))
+            ? dmateUiText("历史题目关联", "Historical question connections") : dmateUiText("最近一题关联", "Related to latest question"))
         : displayCategory;
     const description = questionView
         ? (knowledgeGraphScope === "history"
-            ? dmateUiText(`所选题目关联 ${visibleNodes.length} 个知识点`, `Related to selected question ${visibleNodes.length} concepts`)
+            ? dmateUiText(`历史题目关联 ${visibleNodes.length} 个知识点`, `Historical question connections ${visibleNodes.length} concepts`)
             : `最近一题关联 ${visibleNodes.length} 个知识点`)
         : dmateUiText(`${fullNodes.length} 个知识点`, `${fullNodes.length} concepts`);
 
@@ -22760,6 +22798,7 @@ document.addEventListener(
         const knowledgeGraphCategoryTrigger = document.getElementById("knowledgeGraphCategoryTrigger");
         const knowledgeGraphScopeBtn = document.getElementById("knowledgeGraphScopeBtn");
         const knowledgeGraphFocusBtn = document.getElementById("knowledgeGraphFocusBtn");
+        const knowledgeGraphHistoryBtn = document.getElementById("knowledgeGraphHistoryBtn");
         const knowledgeGraphDetailTab = document.getElementById("knowledgeGraphDetailTab");
         const knowledgeGraphHistoryTab = document.getElementById("knowledgeGraphHistoryTab");
         const knowledgeGraphCopyBtn = document.getElementById("knowledgeGraphCopyBtn");
@@ -23111,6 +23150,7 @@ document.addEventListener(
 
         knowledgeGraphDetailTab?.addEventListener("click", () => setKnowledgeGraphSideMode("detail"));
         knowledgeGraphHistoryTab?.addEventListener("click", () => setKnowledgeGraphSideMode("history"));
+        knowledgeGraphHistoryBtn?.addEventListener("click", () => selectKnowledgeGraphDisplayMode("history"));
 
         if (knowledgeGraphFocusBtn) {
             knowledgeGraphFocusBtn.addEventListener(

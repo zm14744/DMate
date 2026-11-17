@@ -1,4 +1,4 @@
-/* Full graph history follows sidebar conversations and each message sequence.
+/* Independent history mode follows sidebar conversations and each message sequence.
  * All model/account paths are mocked; no paid requests or cloud writes occur.
  */
 'use strict';
@@ -14,17 +14,41 @@ async function settle(page) {
 async function openHistory(page) {
   await page.evaluate(async () => {
     if (document.getElementById('knowledgeGraphModal').classList.contains('hidden')) await openKnowledgeGraph();
-    selectKnowledgeGraphDisplayMode('full');
+    selectKnowledgeGraphDisplayMode('history');
     setKnowledgeGraphFullscreenView(false);
   });
-  await page.locator('#knowledgeGraphHistoryTab').click();
   await page.locator('#knowledgeGraphHistoryWrap').waitFor({state:'visible'});
   await settle(page);
+}
+
+
+async function assertModeControls(page,mode,label) {
+  const selectors={full:'#knowledgeGraphFocusBtn',focus:'#knowledgeGraphScopeBtn',history:'#knowledgeGraphHistoryBtn'};
+  for(const [value,selector] of Object.entries(selectors)) {
+    assert.equal(await page.locator(selector).isVisible(),true,label+': the '+value+' top-level mode is available');
+    assert.equal(await page.locator(selector).getAttribute('aria-pressed'),String(value===mode),
+      label+': exactly the selected top-level mode is pressed');
+  }
+  assert.equal(await page.evaluate(()=>knowledgeGraphViewMode),mode,label+': the mode state matches the toolbar');
+}
+
+async function fullHasNoHistory(page,label) {
+  await page.evaluate(()=>selectKnowledgeGraphDisplayMode('full'));
+  await settle(page);
+  await assertModeControls(page,'full',label);
+  assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),false,label+': full mode has no sidebar mode tabs');
+  assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),true,label+': full mode shows only node details');
+  assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(),false,label+': full mode does not show the history list');
+  assert.equal(await page.locator(cards).count(),0,label+': full mode does not leave hidden history cards behind');
+  assert.equal(await page.locator('#knowledgeGraphLocateOriginal').count(),0,label+': full mode has no question-specific source locator');
 }
 
 async function recentHasNoHistory(page, label) {
   await page.evaluate(() => selectKnowledgeGraphDisplayMode('focus'));
   await settle(page);
+  await assertModeControls(page,'focus',label);
+  assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),false,label+': recent mode has no sidebar mode tabs');
+  assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),true,label+': recent mode shows node details');
   assert.equal(await page.locator('#knowledgeGraphHistoryTab').isVisible(), false, label + ': recent mode hides the history entry');
   assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(), false, label + ': recent mode hides history content');
   assert.equal(await page.locator(cards).count(), 0, label + ': recent mode does not render hidden history cards');
@@ -93,9 +117,22 @@ async function checkCase(browser,width,language) {
     await page.evaluate(value=>DMateI18n.setLanguage(value,false),language);
     const sidebarOrder=await page.locator('#sessions>.session').evaluateAll(nodes=>nodes.map(node=>node.dataset.sessionId));
     assert.deepEqual(sidebarOrder,fixture.conversationOrder,label+': fixture sidebar order intentionally contradicts timestamps');
+    await page.evaluate(async()=>openKnowledgeGraph());
+    await fullHasNoHistory(page,label+'/all knowledge');
     await openHistory(page);
-    assert.equal(await page.locator('#knowledgeGraphHistoryTab').innerText(),language==='en'?'Question history (5)':'题目历史 (5)',
-      label+': full mode counts all conversations, with only within-conversation duplicate removal');
+    await assertModeControls(page,'history',label+'/history list');
+    assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),true,label+': only history mode exposes detail/history tabs');
+    assert.equal(await page.locator('#knowledgeGraphCanvas').innerText(),language==='en'?'Select a past question':'请选择一道历史题目',
+      label+': entering history mode prompts for a specific past question instead of showing the course graph');
+    await page.locator('#knowledgeGraphDetailTab').click();
+    assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),true,label+': the historical detail tab can open before choosing a past question');
+    assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),true,label+': empty historical details keep both sidebar tabs accessible');
+    assert.deepEqual(await page.evaluate(()=>knowledgeGraphDisplayedNodes().map(node=>node.id)),[],label+': unselected historical details never fall back to a full course graph');
+    assert.equal(await page.locator('#knowledgeGraphLocateOriginal').count(),0,label+': an unselected historical detail has no source locator');
+    await page.locator('#knowledgeGraphHistoryTab').click();
+    assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(),true,label+': the sidebar returns to the historical list before a selection');
+    assert.equal(await page.locator('#knowledgeGraphHistoryTab').innerText(),language==='en'?'Past questions (5)':'历史题目 (5)',
+      label+': independent history mode counts all conversations, with only within-conversation duplicate removal');
     assert.deepEqual(await page.locator('#knowledgeGraphHistory .kg-history-conversation').evaluateAll(nodes=>nodes.map(node=>node.dataset.sessionId)),
       ['history-top','history-lower'],label+': nonempty groups follow the exact visible sidebar order');
     assert.deepEqual(await page.locator('#knowledgeGraphHistory .kg-history-conversation-title').allTextContents(),fixture.names,
@@ -113,16 +150,25 @@ async function checkCase(browser,width,language) {
     const snapshot=()=>page.evaluate(()=>JSON.stringify(sessions.map(session=>({id:session.id,messages:session.messages}))));
     assert.equal(await snapshot(),fixture.snapshot,label+': aggregate rendering does not mutate manual/OCR/legacy AI messages');
     assert.equal(await page.locator('#knowledgeGraphModal .graph-status-pill.current').count(),0,
-      label+': full mode remains independent of the current question');
+      label+': history list remains independent of the current question');
 
     await page.locator('.kg-history-item[data-message-id="top-generated"] [data-history-action="graph"]').click();
-    await page.waitForFunction(()=>knowledgeGraphViewMode==='full'&&knowledgeGraphScope==='history'&&knowledgeGraphSelectedNodeId==='logic_equivalence');
+    await page.waitForFunction(()=>knowledgeGraphViewMode==='history'&&knowledgeGraphScope==='history'&&knowledgeGraphSelectedNodeId==='logic_equivalence');
     assert.equal(await page.evaluate(()=>currentId),'history-lower',label+': graph navigation does not switch the conversation');
+    await assertModeControls(page,'history',label+'/historical detail');
+    assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),true,label+': selecting a past graph opens historical node details');
+    assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(),false,label+': the historical list yields to its selected details');
+    assert.equal(await page.locator('#knowledgeGraphLocateOriginal').count(),0,label+': historical node details have no recent-only source locator');
+    assert.equal(await page.locator('.kg-section-title').innerText(),language==='en'?'Historical question connections':'历史题目关联',
+      label+': the selected graph is explicitly labelled as a historical question');
     assert.equal(await page.locator('#knowledgeGraphDetail .graph-status-pill.current').count(),0,label+': history graph navigation omits the redundant detail pill');
     assert.deepEqual(await page.evaluate(()=>knowledgeGraphDisplayedNodes().map(node=>({id:node.id,prerequisites:node.prerequisites}))),
       [{id:'logic_equivalence',prerequisites:[]}],label+': history graph includes only the question concept without fixed course prerequisites');
     assert.equal(await page.evaluate(()=>knowledgeGraphNodeState('逻辑等价',getActiveKnowledgeContext()).fill),'#5b21b6',
       label+': history graph retains the selected question concepts in purple');
+    await page.locator('#knowledgeGraphHistoryTab').click();
+    assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(),true,label+': the history sidebar tab returns to the list without changing top-level mode');
+    await assertModeControls(page,'history',label+'/return to historical list');
     await recentHasNoHistory(page,label);
     assert.equal(await page.evaluate(()=>getCurrent().id),'history-lower',label+': recent mode still uses the actual current conversation');
     assert.equal(await snapshot(),fixture.snapshot,label+': graph/side-mode navigation does not rewrite questions');
@@ -175,7 +221,80 @@ async function checkCase(browser,width,language) {
     assert.equal(await page.locator('#knowledgeGraphModal').isVisible(),true,label+': stale account/context action keeps the current page');
     assert.deepEqual(modelCalls,[],label+': history rendering/navigation never calls a model');
     assert.deepEqual(errors,[],label+': no browser errors');
-    console.log('PASS '+label+': all-conversation history ordering, strict question identity, raw names/content, full-only UI, graph/source actions and stale identity/context guards');
+    console.log('PASS '+label+': all-conversation history ordering, strict question identity, raw names/content, independent history UI, graph/source actions and stale identity/context guards');
+  } finally {await context.close();}
+}
+
+async function checkModeTransitions(browser,width) {
+  const label=width+'/mode transitions',mobile=width<=760;
+  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',
+    ...(mobile?{isMobile:true,hasTouch:true}:{})});
+  const page=await context.newPage(),errors=[],modelCalls=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  await page.route('**/auth/me',route=>route.fulfill({contentType:'application/json',body:'{"configured":true,"authenticated":false}'}));
+  await page.route(/\/(?:chat|analyze-questions|classify|conversation\/title|ocr)(?:\?|$)/,route=>{
+    modelCalls.push(new URL(route.request().url()).pathname);return route.abort();
+  });
+  const switchConversation=async id=>{
+    await page.evaluate(()=>closeKnowledgeGraph());
+    await page.locator('#sessions>.session[data-session-id="'+id+'"] [data-session-name]').evaluate(node=>node.click());
+    await page.waitForFunction(id=>String(currentId)===id,id);
+    assert.equal(await page.evaluate(()=>String(getCurrent().id)),id,label+': the real sidebar handler selects '+id);
+    await page.evaluate(async()=>{await openKnowledgeGraph();setKnowledgeGraphFullscreenView(false);});
+    await settle(page);
+  };
+  const enterHome=async()=>{
+    await page.evaluate(()=>{closeKnowledgeGraph();currentId=null;renderAll();});
+    await page.evaluate(async()=>openKnowledgeGraph());
+    await settle(page);
+  };
+  try {
+    await page.goto(baseURL,{waitUntil:'networkidle'});
+    await page.waitForFunction(()=>!accountVerificationOperation);
+    await page.evaluate(async()=>openKnowledgeGraph());
+    await assertModeControls(page,'full',label+'/initial home');
+    assert.equal(await page.evaluate(()=>getCurrent()),null,label+': the initial centered-composer home has no current conversation');
+    await page.evaluate(()=>closeKnowledgeGraph());
+    await seedConversations(page);
+    await page.evaluate(()=>{
+      sessions.push({id:'existing-blank',name:'已有空对话',nameSource:'user',messages:[],teaching:null,learningQuestion:null,deletedMessageIds:{}});
+      renderAll();
+    });
+    await page.evaluate(async()=>openKnowledgeGraph());
+    await recentHasNoHistory(page,label+'/recent');
+    assert.equal(await page.locator('#knowledgeGraphLocateOriginal').isVisible(),true,label+': recent details retain source navigation');
+    await switchConversation('history-top');
+    await assertModeControls(page,'focus',label+'/switch nonempty while recent');
+    await openHistory(page);
+    await page.locator('.kg-history-item[data-message-id="top-ocr"] [data-history-action="graph"]').click();
+    assert.equal(await page.locator('#knowledgeGraphLocateOriginal').count(),0,label+': history details omit the source locator');
+    const subject=await page.evaluate(()=>knowledgeGraphQuestionReference.messageId);
+    await page.evaluate(()=>closeKnowledgeGraph());
+    await page.evaluate(async()=>openKnowledgeGraph());
+    await assertModeControls(page,'history',label+'/reopen historical detail');
+    assert.equal(await page.evaluate(()=>knowledgeGraphQuestionReference.messageId),subject,label+': reopening preserves the selected historical question');
+    assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),true,label+': reopening preserves the historical detail pane');
+    await switchConversation('history-lower');
+    await assertModeControls(page,'history',label+'/switch nonempty while history');
+    await switchConversation('existing-blank');
+    await assertModeControls(page,'history',label+'/existing empty conversation');
+    await enterHome();
+    await assertModeControls(page,'full',label+'/return home resets full');
+    assert.equal(await page.evaluate(()=>knowledgeGraphQuestionReference),null,label+': entering home clears the selected historical subject');
+    await fullHasNoHistory(page,label+'/home full details');
+    await page.evaluate(()=>{selectKnowledgeGraphDisplayMode('focus');renderAll();});
+    await assertModeControls(page,'focus',label+'/explicit recent on home');
+    await page.evaluate(()=>closeKnowledgeGraph());
+    await page.evaluate(async()=>openKnowledgeGraph());
+    await assertModeControls(page,'full',label+'/closing graph returns to centered home');
+    await switchConversation('history-lower');
+    await assertModeControls(page,'full',label+'/leave home after closing graph');
+    await recentHasNoHistory(page,label+'/recent before second home entry');
+    await enterHome();
+    await assertModeControls(page,'full',label+'/second home entry');
+    assert.deepEqual(modelCalls,[],label+': mode transitions require no model or classification calls');
+    assert.deepEqual(errors,[],label+': mode transitions have no browser errors');
+    console.log('PASS '+label+': three independent top modes, home reset, existing-conversation preservation and history reopen');
   } finally {await context.close();}
 }
 
@@ -197,9 +316,8 @@ async function checkReplyRetention(browser) {
     });
     for(let attempt=0;attempt<100&&requests.length<1;attempt++)await new Promise(resolve=>setTimeout(resolve,20));
     assert.equal(requests.length,1,'exactly one explicit generated-question request is pending');
-    await openHistory(page);
     await page.evaluate(()=>setKnowledgeGraphFilter('函数'));
-    await page.locator('#knowledgeGraphHistoryTab').click();
+    await openHistory(page);
     assert.match(await page.locator('#knowledgeGraphHistoryTab').innerText(),/5/);
     const generated='证明对于任意命题 p，p 与 p 的合取和 p 等价。';
     const teaching={category:'命题逻辑',knowledge_points:['逻辑等价'],focus_points:['逻辑等价'],
@@ -213,21 +331,21 @@ async function checkReplyRetention(browser) {
     assert.equal((await page.evaluate(()=>window.historyReplyPromise)).status,'success','the real answer commit path completes');
     await page.waitForFunction(()=>document.getElementById('knowledgeGraphHistoryTab').textContent.includes('6'));
     assert.deepEqual(await page.evaluate(()=>({mode:knowledgeGraphViewMode,category:knowledgeGraphFilter})),
-      {mode:'full',category:'函数'},'an incoming answer does not force full history into recent-question mode or change the selected module');
+      {mode:'history',category:'函数'},'an incoming answer preserves independent history mode and the remembered module filter');
     assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(),true,'the active question-history pane stays open');
     assert.equal(await page.locator(cards).count(),6,'a committed generated question refreshes the aggregate count');
     assert.equal(await page.locator(cards).last().getAttribute('data-session-id'),'history-lower','new questions stay in their sidebar conversation group');
     assert.match(await page.locator(cards).last().locator('.kg-history-preview').innerText(),/p 与 p 的合取和 p 等价/,
       'the generated question follows the older questions in its conversation');
-    assert.equal(await page.locator('#knowledgeGraphModal .graph-status-pill.current').count(),0,'full history remains free of current-question decorations');
+    assert.equal(await page.locator('#knowledgeGraphModal .graph-status-pill.current').count(),0,'the history list remains free of current-question decorations');
     assert.equal(requests.length,1,'history refresh does not repeat the model request');
     assert.deepEqual(errors,[],'incoming answer history checks have no browser errors');
-    console.log('PASS incoming generated answer: full/history/filter remain selected and the new question appears in its conversation order');
+    console.log('PASS incoming generated answer: independent history and remembered filter remain selected and the new question appears in its conversation order');
   } finally {await context.close();}
 }
 
 (async()=>{
   const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.CHROMIUM_EXECUTABLE_PATH}:{})});
-  try {for(const width of [1440,390])for(const language of ['zh-CN','en'])await checkCase(browser,width,language);await checkReplyRetention(browser);}
+  try {for(const width of [1440,390])for(const language of ['zh-CN','en'])await checkCase(browser,width,language);for(const width of [1440,390])await checkModeTransitions(browser,width);await checkReplyRetention(browser);}
   finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1});

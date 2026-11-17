@@ -190,6 +190,23 @@ async function onlineCase(browser, width) {
     assert.equal((await snapshot(page)).shown, false, 'Cold data preparation keeps the previous page visible');
     await page.evaluate(() => releaseGraphData());
     await ready(page, !mobile(page)); await frames(page);
+    const initialCount = await page.evaluate(() => knowledgeGraphData.nodes.length);
+    stableTrace(await stop(page), 'online/' + width + '/cold all knowledge',
+      { nodes: mobile(page) ? 0 : initialCount, graph: !mobile(page) });
+    assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(), false,
+      'The initial all-knowledge graph has only node details');
+    await page.evaluate(() => restoreGraphData());
+
+    await start(page); await page.locator('#knowledgeGraphScopeBtn').click();
+    await ready(page, !mobile(page)); await frames(page);
+    stableTrace(await stop(page), 'online/' + width + '/recent question', { mode: 'focus', nodes: mobile(page) ? 0 : 1, graph: !mobile(page) });
+    await page.evaluate(() => closeKnowledgeGraph());
+    await gatedData(page); await start(page);
+    await page.evaluate(() => { void openKnowledgeGraph(); });
+    await frames(page, 18);
+    assert.equal((await snapshot(page)).shown, false, 'Cold recent data preparation keeps the previous page visible');
+    await page.evaluate(() => releaseGraphData());
+    await ready(page, !mobile(page)); await frames(page);
     stableTrace(await stop(page), 'online/' + width + '/cold focus', { mode: 'focus', graph: !mobile(page) });
     await page.evaluate(() => restoreGraphData());
 
@@ -215,7 +232,7 @@ async function onlineCase(browser, width) {
     await page.evaluate(() => restoreGraphData());
     assert.deepEqual(indexing, [], 'Opening and reopening never wait on history reindexing');
     assert.deepEqual(modelCalls, []); assert.deepEqual(errors, []);
-    console.log('PASS online/' + width + ': cold/full/reopen frames are stable, camera retained and canceled opens stay closed');
+    console.log('PASS online/' + width + ': cold full/recent/reopen frames are stable, camera retained and canceled opens stay closed');
   } finally { await context.close(); }
 }
 
@@ -294,7 +311,7 @@ async function offlineEntry(browser, width) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ headless: true,
+  const browser = await chromium.launch({ headless: true, ignoreDefaultArgs: ['--hide-scrollbars'],
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
     const widths = process.env.DMATE_TEST_WIDTHS ? process.env.DMATE_TEST_WIDTHS.split(',').map(Number) : [1440, 390];

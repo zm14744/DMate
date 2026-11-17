@@ -2719,7 +2719,7 @@ body[data-appearance-theme="light"] .msg-actions button {
     display:none !important;
 }
 
-/* 节点详情 / 题目历史必须始终同一行。 */
+/* 历史题目关联中的节点详情 / 历史题目始终同一行。 */
 .graph-side-tabs {
     display:flex !important;
     flex-wrap:nowrap !important;
@@ -7145,7 +7145,8 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
     #knowledgeGraphModal .graph-toolbar-left {
         width:100%;
         display:grid !important;
-        grid-template-columns:1fr 1fr;
+        grid-template-columns:repeat(3, minmax(0, 1fr)) !important;
+        align-items:stretch;
         gap:6px !important;
     }
     #knowledgeGraphModal .graph-toolbar-left label { display:none !important; }
@@ -7153,6 +7154,14 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         grid-column:1 / -1;
         width:100%;
         min-width:0;
+    }
+    #knowledgeGraphModal #knowledgeGraphCategoryTrigger {
+        grid-column:1 / -1 !important;
+    }
+    #knowledgeGraphModal #knowledgeGraphFocusBtn,
+    #knowledgeGraphModal #knowledgeGraphScopeBtn,
+    #knowledgeGraphModal #knowledgeGraphHistoryBtn {
+        grid-column:auto !important;
     }
     #knowledgeGraphModal .graph-toolbar-left button {
         min-width:0;
@@ -7567,7 +7576,10 @@ dialog#mobileChoiceModal[data-positioning]::backdrop { visibility:hidden!importa
 /* 图谱交互一致性：仅「全部知识」允许按模块筛选，手机/平板/桌面同步。 */
 #knowledgeGraphModal[data-graph-view="focus"] .graph-toolbar-left label[for="knowledgeGraphCategory"],
 #knowledgeGraphModal[data-graph-view="focus"] #knowledgeGraphCategory,
-#knowledgeGraphModal[data-graph-view="focus"] #knowledgeGraphCategoryTrigger {
+#knowledgeGraphModal[data-graph-view="focus"] #knowledgeGraphCategoryTrigger,
+#knowledgeGraphModal[data-graph-view="history"] .graph-toolbar-left label[for="knowledgeGraphCategory"],
+#knowledgeGraphModal[data-graph-view="history"] #knowledgeGraphCategory,
+#knowledgeGraphModal[data-graph-view="history"] #knowledgeGraphCategoryTrigger {
     display:none !important;
 }
 

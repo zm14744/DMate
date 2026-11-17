@@ -23,7 +23,7 @@ const settle = page => page.evaluate(async () => {
 
 async function removeOnlineOnly(page) {
   await page.evaluate(() => {
-    document.querySelectorAll('#knowledgeGraphFocusBtn,#knowledgeGraphScopeBtn,#knowledgeGraphHistoryTab,#knowledgeGraphHistoryWrap,'
+    document.querySelectorAll('#knowledgeGraphFocusBtn,#knowledgeGraphScopeBtn,#knowledgeGraphHistoryBtn,#knowledgeGraphHistoryTab,#knowledgeGraphHistoryWrap,'
       + '#knowledgeGraphLegendRelated,.graph-legend,.kg-video-section,.graph-side-tabs').forEach(node => node.remove());
   });
 }
@@ -343,6 +343,50 @@ async function inlineLifecycle(page) {
   assert.equal(await page.locator('#knowledgeGraphModal').count(), 1, 'Repeated portal lifecycles keep one graph instance');
 }
 
+async function checkClampedZoom(page) {
+  for (const action of ['in', 'out']) {
+    const button = zoom(page, action);
+    // Reach both bounds through the disconnected tool's real controls.
+    for (let repeat = 0; repeat < 45; repeat++) await button.evaluate(node => node.click());
+    await settle(page);
+    await page.evaluate(() => new Promise(resolve => {
+      let frames = 6; const tick = () => --frames ? requestAnimationFrame(tick) : resolve();
+      requestAnimationFrame(tick);
+    }));
+    const result = await button.evaluate(async button => {
+      const root = document.getElementById('knowledgeGraphModal');
+      const view = root.querySelector('.kg-mobile-viewport,.kg-desktop-viewport');
+      const surface = view.querySelector('.kg-mobile-zoom-surface,.kg-desktop-zoom-surface');
+      const stage = surface.querySelector('.kg-mobile-stage,.kg-desktop-zoom-stage');
+      const label = root.querySelector('.kg-mobile-zoom-label,#knowledgeGraphDesktopZoomLabel');
+      const capture = () => {
+        const rect = stage.getBoundingClientRect();
+        return {scale:view._kgScale || Number(surface.dataset.scale),label:label.textContent,
+          visible:getComputedStyle(view).visibility,
+          rect:[rect.x,rect.y,rect.width,rect.height],scroll:[view.scrollLeft,view.scrollTop],
+          dimensions:[view.clientWidth,view.clientHeight,surface.clientWidth,surface.clientHeight]};
+      };
+      const before = capture(), samples = []; let mutations = 0;
+      const observer = new MutationObserver(records => { mutations += records.length; });
+      observer.observe(view,{attributes:true,attributeFilter:['style','data-scale','data-kg-ready'],subtree:true,childList:true,characterData:true});
+      observer.observe(label,{subtree:true,childList:true,characterData:true});
+      for (let frame = 0; frame < 12; frame++) {
+        if (frame < 6) button.click();
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        samples.push(capture());
+      }
+      observer.disconnect();
+      return {before,samples,mutations};
+    });
+    assert.equal(result.mutations,0,'Offline '+action+' at its clamp causes no graph or label rewrites');
+    assert.equal(result.before.visible,'visible','The disconnected graph remains visible at its limit');
+    for (const sample of result.samples) assert.deepEqual(sample,result.before,
+      'Every disconnected '+action+' clamp frame retains the camera and geometry');
+  }
+  await zoom(page,'fit').click();
+  await settle(page);
+}
+
 async function gestures(page) {
   await category(page, '证明与归纳');
   await fullGraph(page);
@@ -352,6 +396,7 @@ async function gestures(page) {
   assert.ok(await scale(page) > fitted, 'Zoom-in changes the actual graph scale');
   await zoom(page, 'fit').click();
   near(await scale(page), fitted, 'Fit restores the category scale', .001);
+  await checkClampedZoom(page);
   for (let i = 0; i < 5; i++) await zoom(page, 'in').click();
   await view(page).evaluate(node => { node.scrollLeft = 0; node.scrollTop = 0; });
   const before = await view(page).evaluate(node => ({ x: node.scrollLeft, y: node.scrollTop, max: node.scrollWidth - node.clientWidth }));
@@ -616,6 +661,7 @@ async function runCase(browser, width, theme) {
 
 (async () => {
   const browser = await chromium.launch({ headless: true,
+    ignoreDefaultArgs:['--hide-scrollbars'],
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try { for (const width of [1440, 390]) for (const theme of ['light', 'dark']) await runCase(browser, width, theme); }
   finally { await browser.close(); }

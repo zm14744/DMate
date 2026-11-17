@@ -218,7 +218,7 @@ function mount(host,options={}) {
   if(!node){detail.textContent=dmateUiText('点击左侧知识点查看关系。');return;}
   const subline=document.createElement('div');subline.className='graph-detail-subline';
   if(node.level){const pill=document.createElement('span');pill.className='graph-level-pill';pill.textContent=node.level;subline.append(pill);}
-  detail.append(subline);
+  if(subline.childNodes.length)detail.append(subline);
   const names=new Set(visibleNodes.map(n=>n.name));
   const field=(text,values,empty,relations=false)=>{
    const box=document.createElement('div');box.className='graph-detail-field';
@@ -389,13 +389,15 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile, onReady)
     viewport.dataset.kgReady = 'false';
     let initialized = false, applying = false, disposed = false, frame = 0, releaseFrame = 0;
     let width = 0, height = 0;
+    let outerWidth = 0, outerHeight = 0;
     const active = () => window.matchMedia('(max-width:760px)').matches === mobile;
     const scale = () => Number(mobile ? viewport._kgScale : surface.dataset.scale) || 1;
     const remember = () => {
-        // A breakpoint/resize can clamp scroll before its callback runs. Keep
-        // the last camera from the old dimensions rather than saving that clamp.
+        // A real resize can clamp scroll before its callback runs. Scrollbars
+        // created by zoom only change client dimensions, so they must still
+        // commit the new camera instead of restoring an older fitted scale.
         if (!initialized || applying || disposed || !active()
-            || !viewport.isConnected || viewport.clientWidth !== width || viewport.clientHeight !== height) return;
+            || !viewport.isConnected || viewport.offsetWidth !== outerWidth || viewport.offsetHeight !== outerHeight) return;
         const view = viewport.getBoundingClientRect(), bounds = stage.getBoundingClientRect(), zoom = scale();
         memory.set(key, {scale:zoom,
             x:(view.left + viewport.clientLeft + viewport.clientWidth / 2 - bounds.left) / zoom,
@@ -424,6 +426,7 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile, onReady)
             }
         }
         width = viewport.clientWidth; height = viewport.clientHeight;
+        outerWidth = viewport.offsetWidth; outerHeight = viewport.offsetHeight;
         initialized = true;
         viewport.dataset.kgReady = 'true';
         viewport.style.visibility = '';
@@ -445,7 +448,7 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile, onReady)
     };
     const resize = () => {
         if (disposed || !active() || !viewport.clientWidth || !viewport.clientHeight) return;
-        if (initialized && viewport.clientWidth === width && viewport.clientHeight === height) return;
+        if (initialized && viewport.offsetWidth === outerWidth && viewport.offsetHeight === outerHeight) return;
         cancelAnimationFrame(frame);
         frame = requestAnimationFrame(initialize);
     };
@@ -458,7 +461,7 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile, onReady)
     viewport._kgResizeRememberedView = resize;
     viewport.addEventListener('scroll', remember, {passive:true});
     const observer = mobile ? null : new ResizeObserver(resize);
-    observer?.observe(viewport);
+    observer?.observe(viewport, {box:'border-box'});
     const previousDispose = viewport._kgDispose;
     viewport._kgDispose = () => {
         if (disposed) return;
@@ -534,9 +537,12 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     };
 
     const applyScale = (nextScale, anchor = null) => {
+        const scale = clampMobileGraphScale(nextScale, minimumScale);
+        // A clamped button/wheel zoom has no new camera to apply. Avoid
+        // reanchoring it or repainting the same graph at either limit.
+        if (anchor && viewport._kgScale === scale) return scale;
         if (anchor) viewport._kgBeginViewInteraction?.();
         const point = anchor ? graphPoint(anchor) : null;
-        const scale = clampMobileGraphScale(nextScale, minimumScale);
         fitted = false;
         viewport._kgScale = scale;
         viewport.dataset.scale = String(scale);
@@ -1150,12 +1156,15 @@ function setKnowledgeGraphDesktopScale(value, keepCenter = true) {
     const stage = surface?.querySelector(".kg-desktop-zoom-stage");
     const viewport = canvas?.querySelector(".kg-desktop-viewport");
     if (!canvas || !surface || !stage || !viewport) return;
-    if (keepCenter) viewport._kgBeginViewInteraction?.();
 
     const baseWidth = Number(stage.dataset.baseWidth) || 1;
     const baseHeight = Number(stage.dataset.baseHeight) || 1;
     const previous = Number(surface.dataset.scale) || 1;
     const next = Math.max(0.2, Math.min(2.5, Number(value) || 1));
+    // Only real zoom changes should touch the viewport. Reapplying a clamped
+    // scale resets its label and anchor and can restart resize/paint work.
+    if (keepCenter && previous === next) return;
+    if (keepCenter) viewport._kgBeginViewInteraction?.();
     const center = () => {
         const rect = viewport.getBoundingClientRect();
         return {

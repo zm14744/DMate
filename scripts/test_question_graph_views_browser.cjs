@@ -19,8 +19,8 @@ async function openGraph(page, mode) {
   await settle(page);
 }
 async function openHistory(page) {
-  await openGraph(page, 'full');
-  await page.locator('#knowledgeGraphHistoryTab').click();
+  await openGraph(page, 'history');
+  await page.locator('#knowledgeGraphHistoryWrap').waitFor({state:'visible'});
 }
 async function snapshot(page) {
   return page.evaluate(() => {
@@ -192,11 +192,12 @@ async function checkView(browser, width, language) {
     const historic=await snapshot(page);
     assert.deepEqual(historic,recent,label+': selected history question uses exactly the recent graph presentation');
     assert.equal(await page.evaluate(()=>currentId),'current-conversation',label+': historical graph viewing leaves the current conversation intact');
-    assert.equal(await page.evaluate(()=>document.getElementById('knowledgeGraphModal').dataset.graphView),'focus',label+': historical question graph is cross-module focused presentation');
+    assert.equal(await page.evaluate(()=>document.getElementById('knowledgeGraphModal').dataset.graphView),'history',label+': historical question graph uses its independent cross-module presentation');
     await assertLiveGraph(page,width,historic,label+'/history');
     await assertExports(page,historic,label+'/history');
-    assert.equal(await page.locator(locate).isVisible(),true,label+': selected-history details provide source navigation');
-    await assertLocateBesideTitle(page,label+'/history');
+    assert.equal(await page.locator(locate).isVisible(),false,label+': historical details omit the recent-only source locator');
+    assert.equal(await page.evaluate(()=>knowledgeGraphViewMode),'history',label+': a selected historical graph stays in the independent history mode');
+    assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),true,label+': historical graph keeps the detail/history sidebar tabs');
     assert.equal(await page.evaluate(()=>JSON.stringify(sessions)),original,label+': graph/export preserve grouped OCR tokens, member flags, text and metadata');
     assert.equal(await page.locator('#knowledgeGraphDetail .graph-detail-term[data-knowledge-node-id="relation_cartesian"]').count(),0,
       label+': details do not leak a static course successor into the question graph');
@@ -217,9 +218,10 @@ async function checkView(browser, width, language) {
       const session=sessions.find(session=>session.id==='past-conversation');
       session.messages.push(session.messages.shift()); renderKnowledgeGraph();
     });
-    await page.locator(locate).click();
+    await openHistory(page);
+    await page.locator('.kg-history-item[data-message-id="past-group"] [data-history-action="locate"]').click();
     await page.locator('#chat [data-message-index="2"].history-locate-flash').waitFor();
-    assert.equal(await page.evaluate(()=>currentId),'past-conversation',label+': selected-history locator switches to its source conversation');
+    assert.equal(await page.evaluate(()=>currentId),'past-conversation',label+': history-card locator switches to its source conversation');
     assert.match(await page.locator('#chat [data-message-index="2"]').innerText(),/复合函数/);
     const group=await page.evaluate(()=>getCurrent().messages.find(message=>message.messageId==='past-group').ocrGroup);
     assert.deepEqual(group.members,[{requestId:'past-group-one',isQuestion:true},{requestId:'past-group-two',isQuestion:false}],label+': locating grouped OCR preserves question/material identity');
@@ -250,31 +252,31 @@ async function checkReferenceGuards(browser) {
     await page.locator(locate).click();
     await page.locator('#chat [data-message-index="0"].history-locate-flash').waitFor();
     await openHistory(page);
+    const stale=await page.locator('.kg-history-item[data-message-id="pointer-a"] [data-history-action="locate"]').elementHandle();
     await page.locator('.kg-history-item[data-message-id="pointer-a"] [data-history-action="graph"]').click();
-    const stale=await page.locator(locate).elementHandle();
     await page.evaluate(()=>{getCurrent().messages[0].text='改成另一个不同的命题问题';renderKnowledgeGraph();});
     await stale.evaluate(button=>button.click());
     assert.equal(await page.locator('#knowledgeGraphModal').isVisible(),true,'edited selected question invalidates its captured locator');
-    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'无','stale historical subject becomes None instead of borrowing the latest question');
+    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'请选择一道历史题目','stale historical subject returns to the history selection prompt instead of borrowing the latest question');
     assert.equal(await page.locator(locate).isVisible(),false);
     await page.evaluate(()=>{getCurrent().messages[0].text='用逻辑等价证明命题 p 的双重否定与 p 等价';});
     await openHistory(page);
+    const deleted=await page.locator('.kg-history-item[data-message-id="pointer-a"] [data-history-action="locate"]').elementHandle();
     await page.locator('.kg-history-item[data-message-id="pointer-a"] [data-history-action="graph"]').click();
-    const deleted=await page.locator(locate).elementHandle();
     await page.evaluate(()=>{window.__removedGraphQuestion=getCurrent().messages.shift();renderKnowledgeGraph();});
     await deleted.evaluate(button=>button.click());
     assert.equal(await page.locator('#knowledgeGraphModal').isVisible(),true,'deleted selected question invalidates its locator');
-    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'无','deleted historical subject does not fall back to the latest question');
+    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'请选择一道历史题目','deleted historical subject returns to the history selection prompt without falling back to the latest question');
     assert.equal(await page.locator(locate).isVisible(),false);
     await page.evaluate(()=>getCurrent().messages.unshift(window.__removedGraphQuestion));
     await openHistory(page);
+    const oldOwner=await page.locator('.kg-history-item[data-message-id="pointer-a"] [data-history-action="locate"]').elementHandle();
     await page.locator('.kg-history-item[data-message-id="pointer-a"] [data-history-action="graph"]').click();
-    const oldOwner=await page.locator(locate).elementHandle();
     await page.evaluate(()=>bumpCloudSyncContext());
     await oldOwner.evaluate(button=>button.click());
     assert.equal(await page.locator('#knowledgeGraphModal').isVisible(),true,'old owner context cannot close graph or switch source');
     await page.evaluate(()=>renderKnowledgeGraph());
-    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'无');
+    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'请选择一道历史题目');
     await page.evaluate(()=>{
       const teaching=__graphTeachingFixture('分别说明集合运算与逻辑等价的定义',['set_operation','logic_equivalence']);
       sessions=[{id:'independent-concepts',name:'不同知识分支',nameSource:'user',teaching,learningQuestion:null,deletedMessageIds:{},

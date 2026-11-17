@@ -38,8 +38,14 @@
     register({
         '界面语言 / Language': 'Language', '语言 / Language': 'Language',
         '简体中文': '简体中文', 'English': 'English',
-        'DMate - 离散数学智能辅学系统': 'DMate - Discrete Mathematics Tutor'
-    });
+        'DMate - 离散数学智能辅学系统': 'DMate - Discrete Mathematics Tutor',
+        '历史题目关联': 'Historical question connections',
+        '历史题目': 'Past questions',
+        '请选择一道历史题目': 'Select a past question'
+    }, [
+        [/^历史题目\s*[（(](\d+)[）)]$/, (_m, n) => `Past questions (${n})`],
+        [/^历史题目关联 (\d+) 个知识点$/, (_m, n) => `Historical question connections ${n} concepts`]
+    ]);
     if (root.DMateKnowledgeLanguage?.labels) register(root.DMateKnowledgeLanguage.labels);
     function english(source, override) {
         if (typeof override === 'string') return override;

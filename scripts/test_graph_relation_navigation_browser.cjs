@@ -99,7 +99,18 @@ async function expectDestination(page, id, category, label) {
   assert.equal(await page.locator('#knowledgeGraphDetailTitle').innerText(), await nodeLabel(page, id),
     label + ': target details are selected');
   assert.equal(await page.locator('#knowledgeGraphFocusBtn').getAttribute('aria-pressed'), 'true', label + ': all-knowledge mode is active');
-  assert.equal(await page.locator('#knowledgeGraphHistoryTab').count(), 1, label + ': all-knowledge mode retains its question-history entry');
+  assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),false,label + ': all-knowledge mode has no sidebar tabs');
+  assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(),false,label + ': all-knowledge mode hides historical content');
+  const fullscreen=await page.locator('#knowledgeGraphModal').evaluate(node=>node.classList.contains('graph-fullscreen-view'));
+  assert.equal(await page.locator('#knowledgeGraphHistoryBtn').count(),1,label + ': history remains a single independent top-level mode');
+  assert.equal(await page.locator('#knowledgeGraphModal .graph-toolbar').isVisible(),!fullscreen,
+    label + ': graph fullscreen controls the toolbar visibility');
+  assert.equal(await page.locator('#knowledgeGraphHistoryBtn').isVisible(),!fullscreen,
+    label + ': history is visible with the normal toolbar and hidden with fullscreen chrome');
+  assert.equal(await page.locator('#knowledgeGraphDetailWrap').evaluate(node=>node.hidden),false,
+    label + ': all-knowledge mode activates node details');
+  assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),!fullscreen,
+    label + ': node details remain visible outside the full graph canvas');
   const visible = await page.evaluate(id => {
     const canvas = document.getElementById('knowledgeGraphCanvas');
     const node = canvas.querySelector('.selected[data-knowledge-node-id="' + id + '"]');
@@ -142,6 +153,9 @@ async function checkCase(browser, width, language) {
       return JSON.stringify(session.messages);
     }, language);
     await page.waitForFunction(() => knowledgeGraphInitialized && document.getElementById('knowledgeGraphModal').dataset.graphReady === 'true');
+    await page.evaluate(()=>selectKnowledgeGraphDisplayMode('focus'));
+    assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),false,label + ': recent mode contains only node details');
+    assert.equal(await page.locator('#knowledgeGraphHistoryBtn').isVisible(),true,label + ': recent mode retains the independent top history action');
     assert.equal(await page.locator('#knowledgeGraphHistoryTab').isVisible(), false, label + ': recent-question view hides the history entry');
     assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(), false, label + ': recent-question view hides history content');
     assert.equal(await page.locator(historyCards).count(), 0, label + ': recent-question view renders no history cards');
@@ -202,7 +216,7 @@ async function checkCase(browser, width, language) {
     assert.equal(await page.evaluate(() => JSON.stringify(getCurrent().messages)), before, label + ': navigation leaves the real conversation untouched');
     assert.deepEqual(modelCalls, [], label + ': graph navigation/export invokes no model');
     assert.deepEqual(errors, [], label + ': browser errors');
-    console.log('PASS ' + label + ': relation tags navigate modules by click/Enter, same-module camera stays, full mode/export omit question decoration while retaining the full-only history entry');
+    console.log('PASS ' + label + ': relation tags navigate modules by click/Enter, same-module camera stays, full mode/export omit question decoration with history available as an independent top-level mode');
   } finally { await context.close(); }
 }
 

@@ -48,7 +48,8 @@ async function checkCase(browser, width) {
     });
     assert.ok(fixture.bytes < 12 * 1024 * 1024, 'The 5000-message fixture stays below the account snapshot limit');
     assert.equal(fixture.immutable, true, 'Initial graph browsing leaves conversation records unchanged');
-    assert.equal(await page.locator('#knowledgeGraphHistoryTab').innerText(), '题目历史 (500)');
+    assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(), false, width + ': all knowledge exposes only node details');
+    assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(), false, width + ': all knowledge hides the history pane');
     if (mobile) await page.locator('.kg-mobile-expand').click();
     const node = page.locator('#knowledgeGraphCanvas [data-knowledge-node-id="proof_strong_induction"]');
     await node.waitFor({ state: 'visible' });
@@ -76,17 +77,33 @@ async function checkCase(browser, width) {
     // Mutate the existing messages array: object-identity caches would go stale.
     const updated = await page.evaluate(() => {
       const session = sessions[0];
-      const text = '证明命题 p 的双重否定与 p 等价';
+      const text = '用真值表证明命题 p 的双重否定与 p 等价';
       session.messages.push({ role: 'user', messageId: 'selection-new-question-1', text,
         manualIsQuestion: true, questionTeaching: {category: '命题逻辑', knowledge_points: ['逻辑等价'], focus_points: ['逻辑等价'],
           question_graph: {version: 1, sources: {question: text, solution: ''},
-            nodes: [{id: 'logic_equivalence', evidence: [{source: 'question', quote: '双重否定'}]}], edges: []}} });
+            nodes: [{id: 'logic_truth_table', evidence: [{source: 'question', quote: '真值表'}]},
+              {id: 'logic_equivalence', evidence: [{source: 'question', quote: '双重否定'}]}],
+            edges: [{from: 'logic_truth_table', to: 'logic_equivalence', evidence: [{source: 'question', quote: text}]}]}} });
       window.__selectionHistoryCalls = 0;
       renderKnowledgeGraph();
       return { calls: window.__selectionHistoryCalls, count: document.getElementById('knowledgeGraphHistoryTab').textContent };
     });
-    assert.ok(updated.calls > 0, width + ': a data render rebuilds history from changed message contents');
-    assert.equal(updated.count, '题目历史 (501)');
+    assert.equal(updated.calls, 0, width + ': a full-graph data render does not aggregate unrelated question history');
+    assert.equal(await page.locator('#knowledgeGraphHistoryTab').isVisible(), false);
+    if (mobile && await page.locator('#knowledgeGraphModal').evaluate(modal => modal.classList.contains('graph-fullscreen-view')))
+      await page.locator('.kg-mobile-expand').click();
+    await page.evaluate(() => { window.__selectionHistoryCalls = 0; });
+    await page.locator('#knowledgeGraphHistoryBtn').click();
+    assert.ok(await page.evaluate(() => window.__selectionHistoryCalls) > 0, width + ': entering the history page reads current message contents');
+    assert.equal(await page.locator('#knowledgeGraphHistoryTab').innerText(), '历史题目 (501)');
+    assert.equal(await page.locator('#knowledgeGraphHistory .kg-history-item').count(), 501);
+    await page.locator('#knowledgeGraphHistory .kg-history-item[data-message-id="selection-new-question-1"] [data-history-action="graph"]').click();
+    if (mobile) await page.locator('.kg-mobile-expand').click();
+    await page.evaluate(() => { window.__selectionHistoryCalls = 0; });
+    await page.locator('#knowledgeGraphCanvas [data-knowledge-node-id="logic_truth_table"]').click();
+    assert.equal(await page.evaluate(() => window.__selectionHistoryCalls), 0,
+      width + ': a historical question node click also avoids global history scans');
+    assert.equal(await page.locator('#knowledgeGraphDetailTitle').textContent(), '真值表');
     if (mobile) await page.locator('.kg-mobile-expand').click();
     await page.evaluate(() => {
       const text = '证明命题 p 与 q 的双重否定定律';
@@ -99,17 +116,20 @@ async function checkCase(browser, width) {
     await page.locator('#knowledgeGraphHistoryTab').click();
     assert.ok(await page.evaluate(() => window.__selectionHistoryCalls) > 0,
       width + ': opening history always reads fresh records');
-    assert.equal(await page.locator('#knowledgeGraphHistoryTab').innerText(), '题目历史 (502)');
+    assert.equal(await page.locator('#knowledgeGraphHistoryTab').innerText(), '历史题目 (502)');
     assert.equal(await page.locator('#knowledgeGraphHistory .kg-history-item').count(), 502);
     assert.equal(await page.locator('#knowledgeGraphHistory .kg-history-item[data-message-id="selection-new-question-2"]').count(), 1);
     await page.evaluate(() => { window.__selectionHistoryCalls = 0; selectKnowledgeGraphDisplayMode('focus'); });
     assert.equal(await page.evaluate(() => window.__selectionHistoryCalls), 0, width + ': recent mode does not aggregate global history');
     assert.equal(await page.locator('#knowledgeGraphHistoryTab').isVisible(), false);
     await page.evaluate(() => { window.__selectionHistoryCalls = 0; selectKnowledgeGraphDisplayMode('full'); });
-    assert.ok(await page.evaluate(() => window.__selectionHistoryCalls) > 0, width + ': entering full mode refreshes the count');
+    assert.equal(await page.evaluate(() => window.__selectionHistoryCalls), 0, width + ': entering full mode does not aggregate question history');
     await page.evaluate(() => { window.__selectionHistoryCalls = 0; setKnowledgeGraphFilter('函数'); });
-    assert.ok(await page.evaluate(() => window.__selectionHistoryCalls) > 0, width + ': a module change refreshes the count');
-    assert.equal(await page.locator('#knowledgeGraphHistoryTab').innerText(), '题目历史 (502)');
+    assert.equal(await page.evaluate(() => window.__selectionHistoryCalls), 0, width + ': browsing another course module does not aggregate question history');
+    assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(), false);
+    await page.locator('#knowledgeGraphHistoryBtn').click();
+    assert.ok(await page.evaluate(() => window.__selectionHistoryCalls) > 0, width + ': reentering history refreshes the count');
+    assert.equal(await page.locator('#knowledgeGraphHistoryTab').innerText(), '历史题目 (502)');
     assert.deepEqual(modelCalls, [], width + ': selection and history do not invoke models');
     assert.deepEqual(errors, [], width + ': no page errors');
     console.log('PASS ' + width + ': 5000 messages, zero history scans on node clicks; data/mode/module/history changes stay fresh; '

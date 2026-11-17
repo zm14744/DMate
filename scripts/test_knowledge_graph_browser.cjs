@@ -83,6 +83,85 @@ async function fit(page) {
   return snapshot(page);
 }
 
+async function checkZoomLimits(browser, width) {
+  const mobile = width <= 760;
+  const page = await browser.newPage({viewport:{width,height:900},
+    ...(mobile ? {isMobile:true,hasTouch:true} : {})});
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  try {
+    await page.goto(baseURL, {waitUntil:'networkidle'});
+    await openFullGraph(page);
+    const categories = await page.locator('#knowledgeGraphCategory option').evaluateAll(options => options.map(option => option.value));
+    for (const category of categories) {
+      await page.evaluate(value => setKnowledgeGraphFilter(value), category);
+      if (mobile && !await page.locator('.kg-mobile-viewport').count()) await page.locator('.kg-mobile-expand').click();
+      await page.locator(mobile ? '.kg-mobile-viewport' : '.kg-desktop-viewport').waitFor();
+      const result = await page.evaluate(async ({mobile, extendedIdle}) => {
+        const view = document.querySelector(mobile ? '.kg-mobile-viewport' : '.kg-desktop-viewport');
+        const surface = view.querySelector(mobile ? '.kg-mobile-zoom-surface' : '.kg-desktop-zoom-surface');
+        const stage = surface.querySelector(mobile ? '.kg-mobile-stage' : '.kg-desktop-zoom-stage');
+        const label = mobile ? document.querySelector('.kg-mobile-zoom-label') : document.getElementById('knowledgeGraphDesktopZoomLabel');
+        const buttons = mobile ? document.querySelectorAll('.kg-mobile-zoom-btn') : null;
+        const plus = mobile ? buttons[1] : document.getElementById('knowledgeGraphDesktopZoomIn');
+        const minus = mobile ? buttons[0] : document.getElementById('knowledgeGraphDesktopZoomOut');
+        const scale = () => mobile ? view._kgScale : Number(surface.dataset.scale);
+        const frames = count => new Promise(resolve => {
+          const tick = () => --count ? requestAnimationFrame(tick) : resolve();
+          requestAnimationFrame(tick);
+        });
+        const capture = () => {
+          const rect = stage.getBoundingClientRect();
+          return {scale:scale(), label:label.textContent, visible:getComputedStyle(view).visibility,
+            dimensions:[view.clientWidth,view.clientHeight,surface.clientWidth,surface.clientHeight],
+            scroll:[view.scrollLeft,view.scrollTop], stage:[rect.x,rect.y,rect.width,rect.height],
+            nodes:stage.querySelectorAll('.kg-mobile-node,.kg-node-group').length};
+        };
+        const traces = [];
+        for (const [kind,button,limit] of [['maximum',plus,mobile ? 3 : 2.5],['minimum',minus,mobile ? null : .2]]) {
+          // Reach the clamp through the actual control, including scrollbar
+          // transitions; never assign a scale directly for this regression.
+          let previous = null;
+          for (let clicks = 0; clicks < 60; clicks++) {
+            button.click();
+            await frames(2);
+            if (scale() === previous) break;
+            previous = scale();
+          }
+          await frames(6);
+          const before = capture(), samples = [], mutations = [];
+          const observer = new MutationObserver(records => mutations.push(...records.map(record => ({
+            type:record.type, name:record.attributeName || '',
+            element:record.target.nodeType === Node.TEXT_NODE ? record.target.parentElement.className : record.target.className
+          }))));
+          observer.observe(view, {attributes:true,attributeFilter:['style','data-scale','data-kg-ready'],subtree:true,childList:true,characterData:true});
+          observer.observe(label, {subtree:true,childList:true,characterData:true});
+          for (let repeat = 0; repeat < 8; repeat++) {
+            button.click(); await frames(1); samples.push(capture());
+          }
+          for (let idle = 0; idle < (extendedIdle ? 100 : 8); idle++) {
+            await frames(1); samples.push(capture());
+          }
+          observer.disconnect();
+          traces.push({kind,limit,before,samples,mutations});
+        }
+        return traces;
+      }, {mobile, extendedIdle:!mobile && category === categories[1]});
+      for (const trace of result) {
+        const label = width + '/' + category + '/' + trace.kind;
+        if (trace.limit !== null) near(trace.before.scale, trace.limit, label + ': reached the zoom clamp', .000001);
+        assert.equal(trace.before.visible, 'visible', label + ': graph remains visible');
+        assert.ok(trace.before.nodes > 0, label + ': the graph still contains its nodes');
+        assert.deepEqual(trace.mutations, [], label + ': repeated clamped controls do not rewrite or rebuild graph/label');
+        for (const sample of trace.samples) assert.deepEqual(sample, trace.before,
+          label + ': every painted frame preserves scale, camera and geometry');
+      }
+    }
+    assert.deepEqual(errors, [], width + ': zoom-limit browser errors');
+    console.log('PASS ' + width + ': every module keeps all frames and graph/label DOM stable at both zoom limits');
+  } finally { await page.close(); }
+}
+
 async function checkReturnPreservesView(browser, width) {
   const mobile = width <= 760;
   const page = await browser.newPage({ viewport: { width, height: 844 },
@@ -90,6 +169,9 @@ async function checkReturnPreservesView(browser, width) {
   const viewSelector = mobile ? '.kg-mobile-viewport' : '.kg-desktop-viewport';
   try {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
+    // Camera restoration belongs to an existing conversation. Closing a graph
+    // over the landing page intentionally resets it to all knowledge.
+    await page.evaluate(() => newChat());
     await openFullGraph(page);
     if (mobile) {
       await page.locator('.kg-mobile-expand').click();
@@ -501,8 +583,12 @@ async function checkNodeGestures(browser, width) {
 
 (async () => {
   const browser = await chromium.launch({ headless: true,
+    // Hiding native bars masks the client-size changes that used to restore
+    // an old fitted camera after each zoom and cause repeated flashing.
+    ignoreDefaultArgs:['--hide-scrollbars'],
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
+    for (const width of [1440, 390]) await checkZoomLimits(browser, width);
     for (const width of [1440, 390]) await checkReturnPreservesView(browser, width);
     for (const width of [1440, 820, 390]) await checkPanelPresentation(browser, width);
     for (const width of [390, 620]) await checkNodeGestures(browser, width);
