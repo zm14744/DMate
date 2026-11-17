@@ -14,7 +14,7 @@ async function settle(page) {
 async function openHistory(page) {
   await page.evaluate(async () => {
     if (document.getElementById('knowledgeGraphModal').classList.contains('hidden')) await openKnowledgeGraph();
-    if (knowledgeGraphViewMode !== 'full') selectKnowledgeGraphDisplayMode('full');
+    selectKnowledgeGraphDisplayMode('full');
     setKnowledgeGraphFullscreenView(false);
   });
   await page.locator('#knowledgeGraphHistoryTab').click();
@@ -112,9 +112,13 @@ async function checkCase(browser,width,language) {
       label+': full mode remains independent of the current question');
 
     await page.locator('.kg-history-item[data-message-id="top-generated"] [data-history-action="graph"]').click();
-    await page.waitForFunction(()=>knowledgeGraphViewMode==='full'&&knowledgeGraphFilter==='命题逻辑'&&knowledgeGraphSelectedNodeId==='logic_equivalence');
+    await page.waitForFunction(()=>knowledgeGraphViewMode==='full'&&knowledgeGraphScope==='history'&&knowledgeGraphSelectedNodeId==='logic_equivalence');
     assert.equal(await page.evaluate(()=>currentId),'history-lower',label+': graph navigation does not switch the conversation');
-    assert.equal(await page.locator('#knowledgeGraphDetail .graph-status-pill.current').count(),0,label+': history graph navigation adds no question marker');
+    assert.equal(await page.locator('#knowledgeGraphDetail .graph-status-pill.current').count(),0,label+': history graph navigation omits the redundant detail pill');
+    assert.equal(await page.evaluate(()=>knowledgeGraphDisplayedNodes().some(node=>node.id==='logic_truth_table')),true,
+      label+': history graph includes the question prerequisite instead of showing an entire module');
+    assert.equal(await page.evaluate(()=>knowledgeGraphNodeState('逻辑等价',getActiveKnowledgeContext()).fill),'#5b21b6',
+      label+': history graph retains the selected question concepts in purple');
     await recentHasNoHistory(page,label);
     assert.equal(await page.evaluate(()=>getCurrent().id),'history-lower',label+': recent mode still uses the actual current conversation');
     assert.equal(await snapshot(),fixture.snapshot,label+': graph/side-mode navigation does not rewrite questions');

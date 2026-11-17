@@ -1033,6 +1033,8 @@ let knowledgeGraphOpenRevision = 0;
 let knowledgeGraphOpenDataPromise = null;
 let knowledgeGraphMobileFullscreen = false;
 let knowledgeGraphScope = "current";
+let knowledgeGraphQuestionReference = null;
+let knowledgeGraphRenderedQuestion = null;
 let knowledgeGraphSelectedNodeId = "";
 let knowledgeGraphSideMode = "detail";
 let knowledgeGraphLoading = false;
@@ -1166,6 +1168,8 @@ function clearLoggedOutWorkspace({ purgePersistent = true } = {}) {
     wrongBookSearch = "";
     wrongBookSort = "recent";
     knowledgeGraphSelectedNodeId = "";
+    knowledgeGraphQuestionReference = null;
+    knowledgeGraphRenderedQuestion = null;
 
     const sessionsBox = document.getElementById("sessions");
     if (sessionsBox) sessionsBox.innerHTML = "";
@@ -11459,8 +11463,11 @@ let knowledgeGraphPreparedPngPromise = null;
 let knowledgeGraphPreparedPngKey = "";
 
 function knowledgeGraphCopyKey() {
-    const displayedNodes = knowledgeGraphDisplayedNodes();
+    const context = getActiveKnowledgeContext();
+    const displayedNodes = knowledgeGraphDisplayedNodes(context);
     if (!displayedNodes.length) return "";
+    const questionKey = JSON.stringify([knowledgeGraphReferenceKey(context.questionReference),
+        context.focusPoints, context.knowledgePoints, context.relatedPoints, context.prerequisitePoints, context.knowledgePath]);
     const canvas = document.getElementById("knowledgeGraphCanvas");
     const mobileStage = canvas?.querySelector?.(".kg-mobile-stage");
     const svg = canvas?.querySelector?.(".kg-svg");
@@ -11470,14 +11477,14 @@ function knowledgeGraphCopyKey() {
         if (!shouldDrawKnowledgeGraphOffscreen()
                 || !knowledgeGraphData?.nodes?.length) return "";
         return [knowledgeGraphFilter || "全部", knowledgeGraphViewMode,
-            knowledgeGraphScope, displayedNodes.map(node => node.id).join(","),
+            knowledgeGraphScope, questionKey, displayedNodes.map(node => node.id).join(","),
             knowledgeGraphSelectedNodeId || ""].join("|");
     }
 
     return [
         knowledgeGraphFilter || "全部",
         knowledgeGraphViewMode,
-        knowledgeGraphScope,
+        knowledgeGraphScope, questionKey,
         source.scrollWidth || source.getBoundingClientRect().width || 0,
         source.scrollHeight || source.getBoundingClientRect().height || 0,
         source.querySelectorAll?.(".kg-mobile-node, .kg-node")?.length || 0
@@ -11496,7 +11503,7 @@ function shouldDrawKnowledgeGraphOffscreen() {
         || Boolean(window.matchMedia?.("(max-width: 1100px)")?.matches);
 }
 
-function knowledgeGraphExportLayout(nodes) {
+function knowledgeGraphExportLayout(nodes, context = getActiveKnowledgeContext()) {
     const levels = computeKnowledgeGraphLevels(nodes);
     const columns = new Map();
     const originalOrder = new Map(nodes.map((node, index) => [node.id, index]));
@@ -11531,7 +11538,7 @@ function knowledgeGraphExportLayout(nodes) {
     const cellWidth = dmateUiLanguage() === "en" ? 220 : 164;
     const labels = window.DMateKnowledgeGraphLabels.prepare(nodes, {
         label: node => dmateKnowledgeLabel(node.name),
-        badge: node => dmateUiText(knowledgeGraphNodeState(node.name, getActiveKnowledgeContext()).badge || node.level || ""),
+        badge: node => dmateUiText(knowledgeGraphNodeState(node.name, context).badge || node.level || ""),
         width: cellWidth, minHeight: dmateUiLanguage() === "en" ? 94 : 78,
         titleSize: 16, weight: 600, badgeSize: 12, badgeWeight: 500,
         paddingX: 12, paddingY: 12, gap: 6
@@ -11600,7 +11607,7 @@ async function renderKnowledgeGraphOffscreenPngBlob() {
     const context = getActiveKnowledgeContext();
     const nodes = knowledgeGraphDisplayedNodes(context);
     if (!nodes?.length) throw new Error(dmateUiText("当前范围没有可导出的知识节点", "There are no knowledge nodes to export in this module."));
-    const layout = knowledgeGraphExportLayout(nodes);
+    const layout = knowledgeGraphExportLayout(nodes, context);
     const { width, height, positions, edges, outgoing, incoming, cellWidth, cellHeight, labels } = layout;
     const smallDevice = window.matchMedia?.("(max-width: 760px)")?.matches;
     const pixelBudget = smallDevice ? 7000000 : 10000000;
@@ -11769,6 +11776,13 @@ function scheduleKnowledgeGraphPngPreparation() {
     }
 }
 
+function knowledgeGraphImageFilename() {
+    const label = isKnowledgeGraphQuestionView()
+        ? (knowledgeGraphScope === "history" ? "所选题目关联" : "最近一题关联")
+        : (knowledgeGraphFilter || "全部");
+    return `离散数学知识图谱-${label}.png`;
+}
+
 function downloadKnowledgeGraphPng(blob) {
     if (!blob) return false;
 
@@ -11776,7 +11790,7 @@ function downloadKnowledgeGraphPng(blob) {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `离散数学知识图谱-${knowledgeGraphFilter || "全部"}.png`;
+        link.download = knowledgeGraphImageFilename();
         link.style.display = "none";
         document.body.appendChild(link);
         link.click();
@@ -11811,7 +11825,7 @@ async function exportKnowledgeGraphImage() {
         if (!pngPromise) {
             throw new Error(dmateUiText("图谱图片准备失败，请重试", "The graph image could not be prepared. Try again."));
         }
-        await exporter.save(await pngPromise, `离散数学知识图谱-${knowledgeGraphFilter || "全部"}.png`, {
+        await exporter.save(await pngPromise, knowledgeGraphImageFilename(), {
             document,
             onStatus: showCopyToast
         });
@@ -19160,18 +19174,62 @@ function getConversationQuestionHistory(
     );
 }
 
-function getActiveKnowledgeContext() {
-    // Browsing all knowledge is independent of the conversation's question.
-    const empty = { category:"", categories:[], focusPoints:[], knowledgePoints:[], prerequisitePoints:[], knowledgePath:[] };
-    if (knowledgeGraphViewMode !== "focus") return empty;
-    // A saved teaching snapshot alone is not a current question.
-    const current = activeQuestionCandidateFromHistory(getCurrent())
-        ? getCurrentKnowledgeContext() : empty;
+function isKnowledgeGraphQuestionView() {
+    return knowledgeGraphViewMode === "focus" || knowledgeGraphScope === "history";
+}
+
+function knowledgeGraphReferenceKey(reference) {
+    return reference ? JSON.stringify([reference.sessionId, reference.messageId || reference.index, reference.fingerprint]) : "";
+}
+
+function knowledgeGraphQuestionContext(session, item, reference) {
+    const message = session.messages[item.index];
+    const own = item.role === "ai" ? message?.generatedTeaching : message?.questionTeaching;
+    const canonicalNames = values => [...new Set((Array.isArray(values) ? values : [])
+        .map(value => typeof value === "string" ? value.trim() : "").map(value =>
+        findKnowledgeGraphNodeByName(value) || findKnowledgeGraphNodeById(value)).filter(Boolean).map(node => node.name))];
+    const hasKnownPoints = value => ["focus_points", "knowledge_points", "related_knowledge_points", "prerequisite_points", "knowledge_path"]
+        .some(key => canonicalNames(value?.[key]).length);
+    let teaching = hasKnownPoints(own) ? own : (candidateTeachingSnapshot(session, item) || item.teaching || {});
+    const saved = normalizeLearningQuestion(session.learningQuestion);
+    if (!hasKnownPoints(teaching) && saved && wrongQuestionFingerprint(saved.text) === reference.fingerprint) {
+        teaching = { category:saved.category, focus_points:saved.focusPoints, knowledge_points:saved.knowledgePoints,
+            knowledge_path:saved.knowledgePoints };
+    }
     return {
-        ...current,
-        categories: current.category ? [current.category] : [],
-        questionCount: 1,
-        scope: "current"
+        category:teaching.category || "", categories:[], scope:knowledgeGraphScope,
+        focusPoints:canonicalNames(teaching.focus_points), knowledgePoints:canonicalNames(teaching.knowledge_points),
+        relatedPoints:canonicalNames(teaching.related_knowledge_points), prerequisitePoints:canonicalNames(teaching.prerequisite_points),
+        knowledgePath:canonicalNames(teaching.knowledge_path), questionCount:1,
+        questionReference:reference, questionOrder:item.order || 0
+    };
+}
+
+function getKnowledgeGraphQuestionSubject() {
+    if (!isKnowledgeGraphQuestionView()) return null;
+    let session, item, reference;
+    if (knowledgeGraphScope === "history") {
+        reference = knowledgeGraphQuestionReference;
+        if (!reference || !isKnowledgeGraphHistoryOwnerCurrent(reference)) return null;
+        const resolved = resolveKnowledgeGraphHistoryQuestion(reference);
+        if (!resolved) return null;
+        ({session, item} = resolved);
+    } else {
+        const current = getCurrent();
+        if (!current) return null;
+        // Question recovery may repair metadata, so inspect copies only.
+        session = {...current, messages:JSON.parse(JSON.stringify(current.messages || []))};
+        item = activeQuestionCandidateFromHistory(session);
+        if (!item) return null;
+        reference = {sessionId:String(current.id), messageId:current.messages[item.index]?.messageId || "",
+            index:item.index, fingerprint:wrongQuestionFingerprint(item.text)};
+    }
+    return {reference, context:knowledgeGraphQuestionContext(session, item, reference)};
+}
+
+function getActiveKnowledgeContext() {
+    return getKnowledgeGraphQuestionSubject()?.context || {
+        category:"", categories:[], focusPoints:[], knowledgePoints:[], relatedPoints:[], prerequisitePoints:[], knowledgePath:[]
     };
 }
 
@@ -19244,12 +19302,12 @@ async function openKnowledgeGraphCategoryPicker() {
 // 视图筛选唯一入口：最近一题关联始终跨模块查找，全部知识才按模块筛选。
 // 画布、右侧关系详情和图片导出使用同一批可见节点，避免图中无线、右侧却列出节点。
 function knowledgeGraphDisplayCategory() {
-    return knowledgeGraphViewMode === "focus" ? "全部" : (knowledgeGraphFilter || "全部");
+    return isKnowledgeGraphQuestionView() ? "全部" : (knowledgeGraphFilter || "全部");
 }
 
 function knowledgeGraphDisplayedNodes(context = getActiveKnowledgeContext()) {
     const category = knowledgeGraphDisplayCategory();
-    return knowledgeGraphViewMode === "focus"
+    return isKnowledgeGraphQuestionView()
         ? knowledgeGraphFocusedNodes(category, context)
         : knowledgeGraphVisibleNodes(category);
 }
@@ -19297,6 +19355,7 @@ function ensureKnowledgeGraphSelection(visibleNodes, context) {
         ...(context?.focusPoints || []),
         ...(context?.knowledgePath || []),
         ...(context?.knowledgePoints || []),
+        ...(context?.relatedPoints || []),
         ...(context?.prerequisitePoints || [])
     ];
 
@@ -19833,6 +19892,8 @@ async function openKnowledgeGraph() {
         if (!knowledgeGraphData?.nodes?.length) throw new Error("知识图谱数据为空");
 
         knowledgeGraphScope = "current";
+        knowledgeGraphQuestionReference = null;
+        knowledgeGraphRenderedQuestion = null;
         // 最近一题关联没有有效题目时显示“无”；全部知识由用户单独选择。
         if (!knowledgeGraphInitialized) {
             knowledgeGraphFilter = "全部";
@@ -19875,6 +19936,8 @@ async function openKnowledgeGraph() {
 
 function closeKnowledgeGraph() {
     ++knowledgeGraphOpenRevision;
+    knowledgeGraphQuestionReference = null;
+    knowledgeGraphRenderedQuestion = null;
     knowledgeGraphSideMode = "detail";
     document.getElementById("knowledgeGraphHistory")?.replaceChildren();
     const modal = document.getElementById(
@@ -19926,6 +19989,8 @@ function setKnowledgeGraphFilter(value) {
     if (!next) return;
 
     knowledgeGraphFilter = next;
+    knowledgeGraphQuestionReference = null;
+    knowledgeGraphRenderedQuestion = null;
 
     // 直接选模块就是浏览这个模块的全部知识，避免与“本题关联”混淆。
     knowledgeGraphScope = "current";
@@ -19951,6 +20016,8 @@ function updateKnowledgeGraphScopeButton() {
 function selectKnowledgeGraphDisplayMode(mode) {
     if (!knowledgeGraphData) return;
     knowledgeGraphScope = "current";
+    knowledgeGraphQuestionReference = null;
+    knowledgeGraphRenderedQuestion = null;
     knowledgeGraphViewMode = mode === "full" ? "full" : "focus";
     // 视图与模块筛选互不干扰，切换按钮不清除用户选中的模块。
     if (!knowledgeGraphFilter) knowledgeGraphFilter = "全部";
@@ -19971,13 +20038,13 @@ function updateKnowledgeGraphModeButton() {
 
 
 function knowledgeGraphNodeState(nodeName, context) {
-    if (knowledgeGraphViewMode === "focus" && (
+    if (isKnowledgeGraphQuestionView() && (
         context?.focusPoints?.includes(nodeName)
         || context?.knowledgePoints?.includes(nodeName)
     )) {
         return {
             key: "current",
-            label: "本题相关",
+            label: "",
             fill: "#5b21b6",
             stroke: "#c4b5fd",
             text: "#ffffff",
@@ -20017,64 +20084,8 @@ function createSvgElement(tag, attrs = {}) {
     return element;
 }
 
-function knowledgeGraphFocusedNodes(category, context) {
-    const categoryNodes = knowledgeGraphVisibleNodes(
-        category
-    );
-
-    if (!categoryNodes.length) {
-        return [];
-    }
-
-    const byName = new Map(
-        categoryNodes.map(node => [node.name, node])
-    );
-
-    const currentNames = uniqueTextList([
-        ...(context?.focusPoints || []),
-        ...(context?.knowledgePoints || []),
-        ...(context?.prerequisitePoints || []),
-        ...(context?.knowledgePath || [])
-    ], 10)
-        .filter(name => byName.has(name));
-
-    if (!currentNames.length) {
-        return [];
-    }
-
-    const included = new Set(currentNames);
-
-    // 所有当前相关节点补一层直接前置。
-    for (const name of currentNames) {
-        const node = byName.get(name);
-
-        for (const prerequisite of node?.prerequisites || []) {
-            if (byName.has(prerequisite)) {
-                included.add(prerequisite);
-            }
-        }
-    }
-
-    // 当前“本题难点”再补一层直接后续，帮助学生知道掌握后会接到哪里。
-    const focusNames = (
-        context?.focusPoints?.length
-            ? context.focusPoints
-            : context?.knowledgePoints?.slice(0, 1) || []
-    );
-
-    for (const focusName of focusNames) {
-        if (!byName.has(focusName)) continue;
-
-        for (const node of categoryNodes) {
-            if (node.prerequisites.includes(focusName)) {
-                included.add(node.name);
-            }
-        }
-    }
-
-    return categoryNodes.filter(
-        node => included.has(node.name)
-    );
+function knowledgeGraphFocusedNodes(_category, context) {
+    return window.DMateQuestionKnowledgeGraph.build(knowledgeGraphData?.nodes || [], context).nodes;
 }
 
 function knowledgeGraphVisibleNodes(category) {
@@ -20899,10 +20910,12 @@ function navigateKnowledgeGraphRelation(nodeId) {
     const targetOnCanvas = () => [...canvas.querySelectorAll(".kg-mobile-node,.kg-node-group")]
         .find(element => element.dataset.knowledgeNodeId === String(target.id));
     const existing = targetOnCanvas();
-    const reuseCanvas = knowledgeGraphViewMode === "full"
+    const reuseCanvas = !isKnowledgeGraphQuestionView() && knowledgeGraphViewMode === "full"
         && knowledgeGraphFilter === target.category && Boolean(existing);
 
     knowledgeGraphScope = "current";
+    knowledgeGraphQuestionReference = null;
+    knowledgeGraphRenderedQuestion = null;
     knowledgeGraphSideMode = "detail";
     knowledgeGraphViewMode = "full";
     knowledgeGraphFilter = target.category;
@@ -20986,13 +20999,7 @@ function resolveKnowledgeGraphHistoryQuestion(reference) {
         : reference.index;
     const item = knowledgeGraphSessionHistory(session).find(candidate => candidate.index === index
         && wrongQuestionFingerprint(candidate.text) === reference.fingerprint);
-    return item ? {session, item, index} : null;
-}
-
-function knowledgeGraphHistoryTargetNode(item) {
-    const teaching = item.teaching || {};
-    return [...(teaching.focus_points || []), ...(teaching.knowledge_points || []), ...(teaching.knowledge_path || [])]
-        .map(name => findKnowledgeGraphNodeByName(name)).find(Boolean) || null;
+    return item ? {session:{...session, messages:JSON.parse(JSON.stringify(session.messages || []))}, item, index} : null;
 }
 
 function isKnowledgeGraphHistoryOwnerCurrent(context) {
@@ -21011,14 +21018,26 @@ function isKnowledgeGraphHistoryActionCurrent(context) {
 function viewKnowledgeGraphHistoryQuestion(reference, context) {
     if (!isKnowledgeGraphHistoryActionCurrent(context)) return;
     const resolved = resolveKnowledgeGraphHistoryQuestion(reference);
-    const node = resolved && knowledgeGraphHistoryTargetNode(resolved.item);
-    if (!node) return;
+    if (!resolved) return;
+    knowledgeGraphQuestionReference = {sessionId:reference.sessionId, messageId:reference.messageId,
+        index:reference.index, fingerprint:reference.fingerprint,
+        version:context.version, authenticated:context.authenticated, username:context.username};
+    knowledgeGraphScope = "history";
+    knowledgeGraphViewMode = "full";
+    knowledgeGraphRenderedQuestion = null;
     knowledgeGraphSideMode = "detail";
-    navigateKnowledgeGraphRelation(node.id);
+    knowledgeGraphSelectedNodeId = "";
+    renderKnowledgeGraph();
 }
 
 function locateKnowledgeGraphHistoryQuestion(reference, context) {
     if (!isKnowledgeGraphHistoryActionCurrent(context)) return;
+    locateKnowledgeGraphQuestion(reference, context);
+}
+
+function locateKnowledgeGraphQuestion(reference, context) {
+    if (!isKnowledgeGraphHistoryOwnerCurrent(context) || context.openRevision !== knowledgeGraphOpenRevision
+        || document.getElementById("knowledgeGraphModal")?.classList.contains("hidden")) return;
     const resolved = resolveKnowledgeGraphHistoryQuestion(reference);
     if (!resolved) return;
     if (String(currentId) !== String(resolved.session.id)) pauseOcrBatchRun(currentId);
@@ -21094,7 +21113,6 @@ function renderKnowledgeGraphHistory(groups) {
             graph.className = "kg-history-graph";
             graph.dataset.historyAction = "graph";
             graph.textContent = dmateUiText("查看图谱");
-            graph.disabled = !knowledgeGraphHistoryTargetNode(item);
             graph.addEventListener("click", () => viewKnowledgeGraphHistoryQuestion(item, context));
             const locate = document.createElement("button");
             locate.type = "button";
@@ -21156,9 +21174,9 @@ function renderKnowledgeGraphDetail() {
 
     if (!title || !detail || !knowledgeGraphData) return;
 
-    const context = getActiveKnowledgeContext();
+    const context = knowledgeGraphRenderedQuestion?.context || {};
     const displayedNodes = knowledgeGraphDisplayedNodes(context);
-    if (knowledgeGraphViewMode === "focus" && !displayedNodes.length) {
+    if (isKnowledgeGraphQuestionView() && !displayedNodes.length) {
         knowledgeGraphSelectedNodeId = "";
         title.hidden = true;
         title.textContent = "";
@@ -21182,11 +21200,6 @@ function renderKnowledgeGraphDetail() {
         return;
     }
 
-    const state = knowledgeGraphNodeState(
-        node.name,
-        context
-    );
-
     // 和当前画布使用同一批节点：仅列出实际能画出关系线的两端。
     // 跨模块前置关系仍保存在完整数据中，选择「全部知识→全部」时完整显示。
     const namesOnCanvas = new Set(displayedNodes.map(item => item.name));
@@ -21208,14 +21221,26 @@ function renderKnowledgeGraphDetail() {
         subline.appendChild(level);
     }
 
-    if (state.label) {
-        const pill = document.createElement("span");
-        pill.className = `graph-status-pill ${state.key}`;
-        pill.textContent = state.label;
-        subline.appendChild(pill);
-    }
+    if (subline.childNodes.length) detail.appendChild(subline);
 
-    detail.appendChild(subline);
+    const subject = knowledgeGraphRenderedQuestion;
+    if (isKnowledgeGraphQuestionView() && subject) {
+        const actions = document.createElement("div");
+        actions.className = "kg-history-actions kg-question-actions";
+        const locate = document.createElement("button");
+        locate.type = "button";
+        locate.id = "knowledgeGraphLocateOriginal";
+        locate.textContent = dmateUiText("定位原题");
+        const owner = {version:cloudSyncContextVersion, authenticated:accountState.authenticated,
+            username:accountState.username, openRevision:knowledgeGraphOpenRevision};
+        locate.addEventListener("click", () => {
+            const current = getKnowledgeGraphQuestionSubject();
+            if (!current || knowledgeGraphReferenceKey(current.reference) !== knowledgeGraphReferenceKey(subject.reference)) return;
+            locateKnowledgeGraphQuestion(subject.reference, owner);
+        });
+        actions.append(locate);
+        detail.append(actions);
+    }
 
     const addDetailField = (labelText, values, emptyText) => {
         const field = document.createElement("div");
@@ -21385,12 +21410,13 @@ function renderKnowledgeGraph() {
     if (!knowledgeGraphData) return;
 
     // 在两个模式下使用同一个属性控制桌面下拉框与移动端选择入口。
-    modal.dataset.graphView = knowledgeGraphViewMode === "focus" ? "focus" : "full";
+    modal.dataset.graphView = isKnowledgeGraphQuestionView() ? "focus" : "full";
     fillKnowledgeGraphCategoryOptions();
     updateKnowledgeGraphScopeButton();
     updateKnowledgeGraphModeButton();
 
-    const context = getActiveKnowledgeContext();
+    knowledgeGraphRenderedQuestion = getKnowledgeGraphQuestionSubject();
+    const context = knowledgeGraphRenderedQuestion?.context || {};
     const canvas = document.getElementById(
         "knowledgeGraphCanvas"
     );
@@ -21417,7 +21443,7 @@ function renderKnowledgeGraph() {
         context
     );
 
-    if (knowledgeGraphViewMode === "focus" && !visibleNodes.length) {
+    if (isKnowledgeGraphQuestionView() && !visibleNodes.length) {
         canvas.querySelectorAll(".kg-mobile-viewport,.kg-desktop-viewport").forEach(viewport => viewport._kgDispose?.());
         // Keep the remembered camera/full-view preference, but expose the
         // normal toolbar and empty detail instead of an empty fullscreen pane.
@@ -21430,8 +21456,15 @@ function renderKnowledgeGraph() {
         return;
     }
 
-    const description = knowledgeGraphViewMode === "focus"
-        ? `最近一题关联 ${visibleNodes.length} 个知识点`
+    const questionView = isKnowledgeGraphQuestionView();
+    const sectionTitle = questionView
+        ? (knowledgeGraphScope === "history"
+            ? dmateUiText("所选题目关联", "Selected question") : dmateUiText("最近一题关联", "Related to latest question"))
+        : displayCategory;
+    const description = questionView
+        ? (knowledgeGraphScope === "history"
+            ? dmateUiText(`所选题目关联 ${visibleNodes.length} 个知识点`, `Related to selected question ${visibleNodes.length} concepts`)
+            : `最近一题关联 ${visibleNodes.length} 个知识点`)
         : dmateUiText(`${fullNodes.length} 个知识点`, `${fullNodes.length} concepts`);
 
     const mobileGraph = window.matchMedia?.("(max-width: 760px)")?.matches;
@@ -21445,7 +21478,7 @@ function renderKnowledgeGraph() {
         renderMobileKnowledgeGraphSection(
             fragment,
             visibleNodes,
-            displayCategory,
+            sectionTitle,
             description,
             context
         );
@@ -21453,7 +21486,7 @@ function renderKnowledgeGraph() {
         renderKnowledgeGraphSection(
             fragment,
             visibleNodes,
-            displayCategory,
+            sectionTitle,
             description,
             context
         );

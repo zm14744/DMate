@@ -31,6 +31,8 @@ on:
       - 'scripts/test_graph_empty_recent_browser.cjs'
       - 'scripts/test_graph_relation_navigation_browser.cjs'
       - 'scripts/test_graph_all_history_browser.cjs'
+      - 'scripts/test_question_graph_views_browser.cjs'
+      - 'scripts/test_question_knowledge_graph.cjs'
       - 'scripts/test_graph_history_selection_browser.cjs'
       - 'scripts/test_graph_open_stability_browser.cjs'
       - 'scripts/test_offline_graph_browser.cjs'
@@ -107,6 +109,8 @@ on:
       - 'scripts/test_graph_empty_recent_browser.cjs'
       - 'scripts/test_graph_relation_navigation_browser.cjs'
       - 'scripts/test_graph_all_history_browser.cjs'
+      - 'scripts/test_question_graph_views_browser.cjs'
+      - 'scripts/test_question_knowledge_graph.cjs'
       - 'scripts/test_graph_history_selection_browser.cjs'
       - 'scripts/test_graph_open_stability_browser.cjs'
       - 'scripts/test_offline_graph_browser.cjs'
@@ -198,6 +202,9 @@ jobs:
           node --check scripts/test_graph_empty_recent_browser.cjs
           node --check scripts/test_graph_relation_navigation_browser.cjs
           node --check scripts/test_graph_all_history_browser.cjs
+          node --check scripts/test_question_graph_views_browser.cjs
+          node --check scripts/test_question_knowledge_graph.cjs
+          node --check static/question-knowledge-graph.js
           node --check scripts/test_graph_history_selection_browser.cjs
           node --check scripts/test_graph_open_stability_browser.cjs
           node --check scripts/test_offline_graph_browser.cjs
@@ -247,6 +254,8 @@ jobs:
           node --check scripts/test_math_diagram_browser.cjs
       - name: Test math startup, rendering queue and proof endings
         run: node --test scripts/test_math_markdown.cjs
+      - name: Test focused question knowledge relations
+        run: node --test scripts/test_question_knowledge_graph.cjs
       - name: Test local conversation title summaries
         run: node --test scripts/test_conversation_titles.cjs
       - name: Verify offline styles match the online workspace
@@ -362,6 +371,7 @@ jobs:
           node scripts/test_graph_empty_recent_browser.cjs
           node scripts/test_graph_relation_navigation_browser.cjs
           node scripts/test_graph_all_history_browser.cjs
+          node scripts/test_question_graph_views_browser.cjs
           node scripts/test_graph_history_selection_browser.cjs
           node scripts/test_graph_open_stability_browser.cjs
           node scripts/test_offline_graph_browser.cjs

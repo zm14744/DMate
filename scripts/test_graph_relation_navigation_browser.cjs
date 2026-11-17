@@ -54,7 +54,7 @@ async function checkDecoration(page, focus, label) {
   if (focus) {
     assert.ok(result.clone.purple > 0, label + ': current-question nodes retain their focus decoration');
     assert.ok(result.fills.includes('#5b21b6'), label + ': focused PNG retains the current-question fill');
-    assert.equal(result.statusPills, 1, label + ': focused selected node retains the current-question badge');
+    assert.equal(result.statusPills, 0, label + ': focused details omit the redundant current-question pill');
   } else {
     assert.equal(result.clone.purple, 0, label + ': all-knowledge DOM/export clone has no current-question fill');
     assert.equal(result.fills.includes('#5b21b6'), false, label + ': all-knowledge PNG has no current-question fill');
