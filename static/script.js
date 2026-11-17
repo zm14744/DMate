@@ -20954,7 +20954,7 @@ function selectKnowledgeGraphNode(nodeId, sourceElement = null) {
 
     // 只刷新右侧/下方详情，不重建全部节点和连线。
     // 手机上点击节点时不会再出现整张图谱闪一下、卡一下。
-    renderKnowledgeGraphSide();
+    renderKnowledgeGraphSide({refreshHistory:false});
 }
 
 
@@ -21116,16 +21116,20 @@ function setKnowledgeGraphSideMode(mode) {
     renderKnowledgeGraphSide();
 }
 
-function renderKnowledgeGraphSide() {
+function renderKnowledgeGraphSide({refreshHistory = true} = {}) {
     const full = knowledgeGraphViewMode === "full";
     if (!full) knowledgeGraphSideMode = "detail";
     const history = full && knowledgeGraphSideMode === "history";
     const tabs = document.getElementById("knowledgeGraphSideTabs");
     if (tabs) tabs.hidden = !full;
-    const groups = full ? getKnowledgeGraphQuestionHistory() : [];
-    const count = groups.reduce((sum, group) => sum + group.items.length, 0);
+    // Selecting a node cannot change questions. Keep the displayed count until
+    // a data render or history opening refreshes it; history itself is always read fresh.
+    const groups = full ? (refreshHistory || history ? getKnowledgeGraphQuestionHistory() : null) : [];
     const historyTab = document.getElementById("knowledgeGraphHistoryTab");
-    if (historyTab) historyTab.textContent = dmateUiText(`题目历史 (${count})`, `Question history (${count})`);
+    if (historyTab && groups !== null) {
+        const count = groups.reduce((sum, group) => sum + group.items.length, 0);
+        historyTab.textContent = dmateUiText(`题目历史 (${count})`, `Question history (${count})`);
+    }
     for (const [id, selected] of [["knowledgeGraphDetailTab", !history], ["knowledgeGraphHistoryTab", history]]) {
         const button = document.getElementById(id);
         button?.classList.toggle("active", selected);

@@ -40,20 +40,23 @@ ARG DMATE_MODEL_DOWNLOAD_TIMEOUT=3600
 RUN --mount=type=cache,id=dmate-ocr-model-cache-v2,target=/var/cache/dmate-model-build,sharing=locked \
     python scripts/prepare_ocr_model_cache.py --cache-dir /var/cache/dmate-model-build \
         --download-timeout "$DMATE_MODEL_DOWNLOAD_TIMEOUT" && \
-    python scripts/prepare_ocr_model_cache.py --cache-dir /var/cache/dmate-model-build --verify-only && \
     mkdir -p /opt/dmate-model-cache/paddlex && \
     cp -a /var/cache/dmate-model-build/paddlex/official_models \
         /var/cache/dmate-model-build/paddlex/onnx_models \
         /var/cache/dmate-model-build/paddlex/dmate-model-manifest.json \
         /opt/dmate-model-cache/paddlex/
 
+# Cache generated web icons independently of ordinary application changes.
+# Stage them outside /app so COPY cannot overwrite them with older artifacts.
+COPY scripts/generate_icons.py /opt/dmate-icon-build/scripts/generate_icons.py
+RUN python /opt/dmate-icon-build/scripts/generate_icons.py --web-only
+
 COPY . .
 
 # Reject application syntax errors during the build, before replacing a running service.
-RUN python -m compileall -q -l .
-
-# Regenerate sharp platform-specific icons as part of every production image build.
-RUN python scripts/generate_icons.py
+RUN python -m compileall -q -l . && \
+    cp -a /opt/dmate-icon-build/static/icons/. /app/static/icons/ && \
+    rm -rf /opt/dmate-icon-build
 
 # Four independent image requests plus capacity for cancellation, health and chat.
 # The local model scheduler, rather than HTTP threads, limits inference memory.

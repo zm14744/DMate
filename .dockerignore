@@ -26,6 +26,13 @@ node_modules
 **/node_modules
 desktop
 snap
+# Native clients, extension archives and authoring sources are published
+# separately; the web app uses the generated packs in static/offline-content.
+android
+browser-extension
+offline-content
+scripts/test_*
+scripts/native
 *.log
 *.db
 *.sqlite*

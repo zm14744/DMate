@@ -94,11 +94,15 @@ DMATE_GRAPH_CONFIRMATION_DB=/data/graph-confirmations.sqlite3
 
 只需要游客模式时，数据库与认证配置可省略。不要把示例占位值用于正式服务。认证密钥可在自己的运行环境用 `python -c 'import secrets; print(secrets.token_hex(32))'` 生成一次，保存到平台 Secret 后持续复用。
 
-镜像构建除了安装依赖，还会预备 OCR 模型包、转换两个文字模型并检查缓存，再生成跨平台图标。模型准备优先下载 Hugging Face 官方 PaddlePaddle 仓库的固定提交文件，失败或持续过慢时尝试 ModelScope 官方仓库中与预期 SHA256 一致的文件；所有下载仍须通过完整大小、哈希及模型身份检查。`PADDLE_PDX_MODEL_SOURCE`（当前默认 BOS）不改变这个构建下载顺序。下载与重试预算见[本地模型与缓存](#本地模型与缓存)。所有来源均无法提供完整模型时构建会明确失败，后续 `--verify-only` 仍会严格检查模型文件、ONNX 导出和哈希清单。
+镜像构建依次安装依赖、预备 OCR 模型并转换两个文字模型、生成网页图标，最后复制业务源码并检查 Python 语法。模型和图标分别位于普通业务源码之前的缓存层，纯网页更新不会主动重新执行它们。模型准备优先下载 Hugging Face 官方 PaddlePaddle 仓库的固定提交文件，失败或持续过慢时尝试 ModelScope 官方仓库中与预期 SHA256 一致的文件；所有下载仍须通过完整大小、哈希及模型身份检查。`PADDLE_PDX_MODEL_SOURCE`（当前默认 BOS）不改变这个构建下载顺序。下载与重试预算见[本地模型与缓存](#本地模型与缓存)。所有来源均无法提供完整模型时构建会明确失败；准备命令内部会执行最终完整校验，Docker 不再紧接着重复扫描一次相同文件。需要单独检查缓存时仍可使用 `--verify-only`。
 
 Dockerfile 使用 BuildKit 缓存挂载 `dmate-ocr-model-cache-v2`，在 `/var/cache/dmate-model-build` 保留已准备模型和部分下载，核验后只将运行需要的原包、ONNX 模型及清单复制到镜像的 `/opt/dmate-model-cache/paddlex`。普通业务源码在模型准备之后复制，成功的模型层仍可复用；准备脚本修改或构建失败后，只要构建器仍保留该缓存挂载，也可复用模型和断点。缓存可能被清理，Zeabur 更换构建节点时也不保证保留，不能将它视为持久数据卷。构建需要支持 `RUN --mount=type=cache` 的 BuildKit。
 
-`scripts/generate_icons.py` 直接从脚本内的矢量路径生成图标，不再读取 Android 目录里的旧 PNG 作为源图；自定义构建上下文需保留生成脚本及 Pillow 依赖，输出目录由脚本创建。
+`scripts/generate_icons.py --web-only` 直接从脚本内的矢量路径生成网页图标，生产镜像不生成 Android / Tauri 资源。生成结果先暂存在 `/opt/dmate-icon-build`，复制业务源码后再覆盖网页图标，保证旧提交产物不会覆盖新矢量输出。默认命令继续生成各原生平台的图标；自定义构建上下文需保留生成脚本及 Pillow 依赖。
+
+网页镜像排除 `browser-extension`、Android / 桌面源码和根目录 `offline-content` 编写材料，实际离线内容仍随 `static/offline-content` 发布。Firefox 扩展打包仅由扩展源码或提交材料变化触发，普通网页修改不再额外产生 ZIP 提交并重启部署；需要重新整理完整 AMO 提交材料时可手动运行打包工作流。ZIP 固定文件顺序、时间与权限，避免仅因 checkout 时间变化生成重复提交。
+
+缓存失效或更换构建节点时，首次构建仍须安装大型依赖并下载约 156 MiB 官方 OCR 文件，另转换约 30 MiB 的 ONNX 文件，耗时取决于下载和镜像传输速度。应结合 Zeabur 分阶段构建日志判断瓶颈，不能把页面脚本行数或单次总耗时当成模型步骤必然缓慢的证据。
 
 ## 界面语言与接口语言
 

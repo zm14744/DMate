@@ -6,9 +6,11 @@ use a slightly stronger stroke to stay legible in small search-result slots.
 Native bitmap frames are rasterized independently; Android adaptive icons use
 VectorDrawable paths. Historical versioned web assets remain available for old
 cached pages but are no longer inputs to this generator.
+Use --web-only for web images; native builds keep the default platform outputs.
 """
 from __future__ import annotations
 
+import argparse
 import io
 import json
 import math
@@ -185,9 +187,8 @@ def generate_android():
             (directory / f"{name}.xml").write_text(contents, encoding="utf-8")
 
 
-def main():
+def main(web_only=False):
     STATIC.mkdir(parents=True, exist_ok=True)
-    TAURI.mkdir(parents=True, exist_ok=True)
     (STATIC / "dmate-master.svg").write_text(svg_mark(), encoding="utf-8")
     (STATIC / f"dmate-brand-{VERSION}.svg").write_text(svg_mark(), encoding="utf-8")
     for size in APP_SIZES:
@@ -234,28 +235,36 @@ def main():
     # tab variants remain available only under their explicit tab filenames.
     for size in (16, 32, 48, 64, 96, 128, 192):
         shutil.copyfile(STATIC / f"{bing_base}-{size}.png", STATIC / f"favicon-{size}.png")
-    for size, name in ((16, "icon-16.png"), (24, "icon-24.png"), (32, "32x32.png"),
-                       (48, "icon-48.png"), (64, "icon-64.png"), (128, "128x128.png"),
-                       (256, "128x128@2x.png"), (512, "icon.png"), (1024, "icon-1024.png")):
-        save_png(draw_mark(size), TAURI / name)
-    # Small Windows shell icons otherwise have subpixel strokes (0.84px at
-    # 48px), which lose contrast on ordinary-density desktop displays.
-    save_ico(TAURI / "icon.ico", sizes=WINDOWS_ICO_SIZES,
-             min_stroke_px=WINDOWS_MIN_STROKE_PX)
-    save_icns(TAURI / "icon.icns")
-    generate_android()
-    print(json.dumps({"status": "generated", "version": VERSION, "source": "reference-inspired vector paths",
-                      "formats": ["SVG", "PNG", "ICO", "ICNS", "Android VectorDrawable"],
-                      "max_bitmap_size": 1024, "android_adaptive_safe_circle_dp": 66,
+    if not web_only:
+        TAURI.mkdir(parents=True, exist_ok=True)
+        for size, name in ((16, "icon-16.png"), (24, "icon-24.png"), (32, "32x32.png"),
+                           (48, "icon-48.png"), (64, "icon-64.png"), (128, "128x128.png"),
+                           (256, "128x128@2x.png"), (512, "icon.png"), (1024, "icon-1024.png")):
+            save_png(draw_mark(size), TAURI / name)
+        # Small Windows shell icons otherwise have subpixel strokes (0.84px at
+        # 48px), which lose contrast on ordinary-density desktop displays.
+        save_ico(TAURI / "icon.ico", sizes=WINDOWS_ICO_SIZES,
+                 min_stroke_px=WINDOWS_MIN_STROKE_PX)
+        save_icns(TAURI / "icon.icns")
+        generate_android()
+    result = {"status": "generated", "version": VERSION, "source": "reference-inspired vector paths",
+                      "formats": ["SVG", "PNG", "ICO"] + ([] if web_only else ["ICNS", "Android VectorDrawable"]),
+                      "max_bitmap_size": 1024,
                       "stroke_units": STROKE,
                       "search_version": SEARCH_VERSION, "search_stroke_units": SEARCH_STROKE,
                       "search_min_stroke_px": SEARCH_MIN_STROKE_PX,
                       "bing_version": BING_VERSION, "bing_min_stroke_px": BING_MIN_STROKE_PX,
                       "bing_stroke_units": BING_STROKE,
-                      "windows_ico_sizes": WINDOWS_ICO_SIZES,
-                      "windows_min_stroke_px": WINDOWS_MIN_STROKE_PX,
-                      "small_icons": "independently supersampled; search icons use a stronger stroke"}, ensure_ascii=False))
+                      "small_icons": "independently supersampled; search icons use a stronger stroke"}
+    if not web_only:
+        result.update({"android_adaptive_safe_circle_dp": 66,
+                       "windows_ico_sizes": WINDOWS_ICO_SIZES,
+                       "windows_min_stroke_px": WINDOWS_MIN_STROKE_PX})
+    print(json.dumps(result, ensure_ascii=False))
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--web-only", action="store_true",
+                        help="Generate web assets without creating Android or desktop resources")
+    main(web_only=parser.parse_args().web_only)

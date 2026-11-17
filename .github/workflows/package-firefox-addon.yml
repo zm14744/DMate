@@ -6,11 +6,17 @@ on:
     paths:
       - 'browser-extension/firefox/**'
       - '.github/workflows/package-firefox-addon.yml'
-      - 'templates/index.html'
-      - 'templates/_favicon_links.html'
-      - 'static/**'
+      - 'scripts/package_firefox_zip.py'
+      - 'scripts/test_package_firefox_zip.py'
       - 'docs/SECURITY_PRIVACY.md'
       - 'THIRD_PARTY_LICENSES.md'
+  workflow_dispatch:
+
+# The add-on ships its own checked-in frontend. Website-only edits do not
+# change it; manually dispatch when a fresh AMO source bundle is required.
+concurrency:
+  group: firefox-submission-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -22,8 +28,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 0
+
+      - name: Verify reproducible and safe ZIP packaging
+        run: python scripts/test_package_firefox_zip.py
 
       - name: Validate Firefox Manifest V3 package
         run: |
@@ -71,8 +80,7 @@ jobs:
 
       - name: Build Firefox Add-on ZIP
         run: |
-          rm -f browser-extension/DMate_Firefox_Addon.zip
-          (cd browser-extension/firefox && zip -X -qr ../DMate_Firefox_Addon.zip .)
+          python scripts/package_firefox_zip.py browser-extension/firefox browser-extension/DMate_Firefox_Addon.zip
           python - <<'PY'
           import pathlib
           import zipfile
@@ -100,6 +108,7 @@ jobs:
           cp docs/SECURITY_PRIVACY.md "$SRC/SECURITY_PRIVACY.md"
           cp THIRD_PARTY_LICENSES.md "$SRC/THIRD_PARTY_LICENSES.md"
           cp browser-extension/firefox/static/vendor/vendor-packages.json "$SRC/vendor-packages.json"
+          cp scripts/package_firefox_zip.py "$SRC/package_firefox_zip.py"
 
           cat > "$SRC/README.md" <<'EOF'
           # DMate Firefox Add-on — Source Code Submission
@@ -113,12 +122,13 @@ jobs:
           - original-frontend/static/: the original first-party front-end assets and vendored browser libraries.
           - vendor-packages.json: exact upstream npm package versions, registry tarball URLs, integrity values, and vendored file hashes.
           - vendor-source/: official npm package archives for the vendored third-party libraries.
+          - package_firefox_zip.py: reproducible ZIP packager used for the submission artifacts.
           - SECURITY_PRIVACY.md: repository documentation describing data flows, local storage, server processing, and third-party services.
           - THIRD_PARTY_LICENSES.md: third-party license inventory.
 
           ## Reproducing the package
 
-          1. Use Node.js with npm and Python 3.
+          1. Use Node.js with npm and Python 3.10 or later.
           2. The exact upstream dependencies are recorded in vendor-packages.json:
              - mathjax 3.2.2
              - marked 15.0.12
@@ -128,8 +138,8 @@ jobs:
           3. The matching official npm archives are included under vendor-source/. Their package versions and integrity values are also recorded in vendor-packages.json.
           4. The extension uses the original DMate front-end resources locally. extension/sidebar.html is the extension-ready adaptation of the original template: server-side template expressions are resolved or removed, executable inline scripts are moved to local files under extension/extension/, and the API bridge routes application API requests to the declared DMate backend host.
           5. The Firefox-specific integration is defined by extension/manifest.json and extension/background.js. It uses Firefox's native sidebar_action API; the application UI and first-party front-end assets are otherwise reused from the Edge package.
-          6. To package the exact extension tree, run:
-             cd extension && zip -X -qr ../DMate_Firefox_Addon.zip .
+          6. To package the exact extension tree with normalized timestamps and permissions, run:
+             python package_firefox_zip.py extension DMate_Firefox_Addon.zip
 
           No remote JavaScript or WebAssembly is loaded for execution. The extension's application requests go to https://dmate.zeabur.app/; the backend may forward user-submitted content to the configured AI and email providers as documented in SECURITY_PRIVACY.md.
           EOF
@@ -138,14 +148,14 @@ jobs:
             npm pack "$spec" --pack-destination "$SRC/vendor-source"
           done
 
-          rm -f browser-extension/DMate_Firefox_Source_Code.zip
-          (cd "$SRC" && zip -X -qr "$GITHUB_WORKSPACE/browser-extension/DMate_Firefox_Source_Code.zip" .)
+          python scripts/package_firefox_zip.py "$SRC" "$GITHUB_WORKSPACE/browser-extension/DMate_Firefox_Source_Code.zip"
           python - <<'PY'
           import pathlib, zipfile
           p = pathlib.Path("browser-extension/DMate_Firefox_Source_Code.zip")
           with zipfile.ZipFile(p) as z:
               names = z.namelist()
               assert "README.md" in names
+              assert "package_firefox_zip.py" in names
               assert "extension/manifest.json" in names
               assert "original-frontend/templates-index.html" in names
               assert "vendor-packages.json" in names
@@ -164,7 +174,15 @@ jobs:
           retention-days: 90
 
       - name: Commit generated Firefox packages
+        if: github.ref == 'refs/heads/main'
         run: |
+          # Do not publish packages assembled from a superseded source commit.
+          # A normal push also rejects a main update racing this final check.
+          git fetch origin refs/heads/main:refs/remotes/origin/main
+          if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then
+            echo "Main changed during packaging; submission artifacts remain attached to this run."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add browser-extension/DMate_Firefox_Addon.zip browser-extension/DMate_Firefox_Source_Code.zip
