@@ -1132,7 +1132,7 @@ function computeChangedCloudParts(serverParts, localPartHashes) {
     return changed;
 }
 
-function clearLoggedOutWorkspace() {
+function clearLoggedOutWorkspace({ purgePersistent = true } = {}) {
     cancelAccountInteractions();
     // 退出后进入真正的游客模式：页面清空，游客数据不落地。
     sessions = [];
@@ -1141,7 +1141,10 @@ function clearLoggedOutWorkspace() {
     learningState = createEmptyLearningState();
     window.dmateConceptNotebook?.refresh?.();
     volatileCloudBackup = null;
-    purgeGuestPersistentState();
+    // A confirmed expiry clears the visible workspace without destroying this
+    // verified owner's unsynced cache. Only a later verified matching account
+    // may load it; ordinary guests and explicit logout keep the purge policy.
+    if (purgePersistent) purgeGuestPersistentState();
 
     appearanceSettings = { ...APPEARANCE_DEFAULTS };
     appearanceCommittedSettings = { ...APPEARANCE_DEFAULTS };
@@ -1164,6 +1167,26 @@ function clearLoggedOutWorkspace() {
     if (chat) chat.innerHTML = "";
 
     renderAll();
+}
+
+function expireVerifiedAccountSession(owner, contextVersion) {
+    if (!isCloudSyncContextValid(owner, contextVersion)) return false;
+    stopCloudLivePolling();
+    bumpCloudSyncContext();
+    accountState.authenticated = false;
+    accountState.username = "";
+    accountState.email = "";
+    accountState.hasRecoveryCode = false;
+    accountState.revision = 0;
+    accountState.status = "";
+    accountState.syncing = false;
+    // Keep the existing owner metadata with its cache for verified recovery;
+    // guest edits cannot write either section while authenticated is false.
+    clearLoggedOutWorkspace({ purgePersistent:false });
+    renderAccountUi();
+    refreshInputAvailability();
+    setAccountMessage(dmateUiText("登录状态已失效，请重新登录。", "Your sign-in has expired. Sign in again."), true);
+    return true;
 }
 
 function setAppConfirmOpen(open) {
@@ -1950,6 +1973,9 @@ async function accountFetch(url, options = {}) {
     delete fetchOptions.allowConflict;
 
     const syncRequest = /^\/sync(?:\?|$)/.test(String(url));
+    const identityRequest = syncRequest || /^\/auth\/me(?:\?|$)/.test(String(url));
+    const requestOwner = accountState.username;
+    const requestContext = cloudSyncContextVersion;
     const externalSignal = fetchOptions.signal;
     const controller = syncRequest && typeof AbortController !== "undefined" ? new AbortController() : null;
     if (controller) fetchOptions.signal = controller.signal;
@@ -1962,6 +1988,12 @@ async function accountFetch(url, options = {}) {
                 ...(fetchOptions.headers || {})
             }
         });
+        // These endpoints use 401 only for a missing/expired login. Other auth
+        // operations also use 401 for an incorrect password, so leave those
+        // account views and notes intact. Ignore responses from an old owner.
+        if (identityRequest && response.status === 401) {
+            expireVerifiedAccountSession(requestOwner, requestContext);
+        }
         if (syncRequest) {
             const rawLength = response.headers?.get?.("Content-Length");
             const length = rawLength == null || rawLength === "" ? NaN : Number(rawLength);
@@ -3485,7 +3517,7 @@ function retryAccountVerificationNow() {
 
 async function restoreVerifiedAccountSession() {
     if (accountVerificationOperation) return;
-    const operation = { version:cloudSyncContextVersion };
+    const operation = { version:cloudSyncContextVersion, owner:accountState.username };
     const wasAuthenticated = accountState.authenticated;
     const controller = new AbortController();
     accountVerificationOperation = operation;
@@ -3498,6 +3530,10 @@ async function restoreVerifiedAccountSession() {
         if (typeof data.authenticated !== "boolean" || data.authenticated
             && (typeof data.user?.username !== "string" || !data.user.username)) {
             throw new Error("登录状态响应无效，稍后重新验证");
+        }
+        if (wasAuthenticated && !data.authenticated) {
+            expireVerifiedAccountSession(operation.owner, operation.version);
+            return;
         }
         accountVerificationPending = false;
         accountState.configured = data.configured !== false;
@@ -3537,6 +3573,13 @@ async function restoreVerifiedAccountSession() {
     } catch (error) {
         if (operation.version !== cloudSyncContextVersion) return;
         console.warn("读取账号状态失败：", error);
+        if (error?.status === 401 && !wasAuthenticated) {
+            // A fresh page has not loaded an account workspace. Definitive
+            // guest verification must purge old cache bytes without erasing
+            // notes the guest has already typed into this page's memory.
+            clearCloudSyncMeta();
+            purgeGuestPersistentState();
+        }
         const transient = error?.data?.retryable === true || !error?.status || error.status >= 500;
         accountVerificationPending = transient;
         if (error?.status === 503 && error?.data?.configured === false && !error?.data?.retryable) {

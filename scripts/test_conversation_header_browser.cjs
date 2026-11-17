@@ -240,11 +240,15 @@ async function notebookAiActions(page, newButton) {
   await page.locator('#conceptNotebookDialog .dcn-note input[type="checkbox"]').first().check();
   assert.equal(await actions.nth(0).isEnabled(), true, 'One selected concept enables explanation');
   assert.equal(await actions.nth(1).isDisabled(), true, 'Relation analysis still requires two concepts');
+  const explanationPalette = await aiActionPaint(actions.nth(0));
   await newButton.click();
   await page.locator('#conceptNotebookDialog .dcn-title').fill('关联概念');
   for (const checkbox of await page.locator('#conceptNotebookDialog .dcn-note input[type="checkbox"]').all()) await checkbox.check();
   assert.equal(await actions.nth(0).isDisabled(), true, 'Multiple concepts disable single-concept explanation');
   assert.equal(await actions.nth(1).isEnabled(), true, 'Two selected concepts enable relation analysis');
+  const relationPalette = await aiActionPaint(actions.nth(1));
+  assert.deepEqual([relationPalette.background, relationPalette.color],
+    [explanationPalette.background, explanationPalette.color], 'Both enabled notebook actions use the same neutral palette');
   for (const button of await actions.all()) {
     if (await button.isDisabled()) continue;
     await page.mouse.move(0, 0); await page.locator('#conceptNotebookTitle').focus(); await settle(page);

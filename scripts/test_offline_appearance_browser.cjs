@@ -68,11 +68,12 @@ async function appearanceControls(page) {
 
 async function filledAppearanceActions(page) {
   const surface = await page.locator('#appearanceModal .appearance-card').evaluate(node => getComputedStyle(node).backgroundColor);
+  const enabledPalettes = [];
   for (const id of ['appearanceBackgroundUpload','appearanceBackgroundRemove','appearanceReset','appearanceDone']) {
     const button = page.locator('#' + id);
     const paint = () => button.evaluate(node => {
       const style = getComputedStyle(node);
-      return { border:style.borderWidth, background:style.backgroundColor, image:style.backgroundImage, shadow:style.boxShadow };
+      return { border:style.borderWidth, background:style.backgroundColor, color:style.color, image:style.backgroundImage, shadow:style.boxShadow };
     });
     await page.mouse.move(0, 0);
     await page.waitForTimeout(150);
@@ -83,11 +84,14 @@ async function filledAppearanceActions(page) {
     assert.notEqual(idle.background, 'rgba(0, 0, 0, 0)', id + ' retains a filled surface');
     assert.notEqual(idle.background, surface, id + ' stays distinct from the dialog surface');
     if (await button.isEnabled()) {
+      enabledPalettes.push([idle.background, idle.color]);
       await button.hover();
       await page.waitForFunction(({ id, color }) => getComputedStyle(document.getElementById(id)).backgroundColor !== color,
         { id, color:idle.background });
     }
   }
+  for (const palette of enabledPalettes) assert.deepEqual(palette, enabledPalettes[0],
+    'Choose image, remove background and the footer actions share the same neutral palette');
   await page.mouse.move(0, 0);
   await page.waitForTimeout(150);
 }

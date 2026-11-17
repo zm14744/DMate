@@ -792,11 +792,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         max-width:100%;
         overflow-wrap:anywhere;
     }
-    body[data-appearance-theme] :is(
-        #appearanceModal button.primary,
-        #accountModal .account-body button:is(.primary,.danger),
-        #conceptNotebookDialog .dcn-ai-actions > button.dcn-primary
-    ) {
+    body[data-appearance-theme] #accountModal .account-body button.danger {
         --dm-filled-bg:var(--dm-control-bg);
         --dm-filled-hover-bg:var(--dm-control-hover-bg);
         --dm-filled-text:var(--dm-control-text);

@@ -45,6 +45,7 @@ on:
       - 'scripts/test_mistake_action_chrome_browser.cjs'
       - 'scripts/test_conversation_header_browser.cjs'
       - 'scripts/test_notebook_selection_browser.cjs'
+      - 'scripts/test_guest_notebook_lifecycle_browser.cjs'
       - 'scripts/test_concept_notebook_selection.py'
       - 'scripts/test_ui_tooltips_browser.cjs'
       - 'scripts/test_conversation_titles_browser.cjs'
@@ -111,6 +112,7 @@ on:
       - 'scripts/test_mistake_action_chrome_browser.cjs'
       - 'scripts/test_conversation_header_browser.cjs'
       - 'scripts/test_notebook_selection_browser.cjs'
+      - 'scripts/test_guest_notebook_lifecycle_browser.cjs'
       - 'scripts/test_concept_notebook_selection.py'
       - 'scripts/test_ui_tooltips_browser.cjs'
       - 'scripts/test_conversation_titles_browser.cjs'
@@ -192,6 +194,7 @@ jobs:
           node --check scripts/test_mistake_action_chrome_browser.cjs
           node --check scripts/test_conversation_header_browser.cjs
           node --check scripts/test_notebook_selection_browser.cjs
+          node --check scripts/test_guest_notebook_lifecycle_browser.cjs
           node --check scripts/test_ui_tooltips_browser.cjs
           node --check scripts/test_conversation_titles_browser.cjs
           node --check scripts/test_conversation_titles.cjs
@@ -302,6 +305,7 @@ jobs:
           node scripts/test_mistake_action_chrome_browser.cjs
           node scripts/test_conversation_header_browser.cjs
           node scripts/test_notebook_selection_browser.cjs
+          node scripts/test_guest_notebook_lifecycle_browser.cjs
           node scripts/test_ui_tooltips_browser.cjs
           node scripts/test_conversation_titles_browser.cjs
           node scripts/test_voice_input_controls_browser.cjs
