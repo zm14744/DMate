@@ -336,6 +336,141 @@ class TutoringChatTests(unittest.TestCase):
         self.assertNotIn(answer, body["reply"])
         self.assertNotIn(QUESTIONS["zh-CN"], repr(graph))
 
+    @staticmethod
+    def inline_catalog(identifier, quote, *, source="question", reason="题目实际要求研究这个现有课程知识点"):
+        return {"nodes": [{"id": identifier, "usage": "assessed" if source == "question" else "used",
+                           "reason": reason, "evidence": [{"source": source, "quote": quote}]}],
+                "edges": [], "unresolved": ""}
+
+    def test_chat_returns_reviewed_catalog_graph_with_the_same_answer(self):
+        question = QUESTIONS["zh-CN"]
+        answer = "将G按H的陪集分组，各组大小相同，由此得到整除结论"
+        inline = self.inline_catalog("algebra_group", question)
+        body, _ = self.post(self.payload("只给一个提示，先不要完整证明。"),
+                            {"ok": True, "reply": answer, "catalog_graph": inline})
+        graph = body["teaching"]["question_graph"]
+        self.assertEqual(graph["classification_status"], "semantic")
+        self.assertEqual(graph["classification_source"], "catalog_semantic")
+        self.assertFalse(graph["needs_review"])
+        self.assertEqual(graph["sources"], {"question": question, "solution": body["reply"]})
+        self.assertIn("algebra_group", {node["id"] for node in graph["nodes"]})
+        self.assertNotIn("catalog_graph", body)
+
+    def test_inline_catalog_cannot_use_a_draft_replaced_by_the_answer_guard(self):
+        original = "先使用容斥原理进行草稿计算"
+        final = "将G按H的陪集分组，各组大小相同，由此得到整除结论"
+        inline = self.inline_catalog("count_inclusion", original, source="solution")
+        with patch.object(self.runtime, "audit_explicit_count_answer", return_value=final):
+            body, _ = self.post(self.payload("只给一个提示，先不要完整证明。"),
+                                {"ok": True, "reply": original, "catalog_graph": inline})
+        graph = body["teaching"]["question_graph"]
+        self.assertEqual(graph["sources"]["solution"], final)
+        self.assertNotEqual(graph["classification_status"], "semantic")
+        self.assertTrue(graph["needs_review"])
+        self.assertNotIn("count_inclusion", {node["id"] for node in graph["nodes"]})
+        self.assertNotIn(original, repr(graph))
+
+    def test_inline_catalog_partial_validation_remains_reviewable(self):
+        question = QUESTIONS["zh-CN"]
+        inline = self.inline_catalog("algebra_group", question)
+        inline["nodes"] += self.inline_catalog("invented_catalog_node", question)["nodes"]
+        body, _ = self.post(self.payload("只给一个提示，先不要完整证明。"),
+                            {"ok": True, "reply": MOCK_REPLY, "catalog_graph": inline})
+        graph = body["teaching"]["question_graph"]
+        self.assertEqual(graph["classification_status"], "partial")
+        self.assertTrue(graph["needs_review"])
+        self.assertIn("algebra_group", {node["id"] for node in graph["nodes"]})
+        self.assertNotIn("invented_catalog_node", repr(graph))
+
+    def test_generated_retry_returns_only_the_chosen_candidates_catalog(self):
+        question = "设集合A={1,2,3}，B={2,3,4}，求A∪B与A∩B。"
+        answer = "A∪B={1,2,3,4}；A∩B={2,3}"
+        invalid = {"ok": True, "reply": "设条件尚未完整，无法给出题目",
+                   "catalog_graph": self.inline_catalog("function_injection", "设")}
+        valid = {"ok": True, "reply": "【题目】\n" + question
+                 + "\n[[WRONGBOOK_ANSWER]]" + answer + "[[/WRONGBOOK_ANSWER]]",
+                 "catalog_graph": self.inline_catalog("set_operation", question)}
+        payload = {"language": "zh-CN", "request_kind": "exercise", "messages": [
+            {"role": "user", "content": "请出一道集合运算练习题，不要给出答案"}]}
+        with patch.object(self.runtime, "ask_ai", side_effect=[invalid, valid]) as ask, patch.object(
+            self.runtime, "classify_catalog_questions", side_effect=AssertionError("No extra review call")) as review:
+            response = self.client.post("/chat", json=payload)
+        self.addCleanup(response.close)
+        review.assert_not_called()
+        self.assertEqual(ask.call_count, 2)
+        self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+        body = response.get_json()
+        graph = body["generated_teaching"]["question_graph"]
+        self.assertEqual(body["generated_question"], question)
+        self.assertEqual(graph["classification_status"], "semantic")
+        self.assertFalse(graph["needs_review"])
+        self.assertEqual(graph["sources"], {"question": question, "solution": answer})
+        self.assertIn("set_operation", {node["id"] for node in graph["nodes"]})
+        self.assertNotIn("function_injection", {node["id"] for node in graph["nodes"]})
+        self.assertNotIn(answer, body["reply"])
+
+    def test_generated_explanation_supplies_the_final_actual_catalog(self):
+        question = "设集合A={1,2,3}，B={2,3,4}，求A∪B与A∩B。"
+        answer = "A∪B={1,2,3,4}；A∩B={2,3}"
+        explanation = "并集取至少属于一个集合的元素，交集取同时属于两个集合的元素"
+        reason = "实际解析用逐元素判定来计算并集和交集"
+        generation = {"ok": True, "reply": "【题目】\n" + question
+                      + "\n[[WRONGBOOK_ANSWER]]" + answer + "[[/WRONGBOOK_ANSWER]]",
+                      "catalog_graph": self.inline_catalog("set_operation", question)}
+        explained = {"ok": True, "reply": explanation,
+                     "catalog_graph": self.inline_catalog("set_operation", explanation, source="solution", reason=reason)}
+        payload = {"language": "zh-CN", "request_kind": "exercise", "messages": [
+            {"role": "user", "content": "请出一道集合运算练习题，并给出答案和完整解析"}]}
+        with patch.object(self.runtime, "ask_ai", side_effect=[generation, explained]) as ask, patch.object(
+            self.runtime, "classify_catalog_questions", side_effect=AssertionError("No extra review call")) as review:
+            response = self.client.post("/chat", json=payload)
+        self.addCleanup(response.close)
+        review.assert_not_called()
+        self.assertEqual(ask.call_count, 2)
+        self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+        body = response.get_json()
+        graph = body["generated_teaching"]["question_graph"]
+        self.assertEqual(graph["classification_status"], "semantic")
+        self.assertEqual(graph["sources"], {"question": question, "solution": answer + "\n\n" + explanation})
+        self.assertIn(explanation, body["reply"])
+        point = next(node for node in graph["nodes"] if node["id"] == "set_operation")
+        self.assertEqual(point["reason"], reason)
+
+    def test_generated_topic_footer_uses_the_reviewed_cross_module_catalog(self):
+        question = ("设集合A={1,2,3}，B={2,3,4}，求A∪B与A∩B，"
+                    "再求从A∪B中无序选取两个不同元素的选法数。")
+        answer = "A∪B={1,2,3,4}；A∩B={2,3}；选法数为6"
+        inline = self.inline_catalog("set_operation", question)
+        inline["nodes"] += self.inline_catalog("count_perm_comb", "无序选取两个不同元素的选法数")["nodes"]
+        generated = {"ok": True, "reply": "【题目】\n" + question
+                     + "\n[[WRONGBOOK_ANSWER]]" + answer + "[[/WRONGBOOK_ANSWER]]",
+                     "catalog_graph": inline}
+        original_analyze = self.runtime.analyze_question
+
+        def locally_incomplete(text):
+            info = original_analyze(text)
+            if text == question:
+                # Simulate the local miss that the inline model has corrected.
+                info.update(category="集合与关系", related_categories=[],
+                            knowledge_points=["集合运算"], related_knowledge_points=[], focus_points=["集合运算"])
+                info["question_graph"]["nodes"] = [node for node in info["question_graph"]["nodes"]
+                    if node["id"] == "set_operation"]
+                info["question_graph"]["edges"] = []
+            return info
+
+        payload = {"language": "zh-CN", "request_kind": "exercise", "messages": [
+            {"role": "user", "content": "请出一道集合运算练习题，列出涉及的知识点，不要给出答案"}]}
+        with patch.object(self.runtime, "analyze_question", side_effect=locally_incomplete):
+            body, _ = self.post(payload, generated, exercise=True)
+        graph = body["generated_teaching"]["question_graph"]
+        self.assertEqual(graph["classification_status"], "semantic")
+        self.assertTrue({"set_operation", "count_perm_comb"}.issubset({node["id"] for node in graph["nodes"]}))
+        footer = body["reply"].split("【涉及知识点】", 1)[1]
+        self.assertIn("集合运算", footer)
+        self.assertIn("排列与组合", footer)
+        self.assertNotIn(answer, body["reply"])
+        self.assertEqual(graph["sources"], {"question": question, "solution": answer})
+
     def test_failed_full_solution_does_not_promote_the_saved_answer_to_graph_evidence(self):
         body, _ = self.post(self.payload("请给出完整证明。"), FAILURE,
                             expected_mode="full_solution", reference_allowed=True)

@@ -381,6 +381,88 @@ class CatalogSemanticTests(unittest.TestCase):
                 self.assertIn("logic_reasoning", {item["id"] for item in graph["nodes"]})
                 self.assertNotIn("logic_reasoning", graph.get("scope_exclusions", {}))
 
+    def test_inline_answer_prompt_keeps_catalog_scope_and_one_private_graph_contract(self):
+        prompt = service.catalog_answer_prompt()
+        self.assertIn("[[DMATE_CATALOG_GRAPH]]", prompt)
+        self.assertIn("[[/DMATE_CATALOG_GRAPH]]", prompt)
+        self.assertNotIn('"results":[', prompt)
+        catalog = service._catalog_snapshot()
+        self.assertEqual(len(catalog), 68)
+        supplied = json.loads(prompt.rsplit("目录：", 1)[1])
+        self.assertEqual(supplied, catalog)
+        for item in catalog:
+            with self.subTest(node=item["id"]):
+                self.assertIn(item["id"], prompt)
+
+    def test_inline_answer_applies_current_catalog_graph_without_another_review_request(self):
+        teaching = local(QUESTION, ANSWER, difficulty="困难")
+        raw = row()
+        raw["category"] = "图论"  # The model's module claim is not authoritative.
+        with patch.object(service, "classify_catalog_questions", side_effect=AssertionError("No second review")), \
+                patch.object(service.threading, "Thread", side_effect=AssertionError("No review worker")):
+            result = service.apply_catalog_answer(teaching, raw, QUESTION, ANSWER)
+        self.assertEqual(teaching, local(QUESTION, ANSWER, difficulty="困难"), "Applying the answer must not mutate its caller")
+        self.assertEqual(result["category"], "计数与组合")
+        self.assertEqual(result["difficulty"], "困难")
+        self.assertEqual(result["classification_revision"], service.CATALOG_CLASSIFIER_REVISION)
+        self.assertEqual(result["classification_status"], "semantic")
+        self.assertFalse(result["needs_review"])
+        self.assertEqual(result["question_graph"]["sources"], {"question": QUESTION, "solution": ANSWER})
+        self.assertEqual(result["question_graph"]["classification_source"], "catalog_semantic")
+
+    def test_inline_answer_uses_actual_solution_evidence_and_rejects_foreign_snapshots(self):
+        solution = "先对三名学生作不计顺序的选择，得到120种"
+        raw = row([node("count_basic", solution, "solution", "used")])
+        result = service.apply_catalog_answer(local(), raw, QUESTION, solution)
+        records = {item["id"]: item for item in result["question_graph"]["nodes"]}
+        self.assertEqual(records["count_basic"]["usage"], "used")
+        self.assertEqual(records["count_basic"]["evidence"], [{"source": "solution", "quote": solution}])
+        self.assertIsNone(service.apply_catalog_answer(local(), raw, QUESTION, "后来的实际解答未采用该步骤"))
+        foreign = row([node(quote="另一个题目的原文")])
+        foreign["sources"] = {"question": "另一个题目的原文", "solution": solution}
+        self.assertIsNone(service.apply_catalog_answer(local(), foreign, QUESTION, solution))
+
+    def test_inline_answer_reconciles_positive_task_facts_without_inventing_dependencies(self):
+        raw = row([node("count_basic")])
+        result = service.apply_catalog_answer(local(), raw, QUESTION, ANSWER)
+        graph = result["question_graph"]
+        self.assertEqual({item["id"] for item in graph["nodes"]}, {"count_basic", "count_perm_comb"})
+        self.assertIn("count_perm_comb", graph["task_structure_ids"])
+        self.assertEqual(graph["edges"], [])
+
+    def test_inline_answer_invalid_records_remain_partial_or_unavailable(self):
+        for raw in (None, [], {}, row([node("outside_existing_catalog")]),
+                    row([node("count_inclusion", usage="optional")]), row([node(usage="used")])):
+            with self.subTest(raw=raw):
+                self.assertIsNone(service.apply_catalog_answer(local(), raw, QUESTION, ANSWER))
+        result = service.apply_catalog_answer(local(), row([node(), node("outside_existing_catalog")]), QUESTION, ANSWER)
+        self.assertEqual(result["classification_status"], "partial")
+        self.assertTrue(result["needs_review"])
+        self.assertNotIn("outside_existing_catalog", {item["id"] for item in result["question_graph"]["nodes"]})
+
+    def test_inline_answer_does_not_certify_unused_optional_methods(self):
+        question = "从10人中选出3人，甲乙不能同时入选，可用直接分类或容斥原理"
+        unused = row([node("count_inclusion", "容斥原理", "question", "used")])
+        self.assertIsNone(service.apply_catalog_answer(local(), unused, question, "先按是否选择甲分为两类"))
+        solution = "容斥原理先数所有三人小组，再扣去同时含甲乙的8个小组"
+        used = row([node("count_inclusion", solution, "solution", "used")])
+        result = service.apply_catalog_answer(local(), used, question, solution)
+        self.assertIn("count_inclusion", {item["id"] for item in result["question_graph"]["nodes"]})
+
+    def test_inline_answer_preserves_long_actual_solution_without_remote_review_budget(self):
+        quote = "最后按无序选择三名学生的组合计数得到结果"
+        solution = "x" * (service._CATALOG_MAX_SOURCE_CHARS + 50) + "\n" + quote
+        raw = row([node("count_basic", quote, "solution", "used")])
+        with patch.object(service, "classify_catalog_questions", side_effect=AssertionError("No second review")), \
+                patch.object(service.threading, "Thread", side_effect=AssertionError("No review worker")):
+            result = service.apply_catalog_answer(local(), raw, QUESTION, solution)
+        self.assertEqual(result["classification_status"], "semantic")
+        self.assertEqual(result["question_graph"]["sources"]["solution"], solution)
+        record = next(item for item in result["question_graph"]["nodes"] if item["id"] == "count_basic")
+        self.assertIn({"source": "solution", "quote": quote}, record["evidence"])
+        self.assertIsNone(service.apply_catalog_answer(local(), raw, QUESTION,
+            "x" * (service._CATALOG_INLINE_MAX_SOLUTION_CHARS + 1)))
+
 
 if __name__ == "__main__":
     unittest.main()

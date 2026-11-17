@@ -15,6 +15,7 @@ from teaching import teaching_prompt, _active_question_from_messages, extract_cu
 from proof_writing import proof_writing_prompt
 from server_i18n import normalize_language, localize_error_payload
 from graph_ocr_cleanup import ocr_is_label_dominated
+from answer_catalog import CatalogAnswerDeltaFilter, CATALOG_GRAPH_OPEN, split_catalog_answer
 from chat_limits import (MAX_MESSAGE_CHARS, MAX_HISTORY_MESSAGES,
                          MAX_HISTORY_CHARS, MAX_CONFIRMED_MESSAGE_CHARS,
                          MAX_REFERENCE_ANSWER_CHARS, message_char_limit)
@@ -1295,6 +1296,7 @@ def _regenerate_broken_math_answer(
     preferred_provider=None,
     reasoning_effort="none",
     cancelled=None,
+    return_catalog_graph=False,
 ):
     """
     仅在答案数学格式损坏时额外重生成一次。
@@ -1335,7 +1337,7 @@ def _regenerate_broken_math_answer(
         print("数学格式重生成失败：所有可用文本路径均失败")
         return None
 
-    content = result.get("content", "")
+    content, catalog_graph = split_catalog_answer(result.get("content", ""))
     repaired = _repair_common_latex_typos(content)
 
     if _looks_like_broken_math(repaired):
@@ -1343,7 +1345,7 @@ def _regenerate_broken_math_answer(
         return None
 
     print("数学格式异常已自动重生成")
-    return repaired
+    return (repaired, catalog_graph) if return_catalog_graph else repaired
 
 
 def _continue_truncated_answer(
@@ -1381,11 +1383,20 @@ def _continue_truncated_answer(
         })
 
         continuation_started = False
+        # A private catalog suffix may be split by the output budget. Joining
+        # that JSON/marker with a new line would corrupt it and could expose a
+        # partial marker; ordinary answer continuations retain their separator.
+        catalog_tail = CATALOG_GRAPH_OPEN in content or any(
+            content.endswith(CATALOG_GRAPH_OPEN[:length])
+            for length in range(2, len(CATALOG_GRAPH_OPEN))
+        )
+        separator = "" if catalog_tail else "\n"
 
         def publish_continuation(piece):
             nonlocal continuation_started
             if not continuation_started:
-                on_delta("\n")
+                if separator:
+                    on_delta(separator)
                 continuation_started = True
             on_delta(piece)
 
@@ -1410,7 +1421,7 @@ def _continue_truncated_answer(
                 return None
             break
 
-        content = content.rstrip() + "\n" + piece
+        content = content.rstrip() + separator + piece
         current_provider = result.get("provider_id") or current_provider
 
         choice = result.get("choice") or {}
@@ -1505,6 +1516,28 @@ $$
             )
     if response_language == "en":
         system_content += """\n\n[Response language]\nRespond in natural English throughout explanations, headings, exercise statements, feedback and follow-up questions. The Chinese instructions and canonical topic names above are internal guidance, not a request for Chinese output. Preserve mathematical notation, source quotations, user data, and exact machine-readable markers such as [[WRONGBOOK_ANSWER]] and [[ANSWER_ONLY]]. Only switch language when the user explicitly asks. Use English for mixed-language requests by default.\n"""
+    source_graph = context.get("question_graph")
+    source_pair = source_graph.get("sources") if isinstance(source_graph, dict) else None
+    source_question = source_pair.get("question") if isinstance(source_pair, dict) else ""
+    source_question = source_question if isinstance(source_question, str) else ""
+    inline_catalog = context.get("mode") == "exercise" or (
+        context.get("context_scope") != "conversation" and len(source_question.strip()) >= 5
+    )
+    if inline_catalog:
+        # This adds metadata to the existing generation, not a second model
+        # request. The semantic module is imported only for an actual task.
+        from classification_semantic import catalog_answer_prompt
+        system_content += catalog_answer_prompt()
+        if context.get("mode") != "exercise":
+            system_content += (
+                "\n【本次图谱归类绑定的原始题干】\n"
+                + json.dumps({"question": source_question}, ensure_ascii=False)
+                + "\nquestion 引用必须逐字来自此题干；solution 引用只来自你本次实际输出的解答正文。"
+                "历史回答与当前简短追问不能替换此题干，也不算本次解答来源。"
+            )
+    public_on_delta = on_delta
+    delta_filter = CatalogAnswerDeltaFilter(public_on_delta) if callable(public_on_delta) else None
+    on_delta = delta_filter.feed if delta_filter is not None else None
     api_messages = [
         {"role": "system", "content": system_content}
     ] + clean_messages
@@ -1545,6 +1578,11 @@ $$
                 "答案可以精炼，但不能省略关键推导。"
             ),
         }]
+        if delta_filter is not None:
+            # Recovery is a replacement response, so a failed draft's private
+            # suffix state must not hide the replacement's public text.
+            delta_filter = CatalogAnswerDeltaFilter(public_on_delta)
+            on_delta = delta_filter.feed
         fallback = _request_text_completion(
             recovery_messages,
             retries=0,
@@ -1572,7 +1610,8 @@ $$
     # 练习出题由 /chat 统一限制为最多两次候选生成。不能在 AI 层暗中
     # 自动续写/重生成，否则两次候选可能变成 4~6 次昂贵的网络调用。
     is_exercise_generation = (teaching_context or {}).get("mode") == "exercise"
-    if choice.get("finish_reason") == "length":
+    private_suffix_started = CATALOG_GRAPH_OPEN[:-2] in content
+    if choice.get("finish_reason") == "length" and not private_suffix_started:
         if is_exercise_generation:
             print("练习生成输出截断，交由出题校验流程处理。")
             return _failure("出题内容被截断，请重新生成。")
@@ -1593,6 +1632,9 @@ $$
         if content is None:
             return _failure("AI 回答未完整结束，请重新发送。")
 
+    content, catalog_graph = split_catalog_answer(content)
+    if not content.strip():
+        return _failure("AI 服务没有生成有效回答，请重新发送。")
     content = _repair_common_latex_typos(content)
 
     if _looks_like_broken_math(content) and not is_exercise_generation:
@@ -1603,18 +1645,25 @@ $$
             preferred_provider=provider_id,
             reasoning_effort="none" if is_full_solution else reasoning_effort,
             cancelled=cancelled,
+            return_catalog_graph=True,
         )
         if cancelled is not None and cancelled():
             return {"ok": False, "cancelled": True}
 
         if regenerated:
-            content = regenerated
+            if isinstance(regenerated, tuple):
+                content, catalog_graph = regenerated
+            else:
+                # Compatibility with callers replacing the repair helper: an
+                # unstructured replacement cannot carry the old draft's graph.
+                content, catalog_graph = regenerated, None
         else:
             print(
                 "数学格式自动重生成未成功，"
                 "已降级为可读文本，避免中断当前对话。"
             )
             content = _fallback_math_to_readable_text(content)
+            catalog_graph = None
             if not content:
                 return _failure("AI 服务没有生成有效回答，请重新发送。")
 
@@ -1626,7 +1675,12 @@ $$
         f"AI 调用成功：{result.get('provider_name', '未知路径')} / "
         f"{result.get('model', '')}"
     )
-    return _success(content)
+    if delta_filter is not None:
+        delta_filter.finish()
+    result = _success(content)
+    if catalog_graph is not None:
+        result["catalog_graph"] = catalog_graph
+    return result
 
 def _guess_image_mime(raw):
     """根据文件头判断 Qwen Vision 支持的图片 MIME。"""

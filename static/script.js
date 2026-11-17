@@ -13905,7 +13905,10 @@ function attachTeachingSnapshotToLatestQuestion(
         if (message.source === "ocr"
             ? isRecordableOcrQuestionMessage(message)
             : message.manualIsQuestion === true) {
-            message.questionTeaching = normalized;
+            message.questionTeaching = mergeQuestionTeaching(
+                message.questionTeaching, normalized,
+                extractQuestionOnlyFromMessage(message), message
+            );
         }
         return;
     }
@@ -14068,6 +14071,8 @@ async function requestAiReply(session, options = {}) {
     const requestTargetFingerprint = questionCandidateFingerprint(
         requestTargetCandidate
     );
+    const requestTargetMessage = requestTargetCandidate
+        ? session.messages[requestTargetCandidate.index] : null;
 
     const requestKey = sessionBusyKey(session.id);
     const activeRequest = {
@@ -14346,6 +14351,16 @@ async function requestAiReply(session, options = {}) {
                 const activeCandidate = activeQuestionCandidateFromHistory(
                     session
                 );
+                const returnedTarget = !localGeneratedQuestion && requestTargetMessage
+                    ? resolveQuestionAnalysisCandidate(session, requestTargetCandidate, requestTargetMessage) : null;
+                const returnedGraph = normalizedReturnedTeaching?.question_graph;
+                if (returnedTarget && questionGraphMatchesQuestion(returnedGraph, returnedTarget.text, requestTargetMessage)
+                    && isReviewedKnowledgeGraph({questionGraph:returnedGraph, reviewSolutionText:data.reply})) {
+                    const field = returnedTarget.role === "ai" ? "generatedTeaching" : "questionTeaching";
+                    requestTargetMessage[field] = mergeQuestionTeaching(
+                        requestTargetMessage[field], normalizedReturnedTeaching, returnedTarget.text, requestTargetMessage
+                    );
+                }
 
                 // “上一道题/继续/再讲一下”不是新题。返回的教学分析必须写回
                 // 当前指向题，而不是重新覆盖到时间上最新的另一道题。
@@ -14404,7 +14419,9 @@ async function requestAiReply(session, options = {}) {
                 const reviewedCandidate = localGeneratedQuestion
                     ? collectConversationQuestionCandidates(session).find(candidate => candidate.role === "ai"
                         && candidate.text === localGeneratedQuestion)
-                    : (requestTargetCandidate || activeQuestionCandidateFromHistory(session));
+                    : (requestTargetMessage
+                        ? resolveQuestionAnalysisCandidate(session, requestTargetCandidate, requestTargetMessage)
+                        : activeQuestionCandidateFromHistory(session));
                 queueQuestionCatalogReview(session, reviewedCandidate);
             }
 
@@ -14440,7 +14457,7 @@ async function requestAiReply(session, options = {}) {
                     : null
             ),
             targetQuestionFingerprint: requestTargetFingerprint,
-            targetQuestionMessageId: session.messages[requestTargetCandidate?.index]?.messageId
+            targetQuestionMessageId: requestTargetMessage?.messageId
                 || activeRequest.userMessage?.messageId || ""
         };
 

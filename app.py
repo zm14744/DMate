@@ -64,7 +64,9 @@ except (ImportError, OSError) as _fusion_import_error:
     compare_pixel_vision = None
     review_direction_and_multiplicity = None
 from graph_ocr_cleanup import clean_graph_question_text, select_graph_question_text, ocr_is_label_dominated
-from classification_semantic import classify_catalog_questions, local_catalog_classification
+from classification_semantic import (
+    apply_catalog_answer, classify_catalog_questions, local_catalog_classification,
+)
 from exercise_intent import (EXERCISE_INTENT_RULES, classify_exercise_request,
                              is_generic_continuation, resolve_exercise_request)
 from exercise_relation_check import verify_relation_closure_count
@@ -4421,7 +4423,7 @@ def _chat_response(on_delta=None, cancelled=None):
             ):
                 is_narrow_topic = True
 
-            def evaluate(candidate_reply):
+            def evaluate(candidate_reply, candidate_catalog=None):
                 if not isinstance(candidate_reply, str):
                     return None, "AI 没有返回题目文本"
                 visible, hidden_answer = _split_exercise_answer(candidate_reply)
@@ -4466,9 +4468,10 @@ def _chat_response(on_delta=None, cancelled=None):
                     "question": question_text,
                     "answer": cleaned_answer,
                     "teaching": info,
+                    "catalog_graph": candidate_catalog,
                 }, ""
 
-            first_candidate, first_error = evaluate(reply)
+            first_candidate, first_error = evaluate(reply, result.get("catalog_graph"))
             chosen_candidate = first_candidate
             target_difficulty = teaching.get("exercise_target_difficulty") or "中等"
             rank = {"简单": 0, "中等": 1, "困难": 2}
@@ -4533,7 +4536,8 @@ def _chat_response(on_delta=None, cancelled=None):
                     print("练习纠偏失败：", repr(retry_exc))
                     retry_result = None
                 if isinstance(retry_result, dict) and retry_result.get("ok") is True:
-                    second_candidate, second_error = evaluate(retry_result.get("reply"))
+                    second_candidate, second_error = evaluate(
+                        retry_result.get("reply"), retry_result.get("catalog_graph"))
                     if second_candidate:
                         second_level = second_candidate["teaching"].get("difficulty")
                         if chosen_candidate is None:
@@ -4572,6 +4576,7 @@ def _chat_response(on_delta=None, cancelled=None):
             generated_question = chosen_candidate["question"]
             generated_answer = chosen_candidate["answer"]
             generated_teaching = chosen_candidate["teaching"]
+            generated_catalog_graph = chosen_candidate["catalog_graph"]
             generated_solution_text = generated_answer
             actual_difficulty = generated_teaching.get("difficulty")
             # 题干和参照知识点校验通过后即可展示；难度评级如实返回。
@@ -4603,10 +4608,22 @@ def _chat_response(on_delta=None, cancelled=None):
                             and not re.search(r"MATHPROTECTTOKEN\d+ENDTOKEN|DMATE_MATH_\d+_END", explanation_text, re.I)):
                         answer_section += localized("\n\n【解析】\n\n", "\n\n[Explanation]\n\n", response_language) + explanation_text
                         generated_solution_text += "\n\n" + explanation_text
+                        # The proof response reviews the final question and its
+                        # actual method. Do not reuse the generation response's
+                        # classification after adding a different explanation.
+                        generated_catalog_graph = explained.get("catalog_graph")
                     else:
                         answer_section += localized("\n\n解析暂时未能生成，已先保留出题时的参考答案",
                             "\n\nThe explanation is unavailable. The reference answer saved with the exercise is shown above.", response_language)
                 reply += "\n\n" + answer_section
+            # Finish the exact question/answer classification before deriving
+            # any visible topic list from it. The footer is not solution data.
+            generated_teaching = enrich_question_graph(
+                generated_teaching, generated_question, generated_solution_text
+            )
+            generated_teaching = apply_catalog_answer(
+                generated_teaching, generated_catalog_graph, generated_question, generated_solution_text
+            ) or generated_teaching
             if output_intent.get("knowledge"):
                 # Use freshly analyzed *generated question* metadata, rather
                 # than the instruction's topic list or stale previous question.
@@ -4614,9 +4631,11 @@ def _chat_response(on_delta=None, cancelled=None):
                     str(item).strip() for item in (
                         (generated_teaching or {}).get("knowledge_points") or []
                     ) + (
+                        (generated_teaching or {}).get("related_knowledge_points") or []
+                    ) + (
                         (generated_teaching or {}).get("focus_points") or []
                     ) if isinstance(item, str) and item.strip()
-                ))[:6]
+                ))[:68]
                 if knowledge_points:
                     reply += localized("\n\n【涉及知识点】\n\n", "\n\n[Topics]\n\n", response_language) + localized("、", "; ", response_language).join(topic_label(point, response_language) for point in knowledge_points)
                 else:
@@ -4628,13 +4647,7 @@ def _chat_response(on_delta=None, cancelled=None):
             # normal hint tutoring flow. Answers/explanations explicitly asked
             # for in this same turn remain supported.
 
-        if generated_question and generated_teaching:
-            # Bind the graph to the validated new exercise, never its request
-            # or the earlier problem used as a generation reference.
-            generated_teaching = enrich_question_graph(
-                generated_teaching, generated_question, generated_solution_text
-            )
-        elif not effective_exercise_request:
+        if not generated_question and not effective_exercise_request:
             # Reuse the exact source selected by analyze_messages, including
             # navigation to an earlier question. Only the final guarded reply
             # may provide solution evidence; drafts and failed replies cannot.
@@ -4643,6 +4656,9 @@ def _chat_response(on_delta=None, cancelled=None):
             graph_question = sources.get("question") if isinstance(sources, dict) else None
             if isinstance(graph_question, str) and graph_question.strip():
                 teaching = enrich_question_graph(teaching, graph_question, reply)
+                teaching = apply_catalog_answer(
+                    teaching, result.get("catalog_graph"), graph_question, reply
+                ) or teaching
 
         response = {
             "reply": reply,

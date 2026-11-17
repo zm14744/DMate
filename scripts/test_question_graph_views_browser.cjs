@@ -795,6 +795,118 @@ async function checkCompletedAnswerStartsBackgroundReview(browser) {
   } finally {release();await context.close();}
 }
 
+async function checkCompletedAnswerReusesInlineGraph(browser) {
+  const question='从十二名学生中无序选出四人组成小组，有多少种不同选法';
+  const answer='从12人中无序选择4人，共有495种选法';
+  const {context,page,errors,modelCalls}=await newPage(browser,1440,'zh-CN');
+  const reviews=[];
+  try {
+    await page.route('**/analyze-questions',route=>{
+      reviews.push(route.request().postDataJSON());return route.abort();
+    });
+    const teaching=await reviewedTeaching(page,{text:question,solution:answer});
+    await page.route('**/chat',route=>route.fulfill({contentType:'application/json',
+      body:JSON.stringify({reply:answer,teaching})}));
+    await page.evaluate(question=>{
+      const teaching=__graphTeachingFixture(question,[]);
+      sessions=[{id:'inline-answer',name:'随回答取得图谱',nameSource:'user',teaching,learningQuestion:null,
+        deletedMessageIds:{},messages:[{messageId:'inline-question',role:'user',text:question,
+          manualIsQuestion:true,questionTeaching:teaching}]}];
+      currentId='inline-answer';renderAll();
+    },question);
+    const completed=await page.evaluate(()=>requestAiReply(getCurrent(),{completeImmediately:true}));
+    assert.equal(completed.status,'success');
+    assert.equal(reviews.length,0,'an already reviewed graph returned with the answer does not queue a second classification');
+    const expected={ids:['count_perm_comb'],edges:[],purple:['count_perm_comb'],categories:['计数与组合']};
+    await openGraph(page,'focus');
+    assert.deepEqual(await snapshot(page),expected,'the completed answer graph is immediately available in the recent view');
+    assert.equal(await page.evaluate(()=>isReviewedKnowledgeGraph(getActiveKnowledgeContext())),true);
+    await assertLiveGraph(page,1440,expected,'inline answer');
+    await openHistory(page);
+    await page.locator('.kg-history-item[data-message-id="inline-question"] [data-history-action="graph"]').click();
+    assert.deepEqual(await snapshot(page),expected,'history uses the same already reviewed answer graph');
+    await page.evaluate(()=>{
+      closeKnowledgeGraph();saveState();
+      if(!loadState({guest:true}))throw Error('The inline answer fixture did not survive storage');
+      renderAll();
+    });
+    await openGraph(page,'focus');
+    assert.deepEqual(await snapshot(page),expected,'reopening after actual state reload reuses the stored answer graph');
+    await page.evaluate(()=>{
+      const session=getCurrent(),message=session.messages[0];
+      const local=__graphTeachingFixture(message.text,[]);
+      Object.assign(local.question_graph,{classification_source:'local_structure',classification_status:'local',needs_review:true});
+      attachTeachingSnapshotToLatestQuestion(session,local);
+      renderKnowledgeGraph();
+    });
+    assert.deepEqual(await snapshot(page),expected,'a later local teaching snapshot cannot erase the reviewed answer graph');
+    const nextAnswer='也可以先按顺序选出四人，再除去同一组四人的全部排列，结果仍为495';
+    const nextTeaching=await reviewedTeaching(page,{text:question,solution:nextAnswer});
+    await page.route('**/chat',route=>route.fulfill({contentType:'application/json',
+      body:JSON.stringify({reply:nextAnswer,teaching:nextTeaching})}));
+    await page.evaluate(()=>{
+      const text='请用另一种方法，详细解释为什么选出的四人不考虑先后顺序';
+      if(isShortLearningFollowUp(text))throw Error('The fixture must exercise a non-short follow-up');
+      getCurrent().messages.push({role:'user',messageId:'inline-followup',text});renderAll();
+    });
+    const followUp=await page.evaluate(()=>requestAiReply(getCurrent(),{completeImmediately:true}));
+    assert.equal(followUp.status,'success');
+    assert.equal(await page.evaluate(()=>getCurrent().messages[0].questionTeaching.question_graph.sources.solution),nextAnswer,
+      'a reviewed inline follow-up graph attaches to its existing question before the review queue runs');
+    assert.deepEqual(await snapshot(page),expected,'a completed follow-up immediately replaces its source-bound graph');
+    assert.equal(reviews.length,0,'completion, follow-ups, recent/history switches, reopening and storage restoration make zero extra classification requests');
+    assert.deepEqual(modelCalls,[]);assert.deepEqual(errors,[]);
+    console.log('PASS inline answer graph: completion, follow-ups, history, reopen and persistence show the reviewed graph without another analysis request');
+  } finally {await context.close();}
+}
+
+async function checkGeneratedAnswerReusesInlineGraph(browser) {
+  const question='从九个不同的项目中无序选出两个，有多少种不同选法';
+  const hiddenAnswer='共有36种不同选法';
+  const explanation='无序选择两个项目，使用组合数计算得到36';
+  const reply='【题目】\n'+question+'\n\n【解析】\n'+explanation+'\n\n【涉及知识点】\n排列与组合';
+  const sourceSolution=hiddenAnswer+'\n\n'+explanation;
+  const {context,page,errors,modelCalls}=await newPage(browser,1440,'zh-CN');
+  const reviews=[];
+  try {
+    await page.route('**/analyze-questions',route=>{
+      reviews.push(route.request().postDataJSON());return route.abort();
+    });
+    const teaching=await reviewedTeaching(page,{text:question,solution:sourceSolution});
+    await page.route('**/chat',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({
+      reply,generated_question:question,generated_answer:hiddenAnswer,generated_teaching:teaching,teaching,
+      generated_exercise:true})}));
+    await page.evaluate(()=>{
+      sessions=[{id:'inline-generated',name:'出题时取得图谱',nameSource:'user',teaching:null,learningQuestion:null,
+        deletedMessageIds:{},messages:[{messageId:'inline-request',role:'user',text:'出一道排列与组合题'}]}];
+      currentId='inline-generated';renderAll();
+    });
+    const completed=await page.evaluate(()=>requestAiReply(getCurrent(),{completeImmediately:true}));
+    assert.equal(completed.status,'success');
+    assert.equal(reviews.length,0,'the generated question carries its reviewed graph without a second classification');
+    await openGraph(page,'focus');
+    const expected={ids:['count_perm_comb'],edges:[],purple:['count_perm_comb'],categories:['计数与组合']};
+    assert.deepEqual(await snapshot(page),expected,'the generated question graph is immediately available');
+    assert.equal(await page.evaluate(()=>isReviewedKnowledgeGraph(getActiveKnowledgeContext())),true);
+    assert.equal(await page.evaluate(()=>getActiveKnowledgeContext().reviewSolutionText),sourceSolution,
+      'generated inline evidence binds independently to the private answer plus visible explanation, excluding the topic footer');
+    const generatedId=await page.evaluate(()=>getCurrent().messages.find(message=>message.generatedExercise).messageId);
+    await openHistory(page);
+    await page.locator('.kg-history-item[data-message-id="'+generatedId+'"] [data-history-action="graph"]').click();
+    assert.deepEqual(await snapshot(page),expected);
+    await page.evaluate(()=>{
+      closeKnowledgeGraph();saveState();
+      if(!loadState({guest:true}))throw Error('The generated inline fixture did not survive storage');
+      renderAll();
+    });
+    await openGraph(page,'focus');
+    assert.deepEqual(await snapshot(page),expected);
+    assert.equal(reviews.length,0,'the generated graph stays immediately reusable across history, reopen and state restoration');
+    assert.deepEqual(modelCalls,[]);assert.deepEqual(errors,[]);
+    console.log('PASS inline generated graph: hidden answer and visible explanation are stored with an immediately reusable catalog graph');
+  } finally {await context.close();}
+}
+
 async function checkSemanticReviewRejectsOldSolution(browser) {
   const question='证明命题 p∧q 与 q∧p 逻辑等价',oldAnswer='先研究逻辑等价',newAnswer='用真值表验证逻辑等价';
   const {context,page,errors,modelCalls}=await newPage(browser,1440,'zh-CN');
@@ -882,6 +994,7 @@ async function checkNewAnswerHidesPreviousReview(browser) {
     await checkReferenceGuards(browser);await checkEqualSizeCache(browser);await checkGeneratedQuestionSources(browser);
     for(const width of [1440,390])await checkQuestionSpecificTopology(browser,width);await checkLegacyBackfill(browser);await checkDelayedBackfillGuards(browser);await checkLongQuestionIdentity(browser);
     await checkSemanticKnowledgeReview(browser);await checkReviewFailureIsNotCompletion(browser);
+    await checkCompletedAnswerReusesInlineGraph(browser);await checkGeneratedAnswerReusesInlineGraph(browser);
     await checkCompletedAnswerStartsBackgroundReview(browser);await checkSemanticReviewRejectsOldSolution(browser);
     await checkNewAnswerHidesPreviousReview(browser);}
   finally {await browser.close();}
