@@ -79,6 +79,26 @@ async function assertExports(page, expected, label) {
     label + ': redundant related-question detail pill is absent');
   assert.equal(await page.locator('#knowledgeGraphDetail').getByText(/^(本题相关|Related to this question|Related to the selected question)$/).count(), 0);
 }
+async function assertLocateBesideTitle(page, label) {
+  await settle(page);
+  const layout = await page.evaluate(() => {
+    const title = document.getElementById('knowledgeGraphDetailTitle');
+    const button = document.getElementById('knowledgeGraphLocateOriginal');
+    const range = document.createRange();
+    range.selectNodeContents(title);
+    const text = range.getBoundingClientRect(), action = button.getBoundingClientRect();
+    const pane = title.closest('.knowledge-graph-side').getBoundingClientRect();
+    return { text:{left:text.left,right:text.right,center:text.top+text.height/2},
+      action:{left:action.left,right:action.right,center:action.top+action.height/2},
+      pane:{left:pane.left,right:pane.right} };
+  });
+  assert.ok(layout.action.left >= layout.text.right + 4,
+    label + ': Go to original question is to the right of the concept title without overlap');
+  assert.ok(Math.abs(layout.text.center - layout.action.center) <= 3,
+    label + ': concept title and source action share one vertically centered header row');
+  assert.ok(layout.text.left >= layout.pane.left && layout.action.right <= layout.pane.right - 4,
+    label + ': the title/action row fits inside the detail pane');
+}
 async function newPage(browser, width, language) {
   const context = await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',
     ...(width <= 760 ? {isMobile:true,hasTouch:true} : {})});
@@ -139,6 +159,7 @@ async function checkView(browser, width, language) {
     await assertLiveGraph(page,width,recent,label+'/recent');
     await assertExports(page,recent,label+'/recent');
     assert.equal(await page.locator(locate).isVisible(),true,label+': recent details provide Go to original question');
+    await assertLocateBesideTitle(page,label+'/recent');
     assert.equal(await page.locator('#knowledgeGraphHistoryTab').isVisible(),false);
     await page.locator(locate).click();
     await page.locator('#chat [data-message-index="0"].history-locate-flash').waitFor();
@@ -155,6 +176,7 @@ async function checkView(browser, width, language) {
     await assertLiveGraph(page,width,historic,label+'/history');
     await assertExports(page,historic,label+'/history');
     assert.equal(await page.locator(locate).isVisible(),true,label+': selected-history details provide source navigation');
+    await assertLocateBesideTitle(page,label+'/history');
     assert.equal(await page.evaluate(()=>JSON.stringify(sessions)),original,label+': graph/export preserve grouped OCR tokens, member flags, text and metadata');
     await page.locator('#knowledgeGraphDetail .graph-detail-term[data-knowledge-node-id="relation_cartesian"]').click();
     await settle(page);

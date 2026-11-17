@@ -21173,6 +21173,7 @@ function renderKnowledgeGraphDetail() {
     );
 
     if (!title || !detail || !knowledgeGraphData) return;
+    detail.parentElement.querySelector(":scope > .kg-question-actions")?.remove();
 
     const context = knowledgeGraphRenderedQuestion?.context || {};
     const displayedNodes = knowledgeGraphDisplayedNodes(context);
@@ -21239,7 +21240,7 @@ function renderKnowledgeGraphDetail() {
             locateKnowledgeGraphQuestion(subject.reference, owner);
         });
         actions.append(locate);
-        detail.append(actions);
+        detail.before(actions);
     }
 
     const addDetailField = (labelText, values, emptyText) => {
