@@ -110,25 +110,46 @@ async function newPage(browser, width, language) {
   });
   await page.goto(baseURL, {waitUntil:'networkidle'});
   await page.waitForFunction(() => !accountVerificationOperation);
-  await page.evaluate(language => DMateI18n.setLanguage(language,false), language);
+  await page.evaluate(async language => {
+    DMateI18n.setLanguage(language,false);
+    await ensureKnowledgeGraphData();
+    window.__graphTeachingFixture = (question, concepts, relationships = []) => {
+      const points = concepts.map(value => findKnowledgeGraphNodeById(Array.isArray(value) ? value[0] : value).name);
+      return {category:findKnowledgeGraphNodeByName(points[0])?.category || '待识别',
+        knowledge_points:points,focus_points:points.slice(0,2),prerequisite_points:[],knowledge_path:[],
+        question_graph:{version:1,sources:{question,solution:''},
+          nodes:concepts.map(value => ({id:Array.isArray(value) ? value[0] : value,
+            evidence:[{source:'question',quote:Array.isArray(value) ? value[1] : findKnowledgeGraphNodeById(value).name}]})),
+          edges:relationships.map(([from,to,quote]) => ({from,to,evidence:[{source:'question',quote}]}))}};
+    };
+    window.__bindQuestionGraphFixtures = () => {
+      for (const session of sessions) for (const item of getConversationQuestionHistory(session)) {
+        const message = session.messages[item.index];
+        const teaching = item.role === 'ai' ? message.generatedTeaching : message.questionTeaching;
+        if (teaching?.question_graph) teaching.question_graph.sources.question = item.text;
+      }
+    };
+  }, language);
   return {context,page,errors,modelCalls};
 }
 async function seedCrossModule(page) {
   return page.evaluate(() => {
-    const teaching = {category:'集合与关系',focus_points:['集合运算'],knowledge_points:['集合运算','复合函数','容斥原理'],
-      prerequisite_points:[],knowledge_path:['集合运算','复合函数','容斥原理']};
+    const question = '先做集合运算，再依据集合运算的结果求复合函数，并依据集合运算的结果用容斥原理计数';
+    const teaching = __graphTeachingFixture(question,['set_operation','function_composition','count_inclusion'],[
+      ['set_operation','function_composition','依据集合运算的结果求复合函数'],
+      ['set_operation','count_inclusion','依据集合运算的结果用容斥原理计数']]);
     const signed = (body,id) => ({document:{body_text:body,graphs:[]},question_text:body+'\n[canonical '+id+']',
       rendered_question_text:'【题目文字】\n'+body,source_sha256:'a'.repeat(64),document_sha256:'b'.repeat(64),
       confirmation_token:'fixture-token-'+id,revision:1,request_id:id,profile:'editable-v1'});
     const source = id => {
-      const contexts = [signed('已知集合 A、B 与函数 f、g，求复合函数并用容斥原理计数',id+'-one'),signed('第二张图给出补充条件',id+'-two')];
+      const contexts = [signed(question,id+'-one'),signed('第二张图给出补充条件',id+'-two')];
       return {messageId:id,role:'user',source:'ocr',ocrIsQuestion:true,
         text:contexts.map((item,index)=>`【图片 ${index+1}】\n${item.rendered_question_text}`).join('\n\n')+'\n\n【我的要求】\n保留原定义',
         apiText:contexts.map((item,index)=>`【图片 ${index+1}】\n${item.question_text}`).join('\n\n'),semanticContexts:contexts,
         ocrGroup:{id:'confirmed-'+id,groupId:id,members:[{requestId:id+'-one',isQuestion:true},{requestId:id+'-two',isQuestion:false}]},
         questionTeaching:JSON.parse(JSON.stringify(teaching))};
     };
-    const unrelated = {category:'证明与归纳',knowledge_points:['数学归纳法'],focus_points:['数学归纳法']};
+    const unrelated = __graphTeachingFixture('用数学归纳法证明自然数求和公式',['proof_induction']);
     sessions = [
       {id:'past-conversation',name:'历史集合与函数',nameSource:'user',deletedMessageIds:{},learningQuestion:null,teaching:unrelated,messages:[
         source('past-group'),{role:'ai',messageId:'past-explanation',text:'已说明集合与函数的条件'},
@@ -137,7 +158,7 @@ async function seedCrossModule(page) {
         source('current-group'),{role:'ai',messageId:'current-explanation',text:'逐项核对定义'},
         {role:'user',messageId:'current-chat',text:'继续解释',manualIsQuestion:false}]}
     ];
-    currentId='current-conversation'; deletedSessionIds=Object.create(null); renderAll();
+    currentId='current-conversation'; deletedSessionIds=Object.create(null); __bindQuestionGraphFixtures(); renderAll();
     return JSON.stringify(sessions);
   });
 }
@@ -147,13 +168,12 @@ async function checkView(browser, width, language) {
     const original=await seedCrossModule(page);
     await openGraph(page,'focus');
     const recent=await snapshot(page);
-    for(const id of ['set_operation','function_mapping','function_composition','count_inclusion'])
-      assert.ok(recent.ids.includes(id),label+': involved concepts and their real connecting node are included: '+id);
+    assert.deepEqual(recent.ids,['count_inclusion','function_composition','set_operation'],
+      label+': exactly the three evidenced concepts are shown without adding a course bridge');
     assert.equal(recent.categories.length >= 3,true,label+': one question spans multiple modules without a category cutoff');
-    assert.ok(recent.edges.includes('set_operation>function_mapping'));
-    assert.ok(recent.edges.includes('function_mapping>function_composition'));
-    assert.ok(recent.edges.includes('set_operation>count_inclusion'));
-    for(const id of ['relation_equivalence','relation_closure','graph_tree'])
+    assert.deepEqual(recent.edges,['set_operation>count_inclusion','set_operation>function_composition'],
+      label+': the graph uses only the dependencies recorded for this actual question');
+    for(const id of ['function_mapping','relation_cartesian','relation_equivalence','relation_closure','graph_tree'])
       assert.equal(recent.ids.includes(id),false,label+': an unrelated module branch is not dumped into the question graph');
     assert.deepEqual(recent.purple,['count_inclusion','function_composition','set_operation'],label+': all involved question concepts remain purple');
     await assertLiveGraph(page,width,recent,label+'/recent');
@@ -178,16 +198,18 @@ async function checkView(browser, width, language) {
     assert.equal(await page.locator(locate).isVisible(),true,label+': selected-history details provide source navigation');
     await assertLocateBesideTitle(page,label+'/history');
     assert.equal(await page.evaluate(()=>JSON.stringify(sessions)),original,label+': graph/export preserve grouped OCR tokens, member flags, text and metadata');
-    await page.locator('#knowledgeGraphDetail .graph-detail-term[data-knowledge-node-id="relation_cartesian"]').click();
+    assert.equal(await page.locator('#knowledgeGraphDetail .graph-detail-term[data-knowledge-node-id="relation_cartesian"]').count(),0,
+      label+': details do not leak a static course successor into the question graph');
+    await page.locator('#knowledgeGraphDetail .graph-detail-term[data-knowledge-node-id="function_composition"]').click();
     await settle(page);
     const plain=await snapshot(page);
-    assert.deepEqual(plain.ids,await page.evaluate(()=>knowledgeGraphVisibleNodes('集合与关系').map(node=>node.id).sort()),
+    assert.deepEqual(plain.ids,await page.evaluate(()=>knowledgeGraphVisibleNodes('函数').map(node=>node.id).sort()),
       label+': relation navigation leaves the focused canvas and displays the complete target module');
     assert.deepEqual(plain.purple,[],label+': full-module navigation removes the historical question highlights');
     assert.equal(await page.evaluate(()=>knowledgeGraphScope),'current',label+': relation navigation clears selected-history scope');
     assert.equal(await page.evaluate(()=>knowledgeGraphQuestionReference),null,label+': relation navigation clears the subject reference');
     assert.equal(await page.evaluate(()=>document.getElementById('knowledgeGraphModal').dataset.graphView),'full');
-    assert.equal(await page.evaluate(()=>knowledgeGraphSelectedNodeId),'relation_cartesian');
+    assert.equal(await page.evaluate(()=>knowledgeGraphSelectedNodeId),'function_composition');
     await openHistory(page);
     await page.locator('.kg-history-item[data-message-id="past-group"] [data-history-action="graph"]').click();
     if(width<=760&&await page.locator('.kg-mobile-viewport').count())await page.locator('.kg-mobile-expand').click();
@@ -214,9 +236,9 @@ async function checkReferenceGuards(browser) {
   const {context,page,errors,modelCalls}=await newPage(browser,1440,'zh-CN');
   try {
     await page.evaluate(()=>{
-      const a='证明命题 p 的双重否定与 p 等价', b='求集合 A 的补集';
-      const ta={category:'命题逻辑',knowledge_points:['逻辑等价'],focus_points:['逻辑等价']};
-      const tb={category:'集合与关系',knowledge_points:['集合运算'],focus_points:['集合运算']};
+      const a='用逻辑等价证明命题 p 的双重否定与 p 等价', b='用集合运算求集合 A 的补集';
+      const ta=__graphTeachingFixture(a,['logic_equivalence']);
+      const tb=__graphTeachingFixture(b,['set_operation']);
       sessions=[{id:'pointer',name:'指代题目',nameSource:'user',teaching:tb,learningQuestion:null,deletedMessageIds:{},messages:[
         {messageId:'pointer-a',role:'user',text:a,manualIsQuestion:true,questionTeaching:ta},
         {messageId:'pointer-b',role:'user',text:b,manualIsQuestion:true,questionTeaching:tb},
@@ -235,7 +257,7 @@ async function checkReferenceGuards(browser) {
     assert.equal(await page.locator('#knowledgeGraphModal').isVisible(),true,'edited selected question invalidates its captured locator');
     assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'无','stale historical subject becomes None instead of borrowing the latest question');
     assert.equal(await page.locator(locate).isVisible(),false);
-    await page.evaluate(()=>{getCurrent().messages[0].text='证明命题 p 的双重否定与 p 等价';});
+    await page.evaluate(()=>{getCurrent().messages[0].text='用逻辑等价证明命题 p 的双重否定与 p 等价';});
     await openHistory(page);
     await page.locator('.kg-history-item[data-message-id="pointer-a"] [data-history-action="graph"]').click();
     const deleted=await page.locator(locate).elementHandle();
@@ -254,25 +276,7 @@ async function checkReferenceGuards(browser) {
     await page.evaluate(()=>renderKnowledgeGraph());
     assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'无');
     await page.evaluate(()=>{
-      const text='计算集合 A 与 B 的并集，再求函数的复合';
-      const teaching={category:'证明与归纳',focus_points:['数学归纳法'],knowledge_points:['数学归纳法']};
-      sessions=[{id:'saved-snapshot',name:'旧版已保存题目',nameSource:'user',teaching:null,deletedMessageIds:{},
-        learningQuestion:{text,category:'集合与关系',knowledgePoints:['集合运算','复合函数'],focusPoints:['集合运算'],source:'text',sessionId:'saved-snapshot',updatedAt:1},
-        messages:[{messageId:'saved-question',role:'user',text,manualIsQuestion:true}]},
-      {id:'unrelated-current',name:'另一段归纳法',nameSource:'user',teaching,learningQuestion:null,deletedMessageIds:{},
-        messages:[{messageId:'unrelated-question',role:'user',text:'用归纳法证明求和公式',manualIsQuestion:true,questionTeaching:teaching}]}];
-      currentId='saved-snapshot';renderAll();
-    });
-    await openGraph(page,'focus');
-    const fallback=await snapshot(page);
-    assert.ok(fallback.purple.includes('set_operation'),'recent subject can use its matching saved classification snapshot');
-    await page.evaluate(()=>{currentId='unrelated-current';renderAll();});
-    await openHistory(page);
-    await page.locator('.kg-history-item[data-message-id="saved-question"] [data-history-action="graph"]').click();
-    assert.deepEqual(await snapshot(page),fallback,'historical subject reuses its own saved snapshot and never borrows the current conversation');
-    assert.equal(await page.evaluate(()=>currentId),'unrelated-current');
-    await page.evaluate(()=>{
-      const teaching={category:'集合与关系',focus_points:['集合运算','逻辑等价'],knowledge_points:['集合运算','逻辑等价']};
+      const teaching=__graphTeachingFixture('分别说明集合运算与逻辑等价的定义',['set_operation','logic_equivalence']);
       sessions=[{id:'independent-concepts',name:'不同知识分支',nameSource:'user',teaching,learningQuestion:null,deletedMessageIds:{},
         messages:[{messageId:'independent-question',role:'user',text:'分别说明集合运算与逻辑等价的定义',manualIsQuestion:true,questionTeaching:teaching}]}];
       currentId='independent-concepts';renderAll();
@@ -287,9 +291,259 @@ async function checkReferenceGuards(browser) {
     assert.equal(reachable.has('logic_equivalence'),false,'unrelated course branches are not forced together with invented relationships');
     await assertLiveGraph(page,1440,independent,'independent concepts');
     assert.deepEqual(modelCalls,[]); assert.deepEqual(errors,[]);
-    console.log('PASS question references: previous-question pointer, saved fallback, real relationships and stale edit/owner guards');
+    console.log('PASS question references: previous-question pointer, independent involved concepts and stale edit/owner guards');
   } finally {await context.close();}
 }
+async function checkGeneratedQuestionSources(browser) {
+  const {context,page,errors,modelCalls}=await newPage(browser,1440,'zh-CN');
+  try {
+    await page.evaluate(()=>{
+      const question='先做集合运算，再处理函数 f 与 g 的复合';
+      const answer='依据集合运算的结果计算复合函数';
+      const teaching=__graphTeachingFixture(question,['set_operation']);
+      teaching.question_graph.sources.solution=answer;
+      teaching.question_graph.nodes.push({id:'function_composition',evidence:[{source:'solution',quote:'复合函数'}]});
+      teaching.question_graph.edges.push({from:'set_operation',to:'function_composition',evidence:[{source:'solution',quote:answer}]});
+      sessions=[{id:'generated-question',name:'生成题目',nameSource:'user',teaching,learningQuestion:null,deletedMessageIds:{},messages:[
+        {messageId:'generation-request',role:'user',text:'出一道集合运算与函数复合的题目',manualIsQuestion:false},
+        {messageId:'generated-source',role:'ai',text:'【题目】\n'+question,generatedExercise:true,generatedQuestion:question,
+          generatedAnswer:answer,generatedTeaching:teaching}]}];
+      currentId='generated-question';renderAll();
+    });
+    await openGraph(page,'focus');
+    const expected={ids:['function_composition','set_operation'],purple:['function_composition','set_operation'],
+      edges:['set_operation>function_composition']};
+    const graph=await snapshot(page);
+    assert.deepEqual(graph.ids,expected.ids,'a generated question can use its own saved answer as exact evidence');
+    assert.deepEqual(graph.purple,expected.purple);assert.deepEqual(graph.edges,expected.edges);
+    await assertExports(page,expected,'generated question');
+    await page.evaluate(()=>{
+      getCurrent().messages.find(message=>message.messageId==='generated-source').generatedAnswer='答案已修改，旧解答不再存在';
+      renderKnowledgeGraph();
+    });
+    const changed=await snapshot(page);
+    assert.deepEqual(changed.ids,['set_operation'],'saved graph source text cannot attest a deleted or replaced generated answer');
+    assert.deepEqual(changed.purple,changed.ids);assert.deepEqual(changed.edges,[]);
+    assert.deepEqual(modelCalls,[]);assert.deepEqual(errors,[]);
+    console.log('PASS generated question sources: own answer supports relations, replaced answers cannot validate stale evidence');
+  } finally {await context.close();}
+}
+
+async function checkQuestionSpecificTopology(browser, width) {
+  const {context,page,errors,modelCalls}=await newPage(browser,width,'zh-CN');
+  const cases=[
+    {text:'进行集合运算，求 A 与 B 的交集',nodes:['set_operation'],edges:[]},
+    {text:'分别解释函数与映射和复合函数，不建立推导关系',nodes:['function_mapping','function_composition'],edges:[]},
+    {text:'依据函数与映射的定义构造复合函数',nodes:['function_mapping','function_composition'],edges:[['function_mapping','function_composition']]},
+    {text:'先计算复合函数，再依据计算结果判断函数与映射的性质',nodes:['function_mapping','function_composition'],edges:[['function_composition','function_mapping']]},
+    {text:'先用真值表确定真值，再据此证明逻辑等价',nodes:['logic_truth_table','logic_equivalence'],edges:[['logic_truth_table','logic_equivalence']]},
+    {text:'利用量词规则把公式转换成前束范式',nodes:['predicate_quantifier','predicate_prenex'],edges:[['predicate_quantifier','predicate_prenex']]},
+    {text:'先用数学归纳法证明计数公式，再用该公式计算排列与组合',nodes:['proof_induction','count_perm_comb'],edges:[['proof_induction','count_perm_comb']]},
+    {text:'根据同余与模运算的结果求解中国剩余定理中的方程组',nodes:['number_congruence','number_inverse_crt'],edges:[['number_congruence','number_inverse_crt']]},
+    {text:'依据带权图中各边的权重构造最小生成树',nodes:['graph_weighted','tree_mst'],edges:[['graph_weighted','tree_mst']]},
+    {text:'分别分析群与子群以及环与域，不作相互推导',nodes:['algebra_group','algebra_ring_field'],edges:[]},
+    {text:'根据初始条件求解线性齐次递推',nodes:['recurrence_initial','recurrence_homogeneous'],edges:[['recurrence_initial','recurrence_homogeneous']]}
+  ];
+  try {
+    for (const [index,item] of cases.entries()) {
+      await page.evaluate(item=>{
+        const teaching=__graphTeachingFixture(item.text,item.nodes,item.edges.map(([from,to])=>[from,to,item.text]));
+        sessions=[{id:'specific-'+item.index,name:'题目独立关系',nameSource:'user',teaching,learningQuestion:null,deletedMessageIds:{},
+          messages:[{role:'user',messageId:'specific-source',text:item.text,manualIsQuestion:true,questionTeaching:teaching}]}];
+        currentId='specific-'+item.index;renderAll();
+      },{...item,index});
+      await openGraph(page,'focus');
+      const graph=await snapshot(page), expected={ids:[...item.nodes].sort(),purple:[...item.nodes].sort(),
+        edges:item.edges.map(([from,to])=>from+'>'+to).sort()};
+      assert.deepEqual(graph.ids,expected.ids,width+'/case'+index+': only this question’s evidenced nodes appear');
+      assert.deepEqual(graph.purple,expected.purple,width+'/case'+index+': every involved module is purple');
+      assert.deepEqual(graph.edges,expected.edges,width+'/case'+index+': dependencies belong to this question rather than the course');
+      await assertLiveGraph(page,width,expected,width+'/case'+index);
+      for (const id of item.nodes) {
+        await page.evaluate(id=>selectKnowledgeGraphNode(id),id);
+        const relations=await page.locator('#knowledgeGraphDetail .graph-detail-field').evaluateAll(fields=>fields.slice(0,2)
+          .map(field=>[...field.querySelectorAll('[data-knowledge-node-id]')].map(node=>node.dataset.knowledgeNodeId).sort()));
+        assert.deepEqual(relations,[item.edges.filter(([,to])=>to===id).map(([from])=>from).sort(),
+          item.edges.filter(([from])=>from===id).map(([,to])=>to).sort()],
+          width+'/case'+index+'/'+id+': detail prerequisites/successors match only this question’s directed edges');
+      }
+      if(index===3) await assertExports(page,expected,width+'/reverse dependency');
+    }
+    assert.deepEqual(modelCalls,[]);assert.deepEqual(errors,[]);
+    console.log('PASS '+width+': '+cases.length+' question-specific graphs across logic, predicates, proofs, sets, functions, counting, number theory, recurrence, graphs and algebra');
+  } finally {await context.close();}
+}
+
+async function checkLegacyBackfill(browser) {
+  const {context,page,errors,modelCalls}=await newPage(browser,1440,'zh-CN');
+  const classifications=[];
+  try {
+    await page.route('**/analyze-questions',async route=>{
+      const request=route.request().postDataJSON();
+      classifications.push(...request.questions);
+      const results=await page.evaluate(questions=>questions.map(item=>({key:item.key,
+        teaching:__graphTeachingFixture(item.text,['set_operation'])})),request.questions);
+      await route.fulfill({contentType:'application/json',body:JSON.stringify({results})});
+    });
+    await page.evaluate(()=>{
+      const text='进行集合运算，计算 A 与 B 的并集';
+      const old={category:'集合与关系',knowledge_points:['集合运算'],focus_points:['集合运算'],
+        prerequisite_points:['命题推理'],knowledge_path:['集合运算','函数与映射']};
+      sessions=[{id:'legacy',name:'旧题目',nameSource:'user',teaching:old,learningQuestion:null,deletedMessageIds:{},
+        messages:[{messageId:'legacy-question',role:'user',text,manualIsQuestion:true,questionTeaching:old}]}];
+      currentId='legacy';renderAll();
+    });
+    await openGraph(page,'focus');
+    await page.waitForFunction(()=>knowledgeGraphDisplayedNodes().length===1);
+    const graph=await snapshot(page);
+    assert.deepEqual(graph.ids,['set_operation'],'legacy classification is refreshed from its own actual question');
+    assert.deepEqual(graph.purple,['set_operation']);assert.deepEqual(graph.edges,[]);
+    assert.equal(classifications.length,1,'one local backfill refreshes old metadata without a repeated classification loop');
+    assert.equal(classifications[0].text,'进行集合运算，计算 A 与 B 的并集');
+    await openGraph(page,'full');await openGraph(page,'focus');
+    assert.equal(classifications.length,1,'the freshly evidenced graph is reused on reopening');
+    assert.deepEqual(modelCalls,[]);assert.deepEqual(errors,[]);
+    console.log('PASS legacy question graph: one source-bound backfill replaces flat tags and omits stale course paths');
+  } finally {await context.close();}
+}
+
+async function checkDelayedBackfillGuards(browser) {
+  const {context,page,errors,modelCalls}=await newPage(browser,1440,'zh-CN');
+  try {
+    for (const replaceQuestion of [false,true]) {
+      let captured,release;
+      const requestReady=new Promise(resolve=>{captured=resolve;});
+      const allowResponse=new Promise(resolve=>{release=resolve;});
+      await page.route('**/analyze-questions',async route=>{
+        const request=route.request().postDataJSON();
+        const results=await page.evaluate(questions=>questions.map(item=>({key:item.key,
+          teaching:__graphTeachingFixture(item.text,['set_operation'])})),request.questions);
+        captured(request);
+        await allowResponse;
+        await route.fulfill({contentType:'application/json',body:JSON.stringify({results})});
+      });
+      await page.evaluate(()=>{
+        const text='进行集合运算，计算 A 与 B 的交集';
+        const old={category:'集合与关系',knowledge_points:['集合运算'],focus_points:['集合运算']};
+        sessions=[{id:'backfill-race',name:'异步题目分析',nameSource:'user',teaching:old,learningQuestion:null,deletedMessageIds:{},
+          messages:[{messageId:'race-question',role:'user',text,manualIsQuestion:true,questionTeaching:old}]}];
+        currentId='backfill-race';renderAll();
+      });
+      const opening=openGraph(page,'focus');
+      await requestReady;
+      await page.evaluate(replaceQuestion=>{
+        const message=getCurrent().messages[0];
+        window.__pendingQuestionGraph=knowledgeGraphQuestionAnalyses.get(message).promise;
+        if (replaceQuestion) {
+          message.text='依据复合函数的计算结果判断函数与映射的性质';
+          message.questionTeaching=__graphTeachingFixture(message.text,['function_composition','function_mapping'],
+            [['function_composition','function_mapping',message.text]]);
+        } else {
+          const solution='依据集合运算的结果求复合函数';
+          const teaching=__graphTeachingFixture(message.text,['set_operation']);
+          teaching.question_graph.sources.solution=solution;
+          teaching.question_graph.nodes.push({id:'function_composition',evidence:[{source:'solution',quote:'复合函数'}]});
+          teaching.question_graph.edges.push({from:'set_operation',to:'function_composition',evidence:[{source:'solution',quote:solution}]});
+          message.questionTeaching=teaching;
+          getCurrent().messages.push({messageId:'race-solution',role:'ai',text:solution});
+        }
+        window.__newQuestionGraph=JSON.stringify(message.questionTeaching.question_graph);
+        renderKnowledgeGraph();
+      },replaceQuestion);
+      release();
+      await opening;
+      await page.evaluate(()=>window.__pendingQuestionGraph);
+      await settle(page);
+      assert.equal(await page.evaluate(()=>JSON.stringify(getCurrent().messages[0].questionTeaching.question_graph)),
+        await page.evaluate(()=>window.__newQuestionGraph),replaceQuestion
+          ? 'a delayed analysis cannot overwrite the graph of an edited question'
+          : 'a delayed question-only analysis cannot overwrite newer solution-backed dependencies');
+      const graph=await snapshot(page);
+      assert.deepEqual(graph.ids,replaceQuestion?['function_composition','function_mapping']:['function_composition','set_operation']);
+      assert.deepEqual(graph.purple,graph.ids,'the retained source-bound graph keeps all involved nodes purple');
+      assert.deepEqual(graph.edges,[replaceQuestion?'function_composition>function_mapping':'set_operation>function_composition']);
+      await page.unroute('**/analyze-questions');
+    }
+    assert.deepEqual(modelCalls,[]);assert.deepEqual(errors,[]);
+    console.log('PASS delayed graph analyses: edited questions and newer solution-specific dependencies survive stale responses');
+  } finally {await context.close();}
+}
+
+async function checkLongQuestionIdentity(browser) {
+  const {context,page,errors,modelCalls}=await newPage(browser,1440,'zh-CN');
+  try {
+    const collision=await page.evaluate(()=>{
+      const prefix='这是较长题干的公共背景条件，所有已给出的约束都需要保留以便完整核对。'.repeat(70);
+      const a=prefix+'本题最后要求进行集合运算';
+      const b=prefix+'本题最后要求求出复合函数';
+      const solution='依据集合运算的结果，运用逻辑等价得到结论';
+      const ta=__graphTeachingFixture(a,['set_operation']);
+      const tb=__graphTeachingFixture(b,['function_composition']);
+      for (const [teaching,core] of [[ta,'set_operation'],[tb,'function_composition']]) {
+        teaching.question_graph.sources.solution=solution;
+        teaching.question_graph.nodes.push({id:'logic_equivalence',evidence:[{source:'solution',quote:'逻辑等价'}]});
+        teaching.question_graph.edges.push({from:core,to:'logic_equivalence',evidence:[{source:'solution',quote:solution}]});
+      }
+      sessions=[{id:'long-identity',name:'长题干独立身份',nameSource:'user',teaching:tb,learningQuestion:null,deletedMessageIds:{},messages:[
+        {messageId:'long-a',role:'user',text:a,manualIsQuestion:true,questionTeaching:ta},
+        {messageId:'long-b',role:'user',text:b,manualIsQuestion:true,questionTeaching:tb},
+        {messageId:'long-solution',role:'ai',text:solution,targetQuestionMessageId:'long-a',
+          targetQuestionFingerprint:wrongQuestionFingerprint(a)}]}];
+      currentId='long-identity';renderAll();
+      return {prefixLength:prefix.length,sameFingerprint:wrongQuestionFingerprint(a)===wrongQuestionFingerprint(b)};
+    });
+    assert.ok(collision.prefixLength>1600,'the fixtures differ only after the old fingerprint truncation boundary');
+    assert.equal(collision.sameFingerprint,true,'the old legacy fingerprint actually collides for these distinct questions');
+    const restored=await page.evaluate(()=>{
+      saveState();
+      const loaded=loadState({guest:true});
+      return {loaded,target:getCurrent().messages.find(message=>message.messageId==='long-solution')?.targetQuestionMessageId};
+    });
+    assert.equal(restored.loaded,true,'the source-identity fixture survives an actual client-state save/load');
+    assert.equal(restored.target,'long-a','client-state normalization preserves the stable answer target');
+    await openGraph(page,'focus');
+    assert.equal(await page.evaluate(()=>getKnowledgeGraphQuestionSubject().reference.messageId),'long-b',
+      'the latest exact question is active despite its fingerprint matching the earlier question');
+    const latest=await snapshot(page);
+    assert.deepEqual(latest.ids,['function_composition'],'a stable answer target prevents solution evidence from leaking into the later question');
+    assert.deepEqual(latest.purple,latest.ids);assert.deepEqual(latest.edges,[]);
+    await openHistory(page);
+    assert.equal(await page.locator('.kg-history-item').count(),2,'distinct full questions with the same long prefix both remain in history');
+    for (const id of ['long-a','long-b']) assert.equal(await page.locator('.kg-history-item[data-message-id="'+id+'"]').count(),1);
+    await page.locator('.kg-history-item[data-message-id="long-a"] [data-history-action="graph"]').click();
+    const first=await snapshot(page);
+    assert.deepEqual(first.ids,['logic_equivalence','set_operation'],'the actual stable target alone may use its corresponding solution');
+    assert.deepEqual(first.purple,first.ids);assert.deepEqual(first.edges,['set_operation>logic_equivalence']);
+    assert.equal(await page.evaluate(()=>getKnowledgeGraphQuestionSubject().context.solutionText),
+      '依据集合运算的结果，运用逻辑等价得到结论');
+    await page.evaluate(()=>{
+      delete getCurrent().messages.find(message=>message.messageId==='long-solution').targetQuestionMessageId;
+      renderKnowledgeGraph();
+    });
+    assert.deepEqual((await snapshot(page)).ids,['set_operation'],
+      'an ambiguous legacy fingerprint is insufficient to attest solution evidence for the earlier question');
+    await openHistory(page);
+    await page.locator('.kg-history-item[data-message-id="long-b"] [data-history-action="graph"]').click();
+    assert.deepEqual((await snapshot(page)).ids,['function_composition'],
+      'the same ambiguous legacy fingerprint cannot attest that solution for the later question either');
+    assert.equal(await page.evaluate(()=>getKnowledgeGraphQuestionSubject().context.solutionText),'');
+    const mathCollision=await page.evaluate(()=>{
+      const a='逻辑等价：判断 p∧(q∨r)',b='逻辑等价：判断 (p∧q)∨r';
+      const ta=__graphTeachingFixture(a,['logic_equivalence']),tb=__graphTeachingFixture(b,['logic_equivalence']);
+      sessions=[{id:'symbol-identity',name:'数学符号独立身份',nameSource:'user',teaching:tb,learningQuestion:null,deletedMessageIds:{},messages:[
+        {messageId:'intersection-question',role:'user',text:a,manualIsQuestion:true,questionTeaching:ta},
+        {messageId:'union-question',role:'user',text:b,manualIsQuestion:true,questionTeaching:tb}]}];
+      currentId='symbol-identity';renderAll();
+      return wrongQuestionFingerprint(a)===wrongQuestionFingerprint(b);
+    });
+    assert.equal(mathCollision,true,'the old fingerprint also removes the mathematically significant grouping parentheses');
+    await openHistory(page);
+    assert.equal(await page.locator('.kg-history-item').count(),2,'different mathematical groupings do not collapse distinct exact questions');
+    assert.deepEqual(modelCalls,[]);assert.deepEqual(errors,[]);
+    console.log('PASS question identity: long-prefix and mathematical-grouping collisions preserve history, active subject and stable answer ownership');
+  } finally {await context.close();}
+}
+
 async function checkEqualSizeCache(browser) {
   const {context,page,errors,modelCalls}=await newPage(browser,1440,'zh-CN');
   try {
@@ -297,10 +551,13 @@ async function checkEqualSizeCache(browser) {
       await ensureKnowledgeGraphData();
       const only=new Set(['set_operation','function_mapping']);
       knowledgeGraphData={...knowledgeGraphData,nodes:knowledgeGraphData.nodes.filter(node=>only.has(node.id))};
-      const teaching=name=>({category:name==='集合运算'?'集合与关系':'函数',knowledge_points:[name],focus_points:[name]});
-      sessions=[{id:'cache',name:'缓存题目',nameSource:'user',learningQuestion:null,teaching:teaching('函数与映射'),deletedMessageIds:{},messages:[
-        {messageId:'cache-a',role:'user',text:'计算集合 A 与 B 的交集',manualIsQuestion:true,questionTeaching:teaching('集合运算')},
-        {messageId:'cache-b',role:'user',text:'判断函数 f 是否为单射',manualIsQuestion:true,questionTeaching:teaching('函数与映射')}]}];
+      const a='依据集合运算的结果判断函数与映射的性质';
+      const b='依据函数与映射的结果进行集合运算';
+      const ta=__graphTeachingFixture(a,['set_operation','function_mapping'],[['set_operation','function_mapping',a]]);
+      const tb=__graphTeachingFixture(b,['set_operation','function_mapping'],[['function_mapping','set_operation',b]]);
+      sessions=[{id:'cache',name:'缓存题目',nameSource:'user',learningQuestion:null,teaching:tb,deletedMessageIds:{},messages:[
+        {messageId:'cache-a',role:'user',text:a,manualIsQuestion:true,questionTeaching:ta},
+        {messageId:'cache-b',role:'user',text:b,manualIsQuestion:true,questionTeaching:tb}]}];
       currentId='cache';renderAll();
     });
     const read=async id=>{
@@ -315,15 +572,16 @@ async function checkEqualSizeCache(browser) {
     };
     const a=await read('cache-a'),b=await read('cache-b');
     assert.deepEqual(a.ids,b.ids,'equal-size subjects intentionally use the same two real graph nodes');
-    assert.notEqual(a.key,b.key,'PNG cache identity includes the selected historical question and highlighted concepts');
-    assert.notEqual(a.hash,b.hash,'actual cached PNG changes when equal-size subjects highlight opposite nodes');
+    assert.notEqual(a.key,b.key,'PNG cache identity includes the selected historical question and its specific dependencies');
+    assert.notEqual(a.hash,b.hash,'actual cached PNG changes when the same purple concepts have opposite question-specific dependencies');
     assert.deepEqual(modelCalls,[]);assert.deepEqual(errors,[]);
-    console.log('PASS question export cache: equal-size historical subjects retain independent purple PNGs');
+    console.log('PASS question export cache: identical concepts with different question dependencies retain independent PNGs');
   } finally {await context.close();}
 }
 (async()=>{
   const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.CHROMIUM_EXECUTABLE_PATH}:{})});
   try {for(const width of [1440,390])for(const language of ['zh-CN','en'])await checkView(browser,width,language);
-    await checkReferenceGuards(browser);await checkEqualSizeCache(browser);}
+    await checkReferenceGuards(browser);await checkEqualSizeCache(browser);await checkGeneratedQuestionSources(browser);
+    for(const width of [1440,390])await checkQuestionSpecificTopology(browser,width);await checkLegacyBackfill(browser);await checkDelayedBackfillGuards(browser);await checkLongQuestionIdentity(browser);}
   finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1});

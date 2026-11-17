@@ -6,6 +6,8 @@ from pathlib import Path
 
 from exercise_intent import classify_exercise_request, is_generic_continuation, resolve_exercise_request
 from exercise_relation_check import is_routine_small_relation_question
+from question_knowledge_graph import build_question_graph
+from server_i18n import topic_label
 from tutoring_intent import classify_tutoring_request
 
 
@@ -42,6 +44,7 @@ _KNOWLEDGE_INDEX = {
     for node in _KNOWLEDGE_GRAPH.get("nodes", [])
     if isinstance(node, dict) and isinstance(node.get("name"), str)
 }
+_QUESTION_GRAPH_ENGLISH_LABELS = {name: topic_label(name, "en") for name in _KNOWLEDGE_INDEX}
 
 
 def _direct_prerequisites(points, limit=4):
@@ -102,12 +105,46 @@ def _knowledge_path(points, limit=5):
     return best
 
 
-def _enrich_with_graph(result):
+def _question_graph_structural_points(text):
+    points = [point for _category, point in _structural_topic_evidence(text)]
+    # The classifier also reads formulas whose specific topic is more precise
+    # than the broad structural signal (e.g. a recurrence's nonzero forcing).
+    categories = {category for category, _point in _structural_topic_evidence(text)}
+    if "递推关系" in categories:
+        points.extend(_extract_points(text, "递推关系"))
+    if "关系" in text and re.search(r"(?<![a-z0-9_])r\s*(?:\^\s*\{?\s*\d+\s*\}?|[²³⁴⁵⁶⁷⁸⁹])", text, re.I):
+        points.append("关系运算")
+    return list(dict.fromkeys(points))
+
+
+def enrich_question_graph(result, question_text, solution_text=""):
+    """Attach evidence for this exact problem, without course-neighbor expansion.
+
+    The optional solution must be the actual answer belonging to this problem,
+    not an older conversation answer or an unvalidated exercise template.
+    """
     result = dict(result or {})
-    points = result.get("knowledge_points") or []
-    result["prerequisite_points"] = _direct_prerequisites(points)
-    result["knowledge_path"] = _knowledge_path(points)
+    aliases = {point: keywords for rule in CATEGORY_RULES.values()
+               for point, keywords in (rule.get("points") or {}).items()}
+    def source_categories(text):
+        classified = _classify_content(text)
+        return {classified.get("category"), *(classified.get("related_categories") or [])}
+    result["question_graph"] = build_question_graph(
+        question_text, solution_text, _KNOWLEDGE_GRAPH.get("nodes", []), aliases,
+        _question_graph_structural_points,
+        _english_analysis_aliases,
+        source_categories,
+        _QUESTION_GRAPH_ENGLISH_LABELS,
+    )
+    # Legacy prompt fields cannot carry static course ancestry as if it was
+    # established for the actual problem. Per-node dependencies are in the graph.
+    result["prerequisite_points"] = []
+    result["knowledge_path"] = []
     return result
+
+
+def _enrich_with_graph(result, question_text=""):
+    return enrich_question_graph(result, question_text)
 
 
 
@@ -693,6 +730,7 @@ _ENGLISH_TOPIC_ALIASES = (
     (r"\btautolog(?:y|ies)\b", "永真"),
     (r"\bcontradictions?\b", "永假"),
     (r"\bpower sets?\b", "幂集"),
+    (r"\b(?:unions?|intersections?|set differences?|set complements?)\b", "集合运算"),
     (r"\bcartesian products?\b", "笛卡尔积"),
     (r"\bequivalence relations?\b", "等价关系"),
     (r"\bequivalence class(?:es)?\b", "等价类"),
@@ -2024,7 +2062,7 @@ def analyze_question(text):
         "input_source": "图片识题" if _is_image_input(text) else "文本输入",
     }
 
-    return _enrich_with_graph(result)
+    return _enrich_with_graph(result, text)
 
 
 def _normalize_question_reference_text(text):
@@ -2891,7 +2929,7 @@ def analyze_messages(messages):
         "context_scope": "conversation" if conversation_task else "problem",
         "confidence": classified["confidence"],
         "input_source": input_source,
-    })
+    }, classification_text)
 
 
 def _semantic_tutoring_instruction(english=False):

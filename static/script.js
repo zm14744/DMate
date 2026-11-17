@@ -1035,6 +1035,7 @@ let knowledgeGraphMobileFullscreen = false;
 let knowledgeGraphScope = "current";
 let knowledgeGraphQuestionReference = null;
 let knowledgeGraphRenderedQuestion = null;
+const knowledgeGraphQuestionAnalyses = new WeakMap();
 let knowledgeGraphSelectedNodeId = "";
 let knowledgeGraphSideMode = "detail";
 let knowledgeGraphLoading = false;
@@ -2427,7 +2428,7 @@ function mergeCloudMessage(left, right) {
     // 旧设备的分析结果可能较少；不应抹掉已有的题目/参考答案。
     for (const key of [
         "generatedQuestion", "generatedAnswer", "generatedTeaching",
-        "questionTeaching", "apiText", "targetQuestionFingerprint"
+        "questionTeaching", "apiText", "targetQuestionFingerprint", "targetQuestionMessageId"
     ]) {
         if (!merged[key] && left?.[key]) merged[key] = left[key];
     }
@@ -4133,6 +4134,46 @@ function setSessionBusy(sessionId, busy) {
 }
 
 
+function normalizeQuestionKnowledgeGraph(value) {
+    if (!value || value.version !== 1 || !Array.isArray(value.nodes) || !Array.isArray(value.edges)) return null;
+    const evidence = rows => (Array.isArray(rows) ? rows : []).filter(row => row
+        && ["question", "solution"].includes(row.source) && typeof row.quote === "string"
+        && row.quote.trim() && row.quote.length <= 20000).slice(0, 8)
+        .map(row => ({source:row.source, quote:row.quote}));
+    return {
+        version:1,
+        sources:{question:typeof value.sources?.question === "string" ? value.sources.question : "",
+            solution:typeof value.sources?.solution === "string" ? value.sources.solution : ""},
+        nodes:value.nodes.filter(node => node && typeof node.id === "string").slice(0, 256)
+            .map(node => ({id:node.id, evidence:evidence(node.evidence)})),
+        edges:value.edges.filter(edge => edge && typeof edge.from === "string" && typeof edge.to === "string").slice(0, 4096)
+            .map(edge => ({from:edge.from, to:edge.to, evidence:evidence(edge.evidence)}))
+    };
+}
+
+function questionGraphMatchesQuestion(graph, questionText, message = null) {
+    const source = graph?.sources?.question;
+    if (typeof source !== "string" || !source.trim()) return false;
+    const question = String(questionText || "").trim();
+    if (!question) return false;
+    if (source.trim() === question) return true;
+    // OCR and generated questions can carry known presentation headings. Only
+    // project the same message's question; never compare truncated fingerprints.
+    return extractQuestionOnlyFromMessage({...message, role:message?.role || "user", text:source,
+        generatedQuestion:message?.role === "ai" ? source : ""}).trim() === question;
+}
+
+function mergeQuestionTeaching(previous, incoming, questionText, message = null) {
+    const next = normalizeTeaching(incoming);
+    if (!next) return normalizeTeaching(previous);
+    const prior = normalizeTeaching(previous)?.question_graph;
+    // A background question-only classification must not erase relations from
+    // an answer that finished while it was running.
+    if (prior?.sources.solution && questionGraphMatchesQuestion(prior, questionText, message)
+        && !next.question_graph?.sources.solution) next.question_graph = prior;
+    return next;
+}
+
 function normalizeTeaching(value) {
     if (!value || typeof value !== "object") {
         return null;
@@ -4159,6 +4200,7 @@ function normalizeTeaching(value) {
         focus_points: asTextList(value.focus_points).slice(0, 2),
         prerequisite_points: asTextList(value.prerequisite_points),
         knowledge_path: asTextList(value.knowledge_path),
+        question_graph: normalizeQuestionKnowledgeGraph(value.question_graph),
         question_type: asText(value.question_type) || "一般题",
         difficulty: ["简单", "中等", "困难"].includes(asText(value.difficulty))
             ? asText(value.difficulty)
@@ -10475,6 +10517,8 @@ function loadState({ guest = false } = {}) {
                     ),
                     targetQuestionFingerprint: typeof message.targetQuestionFingerprint === "string"
                         ? message.targetQuestionFingerprint : "",
+                    targetQuestionMessageId: typeof message.targetQuestionMessageId === "string"
+                        ? message.targetQuestionMessageId : "",
                     isRetestPrompt: Boolean(message.isRetestPrompt),
                     isRetestAnswer: Boolean(message.isRetestAnswer),
                     isError: Boolean(message.isError),
@@ -11467,7 +11511,7 @@ function knowledgeGraphCopyKey() {
     const displayedNodes = knowledgeGraphDisplayedNodes(context);
     if (!displayedNodes.length) return "";
     const questionKey = JSON.stringify([knowledgeGraphReferenceKey(context.questionReference),
-        context.focusPoints, context.knowledgePoints, context.relatedPoints, context.prerequisitePoints, context.knowledgePath]);
+        displayedNodes.map(node => [node.id, node.prerequisites])]);
     const canvas = document.getElementById("knowledgeGraphCanvas");
     const mobileStage = canvas?.querySelector?.(".kg-mobile-stage");
     const svg = canvas?.querySelector?.(".kg-svg");
@@ -13260,10 +13304,9 @@ function findQuestionCandidateByFingerprint(
     const target = String(fingerprint || "").trim();
     if (!target) return null;
 
-    return collectConversationQuestionCandidates(session)
-        .find(candidate => (
-            questionCandidateFingerprint(candidate) === target
-        )) || null;
+    const matches = collectConversationQuestionCandidates(session)
+        .filter(candidate => questionCandidateFingerprint(candidate) === target);
+    return matches.length === 1 ? matches[0] : null;
 }
 
 function currentQuestionCandidateFromLearningState(session) {
@@ -13273,7 +13316,8 @@ function currentQuestionCandidateFromLearningState(session) {
 
     if (!saved) return null;
 
-    return findQuestionCandidateByFingerprint(
+    const exact = collectConversationQuestionCandidates(session).find(candidate => candidate.text.trim() === saved.text.trim());
+    return exact || findQuestionCandidateByFingerprint(
         session,
         wrongQuestionFingerprint(saved.text)
     );
@@ -13835,6 +13879,7 @@ function attachTeachingSnapshotToLatestQuestion(
 
 async function requestAiReply(session, options = {}) {
     if (!session) return { status: "skipped" };
+    ensureSessionMessageIds(session);
 
     const latestUserBeforeRequest = getLatestUserMessage(
         session
@@ -13856,20 +13901,16 @@ async function requestAiReply(session, options = {}) {
         && isQuestionNavigationFollowUp(latestText)
     );
 
-    // send() 已经解析过导航时，优先使用它写入的强指纹；
+    // send() 已经解析过导航时，优先使用它写入的题目消息标识；
     // 兼容旧会话/旧消息时，再现场解析一次。避免“下一题”被解析两次而跳两格。
     let navigationCandidate = null;
 
     if (latestIsNavigationRequest) {
-        navigationCandidate = latestUserBeforeRequest?.targetQuestionFingerprint
-            ? findQuestionCandidateByFingerprint(
-                session,
-                latestUserBeforeRequest.targetQuestionFingerprint
-            )
-            : resolveQuestionNavigationCandidate(
-                session,
-                latestText
-            );
+        navigationCandidate = latestUserBeforeRequest?.targetQuestionMessageId
+            ? collectConversationQuestionCandidates(session).find(candidate =>
+                session.messages[candidate.index]?.messageId === latestUserBeforeRequest.targetQuestionMessageId)
+            : findQuestionCandidateByFingerprint(session, latestUserBeforeRequest?.targetQuestionFingerprint);
+        navigationCandidate ||= resolveQuestionNavigationCandidate(session, latestText);
     }
 
     const rawExerciseRequest = isSessionExerciseRequest(session, latestText);
@@ -14355,7 +14396,9 @@ async function requestAiReply(session, options = {}) {
                     )
                     : null
             ),
-            targetQuestionFingerprint: requestTargetFingerprint
+            targetQuestionFingerprint: requestTargetFingerprint,
+            targetQuestionMessageId: session.messages[requestTargetCandidate?.index]?.messageId
+                || activeRequest.userMessage?.messageId || ""
         };
 
         if (activeRequest.streaming) {
@@ -14460,11 +14503,13 @@ function queueManualQuestionClassification(session, message) {
     if (message.manualIsQuestion === true
         && !message.isRetestAnswer
         && !isExerciseRequestText(message.text)) {
-        analyzeSingleQuestionTeaching(message.text, "manual-" + Date.now()).then(teaching => {
+        const questionText = message.text;
+        analyzeSingleQuestionTeaching(questionText, "manual-" + Date.now()).then(teaching => {
             if (!teaching || !sessions.includes(session) || !session.messages.includes(message)
-                || message.manualIsQuestion !== true) return;
+                || message.manualIsQuestion !== true || message.text !== questionText) return;
             // 以原有模型返回的有效难度为准；不通过文字长度猜难度。
-            message.questionTeaching = teaching;
+            message.questionTeaching = mergeQuestionTeaching(message.questionTeaching, teaching,
+                extractQuestionOnlyFromMessage(message), message);
             const titleChanged = refineFirstSessionName(session, teaching, message);
             saveState();
             if (titleChanged) renderSessions();
@@ -14481,6 +14526,7 @@ function prepareQuestionNavigationMessage(session, message) {
     // 在请求发出前先切换 current learningQuestion，右侧信息和后端上下文
     // 都围绕同一道目标题，避免旧题/新题一起被回答。
     if (isQuestionNavigationFollowUp(message.text)) {
+        ensureSessionMessageIds(session);
         const targetCandidate = resolveQuestionNavigationCandidate(
             session,
             message.text
@@ -14492,6 +14538,7 @@ function prepareQuestionNavigationMessage(session, message) {
             );
 
             message.targetQuestionFingerprint = targetFingerprint;
+            message.targetQuestionMessageId = session.messages[targetCandidate.index]?.messageId || "";
             message.apiText = buildTargetQuestionApiText(
                 message.text,
                 targetCandidate
@@ -17031,6 +17078,8 @@ function addAssistantMessage(
         targetQuestionFingerprint: typeof meta.targetQuestionFingerprint === "string"
             ? meta.targetQuestionFingerprint
             : "",
+        targetQuestionMessageId: typeof meta.targetQuestionMessageId === "string"
+            ? meta.targetQuestionMessageId : "",
         isError: Boolean(meta.isError),
         isNotice: Boolean(meta.isNotice)
     });
@@ -17249,6 +17298,8 @@ function startTyping(
         targetQuestionFingerprint: typeof meta.targetQuestionFingerprint === "string"
             ? meta.targetQuestionFingerprint
             : "",
+        targetQuestionMessageId: typeof meta.targetQuestionMessageId === "string"
+            ? meta.targetQuestionMessageId : "",
         isError: Boolean(meta.isError),
         isNotice: Boolean(meta.isNotice)
     };
@@ -18409,15 +18460,16 @@ function collectConversationQuestionCandidates(session) {
         const fingerprint = wrongQuestionFingerprint(
             question
         );
+        const identity = question.trim();
 
         if (
             !fingerprint
-            || seen.has(fingerprint)
+            || seen.has(identity)
         ) {
             continue;
         }
 
-        seen.add(fingerprint);
+        seen.add(identity);
 
         candidates.push({
             key: `${index}:${fingerprint}`,
@@ -18463,12 +18515,11 @@ function activeQuestionCandidateFromHistory(session) {
 
         if (
             isQuestionNavigationFollowUp(message.text)
-            && message.targetQuestionFingerprint
+            && (message.targetQuestionMessageId || message.targetQuestionFingerprint)
         ) {
-            const target = candidates.find(candidate => (
-                questionCandidateFingerprint(candidate)
-                === message.targetQuestionFingerprint
-            ));
+            const target = message.targetQuestionMessageId
+                ? candidates.find(candidate => session.messages[candidate.index]?.messageId === message.targetQuestionMessageId)
+                : findQuestionCandidateByFingerprint(session, message.targetQuestionFingerprint);
 
             if (target) {
                 // 如果该导航之后已经出现真正的新题，新题应成为当前题。
@@ -18664,8 +18715,9 @@ function applyQuestionCandidateAsCurrent(
         return false;
     }
 
-    const teaching = normalizeTeaching(
-        teachingOverride
+    const teaching = mergeQuestionTeaching(
+        candidate.role === "ai" ? message.generatedTeaching : message.questionTeaching,
+        teachingOverride, candidate.text, message
     ) || candidateTeachingSnapshot(
         session,
         candidate
@@ -18728,7 +18780,9 @@ async function analyzeSingleQuestionTeaching(
             const response = await fetch("/analyze-questions", {
                 method: "POST", signal:controller.signal,
                 headers: { "Content-Type":"application/json" },
-                body: JSON.stringify({ questions:[{key,text}] })
+                body: JSON.stringify({ questions:[{key,text,
+                    ...(typeof options.solutionText === "string" && options.solutionText
+                        ? {solution:options.solutionText} : {})}] })
             });
             const payload = await response.json();
             if (!response.ok) throw new Error(payload?.error || "题目知识识别失败");
@@ -18837,9 +18891,9 @@ async function ensureActiveQuestionAfterHistoryChange(
 
         if (message) {
             if (candidate.role === "ai") {
-                message.generatedTeaching = teaching;
+                message.generatedTeaching = mergeQuestionTeaching(message.generatedTeaching, teaching, candidate.text, message);
             } else {
-                message.questionTeaching = teaching;
+                message.questionTeaching = mergeQuestionTeaching(message.questionTeaching, teaching, candidate.text, message);
             }
         }
 
@@ -18940,9 +18994,9 @@ async function refreshConversationKnowledgeIndex(
         if (candidate.role === "ai") {
             message.generatedExercise = true;
             message.generatedQuestion = candidate.text;
-            message.generatedTeaching = teaching;
+            message.generatedTeaching = mergeQuestionTeaching(message.generatedTeaching, teaching, candidate.text, message);
         } else {
-            message.questionTeaching = teaching;
+            message.questionTeaching = mergeQuestionTeaching(message.questionTeaching, teaching, candidate.text, message);
         }
 
         updatedMessages.add(message);
@@ -19188,19 +19242,48 @@ function knowledgeGraphQuestionContext(session, item, reference) {
     const canonicalNames = values => [...new Set((Array.isArray(values) ? values : [])
         .map(value => typeof value === "string" ? value.trim() : "").map(value =>
         findKnowledgeGraphNodeByName(value) || findKnowledgeGraphNodeById(value)).filter(Boolean).map(node => node.name))];
-    const hasKnownPoints = value => ["focus_points", "knowledge_points", "related_knowledge_points", "prerequisite_points", "knowledge_path"]
-        .some(key => canonicalNames(value?.[key]).length);
+    const hasKnownPoints = value => normalizeQuestionKnowledgeGraph(value?.question_graph)
+        || ["focus_points", "knowledge_points", "related_knowledge_points", "prerequisite_points", "knowledge_path"]
+            .some(key => canonicalNames(value?.[key]).length);
     let teaching = hasKnownPoints(own) ? own : (candidateTeachingSnapshot(session, item) || item.teaching || {});
     const saved = normalizeLearningQuestion(session.learningQuestion);
     if (!hasKnownPoints(teaching) && saved && wrongQuestionFingerprint(saved.text) === reference.fingerprint) {
         teaching = { category:saved.category, focus_points:saved.focusPoints, knowledge_points:saved.knowledgePoints,
             knowledge_path:saved.knowledgePoints };
     }
+    const graph = normalizeQuestionKnowledgeGraph(teaching.question_graph);
+    const questionGraph = questionGraphMatchesQuestion(graph, item.text, message) ? graph : null;
+    const solutionSources = [];
+    {
+        // Validate against actual stored answers belonging to this question,
+        // rather than accepting the graph's own claimed solution as evidence.
+        if (item.role === "ai" && message.generatedAnswer) solutionSources.push(String(message.generatedAnswer));
+        const history = collectConversationQuestionCandidates(session);
+        const candidates = new Map(history.map(value => [value.index, value]));
+        const legacyMatches = history.filter(value => wrongQuestionFingerprint(value.text) === reference.fingerprint);
+        const uniqueLegacyOwner = legacyMatches.length === 1 && legacyMatches[0].index === item.index;
+        let owner = null;
+        for (let index = 0; index < session.messages.length; index++) {
+            const candidate = candidates.get(index);
+            if (candidate) owner = candidate;
+            const answer = session.messages[index];
+            if (answer.role !== "ai" || answer.isError || answer.isNotice) continue;
+            if (answer.generatedExercise && index !== item.index) continue;
+            const belongs = answer.targetQuestionMessageId
+                ? Boolean(reference.messageId) && answer.targetQuestionMessageId === reference.messageId
+                : answer.targetQuestionFingerprint
+                    ? uniqueLegacyOwner && answer.targetQuestionFingerprint === reference.fingerprint
+                    : owner?.index === item.index;
+            if (belongs && answer.text) solutionSources.push(String(answer.text));
+        }
+    }
+    const solutionText = solutionSources.join("\n\n");
     return {
         category:teaching.category || "", categories:[], scope:knowledgeGraphScope,
         focusPoints:canonicalNames(teaching.focus_points), knowledgePoints:canonicalNames(teaching.knowledge_points),
         relatedPoints:canonicalNames(teaching.related_knowledge_points), prerequisitePoints:canonicalNames(teaching.prerequisite_points),
         knowledgePath:canonicalNames(teaching.knowledge_path), questionCount:1,
+        questionGraph, questionText:item.text, solutionText,
         questionReference:reference, questionOrder:item.order || 0
     };
 }
@@ -19225,6 +19308,42 @@ function getKnowledgeGraphQuestionSubject() {
             index:item.index, fingerprint:wrongQuestionFingerprint(item.text)};
     }
     return {reference, context:knowledgeGraphQuestionContext(session, item, reference)};
+}
+
+function queueKnowledgeGraphQuestionAnalysis(subject) {
+    if (!subject || subject.context.questionGraph) return "ready";
+    const session = sessions.find(value => String(value.id) === String(subject.reference.sessionId));
+    if (!session) return "unavailable";
+    const candidate = collectConversationQuestionCandidates(session).find(value =>
+        (subject.reference.messageId
+            ? session.messages[value.index]?.messageId === subject.reference.messageId
+            : value.index === subject.reference.index) && value.text === subject.context.questionText);
+    const message = candidate && session.messages[candidate.index];
+    if (!message) return "unavailable";
+    const version = cloudSyncContextVersion, previous = knowledgeGraphQuestionAnalyses.get(message);
+    if (previous?.questionText === candidate.text && previous.version === version
+        && (previous.status === "pending" || previous.openRevision === knowledgeGraphOpenRevision)) return previous.status;
+    const operation = {questionText:candidate.text, version, openRevision:knowledgeGraphOpenRevision, status:"pending"};
+    knowledgeGraphQuestionAnalyses.set(message, operation);
+    operation.promise = analyzeSingleQuestionTeaching(candidate.text, candidate.key,
+        {solutionText:subject.context.solutionText}).then(teaching => {
+        operation.status = "unavailable";
+        if (version !== cloudSyncContextVersion || knowledgeGraphQuestionAnalyses.get(message) !== operation) return;
+        const current = resolveQuestionAnalysisCandidate(session, candidate, message);
+        if (!current || !teaching?.question_graph) return;
+        const field = candidate.role === "ai" ? "generatedTeaching" : "questionTeaching";
+        message[field] = mergeQuestionTeaching(message[field], teaching, candidate.text, message);
+        operation.status = "ready";
+        saveState();
+    }).finally(() => {
+        const modal = document.getElementById("knowledgeGraphModal");
+        if (version !== cloudSyncContextVersion || modal?.classList.contains("hidden")) return;
+        const current = getKnowledgeGraphQuestionSubject();
+        if (current && knowledgeGraphReferenceKey(current.reference) === knowledgeGraphReferenceKey(subject.reference)) {
+            renderKnowledgeGraph();
+        }
+    });
+    return operation.status;
 }
 
 function getActiveKnowledgeContext() {
@@ -20005,7 +20124,7 @@ function updateKnowledgeGraphScopeButton() {
     const legend = document.getElementById("knowledgeGraphLegendRelated");
     if (button) {
         button.textContent = "最近一题关联";
-        button.title = "显示当前正在讨论的最近一道题目，及其直接前置与后续知识";
+        button.title = "仅显示最近一道题目实际涉及的知识点及该题的知识关系";
         button.classList.toggle("active", knowledgeGraphViewMode === "focus");
         button.setAttribute("aria-pressed", String(knowledgeGraphViewMode === "focus"));
     }
@@ -20038,10 +20157,7 @@ function updateKnowledgeGraphModeButton() {
 
 
 function knowledgeGraphNodeState(nodeName, context) {
-    if (isKnowledgeGraphQuestionView() && (
-        context?.focusPoints?.includes(nodeName)
-        || context?.knowledgePoints?.includes(nodeName)
-    )) {
+    if (isKnowledgeGraphQuestionView()) {
         return {
             key: "current",
             label: "",
@@ -21183,15 +21299,14 @@ function renderKnowledgeGraphDetail() {
         title.textContent = "";
         const empty = document.createElement("div");
         empty.className = "graph-detail-empty";
-        empty.textContent = dmateUiText("无", "None");
+        empty.textContent = document.querySelector("#knowledgeGraphCanvas > .kg-empty")?.textContent
+            || dmateUiText("无", "None");
         detail.replaceChildren(empty);
         return;
     }
     title.hidden = false;
 
-    const node = findKnowledgeGraphNodeById(
-        knowledgeGraphSelectedNodeId
-    );
+    const node = displayedNodes.find(item => item.id === knowledgeGraphSelectedNodeId);
 
     if (!node) {
         title.textContent = "节点详情";
@@ -21201,8 +21316,8 @@ function renderKnowledgeGraphDetail() {
         return;
     }
 
-    // 和当前画布使用同一批节点：仅列出实际能画出关系线的两端。
-    // 跨模块前置关系仍保存在完整数据中，选择「全部知识→全部」时完整显示。
+    // Question node clones contain only this question's evidenced relations.
+    // Full course browsing keeps the original course prerequisites.
     const namesOnCanvas = new Set(displayedNodes.map(item => item.name));
     const visiblePrerequisites = node.prerequisites.filter(name => namesOnCanvas.has(name));
     const nextNodes = displayedNodes
@@ -21418,6 +21533,7 @@ function renderKnowledgeGraph() {
 
     knowledgeGraphRenderedQuestion = getKnowledgeGraphQuestionSubject();
     const context = knowledgeGraphRenderedQuestion?.context || {};
+    const questionAnalysis = queueKnowledgeGraphQuestionAnalysis(knowledgeGraphRenderedQuestion);
     const canvas = document.getElementById(
         "knowledgeGraphCanvas"
     );
@@ -21451,7 +21567,9 @@ function renderKnowledgeGraph() {
         modal.classList.remove("graph-fullscreen-view");
         const empty = document.createElement("div");
         empty.className = "kg-empty";
-        empty.textContent = dmateUiText("无", "None");
+        empty.textContent = !knowledgeGraphRenderedQuestion ? dmateUiText("无", "None") : questionAnalysis === "pending"
+            ? dmateUiText("正在识别本题知识关系", "Identifying this question's knowledge relations")
+            : dmateUiText("暂无有依据的题目知识关系", "No evidenced knowledge relations for this question");
         canvas.replaceChildren(empty);
         renderKnowledgeGraphSide();
         return;
@@ -21494,8 +21612,11 @@ function renderKnowledgeGraph() {
     }
     canvas.querySelectorAll(".kg-mobile-viewport,.kg-desktop-viewport").forEach(viewport => viewport._kgDispose?.());
     canvas.replaceChildren(fragment);
-    const viewKey = [mobileGraph ? "mobile" : "desktop", dmateUiLanguage(),
-        visibleNodes.map(node => node.id).join(",")].join("|");
+    const topologyKey = questionView
+        ? JSON.stringify([knowledgeGraphReferenceKey(context.questionReference),
+            visibleNodes.map(node => [node.id, node.prerequisites])])
+        : visibleNodes.map(node => node.id).join(",");
+    const viewKey = [mobileGraph ? "mobile" : "desktop", dmateUiLanguage(), topologyKey].join("|");
     installKnowledgeGraphViewMemory(canvas.querySelector(".kg-mobile-viewport,.kg-desktop-viewport"),
         viewKey, knowledgeGraphViewMemory, mobileGraph);
 

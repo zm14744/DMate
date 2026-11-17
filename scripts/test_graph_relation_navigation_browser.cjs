@@ -41,6 +41,7 @@ async function checkSelectedFrame(page, id, label) {
 async function checkDecoration(page, focus, label) {
   const result = await page.evaluate(async () => {
     const decorations = target => ({
+      count:target.querySelectorAll('.kg-node-group > rect,.kg-mobile-node').length,
       purple: [...target.querySelectorAll('.kg-node-group > rect,.kg-mobile-node')].filter(node => {
         const color = node.tagName.toLowerCase() === 'rect' ? node.getAttribute('fill') : node.style.backgroundColor;
         return color === '#5b21b6' || color === 'rgb(91, 33, 182)';
@@ -75,8 +76,10 @@ async function checkDecoration(page, focus, label) {
   assert.equal(result.png.type, 'image/png', label + ': real offscreen export produces PNG');
   assert.ok(result.png.bytes > 1000, label + ': real offscreen export contains graph pixels');
   if (focus) {
-    assert.ok(result.clone.purple > 0, label + ': current-question nodes retain their focus decoration');
-    assert.ok(result.fills.includes('#5b21b6'), label + ': focused PNG retains the current-question fill');
+    assert.ok(result.clone.count > 0, label + ': the actual question provides evidenced concepts');
+    assert.equal(result.clone.purple,result.clone.count, label + ': every displayed question node is purple');
+    assert.equal(result.fills.filter(color=>color==='#5b21b6').length,result.clone.count,
+      label + ': the focused PNG paints every involved node purple');
     assert.equal(result.statusPills, 0, label + ': focused details omit the redundant current-question pill');
   } else {
     assert.equal(result.clone.purple, 0, label + ': all-knowledge DOM/export clone has no current-question fill');
@@ -124,9 +127,14 @@ async function checkCase(browser, width, language) {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
     const before = await page.evaluate(language => {
       newChat();
-      const teaching = { category: '证明与归纳', knowledge_points: ['数学归纳法'], focus_points: ['数学归纳法'] };
+      const question='先用命题推理建立归纳步骤，再用数学归纳法证明自然数求和公式';
+      const teaching = { category: '证明与归纳', knowledge_points: ['数学归纳法','命题推理'], focus_points: ['数学归纳法'],
+        question_graph:{version:1,sources:{question,solution:''},nodes:[
+          {id:'logic_reasoning',evidence:[{source:'question',quote:'命题推理'}]},
+          {id:'proof_induction',evidence:[{source:'question',quote:'数学归纳法'}]}],
+          edges:[{from:'logic_reasoning',to:'proof_induction',evidence:[{source:'question',quote:question}]}]}};
       const session = getCurrent();
-      session.messages = [{ role: 'user', messageId: 'relation-question', text: '用数学归纳法证明自然数求和公式。',
+      session.messages = [{ role: 'user', messageId: 'relation-question', text: question,
         manualIsQuestion: true, questionTeaching: teaching }];
       session.teaching = teaching; session.learningQuestion = null;
       DMateI18n.setLanguage(language, false);

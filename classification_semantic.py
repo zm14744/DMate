@@ -13,9 +13,9 @@ from collections import deque
 
 from teaching import (
     CATEGORY_RULES,
-    _enrich_with_graph,
     analyze_question,
     classification_needs_semantic_fallback,
+    enrich_question_graph,
 )
 
 _LOCK = threading.Lock()
@@ -54,7 +54,7 @@ def _parse_json_reply(text):
     return parsed if isinstance(parsed, dict) else None
 
 
-def _validated_update(raw, existing):
+def _validated_update(raw, existing, question_text=None):
     if not isinstance(raw, dict) or not isinstance(existing, dict):
         return None
     category = raw.get("category")
@@ -96,7 +96,16 @@ def _validated_update(raw, existing):
         "confidence": "中",  # an unverified model judgement is not definitive
         "classification_source": "AI语义复核",
     })
-    return _enrich_with_graph(updated)
+    graph = existing.get("question_graph")
+    sources = graph.get("sources") if isinstance(graph, dict) else None
+    sources = sources if isinstance(sources, dict) else {}
+    if question_text is None:
+        question_text = sources.get("question", "")
+    # Carry an actual answer only when the existing evidence belongs to this
+    # exact question. Never accept graph/solution fields from the model update.
+    solution_text = sources.get("solution", "") if sources.get("question") == question_text else ""
+    return enrich_question_graph(updated, question_text,
+                                 solution_text if isinstance(solution_text, str) else "")
 
 
 def classify_ambiguous_questions(entries):
@@ -121,17 +130,18 @@ def classify_ambiguous_questions(entries):
                 break
             if not classification_needs_semantic_fallback(teaching):
                 continue
-            question = str(text or "").strip()[:1600]
+            source_question = str(text or "").strip()
+            question = source_question[:1600]
             if len(question) < 8:
                 continue
-            digest = hashlib.sha256(question.encode("utf-8")).hexdigest()
+            digest = hashlib.sha256(source_question.encode("utf-8")).hexdigest()
             cached = _CACHE.get(digest)
             if cached and now - cached[0] < 3600:
-                validated = _validated_update(cached[1], teaching)
+                validated = _validated_update(cached[1], teaching, source_question)
                 if validated is not None:
                     response[str(key)] = validated
             else:
-                chosen.append((str(key), question, teaching, digest))
+                chosen.append((str(key), question, teaching, digest, source_question))
     if not chosen or not _can_call_now():
         return response
 
@@ -148,7 +158,7 @@ def classify_ambiguous_questions(entries):
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": json.dumps([
-            {"id": i, "question": q} for i, (_, q, _, _) in enumerate(chosen)
+            {"id": i, "question": q} for i, (_, q, _, _, _) in enumerate(chosen)
         ], ensure_ascii=False)},
     ]
     # Fixed small budget: unlike /chat this must not invoke a reasoning model.
@@ -169,8 +179,8 @@ def classify_ambiguous_questions(entries):
             index = raw["id"]
             if index < 0 or index >= len(chosen):
                 continue
-            key, _, prior, digest = chosen[index]
-            validated = _validated_update(raw, prior)
+            key, _question, prior, digest, source_question = chosen[index]
+            validated = _validated_update(raw, prior, source_question)
             if validated is None:
                 continue
             response[key] = validated

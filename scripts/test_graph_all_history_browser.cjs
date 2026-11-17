@@ -32,19 +32,22 @@ async function recentHasNoHistory(page, label) {
 
 async function seedConversations(page) {
   return page.evaluate(() => {
-    const teaching = (category, point, difficulty='简单', type='判断题') => ({category,
-      focus_points:[point],knowledge_points:[point],prerequisite_points:[],knowledge_path:[point],difficulty,question_type:type});
+    const teaching = (category, point, question, id, quote, difficulty='简单', type='判断题') => ({category,
+      focus_points:[point],knowledge_points:[point],prerequisite_points:[],knowledge_path:[point],difficulty,question_type:type,
+      question_graph:{version:1,sources:{question,solution:''},nodes:[{id,evidence:[{source:'question',quote}]}],edges:[]}});
     const shared = '判断 p 与 q 的合取在什么情况下为真。';
     const generated = '证明命题 p 的双重否定与 p 等价。';
-    const logical = teaching('命题逻辑','逻辑联结词');
-    const sets = teaching('集合与关系','集合运算','中等','计算题');
+    const ocrQuestion = '计算集合 A={1,2}, B={2,3} 的并集。';
+    const powerQuestion = '列出集合 A={1,2} 的幂集。';
+    const logical = teaching('命题逻辑','逻辑联结词',shared,'logic_connectives','合取');
+    const sets = teaching('集合与关系','集合运算',ocrQuestion,'set_operation','并集','中等','计算题');
     const top = {id:'history-top',name:'顶部对话 <b>TOP</b>.',nameSource:'user',createdAt:1,updatedAt:1,deletedMessageIds:{},learningQuestion:null,
       teaching:logical,messages:[
         {messageId:'top-manual',role:'user',text:shared,manualIsQuestion:true,questionTeaching:logical,createdAt:999},
         {messageId:'top-reply',role:'ai',text:'这是对合取条件的解释，不是新题。',createdAt:998},
-        {messageId:'top-ocr',role:'user',text:'【题目文字】\n计算集合 A={1,2}, B={2,3} 的并集。',source:'ocr',ocrIsQuestion:true,questionTeaching:sets,createdAt:900},
+        {messageId:'top-ocr',role:'user',text:'【题目文字】\n'+ocrQuestion,source:'ocr',ocrIsQuestion:true,questionTeaching:sets,createdAt:900},
         {messageId:'top-generated',role:'ai',text:generated,generatedQuestion:generated,
-          generatedTeaching:teaching('命题逻辑','逻辑等价','困难','证明题'),createdAt:1},
+          generatedTeaching:teaching('命题逻辑','逻辑等价',generated,'logic_equivalence','双重否定','困难','证明题'),createdAt:1},
         {messageId:'top-duplicate',role:'user',text:shared,manualIsQuestion:true,questionTeaching:logical},
         {messageId:'top-explicit-no',role:'user',text:'证明集合 A 的双重补等于 A。',manualIsQuestion:false,questionTeaching:sets},
         {messageId:'top-image-no',role:'user',text:'【题目文字】\n求函数 f 的复合。',source:'ocr',ocrIsQuestion:false},
@@ -57,7 +60,8 @@ async function seedConversations(page) {
       teaching:sets,messages:[
         {messageId:'lower-shared',role:'user',text:shared,manualIsQuestion:true,questionTeaching:logical,createdAt:9000},
         {messageId:'lower-follow-up',role:'user',text:'详细解释一下',manualIsQuestion:false,createdAt:5000},
-        {messageId:'lower-later',role:'user',text:'列出集合 A={1,2} 的幂集。',manualIsQuestion:true,questionTeaching:sets,createdAt:2},
+        {messageId:'lower-later',role:'user',text:powerQuestion,manualIsQuestion:true,
+          questionTeaching:teaching('集合与关系','集合运算',powerQuestion,'set_operation','幂集','中等','计算题'),createdAt:2},
         {messageId:'lower-answer',role:'user',text:'这是学生的解答',manualIsQuestion:true,isRetestAnswer:true},
         {messageId:'lower-reply',role:'ai',text:'应当逐个检查这些子集'}
       ]};
@@ -115,8 +119,8 @@ async function checkCase(browser,width,language) {
     await page.waitForFunction(()=>knowledgeGraphViewMode==='full'&&knowledgeGraphScope==='history'&&knowledgeGraphSelectedNodeId==='logic_equivalence');
     assert.equal(await page.evaluate(()=>currentId),'history-lower',label+': graph navigation does not switch the conversation');
     assert.equal(await page.locator('#knowledgeGraphDetail .graph-status-pill.current').count(),0,label+': history graph navigation omits the redundant detail pill');
-    assert.equal(await page.evaluate(()=>knowledgeGraphDisplayedNodes().some(node=>node.id==='logic_truth_table')),true,
-      label+': history graph includes the question prerequisite instead of showing an entire module');
+    assert.deepEqual(await page.evaluate(()=>knowledgeGraphDisplayedNodes().map(node=>({id:node.id,prerequisites:node.prerequisites}))),
+      [{id:'logic_equivalence',prerequisites:[]}],label+': history graph includes only the question concept without fixed course prerequisites');
     assert.equal(await page.evaluate(()=>knowledgeGraphNodeState('逻辑等价',getActiveKnowledgeContext()).fill),'#5b21b6',
       label+': history graph retains the selected question concepts in purple');
     await recentHasNoHistory(page,label);
@@ -199,7 +203,10 @@ async function checkReplyRetention(browser) {
     assert.match(await page.locator('#knowledgeGraphHistoryTab').innerText(),/5/);
     const generated='证明对于任意命题 p，p 与 p 的合取和 p 等价。';
     const teaching={category:'命题逻辑',knowledge_points:['逻辑等价'],focus_points:['逻辑等价'],
-      prerequisite_points:['逻辑联结词'],knowledge_path:['逻辑等价'],difficulty:'简单',question_type:'证明题'};
+      prerequisite_points:[],knowledge_path:['逻辑等价'],difficulty:'简单',question_type:'证明题',
+      question_graph:{version:1,sources:{question:generated,solution:''},nodes:[
+        {id:'logic_connectives',evidence:[{source:'question',quote:'合取'}]},
+        {id:'logic_equivalence',evidence:[{source:'question',quote:'等价'}]}],edges:[]}};
     await requests[0].fulfill({status:200,contentType:'text/event-stream',body:'event: final\ndata: '+JSON.stringify({
       reply:generated,generated_question:generated,generated_teaching:teaching})+'\n\n'});
     await page.waitForFunction(text=>getCurrent().messages.some(message=>message.generatedQuestion===text),generated);

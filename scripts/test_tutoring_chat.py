@@ -270,15 +270,112 @@ class TutoringChatTests(unittest.TestCase):
         payload["solution_reference"]["question"] = old_question
         payload["reasoning_effort_override"] = "high"
 
-        _, context = self.post(payload, expected_mode="full_solution")
+        corrected, context = self.post(payload, expected_mode="full_solution")
         self.assertEqual(context["category"], "集合与关系")
         self.assertIn(context["difficulty"], ("简单", "中等"))
         self.assertNotIn("reasoning_effort_override", context)
+        self.assertEqual(corrected["teaching"]["question_graph"]["sources"]["question"],
+                         "设A、B为集合，证明A∩B⊆A。")
+        self.assertNotIn(old_question, repr(corrected["teaching"]["question_graph"]))
         # Even the error path must not substitute an unrelated old solution
         # merely because a current, different proof permits a full correction.
         body, _ = self.post(payload, FAILURE, expected_mode="full_solution", expected_status=503)
         self.assertNotIn(REFERENCE, repr(body))
         self.assertNotIn("solution_partial", body)
+
+    def test_question_graph_uses_the_final_guarded_reply_as_solution_evidence(self):
+        final_reply = "由子群的陪集构造划分，再根据每个陪集的大小得到整除结论"
+        with patch.object(self.runtime, "audit_explicit_count_answer", return_value=final_reply):
+            body, _ = self.post(self.payload("只给一个提示，先不要完整证明。"),
+                                expected_mode="hint")
+        self.assertEqual(body["reply"], final_reply)
+        self.assertEqual(body["teaching"]["question_graph"]["sources"], {
+            "question": QUESTIONS["zh-CN"], "solution": final_reply,
+        })
+        self.assertNotIn(MOCK_REPLY, repr(body["teaching"]["question_graph"]))
+
+    def test_question_graph_preserves_the_explicit_historical_question_source(self):
+        other_question = "设集合A={1,2,3}，B={2,3,4}，求集合A与集合B的交集和并集。"
+        for language in ("zh-CN", "en"):
+            with self.subTest(language=language):
+                payload = self.payload("只给一个提示，不要完整答案。", language, history=[
+                    {"role": "user", "content": QUESTIONS[language]},
+                    {"role": "assistant", "content": "An earlier response."},
+                    {"role": "user", "content": other_question},
+                    {"role": "assistant", "content": "A response to the later problem."},
+                ])
+                body, _ = self.post(payload)
+                sources = body["teaching"]["question_graph"]["sources"]
+                self.assertEqual(sources["question"], QUESTIONS[language])
+                self.assertEqual(sources["solution"], body["reply"])
+                self.assertNotIn(other_question, repr(sources))
+
+    def test_generated_question_graph_uses_its_own_question_and_hidden_answer(self):
+        question = "设集合A={1,2,3}，B={2,3,4}，求A∪B与A∩B。"
+        answer = "A∪B={1,2,3,4}；A∩B={2,3}"
+        generated = {"ok": True, "reply": "【题目】\n" + question
+                     + "\n[[WRONGBOOK_ANSWER]]" + answer + "[[/WRONGBOOK_ANSWER]]"}
+        body, _ = self.post({
+            "language": "zh-CN", "request_kind": "exercise",
+            "messages": [
+                {"role": "user", "content": QUESTIONS["zh-CN"]},
+                {"role": "assistant", "content": "之前的群论题已经讲解完成"},
+                {"role": "user", "content": "请出一道集合运算练习题，不要给出答案"},
+            ],
+        }, generated, exercise=True)
+        graph = body["generated_teaching"]["question_graph"]
+        self.assertEqual(graph["sources"], {
+            "question": body["generated_question"], "solution": body["generated_answer"],
+        })
+        self.assertEqual(body["generated_question"], question)
+        self.assertEqual(body["generated_answer"], answer)
+        self.assertNotIn(answer, body["reply"])
+        self.assertNotIn(QUESTIONS["zh-CN"], repr(graph))
+
+    def test_failed_full_solution_does_not_promote_the_saved_answer_to_graph_evidence(self):
+        body, _ = self.post(self.payload("请给出完整证明。"), FAILURE,
+                            expected_mode="full_solution", reference_allowed=True)
+        self.assertTrue(body["solution_partial"])
+        graph = body["teaching"]["question_graph"]
+        self.assertEqual(graph["sources"].get("solution", ""), "")
+        self.assertNotIn(REFERENCE, repr(graph))
+
+    def test_history_analysis_uses_each_actual_solution_for_the_same_question(self):
+        question = "请讨论真值表与逻辑等价"
+        solutions = ["利用真值表证明逻辑等价", "利用逻辑等价计算真值表"]
+        response = self.client.post("/analyze-questions", json={"questions": [
+            {"key": str(index), "text": question, "solution": solution}
+            for index, solution in enumerate(solutions)
+        ]})
+        self.addCleanup(response.close)
+        self.assertEqual(response.status_code, 200)
+        graphs = [item["teaching"]["question_graph"] for item in response.get_json()["results"]]
+        for graph, solution in zip(graphs, solutions):
+            self.assertEqual(graph["sources"], {"question": question, "solution": solution})
+        self.assertEqual({node["id"] for node in graphs[0]["nodes"]},
+                         {node["id"] for node in graphs[1]["nodes"]})
+        edge_pairs = lambda graph: {(edge["from"], edge["to"]) for edge in graph["edges"]}
+        self.assertEqual(edge_pairs(graphs[0]), {("logic_truth_table", "logic_equivalence")})
+        self.assertEqual(edge_pairs(graphs[1]), {("logic_equivalence", "logic_truth_table")})
+
+    def test_history_analysis_ignores_non_text_solutions_and_bounds_text(self):
+        question = "请讨论真值表与逻辑等价"
+        prefix = "x" * self.runtime.MAX_MESSAGE_CHARS
+        response = self.client.post("/analyze-questions", json={"questions": [
+            {"key": "absent", "text": question},
+            {"key": "object", "text": question, "solution": {"text": "利用真值表证明逻辑等价"}},
+            {"key": "array", "text": question, "solution": ["利用真值表证明逻辑等价"]},
+            {"key": "long", "text": question, "solution": prefix + "利用真值表证明逻辑等价"},
+        ]})
+        self.addCleanup(response.close)
+        self.assertEqual(response.status_code, 200)
+        graphs = {item["key"]: item["teaching"]["question_graph"]
+                  for item in response.get_json()["results"]}
+        for key in ("absent", "object", "array"):
+            self.assertEqual(graphs[key]["sources"]["solution"], "")
+            self.assertEqual(graphs[key]["edges"], [])
+        self.assertEqual(graphs["long"]["sources"]["solution"], prefix)
+        self.assertEqual(graphs["long"]["edges"], [])
 
 
 if __name__ == "__main__":

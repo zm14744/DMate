@@ -126,8 +126,11 @@ async function checkEmptyRecent(browser, width) {
     // the application's active-question selector (no replaced context function).
     const fixture = await page.evaluate(() => {
       const session = getCurrent();
-      const teaching = { category: '命题逻辑', knowledge_points: ['逻辑联结词'], focus_points: ['逻辑联结词'] };
-      session.messages = [{ role: 'user', text: '判断命题 p 与 q 的合取在什么情况下为真。', manualIsQuestion: true, questionTeaching: teaching }];
+      const question = '判断命题 p 与 q 的合取在什么情况下为真。';
+      const teaching = { category: '命题逻辑', knowledge_points: ['逻辑联结词'], focus_points: ['逻辑联结词'],
+        question_graph: { version: 1, sources: { question, solution: '' },
+          nodes: [{ id: 'logic_connectives', evidence: [{ source: 'question', quote: '合取' }] }], edges: [] } };
+      session.messages = [{ role: 'user', text: question, manualIsQuestion: true, questionTeaching: teaching }];
       session.teaching = teaching;
       session.learningQuestion = null;
       selectKnowledgeGraphDisplayMode('focus');
@@ -135,11 +138,12 @@ async function checkEmptyRecent(browser, width) {
       return { names: displayed.map(node => node.name), total: knowledgeGraphData.nodes.length,
         selected: knowledgeGraphSelectedNodeId };
     });
-    assert.ok(fixture.names.includes('逻辑联结词'), width + ': question concept returns');
-    assert.ok(fixture.names.includes('命题与真值'), width + ': direct prerequisite returns');
-    assert.ok(fixture.names.includes('真值表'), width + ': direct follow-up returns');
+    assert.deepEqual(fixture.names, ['逻辑联结词'], width + ': only this question concept returns, with no course prerequisite or follow-up');
     assert.ok(fixture.names.length < fixture.total, width + ': valid focus contains only related concepts');
     assert.equal(fixture.selected, 'logic_connectives');
+    assert.deepEqual(await page.evaluate(() => knowledgeGraphDisplayedNodes().map(node => ({
+      prerequisites: node.prerequisites, fill: knowledgeGraphNodeState(node.name, getActiveKnowledgeContext()).fill
+    }))), [{ prerequisites: [], fill: '#5b21b6' }], width + ': every involved node is purple and its relations come only from the question');
     assert.equal(await page.locator('#knowledgeGraphDetailTitle').evaluate(title => title.hidden), false, width + ': selected title returns');
     assert.equal(await page.locator('#knowledgeGraphDetailTitle').textContent(), '逻辑联结词');
     assert.equal(await page.locator('#knowledgeGraphDetail .graph-detail-field').count(), 2);
@@ -150,11 +154,13 @@ async function checkEmptyRecent(browser, width) {
 
     await page.evaluate(() => {
       const session = getCurrent();
-      session.messages[0].questionTeaching = { category: '命题逻辑', knowledge_points: ['图谱中不存在的概念'] };
+      session.messages[0].questionTeaching = { category: '命题逻辑', knowledge_points: ['图谱中不存在的概念'],
+        question_graph: { version: 1, sources: { question: session.messages[0].text, solution: '' },
+          nodes: [{ id: 'unknown-concept', evidence: [{ source: 'question', quote: '合取' }] }], edges: [] } };
       session.teaching = session.messages[0].questionTeaching;
       renderKnowledgeGraph();
     });
-    await assertEmpty(page, '无', width + '/unmatched question concepts');
+    await assertEmpty(page, '暂无有依据的题目知识关系', width + '/unmatched question concepts');
     if (process.env.KG_SCREENSHOT_DIR) await page.screenshot({ path: process.env.KG_SCREENSHOT_DIR + '/graph-empty-recent-' + width + '.png' });
     assert.deepEqual(errors, [], width + ': browser errors');
     console.log('PASS ' + width + ': empty recent graph/detail, live language, export guard, full camera memory and valid-question recovery');
@@ -172,16 +178,17 @@ async function checkHistoryModes(browser, width) {
     await page.evaluate(() => { newChat(); openKnowledgeGraph(); });
     await page.waitForFunction(() => knowledgeGraphInitialized);
     const metadataBefore = await page.evaluate(() => {
-      const teaching = (point, difficulty, type) => ({ category: '命题逻辑', knowledge_points: [point], focus_points: [point],
-        difficulty, question_type: type });
+      const teaching = (point, difficulty, type, question, id, quote) => ({ category: '命题逻辑', knowledge_points: [point], focus_points: [point],
+        difficulty, question_type: type, question_graph: { version: 1, sources: { question, solution: '' },
+          nodes: [{ id, evidence: [{ source: 'question', quote }] }], edges: [] } });
       const generatedQuestion = '证明命题 p 的双重否定与 p 等价。';
       getCurrent().messages = [
         { role: 'user', text: '判断 p 与 q 的合取在什么情况下为真。', manualIsQuestion: true,
-          questionTeaching: teaching('逻辑联结词', '简单', '判断题') },
+          questionTeaching: teaching('逻辑联结词', '简单', '判断题', '判断 p 与 q 的合取在什么情况下为真。', 'logic_connectives', '合取') },
         { role: 'user', text: '【题目文字】\n判断 p 与 q 的析取在什么情况下为假。', source: 'ocr', ocrIsQuestion: true,
-          questionTeaching: teaching('逻辑联结词', '中等', '选择题') },
+          questionTeaching: teaching('逻辑联结词', '中等', '选择题', '判断 p 与 q 的析取在什么情况下为假。', 'logic_connectives', '析取') },
         { role: 'ai', text: generatedQuestion, generatedQuestion, generatedExercise: true,
-          generatedTeaching: teaching('逻辑等价', '困难', '证明题') }
+          generatedTeaching: teaching('逻辑等价', '困难', '证明题', generatedQuestion, 'logic_equivalence', '双重否定') }
       ];
       getCurrent().learningQuestion = null;
       getCurrent().teaching = getCurrent().messages[2].generatedTeaching;

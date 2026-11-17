@@ -135,8 +135,11 @@ async function fixture(browser, width, offline = false) {
   if (offline) await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
   else await page.evaluate(() => {
     newChat();
-    const teaching = { category: '命题逻辑', knowledge_points: ['逻辑联结词'], focus_points: ['逻辑联结词'] };
-    getCurrent().messages = [{ role: 'user', text: '判断命题 p 与 q 的合取在什么情况下为真。', manualIsQuestion: true, questionTeaching: teaching }];
+    const question = '判断命题 p 与 q 的合取在什么情况下为真。';
+    const teaching = { category: '命题逻辑', knowledge_points: ['逻辑联结词'], focus_points: ['逻辑联结词'],
+      question_graph: { version: 1, sources: { question, solution: '' },
+        nodes: [{ id: 'logic_connectives', evidence: [{ source: 'question', quote: '合取' }] }], edges: [] } };
+    getCurrent().messages = [{ role: 'user', text: question, manualIsQuestion: true, questionTeaching: teaching }];
     getCurrent().teaching = teaching; getCurrent().learningQuestion = null;
   });
   return { page, context, errors, indexing, modelCalls };

@@ -72,6 +72,7 @@ from teaching import (
     _extract_explicit_review_question,
     analyze_messages,
     analyze_question,
+    enrich_question_graph,
     extract_current_request,
     normalize_user_request_text,
 )
@@ -4571,6 +4572,7 @@ def _chat_response(on_delta=None, cancelled=None):
             generated_question = chosen_candidate["question"]
             generated_answer = chosen_candidate["answer"]
             generated_teaching = chosen_candidate["teaching"]
+            generated_solution_text = generated_answer
             actual_difficulty = generated_teaching.get("difficulty")
             # 题干和参照知识点校验通过后即可展示；难度评级如实返回。
             reply = localized("【题目】\n\n", "[Question]\n\n", response_language) + generated_question
@@ -4600,6 +4602,7 @@ def _chat_response(on_delta=None, cancelled=None):
                     if (isinstance(explained, dict) and explained.get("ok") and explanation_text
                             and not re.search(r"MATHPROTECTTOKEN\d+ENDTOKEN|DMATE_MATH_\d+_END", explanation_text, re.I)):
                         answer_section += localized("\n\n【解析】\n\n", "\n\n[Explanation]\n\n", response_language) + explanation_text
+                        generated_solution_text += "\n\n" + explanation_text
                     else:
                         answer_section += localized("\n\n解析暂时未能生成，已先保留出题时的参考答案",
                             "\n\nThe explanation is unavailable. The reference answer saved with the exercise is shown above.", response_language)
@@ -4624,6 +4627,22 @@ def _chat_response(on_delta=None, cancelled=None):
             # automatic hints. Later, separate requests for help still use the
             # normal hint tutoring flow. Answers/explanations explicitly asked
             # for in this same turn remain supported.
+
+        if generated_question and generated_teaching:
+            # Bind the graph to the validated new exercise, never its request
+            # or the earlier problem used as a generation reference.
+            generated_teaching = enrich_question_graph(
+                generated_teaching, generated_question, generated_solution_text
+            )
+        elif not effective_exercise_request:
+            # Reuse the exact source selected by analyze_messages, including
+            # navigation to an earlier question. Only the final guarded reply
+            # may provide solution evidence; drafts and failed replies cannot.
+            graph = teaching.get("question_graph") if isinstance(teaching, dict) else None
+            sources = graph.get("sources") if isinstance(graph, dict) else None
+            graph_question = sources.get("question") if isinstance(sources, dict) else None
+            if isinstance(graph_question, str) and graph_question.strip():
+                teaching = enrich_question_graph(teaching, graph_question, reply)
 
         response = {
             "reply": reply,
@@ -4687,9 +4706,16 @@ def analyze_questions_batch():
         if isinstance(item, dict):
             key = str(item.get("key", ""))
             text = str(item.get("text", "")).strip()
+            solution = item.get("solution")
         else:
             key = ""
             text = str(item or "").strip()
+            solution = None
+
+        # Legacy-history repair may include this question's stored answer.
+        # Treat other JSON types as absent and keep the same per-item bounds
+        # as the question text; no extra inference request is involved.
+        solution = solution[:MAX_MESSAGE_CHARS] if isinstance(solution, str) else ""
 
         if not text:
             results.append({
@@ -4702,6 +4728,8 @@ def analyze_questions_batch():
             teaching = analyze_question(
                 text[:MAX_MESSAGE_CHARS]
             )
+            if solution:
+                teaching = enrich_question_graph(teaching, text[:MAX_MESSAGE_CHARS], solution)
         except Exception as exc:
             print("历史题目知识识别失败：", repr(exc))
             teaching = None

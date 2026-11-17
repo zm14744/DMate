@@ -25,11 +25,13 @@ async function checkCase(browser, width) {
       sessions = Array.from({ length: 50 }, (_, conversation) => ({
         id: 'selection-history-' + conversation, name: 'Performance fixture ' + conversation, nameSource: 'user',
         deletedMessageIds: {}, learningQuestion: null, teaching,
-        messages: Array.from({ length: 100 }, (_, index) => ({
-          messageId: conversation + '-' + index, role: index % 2 ? 'ai' : 'user',
-          text: index % 10 === 0 ? '证明命题 p 与 ' + index + ' 的关系。' + '条件 '.repeat(100) : '解释内容 '.repeat(120),
-          manualIsQuestion: index % 10 === 0, questionTeaching: index % 10 === 0 ? teaching : null
-        }))
+        messages: Array.from({ length: 100 }, (_, index) => {
+          const text = index % 10 === 0 ? '使用数学归纳法证明命题 p 与 ' + index + ' 的关系。' + '条件 '.repeat(100) : '解释内容 '.repeat(120);
+          return { messageId: conversation + '-' + index, role: index % 2 ? 'ai' : 'user', text,
+            manualIsQuestion: index % 10 === 0, questionTeaching: index % 10 === 0 ? {...teaching,
+              question_graph: {version: 1, sources: {question: text, solution: ''},
+                nodes: [{id: 'proof_induction', evidence: [{source: 'question', quote: '数学归纳法'}]}], edges: []}} : null };
+        })
       }));
       currentId = sessions[0].id;
       const bytes = new TextEncoder().encode(JSON.stringify(sessions)).length;
@@ -74,8 +76,11 @@ async function checkCase(browser, width) {
     // Mutate the existing messages array: object-identity caches would go stale.
     const updated = await page.evaluate(() => {
       const session = sessions[0];
-      session.messages.push({ role: 'user', messageId: 'selection-new-question-1', text: '证明命题 p 的双重否定与 p 等价',
-        manualIsQuestion: true, questionTeaching: session.teaching });
+      const text = '证明命题 p 的双重否定与 p 等价';
+      session.messages.push({ role: 'user', messageId: 'selection-new-question-1', text,
+        manualIsQuestion: true, questionTeaching: {category: '命题逻辑', knowledge_points: ['逻辑等价'], focus_points: ['逻辑等价'],
+          question_graph: {version: 1, sources: {question: text, solution: ''},
+            nodes: [{id: 'logic_equivalence', evidence: [{source: 'question', quote: '双重否定'}]}], edges: []}} });
       window.__selectionHistoryCalls = 0;
       renderKnowledgeGraph();
       return { calls: window.__selectionHistoryCalls, count: document.getElementById('knowledgeGraphHistoryTab').textContent };
@@ -84,8 +89,11 @@ async function checkCase(browser, width) {
     assert.equal(updated.count, '题目历史 (501)');
     if (mobile) await page.locator('.kg-mobile-expand').click();
     await page.evaluate(() => {
-      sessions[0].messages.push({ role: 'user', messageId: 'selection-new-question-2', text: '证明命题 p 与 q 的双重否定定律',
-        manualIsQuestion: true, questionTeaching: sessions[0].teaching });
+      const text = '证明命题 p 与 q 的双重否定定律';
+      sessions[0].messages.push({ role: 'user', messageId: 'selection-new-question-2', text,
+        manualIsQuestion: true, questionTeaching: {category: '命题逻辑', knowledge_points: ['逻辑等价'], focus_points: ['逻辑等价'],
+          question_graph: {version: 1, sources: {question: text, solution: ''},
+            nodes: [{id: 'logic_equivalence', evidence: [{source: 'question', quote: '双重否定'}]}], edges: []}} });
       window.__selectionHistoryCalls = 0;
     });
     await page.locator('#knowledgeGraphHistoryTab').click();
