@@ -50,8 +50,7 @@
 }
 #knowledgeGraphModal .offline-graph-concept-button { margin-top:12px; }
 
-/* Prerequisite/successor terms remain text; associated course links remain
-   buttons. Both use the same borderless filled labels as the libraries. */
+/* Relation navigation and course links share the libraries' filled buttons. */
 @layer dmate-button-themes {
   body.offline-workspace #knowledgeGraphModal :is(.graph-detail-term,.offline-graph-concept-button) {
     box-sizing:border-box;
@@ -70,10 +69,10 @@
     max-width:100%;
     overflow-wrap:anywhere;
   }
-  body.offline-workspace #knowledgeGraphModal .offline-graph-concept-button:not(:disabled):not([aria-disabled="true"]):is(:hover,:focus-visible,:active) {
+  body.offline-workspace #knowledgeGraphModal :is(button.graph-detail-term,.offline-graph-concept-button):not(:disabled):not([aria-disabled="true"]):is(:hover,:focus-visible,:active) {
     background:var(--dm-filled-hover-bg,var(--dm-selected-hover))!important;
   }
-  body.offline-workspace #knowledgeGraphModal .offline-graph-concept-button:focus-visible {
+  body.offline-workspace #knowledgeGraphModal :is(button.graph-detail-term,.offline-graph-concept-button):focus-visible {
     outline:2px solid var(--dm-selected-ring)!important;
     outline-offset:2px!important;
   }

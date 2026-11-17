@@ -220,15 +220,20 @@ function mount(host,options={}) {
   if(node.level){const pill=document.createElement('span');pill.className='graph-level-pill';pill.textContent=node.level;subline.append(pill);}
   detail.append(subline);
   const names=new Set(visibleNodes.map(n=>n.name));
-  const field=(text,values,empty)=>{
+  const field=(text,values,empty,relations=false)=>{
    const box=document.createElement('div');box.className='graph-detail-field';
    const label=document.createElement('div');label.className='graph-detail-field-label';label.textContent=dmateUiText(text);
    const content=document.createElement('div');content.className='graph-detail-field-value graph-detail-term-list';
-   if(values.length)for(const name of values){const term=document.createElement('span');term.className='graph-detail-term';term.textContent=dmateKnowledgeLabel(name);content.append(term);}else content.textContent=dmateUiText(empty);
+   if(values.length)for(const name of values){
+    const target=relations?allNodes.find(record=>record.name===name):null;
+    const term=document.createElement(target?'button':'span');term.className='graph-detail-term';term.textContent=dmateKnowledgeLabel(name);
+    if(target){term.type='button';term.dataset.graphNodeId=String(target.id);term.addEventListener('click',()=>navigateRelation(target),{signal});}
+    content.append(term);
+   }else content.textContent=dmateUiText(empty);
    box.append(label,content);detail.append(box);
   };
-  field('前置知识',node.prerequisites.filter(n=>names.has(n)),'当前图中暂无前置');
-  field('后续知识',visibleNodes.filter(n=>n.prerequisites.includes(node.name)).map(n=>n.name),'当前图中暂无后续');
+  field('前置知识',node.prerequisites.filter(n=>names.has(n)),'当前图中暂无前置',true);
+  field('后续知识',visibleNodes.filter(n=>n.prerequisites.includes(node.name)).map(n=>n.name),'当前图中暂无后续',true);
   if(node.note)field('说明',[node.note],'');
   if(typeof options.renderLearningLinks==='function'){
    // The offline study workspace owns concept/exercise matching and routing.
@@ -253,18 +258,32 @@ function mount(host,options={}) {
   updateMobileGraphEdgeEmphasis(canvas,knowledgeGraphSelectedNodeId);renderDetail();
   options.onSelectionChange?.(allNodes.find(node=>String(node.id)===knowledgeGraphSelectedNodeId));
  }
- function revealSelectedGraphNode(){
+ function navigateRelation(record){
+  knowledgeGraphSelectedNodeId=String(record.id);
+  const targetCategory=categories.includes(record.category)?record.category:'全部';
+  if(category!==targetCategory)setCategory(targetCategory);
+  if(isMobileAppShell()&&!host.classList.contains('graph-fullscreen-view'))toggleKnowledgeGraphFullscreenView();
+  selectKnowledgeGraphNode(knowledgeGraphSelectedNodeId);
+  revealSelectedGraphNode({focus:true,nearest:true});
+ }
+ function revealSelectedGraphNode({focus=false,nearest=false}={}){
+  const targetId=knowledgeGraphSelectedNodeId,targetCategory=category;
   window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>{
-   if(destroyed)return;
-   const node=canvas.querySelector(`[data-node-id="${CSS.escape(knowledgeGraphSelectedNodeId)}"]`);
+   if(destroyed||knowledgeGraphSelectedNodeId!==targetId||category!==targetCategory)return;
+   const node=canvas.querySelector(`[data-node-id="${CSS.escape(targetId)}"]`);
    const viewport=canvas.querySelector('.kg-mobile-viewport,.kg-desktop-viewport');
    if(!node||!viewport)return;
    viewport._kgBeginViewInteraction?.();
    const rect=node.getBoundingClientRect(),view=viewport.getBoundingClientRect();
-   viewport.scrollLeft+=rect.left+rect.width/2-(view.left+viewport.clientLeft+viewport.clientWidth/2);
-   viewport.scrollTop+=rect.top+rect.height/2-(view.top+viewport.clientTop+viewport.clientHeight/2);
+   const left=view.left+viewport.clientLeft,top=view.top+viewport.clientTop;
+   const right=left+viewport.clientWidth,bottom=top+viewport.clientHeight;
+   viewport.scrollLeft+=nearest?(rect.left<left?rect.left-left-8:rect.right>right?rect.right-right+8:0)
+    :rect.left+rect.width/2-(left+viewport.clientWidth/2);
+   viewport.scrollTop+=nearest?(rect.top<top?rect.top-top-8:rect.bottom>bottom?rect.bottom-bottom+8:0)
+    :rect.top+rect.height/2-(top+viewport.clientHeight/2);
    viewport._kgRemember?.();
    if(!isMobileAppShell())desktopFitted=false;
+   if(focus)node.focus({preventScroll:true});
   }));
  }
  function restoreInline(){

@@ -828,6 +828,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         #appearanceModal :is(#appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone),
         #knowledgeGraphModal .kg-history-refresh,
         #knowledgeGraphModal .kg-history-actions > button,
+        #knowledgeGraphModal button.graph-detail-term,
         #downloadModal .download-actions > a,
         #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel),
         #accountModal .account-body button
@@ -838,6 +839,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         #appearanceModal :is(#appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone),
         #knowledgeGraphModal .kg-history-refresh,
         #knowledgeGraphModal .kg-history-actions > button,
+        #knowledgeGraphModal button.graph-detail-term,
         #downloadModal .download-actions > a,
         #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel),
         #accountModal .account-body button

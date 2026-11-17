@@ -419,6 +419,71 @@ async function png(page) {
   assert.equal(await download.failure(), null);
 }
 
+async function relationNavigation(page) {
+  const selected = id => frame(page).locator('[data-node-id="' + id + '"].selected');
+  const assertDestination = async (id, name, module) => {
+    await page.waitForFunction(({id, name, module}) => {
+      const host = document.getElementById('knowledgeGraphModal');
+      const node = host.querySelector('[data-node-id="' + id + '"].selected');
+      const viewport = host.querySelector('.kg-mobile-viewport,.kg-desktop-viewport');
+      if (!node || !viewport || host.querySelector('#knowledgeGraphCategory').value !== module
+        || host.querySelector('#knowledgeGraphDetailTitle').textContent !== DMateI18n.t(name)) return false;
+      const box = node.getBoundingClientRect(), view = viewport.getBoundingClientRect();
+      return document.activeElement === node
+        && box.right > view.left && box.left < view.right && box.bottom > view.top && box.top < view.bottom;
+    }, {id, name, module});
+    assert.equal(await selected(id).count(), 1, 'A relation selects its canonical destination node');
+    assert.equal(await selected(id).evaluate(node => document.activeElement === node), true,
+      'Relation navigation moves keyboard focus to the visible destination');
+  };
+
+  await category(page, '全部');
+  await fullGraph(page);
+  await frame(page).locator('[data-node-id="logic_reasoning"]').scrollIntoViewIfNeeded();
+  await frame(page).locator('[data-node-id="logic_reasoning"]').click();
+  if (mobile(page)) await frame(page).locator('.kg-mobile-expand').click();
+  const successor = frame(page).locator('#knowledgeGraphDetail button.graph-detail-term[data-graph-node-id="proof_induction"]');
+  await successor.click();
+  await assertDestination('proof_induction', '数学归纳法', '证明与归纳');
+
+  await page.evaluate(() => DMateI18n.setLanguage('en', false));
+  await category(page, '全部');
+  if (!mobile(page)) await fullGraph(page);
+  const prerequisite = frame(page).locator('#knowledgeGraphDetail button.graph-detail-term[data-graph-node-id="logic_reasoning"]');
+  await prerequisite.focus();
+  await prerequisite.press('Enter');
+  await assertDestination('logic_reasoning', '命题推理', '命题逻辑');
+  if (!mobile(page)) {
+    await zoom(page, 'in').click();
+    const target = frame(page).locator('[data-node-id="logic_equivalence"]');
+    await target.scrollIntoViewIfNeeded();
+    await settle(page);
+    const previousNode = await target.elementHandle(), previousView = await view(page).elementHandle();
+    const before = await view(page).evaluate(node => ({x:node.scrollLeft, y:node.scrollTop}));
+    const previousScale = await scale(page);
+    await frame(page).locator('#knowledgeGraphDetail button.graph-detail-term[data-graph-node-id="logic_equivalence"]').click();
+    await assertDestination('logic_equivalence', '逻辑等价', '命题逻辑');
+    assert.equal(await target.evaluate((node, previous) => node === previous, previousNode), true,
+      'A same-module relation reuses the existing canvas node');
+    assert.equal(await view(page).evaluate((node, previous) => node === previous, previousView), true,
+      'A same-module relation reuses the existing viewport');
+    near(await scale(page), previousScale, 'A same-module relation preserves zoom', .001);
+    const after = await view(page).evaluate(node => ({x:node.scrollLeft, y:node.scrollTop}));
+    near(after.x, before.x, 'An already visible relation preserves horizontal camera', 1);
+    near(after.y, before.y, 'An already visible relation preserves vertical camera', 1);
+    await previousNode.dispose(); await previousView.dispose();
+  }
+  await page.evaluate(() => DMateI18n.setLanguage('zh-CN', false));
+  if (mobile(page)) {
+    await category(page, '全部');
+    assert.equal(await view(page).count(), 0, 'The inline mobile graph shows its entry rather than a canvas');
+    await frame(page).locator('#knowledgeGraphDetail button.graph-detail-term[data-graph-node-id="proof_induction"]').click();
+    await assertDestination('proof_induction', '数学归纳法', '证明与归纳');
+    assert.equal(await frame(page).evaluate(root => root.classList.contains('graph-fullscreen-view')), true,
+      'A mobile inline relation opens the full graph to reveal its destination');
+  }
+}
+
 async function runCase(browser, width, theme) {
   const label = width + '/' + theme;
   const context = await browser.newContext({ viewport: { width, height: 900 },
@@ -483,6 +548,7 @@ async function runCase(browser, width, theme) {
       assert.deepEqual(await topology(page), reference.expected[name].topology, label + '/' + name + ': shared node geometry, labels and edge routing');
       assert.deepEqual(await selectFirst(page), reference.expected[name].details, label + '/' + name + ': direct prerequisites and successors');
     }
+    await relationNavigation(page);
     await gestures(page);
     await png(page);
     await liveLanguage(page);
@@ -501,7 +567,7 @@ async function runCase(browser, width, theme) {
     assert.deepEqual(failures, [], label + ': all necessary graph assets are cached');
     assert.deepEqual(api, [], label + ': no online video or API calls');
     console.log('PASS ' + label + ': online layout/styles, ' + reference.categories.length
-      + ' categories and node relations, selected outlines, zoom/Fit/' + (mobile(page) ? 'drag/pinch' : 'scroll/clipping')
+      + ' categories, relation module navigation, selected outlines, zoom/Fit/' + (mobile(page) ? 'drag/pinch' : 'scroll/clipping')
       + ', live language switching, PNG and two truly offline reloads');
   } catch (error) {
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/FAILED-offline-graph-' + width + '-' + theme + '.png' }).catch(() => {});

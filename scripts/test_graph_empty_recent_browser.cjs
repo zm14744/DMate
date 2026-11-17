@@ -1,4 +1,4 @@
-/* Graph empty-state and question-history presentation regressions. */
+/* Graph empty-state and removed question-history chrome regressions. */
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
@@ -161,7 +161,7 @@ async function checkEmptyRecent(browser, width) {
   } finally { await page.close(); }
 }
 
-async function checkHistoryPresentation(browser, width) {
+async function checkHistoryRemoval(browser, width) {
   const page = await browser.newPage({ viewport: { width, height: 844 },
     ...(width <= 760 ? { isMobile: true, hasTouch: true } : {}) });
   const errors = [];
@@ -183,39 +183,35 @@ async function checkHistoryPresentation(browser, width) {
         { role: 'ai', text: generatedQuestion, generatedQuestion, generatedExercise: true,
           generatedTeaching: teaching('逻辑等价', '困难', '证明题') }
       ];
+      getCurrent().learningQuestion = null;
+      getCurrent().teaching = getCurrent().messages[2].generatedTeaching;
       renderKnowledgeGraph();
-      setKnowledgeGraphSideMode('history');
       return JSON.stringify(getCurrent().messages);
     });
-    const cards = page.locator('#knowledgeGraphHistory .kg-history-item');
-    assert.equal(await cards.count(), 3, width + ': all question sources remain in history');
-    assert.equal(await page.locator('#knowledgeGraphModal .kg-history-source').count(), 0, width + ': no source badges');
-    assert.deepEqual(await cards.locator('.kg-history-item-top').allTextContents(), ['第 1 题', '第 2 题', '第 3 题'],
-      width + ': history headings contain only question numbers');
-    assert.equal(await cards.locator('.kg-history-preview').count(), 3, width + ': previews remain');
-    assert.equal(await cards.locator('.kg-history-points').count(), 3, width + ': knowledge classifications remain');
-    assert.equal(await cards.locator('.kg-history-actions button').count(), 6, width + ': graph and locate actions remain');
-    assert.deepEqual(await page.evaluate(() => getConversationQuestionHistory().map(item => ({
-      role: item.role, source: item.source, category: item.teaching.category,
-      type: item.teaching.question_type, difficulty: item.teaching.difficulty
-    }))), [
-      { role: 'user', source: '', category: '命题逻辑', type: '判断题', difficulty: '简单' },
-      { role: 'user', source: 'ocr', category: '命题逻辑', type: '选择题', difficulty: '中等' },
-      { role: 'ai', source: '', category: '命题逻辑', type: '证明题', difficulty: '困难' }
-    ], width + ': underlying source, type, classification, and difficulty metadata remain intact');
-    for (let index = 0; index < 3; index++) {
-      await cards.nth(index).locator('.kg-history-actions button').first().click();
-      assert.deepEqual(await page.evaluate(() => ({ scope: knowledgeGraphScope, index: knowledgeGraphHistoryMessageIndex,
-        point: getActiveKnowledgeContext().knowledgePoints[0] })),
-      { scope: 'history', index, point: index === 2 ? '逻辑等价' : '逻辑联结词' },
-      width + ': view graph still selects history question ' + (index + 1));
-      assert.equal(await page.locator('#knowledgeGraphModal .kg-history-source').count(), 0,
-        width + ': source badges stay removed after graph navigation');
+    for (const language of ['zh-CN', 'en']) {
+      await page.evaluate(value => DMateI18n.setLanguage(value, false), language);
+      for (const mode of ['focus', 'full', 'focus']) {
+        await page.evaluate(value => selectKnowledgeGraphDisplayMode(value), mode);
+        await nextFrames(page);
+        assert.equal(await page.locator('#knowledgeGraphHistoryTab,#knowledgeGraphHistoryWrap,#knowledgeGraphHistory,'
+          + '#knowledgeGraphModal .kg-history-item,#knowledgeGraphModal .kg-history-refresh').count(), 0,
+        width + '/' + language + '/' + mode + ': graph has no question-history entry or content');
+        assert.equal(await page.locator('#knowledgeGraphModal').getByText(/^(题目历史|Question history)(?:\s*\(.*\))?$/).count(), 0,
+          width + '/' + language + '/' + mode + ': history label is absent');
+        assert.equal(await page.locator('#knowledgeGraphDetailTitle').evaluate(title => title.hidden), false,
+          width + ': latest-question node details remain available');
+        assert.equal(await page.evaluate(() => JSON.stringify(getCurrent().messages)), metadataBefore,
+          width + ': graph mode/language navigation does not mutate chat or question metadata');
+      }
     }
+    await page.evaluate(() => { closeKnowledgeGraph(); openKnowledgeGraph(); });
+    await page.waitForFunction(() => document.getElementById('knowledgeGraphModal').dataset.graphReady === 'true');
+    assert.equal(await page.locator('#knowledgeGraphHistoryTab,#knowledgeGraphHistoryWrap,#knowledgeGraphHistory').count(), 0,
+      width + ': reopening does not recreate graph history');
     assert.equal(await page.evaluate(() => JSON.stringify(getCurrent().messages)), metadataBefore,
-      width + ': presentation and graph navigation do not mutate question metadata');
-    assert.deepEqual(errors, [], width + ': history browser errors');
-    console.log('PASS ' + width + ': graph history hides manual/OCR/AI source badges, preserves metadata and graph navigation');
+      width + ': manual/OCR/generated source, classification, type and difficulty remain in actual messages');
+    assert.deepEqual(errors, [], width + ': browser errors');
+    console.log('PASS ' + width + ': graph history removed in both modes/languages, original manual/OCR/AI chat metadata retained');
   } finally { await page.close(); }
 }
 
@@ -224,7 +220,7 @@ async function checkHistoryPresentation(browser, width) {
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
     for (const width of [1440, 390]) await checkEmptyRecent(browser, width);
-    for (const width of [1440, 390]) await checkHistoryPresentation(browser, width);
+    for (const width of [1440, 390]) await checkHistoryRemoval(browser, width);
   }
   finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
