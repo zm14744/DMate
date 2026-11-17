@@ -42,6 +42,10 @@ class DockerContextTest(unittest.TestCase):
                 self.assertFalse({name for name in files if name.startswith(forbidden)})
                 self.assertNotIn("app/.env", files)
                 self.assertFalse({name for name in files if name.startswith("app/scripts/test_")})
+                self.assertEqual({name for name in files if name.startswith("app/scripts/")}, {
+                    "app/scripts/generate_icons.py", "app/scripts/prepare_ocr_model_cache.py",
+                    "app/scripts/ocr-model-lock.json",
+                }, "The web image must carry its required build helpers without development/publishing scripts")
         finally:
             if container:
                 subprocess.run(["docker", "rm", "--force", container], check=False, capture_output=True)

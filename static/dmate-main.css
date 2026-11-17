@@ -1969,7 +1969,8 @@ input[type="search"]::-webkit-search-cancel-button {
     color:var(--text-secondary);
 }
 
-.msg.history-locate-flash {
+.msg.history-locate-flash,
+.wrong-card.history-locate-flash {
     animation:historyLocateFlash 1.5s ease;
 }
 
@@ -7160,7 +7161,8 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
     }
     #knowledgeGraphModal #knowledgeGraphFocusBtn,
     #knowledgeGraphModal #knowledgeGraphScopeBtn,
-    #knowledgeGraphModal #knowledgeGraphHistoryBtn {
+    #knowledgeGraphModal #knowledgeGraphHistoryBtn,
+    #knowledgeGraphModal #knowledgeGraphWrongBtn {
         grid-column:auto !important;
     }
     #knowledgeGraphModal .graph-toolbar-left button {
@@ -7574,12 +7576,20 @@ dialog#mobileChoiceModal[data-positioning]::backdrop { visibility:hidden!importa
 }
 
 /* 图谱交互一致性：仅「全部知识」允许按模块筛选，手机/平板/桌面同步。 */
+#knowledgeGraphModal .graph-toolbar-left > [hidden] {
+    display:none !important;
+}
+#knowledgeGraphModal[data-graph-view="wrong"] #knowledgeGraphWrongBtn {
+    grid-column:1 / -1 !important;
+}
 #knowledgeGraphModal[data-graph-view="focus"] .graph-toolbar-left label[for="knowledgeGraphCategory"],
 #knowledgeGraphModal[data-graph-view="focus"] #knowledgeGraphCategory,
 #knowledgeGraphModal[data-graph-view="focus"] #knowledgeGraphCategoryTrigger,
 #knowledgeGraphModal[data-graph-view="history"] .graph-toolbar-left label[for="knowledgeGraphCategory"],
 #knowledgeGraphModal[data-graph-view="history"] #knowledgeGraphCategory,
-#knowledgeGraphModal[data-graph-view="history"] #knowledgeGraphCategoryTrigger {
+#knowledgeGraphModal[data-graph-view="history"] #knowledgeGraphCategoryTrigger,
+#knowledgeGraphModal[data-graph-view="wrong"] #knowledgeGraphCategory,
+#knowledgeGraphModal[data-graph-view="wrong"] #knowledgeGraphCategoryTrigger {
     display:none !important;
 }
 

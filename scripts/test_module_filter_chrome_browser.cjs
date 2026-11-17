@@ -298,7 +298,14 @@ async function runCase(browser, width, theme, offline) {
       await settle(page);
       await offlineHeader(page);
     } else {
-      await page.evaluate(mode => { appearanceSettings.mode = mode; applyAppearanceSettings({ save: false }); openKnowledgeGraph(); }, theme);
+      await page.evaluate(mode => {
+        const question = '判断命题 p 与 q 的合取在什么情况下为真';
+        sessions = [{id:'navigation-paint',name:'Navigation paint',nameSource:'user',
+          messages:[{messageId:'navigation-question',role:'user',text:question,manualIsQuestion:true}],
+          learningQuestion:null,teaching:null}];
+        currentId='navigation-paint';
+        appearanceSettings.mode = mode; applyAppearanceSettings({ save: false }); openKnowledgeGraph();
+      }, theme);
       await page.waitForFunction(() => knowledgeGraphInitialized);
       await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
       await page.waitForSelector('#knowledgeGraphCanvas .kg-section');

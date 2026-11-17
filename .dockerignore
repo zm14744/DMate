@@ -31,9 +31,11 @@ snap
 android
 browser-extension
 offline-content
-scripts/test_*
-scripts/fixtures
-scripts/native
+# Only the model and web-icon build helpers belong in the web image.
+scripts/**
+!scripts/generate_icons.py
+!scripts/prepare_ocr_model_cache.py
+!scripts/ocr-model-lock.json
 *.log
 *.db
 *.sqlite*

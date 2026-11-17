@@ -267,7 +267,7 @@ async function checkReferenceGuards(browser) {
     await page.evaluate(()=>{getCurrent().messages[0].text='改成另一个不同的命题问题';renderKnowledgeGraph();});
     await stale.evaluate(button=>button.click());
     assert.equal(await page.locator('#knowledgeGraphModal').isVisible(),true,'edited selected question invalidates its captured locator');
-    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'请选择一道历史题目','stale historical subject returns to the history selection prompt instead of borrowing the latest question');
+    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'无','stale historical subject becomes empty instead of borrowing the latest question');
     assert.equal(await page.locator(locate).isVisible(),false);
     await page.evaluate(()=>{getCurrent().messages[0].text='用逻辑等价证明命题 p 的双重否定与 p 等价';});
     await openHistory(page);
@@ -276,7 +276,7 @@ async function checkReferenceGuards(browser) {
     await page.evaluate(()=>{window.__removedGraphQuestion=getCurrent().messages.shift();renderKnowledgeGraph();});
     await deleted.evaluate(button=>button.click());
     assert.equal(await page.locator('#knowledgeGraphModal').isVisible(),true,'deleted selected question invalidates its locator');
-    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'请选择一道历史题目','deleted historical subject returns to the history selection prompt without falling back to the latest question');
+    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'无','deleted historical subject becomes empty without falling back to the latest question');
     assert.equal(await page.locator(locate).isVisible(),false);
     await page.evaluate(()=>getCurrent().messages.unshift(window.__removedGraphQuestion));
     await openHistory(page);
@@ -286,7 +286,7 @@ async function checkReferenceGuards(browser) {
     await oldOwner.evaluate(button=>button.click());
     assert.equal(await page.locator('#knowledgeGraphModal').isVisible(),true,'old owner context cannot close graph or switch source');
     await page.evaluate(()=>renderKnowledgeGraph());
-    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'请选择一道历史题目');
+    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'无');
     await page.evaluate(()=>{
       const teaching=__graphTeachingFixture('分别说明集合运算与逻辑等价的定义',['set_operation','logic_equivalence']);
       sessions=[{id:'independent-concepts',name:'不同知识分支',nameSource:'user',teaching,learningQuestion:null,deletedMessageIds:{},

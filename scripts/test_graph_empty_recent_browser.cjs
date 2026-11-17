@@ -8,7 +8,7 @@ async function nextFrames(page) {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
-async function assertEmpty(page, text, label) {
+async function assertEmpty(page, text, label, mode = 'focus') {
   assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(), text, label + ': canvas contains only the empty label');
   const canvasPosition = await page.locator('#knowledgeGraphCanvas').evaluate(canvas => {
     const pane = canvas.getBoundingClientRect(), empty = canvas.querySelector(':scope > .kg-empty').getBoundingClientRect();
@@ -43,7 +43,7 @@ async function assertEmpty(page, text, label) {
   assert.deepEqual(await page.evaluate(() => ({ mode: knowledgeGraphViewMode, selected: knowledgeGraphSelectedNodeId,
     nodes: knowledgeGraphDisplayedNodes().length, key: knowledgeGraphCopyKey(), png: prepareKnowledgeGraphPng(),
     target: buildKnowledgeGraphImageCopyTarget() })),
-  { mode: 'focus', selected: '', nodes: 0, key: '', png: null, target: null }, label + ': all graph/export paths share the empty set');
+  { mode, selected: '', nodes: 0, key: '', png: null, target: null }, label + ': all graph/export paths share the empty set');
 }
 
 async function checkEmptyRecent(browser, width) {
@@ -63,14 +63,21 @@ async function checkEmptyRecent(browser, width) {
     assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(), false, width + ': all knowledge has no history pane');
     assert.equal(await page.evaluate(() => knowledgeGraphDisplayedNodes().length), await page.evaluate(() => knowledgeGraphData.nodes.length),
       width + ': initial all-knowledge view contains the complete course graph');
-    await page.locator('#knowledgeGraphScopeBtn').click();
+    assert.equal(await page.locator('#knowledgeGraphScopeBtn').isVisible(), false, width + ': a new conversation has no recent-question button');
+    assert.deepEqual(await page.locator('#knowledgeGraphFocusBtn,#knowledgeGraphHistoryBtn,#knowledgeGraphScopeBtn').evaluateAll(buttons => buttons.map(button => button.id)),
+      ['knowledgeGraphFocusBtn','knowledgeGraphHistoryBtn','knowledgeGraphScopeBtn'], width + ': history precedes latest in toolbar order');
+    await page.evaluate(() => selectKnowledgeGraphDisplayMode('focus'));
+    assert.equal(await page.evaluate(() => knowledgeGraphViewMode), 'full', width + ': an unavailable recent page cannot be selected programmatically');
+    await page.locator('#knowledgeGraphHistoryBtn').click();
     await page.waitForFunction(() => knowledgeGraphInitialized && document.getElementById('knowledgeGraphCanvas').innerText.trim() === '无');
-    await assertEmpty(page, '无', width + '/explicit recent view of a new chat');
+    assert.equal((await page.locator('#knowledgeGraphHistory').innerText()).trim(), '无', width + ': empty history list uses the same empty label');
+    await page.locator('#knowledgeGraphDetailTab').click();
+    await assertEmpty(page, '无', width + '/history without a selected question', 'history');
 
     // English must update the same open dialog, rather than requiring reopen.
     await page.evaluate(() => window.DMateI18n.setLanguage('en', false));
     await page.waitForFunction(() => document.getElementById('knowledgeGraphCanvas').innerText.trim() === 'None');
-    await assertEmpty(page, 'None', width + '/live English');
+    await assertEmpty(page, 'None', width + '/live English', 'history');
     await page.evaluate(() => window.DMateI18n.setLanguage('zh-CN', false));
     await page.waitForFunction(() => document.getElementById('knowledgeGraphCanvas').innerText.trim() === '无');
 
@@ -84,7 +91,8 @@ async function checkEmptyRecent(browser, width) {
       renderKnowledgeGraph();
       selectKnowledgeGraphNode('logic_truth');
     });
-    await assertEmpty(page, '无', width + '/stale snapshot and selected node');
+    assert.equal(await page.locator('#knowledgeGraphScopeBtn').isVisible(), false, width + ': stale session metadata cannot revive latest-question navigation');
+    await assertEmpty(page, '无', width + '/stale snapshot and selected node', 'history');
     const rejected = await page.evaluate(async () => {
       let saves = 0;
       const original = window.DMateDrawingExport;
@@ -95,10 +103,10 @@ async function checkEmptyRecent(browser, width) {
       window.DMateDrawingExport = original;
       return { saves, rendered, exported };
     });
-    assert.deepEqual(rejected, { saves: 0, rendered: false, exported: false }, width + ': empty focus never exports a full graph');
+    assert.deepEqual(rejected, { saves: 0, rendered: false, exported: false }, width + ': empty history never exports a full graph');
 
     // Explicit full mode still renders the entire model and retains its camera
-    // through a visit to the empty recent-question view.
+    // through a visit to a history page without a selected question.
     await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
     await page.waitForSelector('#knowledgeGraphCanvas .kg-section');
     if (mobile) await page.locator('.kg-mobile-expand').click();
@@ -120,8 +128,9 @@ async function checkEmptyRecent(browser, width) {
     }));
     const before = await camera();
     assert.ok(before.top > 0, width + ': full graph test camera was moved');
-    await page.evaluate(() => selectKnowledgeGraphDisplayMode('focus'));
-    await assertEmpty(page, '无', width + '/full to empty');
+    await page.evaluate(() => selectKnowledgeGraphDisplayMode('history'));
+    await page.locator('#knowledgeGraphDetailTab').click();
+    await assertEmpty(page, '无', width + '/full to empty history', 'history');
     assert.equal(await page.locator('#knowledgeGraphModal').evaluate(modal => modal.classList.contains('graph-fullscreen-view')), false,
       width + ': empty mode exposes toolbar and detail');
     await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
@@ -170,7 +179,7 @@ async function checkEmptyRecent(browser, width) {
     await assertEmpty(page, '知识点归类暂未完成', width + '/unmatched question concepts');
     if (process.env.KG_SCREENSHOT_DIR) await page.screenshot({ path: process.env.KG_SCREENSHOT_DIR + '/graph-empty-recent-' + width + '.png' });
     assert.deepEqual(errors, [], width + ': browser errors');
-    console.log('PASS ' + width + ': empty recent graph/detail, live language, export guard, full camera memory and valid-question recovery');
+    console.log('PASS ' + width + ': hidden unavailable recent button, empty history graph/detail, live language, export guard, full camera memory and valid-question recovery');
   } finally { await page.close(); }
 }
 
@@ -298,18 +307,23 @@ async function checkConversationModes(browser, width) {
     assert.equal(await page.evaluate(() => knowledgeGraphViewMode), 'full', width + ': first graph defaults to all knowledge');
     for (const mode of ['focus', 'history']) {
       await page.evaluate(mode => selectKnowledgeGraphDisplayMode(mode), mode);
+      let expectedMode = mode;
       for (const destination of ['mode-b', 'mode-empty', 'mode-a']) {
         await navigate(destination);
-        assert.equal(await page.evaluate(() => knowledgeGraphViewMode), mode,
-          width + ': switching to ' + destination + ' preserves the selected ' + mode + ' page');
+        if (destination === 'mode-empty' && expectedMode === 'focus') expectedMode = 'full';
+        assert.equal(await page.evaluate(() => knowledgeGraphViewMode), expectedMode,
+          width + ': switching to ' + destination + ' preserves available pages and falls back when recent has no question');
+        assert.equal(await page.locator('#knowledgeGraphScopeBtn').isVisible(), destination !== 'mode-empty',
+          width + ': latest-question button follows actual current-conversation questions');
       }
     }
     await home();
     assert.equal(await page.evaluate(() => knowledgeGraphViewMode), 'full', width + ': entering the centered home resets to all knowledge');
     for (const mode of ['focus', 'history']) {
       await page.evaluate(mode => { selectKnowledgeGraphDisplayMode(mode); renderAll(); }, mode);
-      assert.equal(await page.evaluate(() => knowledgeGraphViewMode), mode,
-        width + ': rerendering the same home does not undo an explicit ' + mode + ' selection');
+      assert.equal(await page.evaluate(() => knowledgeGraphViewMode), mode === 'focus' ? 'full' : mode,
+        width + ': home allows history but has no recent-question page');
+      assert.equal(await page.locator('#knowledgeGraphScopeBtn').isVisible(), false, width + ': centered home omits latest-question navigation');
       await page.evaluate(() => closeKnowledgeGraph());
       await open();
       assert.equal(await page.evaluate(() => knowledgeGraphViewMode), 'full', width + ': closing a home graph resets the next opening to all knowledge');
@@ -319,15 +333,16 @@ async function checkConversationModes(browser, width) {
     await page.locator('#knowledgeGraphScopeBtn').click();
     await page.evaluate(() => newChat());
     assert.deepEqual(await page.evaluate(() => ({ mode: knowledgeGraphViewMode, empty: getCurrent()?.messages.length === 0,
-      hasConversation: currentId !== null })), { mode: 'focus', empty: true, hasConversation: true },
-    width + ': creating a new conversation preserves the page and is distinct from home');
+      hasConversation: currentId !== null })), { mode: 'full', empty: true, hasConversation: true },
+    width + ': a new empty conversation falls back from recent to all knowledge');
+    assert.equal(await page.locator('#knowledgeGraphScopeBtn').isVisible(), false, width + ': new conversation omits recent-question navigation');
     await home();
     assert.equal(await page.evaluate(() => knowledgeGraphViewMode), 'full', width + ': returning home resets all knowledge again');
     await navigate('mode-b');
     assert.equal(await page.evaluate(() => knowledgeGraphViewMode), 'full', width + ': conversation entry retains the reset full page');
     assert.deepEqual(analysis, [], width + ': navigation uses source-bound fixtures without reclassification');
     assert.deepEqual(errors, [], width + ': conversation/home mode checks have no page errors');
-    console.log('PASS ' + width + ': full default, conversation/new-chat page preservation, home-entry reset and explicit home selection');
+    console.log('PASS ' + width + ': full default, available conversation pages preserved, empty-conversation fallback and home-entry reset');
   } finally { await page.close(); }
 }
 

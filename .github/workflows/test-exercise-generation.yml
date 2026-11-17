@@ -27,6 +27,7 @@ on:
       - 'docs/PROOF_WRITING_STANDARD.en.md'
       - 'scripts/test_proof_writing.py'
       - 'scripts/test_tutoring_*.py'
+      - 'scripts/test_startup_lightweight.py'
       - 'exercise_relation_check.py'
       - 'exercise_intent.py'
       - 'static/exercise-intent-rules.json'
@@ -77,6 +78,8 @@ jobs:
         run: python -m unittest discover -s scripts -p 'test_concept_notebook_selection.py' -v
       - name: Run chat intent regressions without external AI calls
         run: python -m unittest discover -s scripts -p 'test_tutoring_chat.py' -v
+      - name: Verify lightweight web startup and lazy image readers
+        run: python -m unittest discover -s scripts -p 'test_startup_lightweight.py' -v
       - name: Verify multi-turn context and task continuation
         run: |
           python -m unittest discover -s scripts -p 'test_conversation_context.py' -v

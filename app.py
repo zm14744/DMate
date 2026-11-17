@@ -40,29 +40,6 @@ from graph_consistency import reconcile_vision_edges, summarize_tree_question
 from math_answer_guard import audit_explicit_count_answer
 from solution_integrity import verify_exact_question
 from answer_context_guard import missing_previous_problem
-try:
-    from graph_recognition import recognize_graphs
-except (ImportError, OSError) as _graph_import_error:
-    print(f"OpenCV 图结构模块不可用，保留原 Vision 识别：{_graph_import_error}")
-    recognize_graphs = None
-try:
-    from graph_line_tracer import attach_line_evidence
-except (ImportError, OSError) as _trace_import_error:
-    print(f"图论线条追踪模块不可用，保留原识别：{_trace_import_error}")
-    attach_line_evidence = None
-try:
-    from graph_validation import audit_graph_records
-except (ImportError, OSError) as _validate_import_error:
-    print(f"图结构校验模块不可用，保留原识别：{_validate_import_error}")
-    audit_graph_records = None
-try:
-    from graph_evidence_fusion import (
-        compare_pixel_vision, review_direction_and_multiplicity,
-    )
-except (ImportError, OSError) as _fusion_import_error:
-    print(f"图像边集证据融合模块不可用，保留原识别：{_fusion_import_error}")
-    compare_pixel_vision = None
-    review_direction_and_multiplicity = None
 from graph_ocr_cleanup import clean_graph_question_text, select_graph_question_text, ocr_is_label_dominated
 from classification_semantic import (
     apply_catalog_answer, classify_catalog_questions, local_catalog_classification,
@@ -5186,13 +5163,17 @@ def ocr():
             return _run_graph_ocr_route(raw, result, local_execution, request_id,
                                        recognition_deadline, pipeline=active_pipeline(), started_at=started_at)
 
-        if possible_graph and recognize_graphs is not None:
+        if possible_graph:
             try:
+                # The compatibility pixel readers are needed only in this
+                # route. Loading their native libraries must not delay chat,
+                # the homepage or deployment health checks.
+                from graph_recognition import recognize_graphs
                 graph_cv = recognize_graphs(raw, text_hint=ocr_text,
                                             allow_without_context=(len(ocr_text) < 20 or label_only_ocr))
                 if (_env_bool("GRAPH_PATH_EVIDENCE_ENABLED", True)
-                        and attach_line_evidence is not None
                         and graph_cv.get("graphs")):
+                    from graph_line_tracer import attach_line_evidence
                     graph_cv = attach_line_evidence(raw, graph_cv)
             except Exception as cv_exc:
                 print(f"OpenCV 图结构识别降级：{type(cv_exc).__name__}")
@@ -5287,28 +5268,27 @@ def ocr():
         # marked vertices. Run a second independent image-only edge audit.
         # Never let a failed/mismatching read trigger a confident answer.
         graph_review_issues = []
-        if (audit_graph_records is not None and isinstance(vision_result, dict)
-                and vision_result.get("ok")):
+        if isinstance(vision_result, dict) and vision_result.get("ok"):
             try:
+                from graph_validation import audit_graph_records
                 graph_review_issues = audit_graph_records(
                     vision_result.get("graph_data") or []
                 )
             except Exception as graph_check_exc:
                 print(f"图结构一致性校验降级：{type(graph_check_exc).__name__}")
         fusion_issues = []
-        if (compare_pixel_vision is not None and isinstance(vision_result, dict)
-                and vision_result.get("ok") and cv_graphs):
+        if isinstance(vision_result, dict) and vision_result.get("ok") and cv_graphs:
             try:
+                from graph_evidence_fusion import compare_pixel_vision, review_direction_and_multiplicity
                 fusion_issues = compare_pixel_vision(
                     graph_cv, vision_result.get("graph_data") or []
                 )
-                if review_direction_and_multiplicity is not None:
-                    fusion_issues.extend(review_direction_and_multiplicity(
-                        graph_cv, vision_result.get("graph_data") or []
-                    ))
+                fusion_issues.extend(review_direction_and_multiplicity(
+                    graph_cv, vision_result.get("graph_data") or []
+                ))
                 fusion_issues = list(dict.fromkeys(fusion_issues))[:12]
                 graph_review_issues.extend(fusion_issues)
-            except (TypeError, ValueError, KeyError) as fusion_exc:
+            except (ImportError, OSError, TypeError, ValueError, KeyError) as fusion_exc:
                 print(f"图论边集证据核对降级：{type(fusion_exc).__name__}")
 
         # Labeled 3+ figure slides were previously audited only by vertex

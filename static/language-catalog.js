@@ -1023,6 +1023,8 @@
         "图内右方": "right",
         "图内中部": "center",
         "本题难点": "Focus",
+        "难点": "Focus",
+        "难点：": "Focus: ",
         "整题涉及": "Concepts",
         "复测情况": "Retest progress"
 };

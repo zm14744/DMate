@@ -26,7 +26,7 @@ async function seed(page) {
     const entry = (id, question, corrected, updatedAt) => ({
       id, question, corrected, updatedAt, createdAt: updatedAt,
       category: '证明与归纳', relatedCategories: [], knowledgePoints: ['直接证明与反证法'],
-      focusPoints: [], difficulty: '简单', classificationVersion: 3,
+      focusPoints: ['直接证明与反证法'], difficulty: '简单', classificationVersion: 3,
       answer: '本地参考答案', referenceAnswer: '本地参考答案', analysis: '已有解析', note: ''
     });
     learningState = normalizeLearningState({ version: 9, events: [], wrongQuestions: [
@@ -91,6 +91,19 @@ async function runCase(browser, width) {
     await page.locator('#wrongBookModal').waitFor({ state: 'visible' });
     assert.deepEqual(await page.locator('[data-wrong-filter]').allTextContents(), ['待订正', '已订正']);
     assert.match(await page.locator('#wrongBookStats').innerText(), /共 4 道\s+待订正 2\s+已订正 2/);
+    const firstCard = page.locator('#wrongBookList .wrong-card').first();
+    assert.deepEqual(await firstCard.locator('.wrong-meta-label').allTextContents(), ['难点'],
+      'The card presents its focus without a whole-question concepts row');
+    assert.equal((await page.locator('#wrongBookList').innerText()).includes('整题涉及'), false);
+    assert.equal(await firstCard.getAttribute('data-wrong-question-id'), 'filter-new-pending');
+    assert.equal(await firstCard.locator('.wrong-actions > button').nth(1).getAttribute('data-wrong-action'), 'graph',
+      'View graph follows the existing image-export action');
+    assert.equal(await firstCard.locator('.wrong-actions > button').nth(1).innerText(), '查看图谱');
+    const printable = await page.evaluate(() => buildWrongBookPdfExportElement(learningState.wrongQuestions).textContent);
+    assert.ok(printable.includes('难点：'));
+    assert.equal(printable.includes('整题涉及'), false, 'PDF presentation follows the card focus-only metadata');
+    assert.deepEqual(await page.evaluate(() => learningState.wrongQuestions[0].knowledgePoints), ['直接证明与反证法'],
+      'Full classification data remains available for graphs and retests');
     await expectFilter(page, 'pending', [questions.newPending, questions.oldPending]);
     const pending = page.locator('[data-wrong-filter="pending"]');
     await pending.click(); await pending.click();

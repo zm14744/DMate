@@ -69,6 +69,7 @@ on:
       - 'scripts/test_conversation_titles.py'
       - 'scripts/test_voice_input_controls_browser.cjs'
       - 'scripts/test_wrongbook_filters_browser.cjs'
+      - 'scripts/test_wrongbook_graph_browser.cjs'
       - 'scripts/test_wrong_question_previews_browser.cjs'
       - 'scripts/test_scrollbar_visibility_browser.cjs'
       - 'scripts/test_select_controls_browser.cjs'
@@ -152,6 +153,7 @@ on:
       - 'scripts/test_conversation_titles.py'
       - 'scripts/test_voice_input_controls_browser.cjs'
       - 'scripts/test_wrongbook_filters_browser.cjs'
+      - 'scripts/test_wrongbook_graph_browser.cjs'
       - 'scripts/test_wrong_question_previews_browser.cjs'
       - 'scripts/test_scrollbar_visibility_browser.cjs'
       - 'scripts/test_select_controls_browser.cjs'
@@ -366,6 +368,7 @@ jobs:
           node scripts/test_conversation_titles_browser.cjs
           node scripts/test_voice_input_controls_browser.cjs
           node scripts/test_wrongbook_filters_browser.cjs
+          node scripts/test_wrongbook_graph_browser.cjs
           node scripts/test_wrong_question_previews_browser.cjs
           node scripts/test_scrollbar_visibility_browser.cjs
           node scripts/test_select_controls_browser.cjs

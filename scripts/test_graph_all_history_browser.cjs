@@ -22,20 +22,21 @@ async function openHistory(page) {
 }
 
 
-async function assertModeControls(page,mode,label) {
+async function assertModeControls(page,mode,label,recentAvailable=true) {
   const selectors={full:'#knowledgeGraphFocusBtn',focus:'#knowledgeGraphScopeBtn',history:'#knowledgeGraphHistoryBtn'};
   for(const [value,selector] of Object.entries(selectors)) {
-    assert.equal(await page.locator(selector).isVisible(),true,label+': the '+value+' top-level mode is available');
+    assert.equal(await page.locator(selector).isVisible(),value==='focus'?recentAvailable:true,
+      label+': the '+value+' top-level mode follows actual question availability');
     assert.equal(await page.locator(selector).getAttribute('aria-pressed'),String(value===mode),
       label+': exactly the selected top-level mode is pressed');
   }
   assert.equal(await page.evaluate(()=>knowledgeGraphViewMode),mode,label+': the mode state matches the toolbar');
 }
 
-async function fullHasNoHistory(page,label) {
+async function fullHasNoHistory(page,label,recentAvailable=true) {
   await page.evaluate(()=>selectKnowledgeGraphDisplayMode('full'));
   await settle(page);
-  await assertModeControls(page,'full',label);
+  await assertModeControls(page,'full',label,recentAvailable);
   assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),false,label+': full mode has no sidebar mode tabs');
   assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),true,label+': full mode shows only node details');
   assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(),false,label+': full mode does not show the history list');
@@ -137,8 +138,8 @@ async function checkCase(browser,width,language) {
     await openHistory(page);
     await assertModeControls(page,'history',label+'/history list');
     assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),true,label+': only history mode exposes detail/history tabs');
-    assert.equal(await page.locator('#knowledgeGraphCanvas').innerText(),language==='en'?'Select a past question':'请选择一道历史题目',
-      label+': entering history mode prompts for a specific past question instead of showing the course graph');
+    assert.equal(await page.locator('#knowledgeGraphCanvas').innerText(),language==='en'?'None':'无',
+      label+': history without a selected question uses the empty label instead of showing the course graph');
     await page.locator('#knowledgeGraphDetailTab').click();
     assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),true,label+': the historical detail tab can open before choosing a past question');
     assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),true,label+': empty historical details keep both sidebar tabs accessible');
@@ -267,7 +268,7 @@ async function checkModeTransitions(browser,width) {
     await page.goto(baseURL,{waitUntil:'networkidle'});
     await page.waitForFunction(()=>!accountVerificationOperation);
     await page.evaluate(async()=>openKnowledgeGraph());
-    await assertModeControls(page,'full',label+'/initial home');
+    await assertModeControls(page,'full',label+'/initial home',false);
     assert.equal(await page.evaluate(()=>getCurrent()),null,label+': the initial centered-composer home has no current conversation');
     await page.evaluate(()=>closeKnowledgeGraph());
     await seedConversations(page);
@@ -292,21 +293,21 @@ async function checkModeTransitions(browser,width) {
     await switchConversation('history-lower');
     await assertModeControls(page,'history',label+'/switch nonempty while history');
     await switchConversation('existing-blank');
-    await assertModeControls(page,'history',label+'/existing empty conversation');
+    await assertModeControls(page,'history',label+'/existing empty conversation',false);
     await enterHome();
-    await assertModeControls(page,'full',label+'/return home resets full');
+    await assertModeControls(page,'full',label+'/return home resets full',false);
     assert.equal(await page.evaluate(()=>knowledgeGraphQuestionReference),null,label+': entering home clears the selected historical subject');
-    await fullHasNoHistory(page,label+'/home full details');
+    await fullHasNoHistory(page,label+'/home full details',false);
     await page.evaluate(()=>{selectKnowledgeGraphDisplayMode('focus');renderAll();});
-    await assertModeControls(page,'focus',label+'/explicit recent on home');
+    await assertModeControls(page,'full',label+'/home cannot select unavailable recent mode',false);
     await page.evaluate(()=>closeKnowledgeGraph());
     await page.evaluate(async()=>openKnowledgeGraph());
-    await assertModeControls(page,'full',label+'/closing graph returns to centered home');
+    await assertModeControls(page,'full',label+'/closing graph returns to centered home',false);
     await switchConversation('history-lower');
     await assertModeControls(page,'full',label+'/leave home after closing graph');
     await recentHasNoHistory(page,label+'/recent before second home entry');
     await enterHome();
-    await assertModeControls(page,'full',label+'/second home entry');
+    await assertModeControls(page,'full',label+'/second home entry',false);
     assert.deepEqual(modelCalls,[],label+': mode transitions require no model or classification calls');
     assert.deepEqual(errors,[],label+': mode transitions have no browser errors');
     console.log('PASS '+label+': three independent top modes, home reset, existing-conversation preservation and history reopen');
