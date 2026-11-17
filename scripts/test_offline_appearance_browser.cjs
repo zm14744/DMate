@@ -165,12 +165,12 @@ async function filledAppearanceActions(page) {
     await openAppearance(page);
     await page.locator('[data-appearance-accent="teal"]').click();
     await page.evaluate(() => {
-      window.restoreAppearanceTransaction = IDBDatabase.prototype.transaction;
-      IDBDatabase.prototype.transaction = function(stores, mode, ...options) {
-        if (this.name === 'dmate-offline-workspace' && mode === 'readwrite' && stores === 'settings') {
+      window.restoreAppearanceTransaction = Storage.prototype.setItem;
+      Storage.prototype.setItem = function(key, value) {
+        if (this === sessionStorage && key === 'dmate:guest-tab:v1') {
           throw new DOMException('Appearance write blocked for regression test','QuotaExceededError');
         }
-        return window.restoreAppearanceTransaction.call(this,stores,mode,...options);
+        return window.restoreAppearanceTransaction.call(this,key,value);
       };
     });
     await page.locator('#appearanceDone').click();
@@ -181,7 +181,7 @@ async function filledAppearanceActions(page) {
     await page.locator('.dmate-delete-confirm[open]').waitFor({ state:'detached' });
     assert.equal(await page.locator('#appearanceModal').isVisible(), true, 'Notice dismissal must preserve the draft');
     await page.evaluate(() => {
-      IDBDatabase.prototype.transaction = window.restoreAppearanceTransaction;
+      Storage.prototype.setItem = window.restoreAppearanceTransaction;
       delete window.restoreAppearanceTransaction;
     });
     await page.locator('#appearanceDone').click();

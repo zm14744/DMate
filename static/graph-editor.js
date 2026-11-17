@@ -372,10 +372,10 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
                 const failed = rows.filter(r => ['error','empty'].includes(r.status)).length;
                 status.textContent = textBusy && rows.some(r=>r.status==='recognizing') ? '正在按编号识别，新增框会接着处理…'
                     : queued ? '已框选，准备按编号一次识别…'
-                    : failed ? '部分文字框未识别完成，请查看对应编号并重试。'
-                    : rows.length ? '已按框编号顺序汇总。' : '连续框选即可自动识别，支持多个文字框。';
+                    : failed ? '部分文字框未识别完成，请查看对应编号并重试'
+                    : rows.length ? '已按框编号顺序汇总' : '连续框选即可自动识别，支持多个文字框';
                 if (textState.assemblyError) status.textContent = textState.assemblyError;
-                if (textState.manuallyEdited && rows.length) status.textContent += ' 已保留手动修改，可点击下方按钮重新汇总。';
+                if (textState.manuallyEdited && rows.length) status.textContent += '；已保留手动修改，可点击下方按钮重新汇总';
                 list.replaceChildren();
                 const labels = {queued:'待识别',recognizing:'识别中',done:'已识别',empty:'未识别到文字',error:'识别失败'};
                 for (const row of rows) {

@@ -61,8 +61,12 @@ public final class MainActivity extends Activity {
     private static final String HOME_HOST = "dmate.zeabur.app";
     private static final String LANGUAGE_PREFERENCES = "dmate_native_language";
     private static final String LANGUAGE_KEY = "ui_language";
+    private static final String GUEST_PROCESS_KEY = "dmate_guest_process";
+    private static final String GUEST_SESSION_KEY = "dmate_guest_session";
 
     private WebView webView;
+    private ScriptHandler guestSessionStartScript;
+    private String guestSessionToken;
     private ScriptHandler systemThemeStartScript;
     private String documentStartSystemTheme;
     private ValueCallback<Uri[]> pendingFileCallback;
@@ -94,6 +98,9 @@ public final class MainActivity extends Activity {
         // theme, so choose it before constructing the WebView.
         setTheme(systemAppearanceTheme(getResources().getConfiguration()));
         super.onCreate(savedInstanceState);
+        guestSessionToken = GuestSession.start(
+            savedInstanceState == null ? null : savedInstanceState.getString(GUEST_PROCESS_KEY),
+            savedInstanceState == null ? null : savedInstanceState.getString(GUEST_SESSION_KEY));
         getWindow().setStatusBarColor(Color.BLACK);
         getWindow().setNavigationBarColor(Color.BLACK);
         setContentView(R.layout.activity_main);
@@ -199,8 +206,12 @@ public final class MainActivity extends Activity {
         String ua = settings.getUserAgentString();
         if (ua == null) ua = "";
         if (!ua.contains(BuildConfig.DMATE_USER_AGENT)) {
-            settings.setUserAgentString((ua + " " + BuildConfig.DMATE_USER_AGENT).trim());
+            ua = (ua + " " + BuildConfig.DMATE_USER_AGENT).trim();
         }
+        // Synchronous fallback for WebViews without document-start scripts.
+        // This per-window nonce grants no native capability and resets on launch.
+        ua = ua.replaceAll("\\s*DMateGuestSession/[A-Za-z0-9-]+", "");
+        settings.setUserAgentString(ua + " DMateGuestSession/" + guestSessionToken);
 
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
@@ -208,6 +219,10 @@ public final class MainActivity extends Activity {
 
         installGallerySaveBridge();
         installLanguageBridge();
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            guestSessionStartScript = WebViewCompat.addDocumentStartJavaScript(
+                webView, GuestSession.script(guestSessionToken), Collections.singleton("https://" + HOME_HOST));
+        }
         refreshSystemThemeBridge();
         webView.setWebViewClient(new DmateWebViewClient());
         webView.setWebChromeClient(new DmateChromeClient());
@@ -527,7 +542,10 @@ public final class MainActivity extends Activity {
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
             CookieManager.getInstance().flush();
-            if (view == webView) refreshSystemThemeBridge();
+            if (view == webView) {
+                webView.evaluateJavascript(GuestSession.script(guestSessionToken), null);
+                refreshSystemThemeBridge();
+            }
         }
 
         @Override
@@ -713,6 +731,8 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
+        outState.putString(GUEST_PROCESS_KEY, GuestSession.processToken());
+        outState.putString(GUEST_SESSION_KEY, guestSessionToken);
         if (webView != null) webView.saveState(outState);
         super.onSaveInstanceState(outState);
     }
@@ -736,6 +756,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (isFinishing()) GuestSession.end(guestSessionToken);
         cancelPendingMicrophoneRequest();
         if (pendingFileCallback != null) {
             pendingFileCallback.onReceiveValue(null);
@@ -744,6 +765,10 @@ public final class MainActivity extends Activity {
         pendingLegacySave = null;
         imageSaver.shutdown();
         if (webView != null) {
+            if (guestSessionStartScript != null) {
+                guestSessionStartScript.remove();
+                guestSessionStartScript = null;
+            }
             if (systemThemeStartScript != null) {
                 systemThemeStartScript.remove();
                 systemThemeStartScript = null;

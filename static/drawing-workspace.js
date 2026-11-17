@@ -198,7 +198,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    // is full. Closing the drawing dialog must not discard that newer draft.
    sessionState.gallery=payload;
    if(payload===savedRaw&&!sessionState.galleryDirty)return true;
-   try{if(persistent)win.localStorage.setItem(key,payload);sessionState.galleryDirty=false;savedRaw=payload;persistError='';persistNoticeShown='';return true;}
+   try{if(sessionState.gallerySaveFailed)throw new Error('Guest gallery checkpoint failed');if(persistent)win.localStorage.setItem(key,payload);sessionState.galleryDirty=false;savedRaw=payload;persistError='';persistNoticeShown='';return true;}
    catch(_){sessionState.galleryDirty=true;persistError='此设备存储不足，当前绘图仍在本页保留；请导出图片后再关闭页面。';if(notify)setStatus();return false;}
   }
   function schedule(){clearTimeout(timer);timer=win.setTimeout(()=>persist(),350);}

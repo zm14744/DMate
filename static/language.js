@@ -18,7 +18,7 @@
     let current = 'zh-CN', bound = false;
     function accountLanguageKey() { return ACCOUNT_KEY_PREFIX + encodeURIComponent(account.username); }
     function readSavedLanguage() {
-        if (!account.authenticated || !account.username) return 'zh-CN';
+        if (!account.authenticated || !account.username) return root.DMateGuestSession?.read('language') === 'en' ? 'en' : 'zh-CN';
         try { return root.localStorage.getItem(accountLanguageKey()) === 'en' ? 'en' : 'zh-CN'; }
         catch (_) { return 'zh-CN'; }
     }
@@ -136,7 +136,7 @@
         current = next;
         if (persist && account.authenticated && account.username) {
             try { root.localStorage.setItem(accountLanguageKey(), current); } catch (_) {}
-        }
+        } else if (persist) root.DMateGuestSession?.write('language', current);
         refreshLanguageControls();
         translate(document.body);
         // In-place switching preserves drafts, streams, focus and cloud work.
@@ -168,7 +168,7 @@
         document.querySelectorAll('[data-dmate-language]').forEach(button => {
             button.addEventListener('click', () => setLanguage(button.dataset.dmateLanguage));
         });
-        setLanguage(current, false);
+        setLanguage(readSavedLanguage(), false);
         // Watch in both languages. Self-writes are idempotent; streaming/user
         // text is pruned. Never modify input values or business identifiers.
         new MutationObserver(records => {

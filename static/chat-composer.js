@@ -485,9 +485,7 @@
         function keydown(event) {
             if (event.key !== 'Enter' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey
                 || composing || event.isComposing || event.keyCode === 229 || Date.now() < commitUntil) return;
-            // A mobile keyboard's Return inserts a new line. Desktop Enter
-            // sends; Shift+Enter always remains available for a new line.
-            if (win.matchMedia?.('(max-width:680px)').matches || win.matchMedia?.('(pointer:coarse)').matches) return;
+            // Enter submits on every device; Shift+Enter remains a newline.
             event.preventDefault();
             if (!input.disabled && !input.readOnly) options.onSend?.();
         }

@@ -7,7 +7,7 @@ const { chromium } = require('playwright');
 const baseURL = process.env.BASE_URL || process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const executablePath = process.env.CHROMIUM || process.env.CHROMIUM_EXECUTABLE_PATH;
 const dbName = 'dmate-offline-workspace', journalKey = 'dmate:offline:notebook-journal:v1';
-const galleryKey = 'dmate:offline:drawing-gallery:v1', migrationKey = 'dmate_offline_migration_v1';
+const galleryKey = 'dmate:offline:drawing-gallery:v1::account%3Afixture-user', migrationKey = 'dmate_offline_migration_v1';
 const documentFor = label => ({ body_text: 'Body ' + label, graphs: [{ id:'G1', name:label,
   directed:false, weighted:false, vertices:[{ id:'v1', label, x:.3, y:.4 }], edges:[] }] });
 const drawing = (id, name, label, updatedAt) => ({ id, name, document:documentFor(label),
@@ -16,9 +16,10 @@ const ready = page => page.waitForFunction(() => document.documentElement.datase
 const removed = '#wrongBookBtn,#conceptNotebookBtn,#mistakesPanel,#notesPanel,#recordDialog,#recordForm';
 
 async function bootstrap(context) {
-  await context.route('**/__offline-data-test', route => route.fulfill({ contentType:'text/html', body:'<!doctype html><title>Local fixture</title>' }));
+  await context.route('**/__offline-data-test', route => route.fulfill({ contentType:'text/html', body:'<!doctype html><title>Local fixture</title><script src="/static/guest-session.js"></script>' }));
   const page = await context.newPage();
   await page.goto(baseURL + '/__offline-data-test');
+  await page.evaluate(() => DMateGuestSession.setAccountOwner('fixture-user'));
   return page;
 }
 
@@ -192,6 +193,7 @@ async function verifyBridge(browser) {
       const schema = await new Promise((resolve, reject) => {
         const request = indexedDB.open('dmate-offline-workspace',2);
         request.onerror = () => reject(request.error);
+        request.onupgradeneeded = () => { for (const name of ['practice','settings']) request.result.createObjectStore(name,{keyPath:'id'}); };
         request.onsuccess = () => { const db=request.result; resolve([...db.objectStoreNames]); db.close(); };
       });
       return { first, second, schema };

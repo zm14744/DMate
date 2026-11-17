@@ -8884,6 +8884,7 @@ body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
 <link rel="stylesheet" href="/static/voice-input.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/concept-notebook.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/chat-composer.css?v={{ dmate_web_revision }}">
+<link rel="stylesheet" href="/static/chat-message-edit.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/image-groups.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/drawing-workspace.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/ai-answer-renderer.css?v={{ dmate_web_revision }}">
@@ -9035,7 +9036,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
         </div>
         <div class="input">
             <div class="manual-question-composer">
-                <textarea id="text" rows="1" placeholder="询问DMate" autocomplete="off" enterkeyhint="enter" aria-label="消息输入"></textarea>
+                <textarea id="text" rows="1" placeholder="询问DMate" autocomplete="off" enterkeyhint="send" aria-label="消息输入"></textarea>
                 <button id="voiceInputBtn" class="voice-input-button" type="button" aria-label="语音输入" title="语音输入" aria-pressed="false">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>
                 </button>
@@ -9397,7 +9398,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
                 <div id="accountRegistrationRecoveryPanel" class="account-registration-recovery-panel hidden" aria-live="polite">
                     <div class="account-panel-title">注册成功，请保存恢复码</div>
                     <div class="account-panel-copy">
-                        这枚恢复码以后用于重置密码。它只会在本次注册后显示；可以直接选中文字，也可以点击下面的“复制恢复码”
+                        这枚恢复码以后用于重置密码；它只会在本次注册后显示；可以直接选中文字，也可以点击下面的“复制恢复码”
                     </div>
                     <div class="account-recovery-code-box">
                         <code id="accountRegistrationRecoveryCodeValue" class="account-recovery-code-value" tabindex="0"></code>
@@ -9414,7 +9415,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
                 <div id="accountEmailBindPanel" class="account-email-bind-panel hidden">
                     <div class="account-panel-title">绑定 / 更换邮箱</div>
                     <div class="account-panel-copy">
-                        验证当前密码和新邮箱。没收到验证码时请检查垃圾邮箱
+                        验证当前密码和新邮箱；没收到验证码时请检查垃圾邮箱
                     </div>
                     <label class="account-field" for="accountEmailBindPassword">
                         <span>当前密码</span>
@@ -9441,7 +9442,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
                 <div id="accountRecoveryCodePanel" class="account-recovery-code-panel hidden">
                     <div class="account-panel-title">修改恢复码</div>
                     <div class="account-panel-copy">
-                        注册时系统会赠送一枚恢复码。登录后可以在这里自行修改；修改前必须验证当前密码
+                        注册时系统会赠送一枚恢复码；登录后可以在这里自行修改；修改前必须验证当前密码
                     </div>
                     <label class="account-field" for="accountRecoveryCurrentPassword">
                         <span>当前密码</span>
@@ -9545,7 +9546,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
         </div>
 
         <div class="wrong-picker-intro">
-            检测到这一段里包含多道独立题目。请选择真正需要记录的题，不会再把整份题库一起塞进错题本
+            检测到这一段里包含多道独立题目；请选择真正需要记录的题，不会再把整份题库一起塞进错题本
         </div>
 
         <div id="wrongQuestionPickerList" class="wrong-picker-list"></div>
@@ -9702,9 +9703,11 @@ window.DMATE_CLIENT_CONFIG = {{ {
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
 <script id="exerciseIntentRules" type="application/json">{{ exercise_intent_rules | tojson }}</script>
+<script defer src="/static/guest-session.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/language-catalog.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/language-knowledge.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/language.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/modal-text.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/knowledge-graph-labels.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/exercise-intent.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/graph-editor-model.js?v={{ dmate_web_revision }}"></script>
@@ -9726,6 +9729,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script defer src="/static/learning-report.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/chat-stream.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/conversation-titles.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/chat-message-edit.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/script.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/desktop-shell.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/ui-tooltip.js?v={{ dmate_web_revision }}"></script>

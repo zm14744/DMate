@@ -1,6 +1,7 @@
 (function(root){
  'use strict';
 const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
+const instruction=value=>root.DMateModalText?.instruction(value)??String(value);
  const pending=new WeakMap();let serial=0;
  function cancel(owner){pending.get(owner)?.finish(false);}
  function request(owner,settings={}){
@@ -13,10 +14,10 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   return new Promise(resolve=>{
    const el=(tag,className,text)=>{const node=doc.createElement(tag);node.className=className;if(text!==undefined)node.textContent=text;return node;};
    const prompt=el('dialog','dmate-delete-confirm'+(noticeOnly?' dmate-notice-only':'')),head=el('header','dmate-delete-confirm-head');
-   const title=el('h3','dmate-delete-confirm-title',uiText(String(settings.title||(noticeOnly?'提示':'确认删除？'))));
+   const title=el('h3','dmate-delete-confirm-title',instruction(uiText(String(settings.title||(noticeOnly?'提示':'确认删除？')))));
    const bodyText=String(settings.body||(noticeOnly?'操作未完成。':'删除后无法恢复。'));
    const suffix=settings.content===undefined?'':'\n'+String(settings.content);
-   const body=el('p','dmate-delete-confirm-body',uiText(suffix&&bodyText.endsWith(suffix)?bodyText.slice(0,-suffix.length):bodyText));
+   const body=el('p','dmate-delete-confirm-body',instruction(uiText(suffix&&bodyText.endsWith(suffix)?bodyText.slice(0,-suffix.length):bodyText)));
    const actions=el('footer','dmate-delete-confirm-actions'),close=el('button','dmate-delete-confirm-close modal-close-dot');
    const confirm=el('button','dmate-delete-confirm-delete',uiText(String(settings.confirmText||'删除')));
    if(settings.content!==undefined){const content=el('span','dmate-delete-confirm-content',String(settings.content));content.setAttribute('data-i18n-content','');body.append(doc.createTextNode('\n'),content);}

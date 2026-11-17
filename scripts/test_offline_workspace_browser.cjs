@@ -41,7 +41,7 @@ async function navigate(page, panel) {
     'The selected learning tool remains available to assistive navigation');
 }
 
-async function ready(page) {
+async function ready(page, expectedPanel = 'graph') {
   await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
   assert.equal(await page.locator('.offline-header,#networkStatus,#saveState').count(), 0,
     'The removed header, save-state label, and network status are absent from the DOM');
@@ -60,11 +60,11 @@ async function ready(page) {
   });
   assert.equal(entries.order, true, 'The online entry precedes appearance in sidebar reading order');
   assert.ok(entries.onlineBottom <= entries.appearanceTop + 1, 'The online button is displayed above appearance');
-  await page.locator('#graphPanel').waitFor({ state: 'visible' });
-  assert.equal(await page.locator('.offline-nav-item.active').getAttribute('data-panel'), 'graph', 'The first module is the default');
+  await page.locator('.offline-panel:not([hidden])').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('.offline-nav-item.active').getAttribute('data-panel'), expectedPanel, 'The default or restored module is selected');
   assert.equal(await page.locator('.offline-topbar .mobile-topbar-brand,.offline-topbar .mobile-dmate-mark,#offlineMobileTitle').count(), 0,
     'The mobile header has no centered application logo or panel title');
-  assert.equal(await page.locator('.offline-nav-item[aria-current="page"]').getAttribute('data-panel'), 'graph');
+  assert.equal(await page.locator('.offline-nav-item[aria-current="page"]').getAttribute('data-panel'), expectedPanel);
   const schema = await page.evaluate(() => new Promise((resolve, reject) => {
     const request = indexedDB.open('dmate-offline-workspace', 2);
     request.onerror = () => reject(request.error);
@@ -151,8 +151,8 @@ async function onlineOfflineEntry(page) {
 async function onlineReference(page, theme) {
   await page.goto(baseURL + '/', { waitUntil: 'networkidle' });
   await page.evaluate(value => {
-    document.documentElement.dataset.appearanceTheme = value;
-    document.body.dataset.appearanceTheme = value;
+    appearanceSettings = {...APPEARANCE_DEFAULTS, mode:value};
+    applyAppearanceSettings({save:true});
   }, theme);
   await onlineOfflineEntry(page);
   const icons = {};
@@ -176,7 +176,7 @@ async function drawingSnapshot(page, selector) {
     await Promise.all(host.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
     const origin = host.getBoundingClientRect();
     const selectors = ['.dmate-drawing-workspace', '.ddw-header', '.ddw-name', '.ddw-page-actions',
-      ...[1, 2, 3].map(index => '.ddw-page-actions>button:nth-child(' + index + ')'),
+      ...[1, 2].map(index => '.ddw-page-actions>button:nth-child(' + index + ')'),
       '.ddw-body', '.ddw-editor', '.dge-topline', '[data-editor-undo]', '[data-editor-redo]',
       '.dge-view-controls', '.ddw-canvas-frame', '.dge-overlay-viewport', '.ddw-side-actions',
       '.ddw-side-actions>button:first-child', '.ddw-side-actions>button:nth-child(2)', '.dge-tool-palette>summary'];
@@ -644,6 +644,8 @@ async function drawing(page, reference) {
   await navigate(page, 'drawing');
   const workspace = page.locator('#offlineDrawingHost .dmate-drawing-workspace');
   await workspace.waitFor();
+  const previousNames = await page.evaluate(() => JSON.parse(DMateGuestSession.read('drawings')?.gallery || '{"pages":[]}').pages.map(page => page.name));
+  assert.ok(previousNames.length >= 2, 'The same guest tab retains drawings made in the online reference');
   assert.equal(await page.locator('#offlineDrawingTitle').innerText(), '绘图');
   assert.deepEqual(await drawingShellStyle(page, '#drawingPanel'), reference.outer,
     'Online/offline drawing shell background, outline, typography, padding and heading match');
@@ -705,7 +707,7 @@ async function drawing(page, reference) {
   await workspace.locator('[data-overlay-tool="zoom-fit"]').click();
   assert.notEqual(await workspace.locator('.dge-overlay-zoom').innerText(), zoomed, 'Fit recalculates the view after zoom');
   const downloading = page.waitForEvent('download');
-  await workspace.getByRole('button', { name: '导出图片', exact: true }).click();
+  await page.locator('#drawingPanel').getByRole('button', { name: '以图片形式导出', exact: true }).click();
   if (page.viewportSize().width < 760) {
     await workspace.locator('.ddw-export-preview').waitFor();
     await page.waitForFunction(() => document.querySelector('.ddw-export-image')?.naturalWidth > 64);
@@ -723,21 +725,21 @@ async function drawing(page, reference) {
     if (await history.getAttribute('aria-expanded') !== 'true') await history.click();
     return workspace.locator('.ddw-history-open').allTextContents();
   };
-  assert.deepEqual(await historyNames(), ['离线保存画板']);
+  assert.deepEqual(await historyNames(), [...previousNames, '离线保存画板']);
   await history.click();
   await workspace.getByRole('button', { name: '新建空白页', exact: true }).click();
   await workspace.locator('.ddw-name').fill('待删除画板');
-  assert.deepEqual(await historyNames(), ['离线保存画板', '待删除画板']);
+  assert.deepEqual(await historyNames(), [...previousNames, '离线保存画板', '待删除画板']);
   await workspace.locator('.ddw-history-open').getByText('离线保存画板', { exact: true }).click();
   assert.equal(await workspace.locator('.dge-overlay-node').count(), 2);
-  assert.deepEqual(await historyNames(), ['离线保存画板', '待删除画板'], 'Selecting history does not change creation order');
+  assert.deepEqual(await historyNames(), [...previousNames, '离线保存画板', '待删除画板'], 'Selecting history does not change creation order');
   await workspace.locator('.ddw-history-item').filter({ hasText: '待删除画板' })
     .locator('.ddw-history-delete').click();
   await page.locator('.dmate-delete-confirm-delete').click();
-  await page.waitForFunction(() => document.querySelectorAll('.ddw-history-open').length === 1);
-  assert.deepEqual(await historyNames(), ['离线保存画板']);
+  await page.waitForFunction(count => document.querySelectorAll('.ddw-history-open').length === count, previousNames.length + 1);
+  assert.deepEqual(await historyNames(), [...previousNames, '离线保存画板']);
   await history.click();
-  await page.waitForFunction(() => (localStorage.getItem('dmate:offline:drawing-gallery:v1') || '').includes('离线保存画板'));
+  await page.waitForFunction(() => (DMateGuestSession.read('drawings')?.gallery || '').includes('离线保存画板'));
   assert.equal(await workspace.locator('.ddw-name').inputValue(), '离线保存画板');
 }
 
@@ -784,11 +786,6 @@ async function runCase(browser, width, theme) {
   const context = await browser.newContext({ viewport: { width, height: 900 }, isMobile: width < 1101,
     hasTouch: width < 1101, serviceWorkers: 'allow',
     ...(width < 760 ? { userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36' } : {}) });
-  await context.addInitScript(value => {
-    if (!localStorage.getItem('dmate:offline:appearance:v1')) {
-      localStorage.setItem('dmate:offline:appearance:v1', JSON.stringify({ mode: value, accent: 'blue', panelOpacity: 100 }));
-    }
-  }, theme);
   const page = await context.newPage(), errors = [], failures = [], nativeDialogs = [], apiRequests = [];
   let workerProtocol;
   try {
@@ -863,8 +860,10 @@ async function runCase(browser, width, theme) {
     await drawing(page, reference.drawing);
     // A second fully offline navigation preserves old records and the drawing.
     await page.reload({ waitUntil: 'networkidle' });
-    await ready(page);
+    await ready(page, 'drawing');
     assert.equal(await page.evaluate(() => document.documentElement.dataset.appearanceTheme), theme, 'Offline appearance persists');
+    assert.equal(await page.locator('.offline-nav-item[aria-current="page"]').getAttribute('data-panel'), 'drawing',
+      'Refresh restores the selected guest workspace panel');
     assert.deepEqual(await readStore(page, 'practice'), preservedPractice,
       'Offline reload preserves existing records without creating or rewriting practice data');
     await navigate(page, 'drawing');

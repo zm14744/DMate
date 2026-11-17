@@ -46,6 +46,12 @@ on:
       - 'scripts/test_conversation_header_browser.cjs'
       - 'scripts/test_notebook_selection_browser.cjs'
       - 'scripts/test_guest_notebook_lifecycle_browser.cjs'
+      - 'scripts/test_composer_keyboard_browser.cjs'
+      - 'scripts/test_chat_message_edit_ui_browser.cjs'
+      - 'scripts/test_chat_message_edit_browser.cjs'
+      - 'scripts/test_chat_message_edit_context_browser.cjs'
+      - 'scripts/test_account_modal_chrome_browser.cjs'
+      - 'scripts/test_guest_session_browser.cjs'
       - 'scripts/test_concept_notebook_selection.py'
       - 'scripts/test_ui_tooltips_browser.cjs'
       - 'scripts/test_conversation_titles_browser.cjs'
@@ -113,6 +119,12 @@ on:
       - 'scripts/test_conversation_header_browser.cjs'
       - 'scripts/test_notebook_selection_browser.cjs'
       - 'scripts/test_guest_notebook_lifecycle_browser.cjs'
+      - 'scripts/test_composer_keyboard_browser.cjs'
+      - 'scripts/test_chat_message_edit_ui_browser.cjs'
+      - 'scripts/test_chat_message_edit_browser.cjs'
+      - 'scripts/test_chat_message_edit_context_browser.cjs'
+      - 'scripts/test_account_modal_chrome_browser.cjs'
+      - 'scripts/test_guest_session_browser.cjs'
       - 'scripts/test_concept_notebook_selection.py'
       - 'scripts/test_ui_tooltips_browser.cjs'
       - 'scripts/test_conversation_titles_browser.cjs'
@@ -143,7 +155,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -195,6 +207,16 @@ jobs:
           node --check scripts/test_conversation_header_browser.cjs
           node --check scripts/test_notebook_selection_browser.cjs
           node --check scripts/test_guest_notebook_lifecycle_browser.cjs
+          node --check scripts/test_composer_keyboard_browser.cjs
+          node --check scripts/test_chat_message_edit_ui_browser.cjs
+          node --check scripts/test_chat_message_edit_browser.cjs
+          node --check scripts/test_chat_message_edit_context_browser.cjs
+          node --check scripts/test_account_modal_chrome_browser.cjs
+          node --check scripts/test_guest_session_browser.cjs
+          node --check static/guest-session.js
+          node --check static/modal-text.js
+          node --check static/chat-message-edit.js
+          node --check static/chat-composer.js
           node --check scripts/test_ui_tooltips_browser.cjs
           node --check scripts/test_conversation_titles_browser.cjs
           node --check scripts/test_conversation_titles.cjs
@@ -306,6 +328,12 @@ jobs:
           node scripts/test_conversation_header_browser.cjs
           node scripts/test_notebook_selection_browser.cjs
           node scripts/test_guest_notebook_lifecycle_browser.cjs
+          node scripts/test_composer_keyboard_browser.cjs
+          node scripts/test_chat_message_edit_ui_browser.cjs
+          node scripts/test_chat_message_edit_browser.cjs
+          node scripts/test_chat_message_edit_context_browser.cjs
+          node scripts/test_account_modal_chrome_browser.cjs
+          node scripts/test_guest_session_browser.cjs
           node scripts/test_ui_tooltips_browser.cjs
           node scripts/test_conversation_titles_browser.cjs
           node scripts/test_voice_input_controls_browser.cjs

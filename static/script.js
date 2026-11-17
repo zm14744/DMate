@@ -263,7 +263,7 @@ function appearanceLocalStorageKey() {
 
 function loadAppearanceSettings() {
     if (!shouldPersistClientState()) {
-        return { ...APPEARANCE_DEFAULTS };
+        return normalizeAppearanceSettings(window.DMateGuestSession?.read("appearance") || APPEARANCE_DEFAULTS);
     }
 
     try {
@@ -298,7 +298,7 @@ function saveAppearanceSettings() {
         } catch (_error) {
             // 外观保存失败不应影响学习系统本身。
         }
-    }
+    } else window.DMateGuestSession?.write("appearance", appearanceCommittedSettings);
     // No cloud sync: this is deliberately a device-local preference.
 }
 
@@ -590,7 +590,7 @@ function openAppearanceDatabase() {
 
 async function readAppearanceBackgroundBlob() {
     if (!shouldPersistClientState()) {
-        return appearanceGuestCommittedBackgroundBlob;
+        return appearanceGuestCommittedBackgroundBlob || await window.DMateGuestSession?.readBlob("background");
     }
 
     const db = await openAppearanceDatabase();
@@ -612,6 +612,8 @@ async function readAppearanceBackgroundBlob() {
 async function writeAppearanceBackgroundBlob(blob) {
     if (!shouldPersistClientState()) {
         appearanceGuestCommittedBackgroundBlob = blob instanceof Blob ? blob : null;
+        if (window.DMateGuestSession && !await window.DMateGuestSession.writeBlob("background", appearanceGuestCommittedBackgroundBlob))
+            throw new Error(dmateUiText("本标签页的临时存储空间不足，请减小背景图片后重试", "This tab's temporary storage is full. Use a smaller background image and try again"));
         return;
     }
 
@@ -636,6 +638,7 @@ async function writeAppearanceBackgroundBlob(blob) {
 async function deleteAppearanceBackgroundBlob() {
     if (!shouldPersistClientState()) {
         appearanceGuestCommittedBackgroundBlob = null;
+        window.DMateGuestSession?.remove("background");
         return;
     }
 
@@ -750,7 +753,11 @@ function closeAppearanceBackgroundViewer() {
 async function loadAppearanceBackground() {
     // 未经服务器验证时，不展示上一个使用者保留在 IndexedDB 的图片。
     if (!shouldPersistClientState()) {
-        clearAppearanceBackgroundVisual();
+        const context = cloudSyncContextVersion, previous = appearanceGuestCommittedBackgroundBlob;
+        const blob = appearanceGuestCommittedBackgroundBlob || await window.DMateGuestSession?.readBlob("background");
+        if (shouldPersistClientState() || context !== cloudSyncContextVersion || previous !== appearanceGuestCommittedBackgroundBlob) return;
+        if (blob instanceof Blob) { appearanceGuestCommittedBackgroundBlob = blob; setAppearanceBackgroundVisual(blob); }
+        else clearAppearanceBackgroundVisual();
         return;
     }
     const owner = accountState.username;
@@ -1134,6 +1141,7 @@ function computeChangedCloudParts(serverParts, localPartHashes) {
 
 function clearLoggedOutWorkspace({ purgePersistent = true } = {}) {
     cancelAccountInteractions();
+    window.DMateGuestSession?.reset();
     // 退出后进入真正的游客模式：页面清空，游客数据不落地。
     sessions = [];
     currentId = null;
@@ -1225,8 +1233,8 @@ function showAppConfirm(options = {}) {
 
     if (appConfirmResolver) resolveAppConfirm(false);
 
-    title.textContent = String(options.title || "请确认");
-    body.textContent = String(options.body || "确定继续吗？");
+    title.textContent = window.DMateModalText?.instruction(String(options.title || "请确认")) ?? String(options.title || "请确认");
+    body.textContent = window.DMateModalText?.instruction(String(options.body || "确定继续吗？")) ?? String(options.body || "确定继续吗？");
     if (options.content) {
         const content = document.createElement("div");
         content.setAttribute("data-i18n-content", "");
@@ -1451,6 +1459,10 @@ function clearLegacyPersistentBackup() {
 
 function applyCloudSnapshot(snapshot, { selectionId = currentId } = {}) {
     if (!snapshot || typeof snapshot !== "object") return false;
+    // A push that was already in flight can finish with a conflict merge after
+    // editing starts. Keep the draft's original objects until it is closed;
+    // the existing dirty-sync retry will then apply remote edits/deletions.
+    if (window.DMateChatEditDraft?.snapshot()) return false;
     cloudApplyingSnapshot = true;
     const previous = { sessions, currentId, deletedSessionIds, learningState };
     const written = [];
@@ -1716,47 +1728,49 @@ function renderAccountUi() {
     window.dispatchEvent(new CustomEvent("dmate:account-state", {
         detail: { authenticated: accountState.authenticated, username: accountState.username }
     }));
+    const modal = document.getElementById("accountModal");
+    if (modal) window.DMateModalText?.refresh(modal);
 }
 
 function setAccountMessage(message = "", isError = false) {
     const box = document.getElementById("accountMessage");
     if (!box) return;
-    box.textContent = String(message || "");
+    box.textContent = window.DMateModalText?.instruction(String(message || "")) ?? String(message || "");
     box.classList.toggle("error", Boolean(isError));
 }
 
 function setAccountRegisterMessage(message = "", isError = false) {
     const box = document.getElementById("accountRegisterMessage");
     if (!box) return;
-    box.textContent = String(message || "");
+    box.textContent = window.DMateModalText?.instruction(String(message || "")) ?? String(message || "");
     box.classList.toggle("error", Boolean(isError));
 }
 
 function setAccountEmailRecoverMessage(message = "", isError = false) {
     const box = document.getElementById("accountEmailRecoverMessage");
     if (!box) return;
-    box.textContent = String(message || "");
+    box.textContent = window.DMateModalText?.instruction(String(message || "")) ?? String(message || "");
     box.classList.toggle("error", Boolean(isError));
 }
 
 function setAccountEmailBindMessage(message = "", isError = false) {
     const box = document.getElementById("accountEmailBindMessage");
     if (!box) return;
-    box.textContent = String(message || "");
+    box.textContent = window.DMateModalText?.instruction(String(message || "")) ?? String(message || "");
     box.classList.toggle("error", Boolean(isError));
 }
 
 function setAccountRecoverMessage(message = "", isError = false) {
     const box = document.getElementById("accountRecoverMessage");
     if (!box) return;
-    box.textContent = String(message || "");
+    box.textContent = window.DMateModalText?.instruction(String(message || "")) ?? String(message || "");
     box.classList.toggle("error", Boolean(isError));
 }
 
 function setAccountRecoveryCodeMessage(message = "", isError = false) {
     const box = document.getElementById("accountRecoveryCodeMessage");
     if (!box) return;
-    box.textContent = String(message || "");
+    box.textContent = window.DMateModalText?.instruction(String(message || "")) ?? String(message || "");
     box.classList.toggle("error", Boolean(isError));
 }
 
@@ -1883,6 +1897,7 @@ function openAccountModal() {
     modal.classList.remove("hidden");
     modal.setAttribute("aria-hidden", "false");
     renderAccountUi();
+    window.DMateModalText?.refresh(modal);
 }
 
 function revealRegistrationRecoveryCode(code) {
@@ -1935,7 +1950,7 @@ async function copyRegistrationRecoveryCode() {
 function setAccountDeleteMessage(message = "", isError = false) {
     const box = document.getElementById("accountDeleteMessage");
     if (!box) return;
-    box.textContent = String(message || "");
+    box.textContent = window.DMateModalText?.instruction(String(message || "")) ?? String(message || "");
     box.classList.toggle("error", Boolean(isError));
 }
 
@@ -1947,6 +1962,8 @@ function setAccountDeletePanel(open) {
         if (password) password.value = "";
         setAccountDeleteMessage("");
     } else {
+        setAccountEmailBindPanel(false);
+        setAccountRecoveryCodePanel(false);
         window.setTimeout(() => password?.focus(), 40);
     }
 }
@@ -2131,6 +2148,7 @@ function startCloudLivePolling() {
 
 function cloudUiEditInProgress() {
     // UI 锁定期间延迟拉取，防止刷新中断正在生成的回答、OCR 或用户编辑。
+    if (window.DMateChatEditDraft?.snapshot()) return true;
     if (typeof busySessionIds !== "undefined" && busySessionIds.size) return true;
     if (typeof pendingAiStartSessionIds !== "undefined" && pendingAiStartSessionIds.size) return true;
     if (typeof typingTimer !== "undefined" && typingTimer) return true;
@@ -2143,7 +2161,7 @@ function cloudUiEditInProgress() {
 }
 
 // Native-shell web updates must inspect the whole workspace, including work
-// in another conversation and guest records which exist only in memory.
+// in another conversation and records scoped to the current guest session.
 function dmateHasUnsavedWork() {
     if (cloudUiEditInProgress() || activeAiRequests.size || typingContext
         || ocrTasks.size || ocrBatchPreparing || ocrRequestInFlight
@@ -3390,17 +3408,26 @@ async function recoverAccountPassword() {
 }
 
 async function logoutAccount() {
-    if (accountState.syncing) return;
+    if (!accountState.authenticated || accountState.syncing) return;
+    const owner = accountState.username;
+    const contextVersion = cloudSyncContextVersion;
+    const currentAccount = () => isCloudSyncContextValid(owner, contextVersion);
 
     const meta = readCloudSyncMeta();
     if (meta.username === accountState.username && meta.dirty) {
         const synced = await pushCloudSnapshot(false);
-        if (!synced && !window.confirm(
-            "本设备还有尚未同步到云端的数据。\n\n仍然退出吗？为保护账号隐私，退出将清除本地学习缓存，未同步的内容可能无法找回"
-        )) {
-            return;
+        if (!currentAccount()) return;
+        if (!synced) {
+            const confirmed = await showAppConfirm({
+                title: "仍然退出登录？",
+                body: "本设备还有尚未同步到云端的数据\n为保护账号隐私，退出将清除本地学习缓存，未同步的内容可能无法找回",
+                confirmText: "退出登录",
+                returnFocus: document.getElementById("accountLogout")
+            });
+            if (!confirmed || !currentAccount()) return;
         }
     }
+    if (!currentAccount()) return;
 
     accountState.syncing = true;
     accountState.status = "正在退出…";
@@ -3412,18 +3439,21 @@ async function logoutAccount() {
             body:JSON.stringify({})
         });
     } catch (error) {
+        if (!currentAccount()) return;
         accountState.syncing = false;
         accountState.status = "退出失败";
         setAccountMessage(error?.message || "退出登录失败，请检查网络后重试", true);
         renderAccountUi();
         return;
     }
+    if (!currentAccount()) return;
 
     // A failed logout leaves this account active. Invalidate its pending
     // replies only after the server has actually confirmed the transition.
-    bumpCloudSyncContext();
+    const transitionVersion = bumpCloudSyncContext();
     // 同一浏览器的下一个访客不应读取当前账号的本机背景图片。
     try { await deleteAppearanceBackgroundBlob(); } catch (_error) {}
+    if (!isCloudSyncContextValid(owner, transitionVersion)) return;
     // 退出不留下可供其他使用者读取的学习快照或备份。
     volatileCloudBackup = null;
     clearLegacyPersistentBackup();
@@ -3453,6 +3483,9 @@ async function logoutAccount() {
 
 async function deleteAccount() {
     if (!accountState.authenticated || accountState.syncing) return;
+    const owner = accountState.username;
+    const contextVersion = cloudSyncContextVersion;
+    const currentAccount = () => isCloudSyncContextValid(owner, contextVersion);
 
     const passwordInput = document.getElementById("accountDeletePassword");
     const password = passwordInput?.value || "";
@@ -3462,10 +3495,14 @@ async function deleteAccount() {
         return;
     }
 
-    const confirmed = window.confirm(
-        "确定永久注销这个账号吗？\n\n账号和云端同步数据都会被删除，此操作无法撤销。\n注销后页面会进入空白游客模式"
-    );
-    if (!confirmed) return;
+    const confirmed = await showAppConfirm({
+        title: "永久注销账号？",
+        body: "账号和云端同步数据都会永久删除，此操作无法撤销\n注销后页面会进入空白游客模式",
+        confirmText: "永久注销",
+        confirmTone: "danger",
+        returnFocus: document.getElementById("accountDeleteConfirm")
+    });
+    if (!confirmed || !currentAccount()) return;
 
     accountState.syncing = true;
     accountState.status = "正在注销…";
@@ -3478,15 +3515,18 @@ async function deleteAccount() {
             body:JSON.stringify({ password })
         });
     } catch (error) {
+        if (!currentAccount()) return;
         accountState.syncing = false;
         accountState.status = "";
         setAccountDeleteMessage(error?.message || "注销账号失败，请稍后再试", true);
         renderAccountUi();
         return;
     }
+    if (!currentAccount()) return;
 
-    bumpCloudSyncContext();
+    const transitionVersion = bumpCloudSyncContext();
     try { await deleteAppearanceBackgroundBlob(); } catch (_error) {}
+    if (!isCloudSyncContextValid(owner, transitionVersion)) return;
     volatileCloudBackup = null;
     clearLegacyPersistentBackup();
     stopCloudLivePolling();
@@ -4504,7 +4544,7 @@ function saveLearningState() {
             accountState.status = "本机存储空间不足，请及时导出学习数据备份";
             renderAccountUi();
         }
-    }
+    } else if (window.DMateGuestSession) persisted = window.DMateGuestSession.write("learning", learningState);
     scheduleCloudSync();
     return persisted;
 }
@@ -6527,6 +6567,7 @@ function createChatActionIcon(name) {
         copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
         trash: '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
         image: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+        'pencil-line': '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/><path d="M13 21h8"/>',
         'book-plus': '<path d="M12 7v6"/><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><path d="M9 10h6"/>'
     };
     const svg = createSvgElement("svg", {
@@ -10354,18 +10395,18 @@ function saveState() {
         } catch (error) {
             console.warn("本地会话保存失败：", error);
         }
-    }
+    } else if (window.DMateGuestSession && !window.DMateGuestSession.write("sessions", { sessions, currentId, deletedSessionIds:{...deletedSessionIds} })) reportGuestSaveFailure();
     scheduleCloudSync();
 }
 
-function loadState() {
-    if (!shouldPersistClientState()) return false;
+function loadState({ guest = false } = {}) {
+    if (!shouldPersistClientState() && !guest) return false;
 
     try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const raw = guest ? window.DMateGuestSession?.read("sessions") : localStorage.getItem(STORAGE_KEY);
         if (!raw) return false;
 
-        const data = JSON.parse(raw);
+        const data = guest ? raw : JSON.parse(raw);
         if (!data || !Array.isArray(data.sessions)) {
             return false;
         }
@@ -11151,7 +11192,7 @@ function showMobilePngSaveDialog(blob, filename) {
     const title = document.createElement("strong");
     title.textContent = "图片已生成";
     const tip = document.createElement("p");
-    tip.textContent = "网页无法直接写入手机相册。可以长按下方图片选择保存，或使用系统分享、下载图片";
+    tip.textContent = "网页无法直接写入手机相册；可以长按下方图片选择保存，或使用系统分享、下载图片";
     const preview = document.createElement("img");
     preview.src = url;
     preview.alt = "已生成的题目或知识图谱图片，长按可保存";
@@ -14372,44 +14413,8 @@ async function requestAiReply(session, options = {}) {
     }
 }
 
-function send() {
-    if (window.dmateVoiceInput?.state && window.dmateVoiceInput.state !== "idle") return;
-    if (ocrTasks.size > 0) { void sendOcrBatch(); return; }
-    if (
-        ocrReviewInProgress
-        || isCurrentSessionTyping()
-        || isSessionBusy(currentId)
-    ) {
-        return;
-    }
-
-    const input = document.getElementById("text");
-    if (!input) return;
-
-    const text = input.value.trim();
-    if (!text) return;
-    if (Array.from(text).length > MAX_CHAT_MESSAGE_CHARS) {
-        showCopyToast("单条文字消息最多 20000 字符，请缩短后发送");
-        input.focus({ preventScroll: true });
-        return;
-    }
-
-    if (!currentId) {
-        newChat();
-    }
-
-    const session = getCurrent();
-    if (!session) return;
-
-    const message = {
-        role: "user",
-        text,
-        // 发送时固定选择，不受之后切换输入模式的影响。
-        manualIsQuestion: manualQuestionMode
-    };
-
+function prepareRetestAnswerMessage(session, message) {
     const retest = normalizeRetestSession(session.retest);
-
     if (retest && retest.stage === "awaiting_answer") {
         const retestCheckParts = [
             "【错题复测回答】",
@@ -14434,7 +14439,7 @@ function send() {
         retestCheckParts.push(
             "",
             "【学生作答】",
-            text
+            message.text
         );
 
         message.apiText = retestCheckParts.join("\n");
@@ -14443,15 +14448,15 @@ function send() {
         retest.stage = "checking";
         session.retest = retest;
     }
+}
 
-    session.messages.push(message);
-
+function queueManualQuestionClassification(session, message) {
     // 用户明确标为题目时，独立请求现有知识/难度分类器；不改 AI 回复。
     // 避免 AI 失败或较慢时题目难度始终空白。
     if (message.manualIsQuestion === true
         && !message.isRetestAnswer
-        && !isExerciseRequestText(text)) {
-        analyzeSingleQuestionTeaching(text, "manual-" + Date.now()).then(teaching => {
+        && !isExerciseRequestText(message.text)) {
+        analyzeSingleQuestionTeaching(message.text, "manual-" + Date.now()).then(teaching => {
             if (!teaching || !sessions.includes(session) || !session.messages.includes(message)
                 || message.manualIsQuestion !== true) return;
             // 以原有模型返回的有效难度为准；不通过文字长度猜难度。
@@ -14465,14 +14470,16 @@ function send() {
             }
         });
     }
+}
 
+function prepareQuestionNavigationMessage(session, message) {
     // “上一道题 / 第一题 / 第二题”都属于明确的题目导航。
     // 在请求发出前先切换 current learningQuestion，右侧信息和后端上下文
     // 都围绕同一道目标题，避免旧题/新题一起被回答。
-    if (isQuestionNavigationFollowUp(text)) {
+    if (isQuestionNavigationFollowUp(message.text)) {
         const targetCandidate = resolveQuestionNavigationCandidate(
             session,
-            text
+            message.text
         );
 
         if (targetCandidate) {
@@ -14482,7 +14489,7 @@ function send() {
 
             message.targetQuestionFingerprint = targetFingerprint;
             message.apiText = buildTargetQuestionApiText(
-                text,
+                message.text,
                 targetCandidate
             );
 
@@ -14492,6 +14499,30 @@ function send() {
             );
         }
     }
+}
+
+function send() {
+    if (window.dmateVoiceInput?.state && window.dmateVoiceInput.state !== "idle") return;
+    if (ocrTasks.size > 0) { void sendOcrBatch(); return; }
+    if (ocrReviewInProgress || isCurrentSessionTyping() || isSessionBusy(currentId)) return;
+    const input = document.getElementById("text");
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    if (Array.from(text).length > MAX_CHAT_MESSAGE_CHARS) {
+        showCopyToast("单条文字消息最多 20000 字符，请缩短后发送");
+        input.focus({ preventScroll: true });
+        return;
+    }
+    if (!currentId) newChat();
+    const session = getCurrent();
+    if (!session) return;
+    // Keep the sender's question choice fixed even when its toggle changes later.
+    const message = { role:"user", text, manualIsQuestion:manualQuestionMode };
+    prepareRetestAnswerMessage(session, message);
+    session.messages.push(message);
+    queueManualQuestionClassification(session, message);
+    prepareQuestionNavigationMessage(session, message);
 
     maybeAutoNameSession(
         session,
@@ -14977,6 +15008,86 @@ let ocrTaskTimer = null;
 let ocrEditorTaskId = null;
 let ocrEditorController = null;
 let graphSessionPromise = null;
+let guestOcrRestoring = false;
+let guestWorkspaceReady = false;
+let guestOcrSaveVersion = 0;
+const guestOcrFiles = new WeakMap();
+let guestSaveWarningShown = false;
+
+function reportGuestSaveFailure() {
+    if (guestSaveWarningShown || shouldPersistClientState()) return;
+    guestSaveWarningShown = true;
+    showCurrentError(window.DMateI18n?.isEnglish?.()
+        ? "This tab could not save the latest changes for refresh; free some browser storage and try again"
+        : "本标签页未能保存最新内容供刷新恢复，请释放浏览器存储空间后重试");
+}
+
+function checkpointGuestDrafts() {
+    if (!guestWorkspaceReady || shouldPersistClientState() || !window.DMateGuestSession || window.DMateGuestSession.getOwner()) return;
+    if (!window.DMateGuestSession.write("draft", document.getElementById("text")?.value || "")) reportGuestSaveFailure();
+    if (!window.DMateGuestSession.write("edit", window.DMateChatEditDraft?.snapshot?.() || null)) reportGuestSaveFailure();
+    if (!window.DMateGuestSession.write("notebook-view", window.dmateConceptNotebook?.getViewState?.() || null)) reportGuestSaveFailure();
+    const wrongEdit = currentWrongEditId ? {id:currentWrongEditId,
+        question:document.getElementById("wrongEditQuestion")?.value || "",
+        note:document.getElementById("wrongEditNote")?.value || ""} : null;
+    if (!window.DMateGuestSession.write("workspace-view", {wrongEdit, wrongBookFilter, wrongBookSearch, wrongBookSort})) reportGuestSaveFailure();
+    void checkpointGuestOcrTasks();
+}
+
+async function checkpointGuestOcrTasks() {
+    const storage = window.DMateGuestSession;
+    if (!guestWorkspaceReady || guestOcrRestoring || shouldPersistClientState() || !storage || storage.getOwner()) return;
+    const version = ++guestOcrSaveVersion, context = cloudSyncContextVersion, rows = [];
+    const fields = ["id", "groupId", "sessionId", "state", "draft", "initialDocument", "confirmation", "scanState", "textEditorState",
+        "dirty", "userRequest", "isQuestion", "error", "notice", "sourceSha256", "descriptions", "descriptionState", "result"];
+    for (const task of ocrTasks.values()) {
+        const section = "ocr-file-" + task.id;
+        let pending = guestOcrFiles.get(task.file);
+        if (!pending) {
+            pending = storage.writeBlob(section, task.file);
+            guestOcrFiles.set(task.file, pending);
+        }
+        if (!await pending) { guestOcrFiles.delete(task.file); reportGuestSaveFailure(); return; }
+        if (version !== guestOcrSaveVersion || context !== cloudSyncContextVersion || shouldPersistClientState() || storage.getOwner()) return;
+        const row = {name:task.file.name, type:task.file.type};
+        for (const key of fields) if (task[key] !== undefined) row[key] = task[key];
+        if (row.scanState) row.scanState = JSON.parse(JSON.stringify(row.scanState,
+            (key, value) => key === "controller" ? undefined : value));
+        rows.push(row);
+    }
+    if (version !== guestOcrSaveVersion || context !== cloudSyncContextVersion || shouldPersistClientState() || storage.getOwner()) return;
+    if (!storage.write("ocr", rows)) { reportGuestSaveFailure(); return; }
+    const active = new Set(rows.map(row => "ocr-file-" + row.id));
+    for (const key of storage.sections()) if (key.startsWith("ocr-file-") && !active.has(key)) storage.remove(key);
+}
+
+async function restoreGuestOcrTasks() {
+    const storage = window.DMateGuestSession, saved = storage?.read("ocr");
+    if (!Array.isArray(saved) || shouldPersistClientState()) return;
+    const context = cloudSyncContextVersion;
+    let missing = 0;
+    guestOcrRestoring = true;
+    try {
+        for (const row of saved.slice(0, OCR_MAX_CONCURRENT)) {
+            const blob = await storage.readBlob("ocr-file-" + row.id);
+            if (context !== cloudSyncContextVersion || shouldPersistClientState() || storage.getOwner()) return;
+            if (!blob) { missing++; continue; }
+            if (!sessions.some(session => session.id === row.sessionId) || ocrTasks.has(row.id)) continue;
+            const file = new File([blob], row.name || "图片.png", {type:row.type || blob.type});
+            const interrupted = row.state === "recognizing";
+            const task = {...row, file, originalUrl:URL.createObjectURL(file), controller:new AbortController(),
+                startedAt:performance.now(), finishedAt:performance.now(), confirming:false, sending:false,
+                state:interrupted ? "failed" : row.state,
+                error:interrupted ? "页面刷新中断了识别，请重新识别这张图片" : row.error};
+            guestOcrFiles.set(file, Promise.resolve(true));
+            ocrTasks.set(task.id, task);
+        }
+    } finally {
+        guestOcrRestoring = false; renderOcrTasks();
+        if (missing && context === cloudSyncContextVersion && !shouldPersistClientState())
+            showCurrentError("部分待发送图片无法从本标签页恢复，请重新选择图片");
+    }
+}
 
 function isOcrSendInProgress() {
     // Sending changes the visible workspace, while originals and confirmed
@@ -15185,6 +15296,7 @@ function openOcrGrouping() {
 }
 
 function renderOcrTasks() {
+    void checkpointGuestOcrTasks();
     const panel = document.getElementById("ocrTaskPanel");
     const list = document.getElementById("ocrTaskList");
     if (!panel || !list) return;
@@ -15748,7 +15860,7 @@ function openGraphDrawing() {
     const owner = drawingStorageOwner();
     if (standaloneDrawingOwner !== owner) {
         standaloneDrawing = null;
-        standaloneDrawingSessionState = {};
+        standaloneDrawingSessionState = owner === "guest" ? window.DMateGuestSession?.drawingState("drawings") || {} : {};
         standaloneDrawingOwner = owner;
     }
     const persistent = shouldPersistClientState();
@@ -16609,6 +16721,195 @@ function hideGeneratedExerciseKnowledgePoints(raw, teaching = null) {
     return output.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+let chatMessageEditState = null;
+
+function validChatMessageEdit(state = chatMessageEditState) {
+    return Boolean(state && state.contextVersion === cloudSyncContextVersion
+        && sessions.includes(state.session) && state.session.messages?.includes(state.message)
+        && state.message.role === "user");
+}
+
+function notifyChatMessageEditChange() {
+    window.dispatchEvent(new Event("dmate:chat-edit-draftchange"));
+}
+
+function beginChatMessageEdit(sessionId, messageIndex) {
+    const session = sessions.find(item => String(item.id) === String(sessionId));
+    const message = session?.messages?.[messageIndex];
+    if (!session || message?.role !== "user" || !window.DMateChatMessageEdit?.mount) return;
+    ensureSessionMessageIds(session);
+    chatMessageEditState?.controller?.destroy();
+    chatMessageEditState = { session, message, value:message.text || "", contextVersion:cloudSyncContextVersion,
+        selection:{ start:String(message.text || "").length, end:String(message.text || "").length }, focusOnRender:true };
+    preserveChatScrollOnce = document.getElementById("chat")?.scrollTop ?? null;
+    renderChat();
+    notifyChatMessageEditChange();
+}
+
+function cancelChatMessageEdit() {
+    if (!chatMessageEditState) return;
+    chatMessageEditState.controller?.destroy();
+    chatMessageEditState = null;
+    preserveChatScrollOnce = document.getElementById("chat")?.scrollTop ?? null;
+    renderChat();
+    notifyChatMessageEditChange();
+}
+
+function prepareChatMessageEditRender() {
+    const state = chatMessageEditState;
+    if (!state) return;
+    if (!validChatMessageEdit(state)) {
+        state.controller?.destroy();
+        chatMessageEditState = null;
+        return;
+    }
+    const input = state.controller?.textarea;
+    if (input && document.activeElement === input) {
+        state.focusOnRender = true;
+        state.selection = { start:input.selectionStart, end:input.selectionEnd, direction:input.selectionDirection };
+    }
+    state.controller?.destroy();
+    state.controller = null;
+}
+
+function renderChatMessageEdit(session, message, bubble) {
+    const state = chatMessageEditState;
+    if (!validChatMessageEdit(state) || state.session !== session || state.message !== message) return false;
+    const controller = window.DMateChatMessageEdit.mount({ host:bubble, value:state.value,
+        maxCharacters:message.source === "ocr" ? 28000 : MAX_CHAT_MESSAGE_CHARS,
+        onChange:(value, selection) => {
+            if (chatMessageEditState !== state || !validChatMessageEdit(state)) return;
+            state.value = value; state.selection = selection; notifyChatMessageEditChange();
+        },
+        onSelectionChange:selection => {
+            if (chatMessageEditState !== state || !validChatMessageEdit(state)) return;
+            state.selection = selection; notifyChatMessageEditChange();
+        },
+        onCancel:cancelChatMessageEdit,
+        onSubmit:value => submitChatMessageEdit(state, value) });
+    state.controller = controller;
+    if (state.focusOnRender) {
+        state.focusOnRender = false;
+        queueMicrotask(() => {
+            if (chatMessageEditState === state && validChatMessageEdit(state) && controller === state.controller)
+                controller.focus(state.selection);
+        });
+    }
+    return true;
+}
+
+// The guest tab snapshot stores text only, never controllers or rendered HTML.
+window.DMateChatEditDraft = {
+    snapshot() {
+        const state = chatMessageEditState;
+        return validChatMessageEdit(state) ? { sessionId:String(state.session.id), messageId:state.message.messageId,
+            value:state.value, selection:state.selection } : null;
+    },
+    restore(value) {
+        if (!value || typeof value.value !== "string" || Array.from(value.value).length > 28000) return false;
+        const session = sessions.find(item => String(item.id) === String(value.sessionId));
+        const message = session?.messages?.find(item => item.messageId === value.messageId && item.role === "user");
+        if (!message) return false;
+        chatMessageEditState?.controller?.destroy();
+        chatMessageEditState = { session, message, value:value.value, selection:value.selection,
+            contextVersion:cloudSyncContextVersion, focusOnRender:false };
+        return true;
+    }
+};
+
+function editedUserMessage(original, value) {
+    let text = value.trim();
+    const message = { role:"user", text };
+    if (typeof original.manualIsQuestion === "boolean") message.manualIsQuestion = original.manualIsQuestion;
+    if (original.source === "ocr") {
+        const marker = "\n\n【我的要求】\n";
+        const position = original.text.indexOf(marker);
+        const question = position >= 0 ? original.text.slice(0, position) : original.text;
+        const contexts = sanitizeSemanticContexts(original.semanticContexts, original);
+        const context = contexts ? null : sanitizeSemanticContext(original.semanticContext, original);
+        if ((context || contexts) && (text === question || text.startsWith(question + marker))) {
+            const request = text === question ? "" : text.slice(question.length + marker.length).trim();
+            const apiQuestion = contexts ? ocrBatchQuestion(contexts, "question_text") : context.question_text;
+            message.source = "ocr";
+            message.ocrIsQuestion = original.ocrIsQuestion !== false;
+            message.apiText = request ? ["【当前指向题目】", apiQuestion, "【当前指向题目结束】", "",
+                "【本轮唯一需要执行的用户请求】", request, "【本轮请求结束】"].join("\n") : apiQuestion;
+            if (contexts) {
+                message.semanticContexts = contexts;
+                const group = sanitizeOcrGroup(original.ocrGroup, original);
+                if (group) message.ocrGroup = group;
+            } else message.semanticContext = context;
+        } else {
+            // A changed confirmed question is new user text, not a valid use of
+            // the old graph signature. Keep its visible content without stale
+            // OCR scaffolding or a hidden instruction that contradicts it.
+            message.text = text.replace(marker, "\n\n");
+            message.manualIsQuestion = original.ocrIsQuestion !== false;
+        }
+    }
+    return message;
+}
+
+async function submitChatMessageEdit(state, value) {
+    if (chatMessageEditState !== state || !validChatMessageEdit(state)
+        || getCurrent() !== state.session) return;
+    const session = state.session, original = state.message;
+    const replacement = editedUserMessage(original, value);
+    const limit = replacement.source === "ocr" ? 28000 : MAX_CHAT_MESSAGE_CHARS;
+    if (!replacement.text.trim() || Array.from(replacement.text).length > limit) {
+        showCopyToast(dmateUiText(`单条文字消息最多 ${limit} 字符`, `A message can contain at most ${limit} characters`));
+        return;
+    }
+    const index = session.messages.indexOf(original);
+    const oldFirst = firstSessionNamingMessage(session);
+    const refreshName = session.nameSource !== "user" && index <= session.messages.indexOf(oldFirst)
+        && (canRefreshAutoSessionName(session, oldFirst) || session.nameSource === "retest");
+    const retest = normalizeRetestSession(session.retest);
+    const keepRetestAnswer = original.isRetestAnswer && retest?.generatedQuestion
+        && session.messages.slice(0, index).some(message => message.role === "ai"
+            && wrongQuestionFingerprint(message.generatedQuestion || message.text) === wrongQuestionFingerprint(retest.generatedQuestion));
+
+    // Opening/canceling a draft never changes generation. Only sending the edit
+    // invalidates the old branch and its unfinished stream/typing work.
+    chatMessageEditState = null;
+    state.controller?.destroy();
+    cancelOcrBatchRun(session.id);
+    const key = sessionBusyKey(session.id), request = activeAiRequests.get(key);
+    if (request) {
+        request.cancelled = true; request.controller.abort(); discardRequestStreamPreview(request);
+        activeAiRequests.delete(key);
+    }
+    if (typingContext?.session === session) clearTypingState(true);
+    busySessionIds.delete(key); pendingAiStartSessionIds.delete(key);
+    ensureSessionMessageIds(session);
+    const removed = session.messages.splice(index);
+    for (const message of removed) session.deletedMessageIds[message.messageId] = Math.max(
+        Date.now(), session.deletedMessageIds[message.messageId] || 0);
+    session.messages.push(replacement);
+    ensureSessionMessageIds(session);
+    session.teaching = null; session.learningQuestion = null; session.solverEffortPreference = null;
+    if (keepRetestAnswer) {
+        session.retest = { ...retest, stage:"awaiting_answer", result:"" };
+        prepareRetestAnswerMessage(session, replacement);
+    } else if (retest) session.retest = null;
+    prepareQuestionNavigationMessage(session, replacement);
+    const candidate = activeQuestionCandidateFromHistory(session);
+    const teaching = candidate && candidateTeachingSnapshot(session, candidate);
+    if (candidate && teaching) applyQuestionCandidateAsCurrent(session, candidate, teaching);
+    if (refreshName) {
+        session.name = deriveSessionName(replacement.text, replacement.source || "text");
+        session.nameSource = replacement.source === "ocr" && session.name === "图片识题" ? "ocr" : "content";
+        delete session.titleSummary;
+    }
+    knowledgeGraphHistoryMessageIndex = null; knowledgeGraphSelectedNodeId = "";
+    queueManualQuestionClassification(session, replacement);
+    forceChatBottomOnce = true;
+    saveState(); renderChat(); renderSessions(); renderInfo(); renderLearningSummary();
+    notifyChatMessageEditChange();
+    refreshInputAvailability();
+    await requestAiReply(session, { expectedUserMessage:replacement });
+}
+
 async function deleteChatMessage(sessionId, messageIndex) {
     const session = sessions.find(
         item => String(item.id) === String(sessionId)
@@ -17051,6 +17352,7 @@ document.addEventListener("visibilitychange", () => {
 // 渲染聊天
 // -----------------------------
 function renderChat(preparedReply = null) {
+    prepareChatMessageEditRender();
     const chat = document.getElementById("chat");
     if (!chat) return;
     const session = getCurrent();
@@ -17188,6 +17490,11 @@ function renderChat(preparedReply = null) {
             bubble.insertBefore(difficultyBadge, content);
         }
 
+        if (message.role === "user" && renderChatMessageEdit(session, message, bubble)) {
+            chat.appendChild(div);
+            continue;
+        }
+
         // 难度仍显示，但不向用户展示模块分类标签。
         // generatedTeaching 的模块与相关知识点保留，供复测、错题与图谱使用。
 
@@ -17233,6 +17540,17 @@ function renderChat(preparedReply = null) {
             );
 
             actions.appendChild(wrongButton);
+        }
+
+        if (message.role === "user") {
+            const editButton = document.createElement("button");
+            editButton.type = "button";
+            editButton.className = "chat-message-edit-button";
+            editButton.setAttribute("aria-label", "重新编辑");
+            editButton.title = "重新编辑";
+            editButton.appendChild(createChatActionIcon("pencil-line"));
+            editButton.onclick = () => beginChatMessageEdit(session.id, messageIndex);
+            actions.appendChild(editButton);
         }
 
         const deleteButton = document.createElement("button");
@@ -22580,6 +22898,7 @@ document.addEventListener(
     "DOMContentLoaded",
     () => {
         removeDeprecatedCopyControls();
+        window.DMateGuestSession?.beginGuest();
         initAppearanceSystem();
         initDmateDownloadDialog();
         initManualQuestionMode();
@@ -22664,6 +22983,16 @@ document.addEventListener(
         }
 
         input?.addEventListener("input", refreshInputAvailability);
+        input?.addEventListener("input", checkpointGuestDrafts);
+        window.addEventListener("dmate:chat-edit-draftchange", checkpointGuestDrafts);
+        window.addEventListener("dmate:notebook-viewchange", checkpointGuestDrafts);
+        window.addEventListener("dmate:guest-save-failure", reportGuestSaveFailure);
+        document.addEventListener("input", () => queueMicrotask(checkpointGuestDrafts));
+        for (const type of ["change", "click"]) document.addEventListener(type, event => {
+            if (event.target.closest?.("#ocrTaskPanel, #ocrGroupingDialog, #graphEditorDialog")) queueMicrotask(checkpointGuestDrafts);
+        });
+        window.addEventListener("pagehide", checkpointGuestDrafts);
+        document.addEventListener("visibilitychange", () => { if (document.hidden) checkpointGuestDrafts(); });
         initializeChatComposer();
 
         if (imageBtn) {
@@ -23046,17 +23375,38 @@ document.addEventListener(
             }
         });
 
-        // 启动时始终显示空白工作区。不得根据 localStorage 中旧登录标记
-        // 在 /auth/me 验证之前渲染任何历史聊天或错题。
+        // Only this tab's guest snapshot may appear before account verification.
+        // Account caches remain unread until /auth/me confirms their owner.
         sessions = [];
         currentId = null;
         deletedSessionIds = Object.create(null);
         learningState = createEmptyLearningState();
         clearLegacyPersistentBackup();
+        loadState({guest:true});
+        const guestLearning = window.DMateGuestSession?.read("learning");
+        if (guestLearning) learningState = normalizeLearningState(guestLearning);
+        const guestDraft = window.DMateGuestSession?.read("draft");
+        if (input && typeof guestDraft === "string") input.value = guestDraft;
+        const guestView = window.DMateGuestSession?.read("workspace-view");
+        if (["pending", "corrected"].includes(guestView?.wrongBookFilter)) wrongBookFilter = guestView.wrongBookFilter;
+        if (typeof guestView?.wrongBookSearch === "string") wrongBookSearch = guestView.wrongBookSearch;
+        if (typeof guestView?.wrongBookSort === "string") wrongBookSort = guestView.wrongBookSort;
+        standaloneDrawingOwner = "guest";
+        standaloneDrawingSessionState = window.DMateGuestSession?.drawingState("drawings") || {};
+        window.DMateChatEditDraft?.restore?.(window.DMateGuestSession?.read("edit"));
 
         renderAll();
         refreshInputAvailability();
         initAccountSystem();
+        window.dmateConceptNotebook?.restoreViewState?.(window.DMateGuestSession?.read("notebook-view"));
+        if (guestView?.wrongEdit && learningState.wrongQuestions.some(item => item.id === guestView.wrongEdit.id)) {
+            openWrongEdit(guestView.wrongEdit.id);
+            document.getElementById("wrongEditQuestion").value = String(guestView.wrongEdit.question || "");
+            document.getElementById("wrongEditNote").value = String(guestView.wrongEdit.note || "");
+            updateWrongEditQuestionPreview();
+        }
+        guestWorkspaceReady = true;
+        void restoreGuestOcrTasks();
 
         // 兼容旧会话：如果之前 AI 出过题但没有保存 generatedQuestion /
         // generatedTeaching，启动后自动恢复最近真实题目并补分类。
@@ -23079,6 +23429,12 @@ document.addEventListener(
 // 不从 localStorage 的旧账号标记推断身份，也不上传这份快照。
 window.DMateOfflineBridge = Object.freeze({
     async snapshot() {
+        const context = cloudSyncContextVersion, owner = drawingStorageOwner();
+        const username = shouldPersistClientState() ? accountState.username : "";
+        const verifyOwner = () => {
+            if (context !== cloudSyncContextVersion || drawingStorageOwner() !== owner)
+                throw new Error("账号状态已变化，请重新打开离线版");
+        };
         let drawings = [];
         try {
             drawings = typeof collectLearningReviewDrawings === "function"
@@ -23091,8 +23447,15 @@ window.DMateOfflineBridge = Object.freeze({
         try {
             backgroundBlob = await readAppearanceBackgroundBlob();
         } catch (_error) {}
+        verifyOwner();
         try {
-            localStorage.setItem("dmate:offline:appearance:v1", JSON.stringify(settings));
+            if (!shouldPersistClientState()) {
+                if (!window.DMateGuestSession?.write("appearance", settings)
+                    || backgroundBlob && !await window.DMateGuestSession.writeBlob("background", backgroundBlob))
+                    throw new Error("本标签页的离线外观暂时无法保存");
+            } else {
+            const offlineOwnerSuffix = "::" + encodeURIComponent("account:" + accountState.username);
+            localStorage.setItem("dmate:offline:appearance:v1" + offlineOwnerSuffix, JSON.stringify(settings));
             await new Promise((resolve, reject) => {
                 const request = indexedDB.open("dmate-offline-workspace", 2);
                 request.onupgradeneeded = () => {
@@ -23106,7 +23469,7 @@ window.DMateOfflineBridge = Object.freeze({
                     const db = request.result;
                     const tx = db.transaction("settings", "readwrite");
                     tx.objectStore("settings").put({
-                        id:"appearance", settings, backgroundBlob,
+                        id:"appearance" + offlineOwnerSuffix, settings, backgroundBlob,
                         updatedAt:Date.now()
                     });
                     tx.oncomplete = () => { db.close(); resolve(); };
@@ -23114,9 +23477,11 @@ window.DMateOfflineBridge = Object.freeze({
                     tx.onabort = () => { const error=tx.error; db.close(); reject(error || new Error("离线外观数据保存中断")); };
                 };
             });
+            }
         } catch (error) {
             console.warn("DMate 原有外观未能复制到离线工作区：", error);
         }
+        verifyOwner();
 
         const copiedDrawings = Array.isArray(drawings) ? JSON.parse(JSON.stringify(drawings)) : [];
         const legacyPage = copiedDrawings.length === 1 ? copiedDrawings[0] : null;
@@ -23127,7 +23492,7 @@ window.DMateOfflineBridge = Object.freeze({
             legacyPage.id = "legacy-local";
         }
         return {
-            username: accountState.authenticated ? accountState.username : "",
+            username,
             drawings: copiedDrawings
         };
     }

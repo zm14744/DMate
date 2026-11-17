@@ -1,4 +1,4 @@
-/* Guest notes remain page-local; definitive authentication expiry revokes the
+/* Guest notes survive refresh within their tab; authentication expiry revokes the
  * live workspace without destroying its verified owner's recoverable cache. */
 'use strict';
 const assert = require('node:assert/strict');
@@ -92,12 +92,18 @@ async function guestPageLifecycle(browser, width) {
     }, { learningKey, metaKey, record:note('old-account') });
     await page.reload({ waitUntil:'networkidle' });
     await page.waitForFunction(() => !accountVerificationOperation);
-    assert.equal((await state(page)).notes.length, 0, 'A guest reload starts with an empty notebook');
+    assert.equal((await state(page)).notes.length, 1, 'A guest reload restores this tab\'s notebook');
     assert.equal((await state(page)).cache, null, 'An ordinary guest bootstrap removes legacy account snapshots instead of recovering them');
     await page.evaluate(() => window.dmateConceptNotebook.open());
-    assert.equal(await page.locator('.dcn-note').count(), 0);
+    assert.equal(await page.locator('.dcn-note').count(), 1);
+    assert.equal(await page.locator('.dcn-title').inputValue(), 'This page only');
+    const another = await context.newPage();
+    await another.goto(baseURL, {waitUntil:'networkidle'});
+    await another.waitForFunction(() => !accountVerificationOperation);
+    assert.deepEqual((await state(another)).notes, [], 'A new tab cannot restore another tab\'s notes');
+    await another.close();
     assert.deepEqual(server.errors, []);
-    console.log('PASS ' + width + ': guest delayed verification, no persistent writes, same-page reopen and fresh reload');
+    console.log('PASS ' + width + ': delayed verification, no account writes, modal reopen, reload recovery and fresh-tab isolation');
   } finally { await context.close(); }
 }
 

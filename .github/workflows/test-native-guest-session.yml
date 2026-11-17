@@ -1,0 +1,45 @@
+name: Test native guest session lifetime
+
+on:
+  push:
+    paths:
+      - 'android/app/src/main/java/app/dmate/client/GuestSession.java'
+      - 'android/app/src/main/java/app/dmate/client/MainActivity.java'
+      - 'desktop/src-tauri/src/guest-session.js'
+      - 'desktop/src-tauri/src/guest_session.rs'
+      - 'desktop/src-tauri/src/main.rs'
+      - 'scripts/native/GuestSessionTest.java'
+      - 'scripts/test_native_guest_session.py'
+      - '.github/workflows/test-native-guest-session.yml'
+  pull_request:
+    paths:
+      - 'android/app/src/main/java/app/dmate/client/GuestSession.java'
+      - 'android/app/src/main/java/app/dmate/client/MainActivity.java'
+      - 'desktop/src-tauri/src/guest-session.js'
+      - 'desktop/src-tauri/src/guest_session.rs'
+      - 'desktop/src-tauri/src/main.rs'
+      - 'scripts/native/GuestSessionTest.java'
+      - 'scripts/test_native_guest_session.py'
+      - '.github/workflows/test-native-guest-session.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Verify native launch, refresh, origin and frame boundaries
+        run: python scripts/test_native_guest_session.py -v

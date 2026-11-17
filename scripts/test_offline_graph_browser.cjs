@@ -159,6 +159,10 @@ async function onlineReference(browser, width, theme, available) {
   const page = await context.newPage();
   try {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
+    await page.evaluate(value => {
+      appearanceSettings = {...APPEARANCE_DEFAULTS, mode:value};
+      applyAppearanceSettings({save:true});
+    }, theme);
     await page.evaluate(theme => {
       DMateI18n.setLanguage('zh-CN', false);
       document.documentElement.dataset.appearanceTheme = theme;
@@ -419,13 +423,13 @@ async function runCase(browser, width, theme) {
   const label = width + '/' + theme;
   const context = await browser.newContext({ viewport: { width, height: 900 },
     isMobile: width <= 760, hasTouch: width <= 760, serviceWorkers: 'allow' });
-  await context.addInitScript(theme => localStorage.setItem('dmate:offline:appearance:v1',
-    JSON.stringify({ mode: theme, accent: 'blue', panelOpacity: 100 })), theme);
   const page = await context.newPage(), errors = [], failures = [], api = [];
   let protocol;
   page.on('pageerror', error => errors.push(error.message));
   try {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
+    await page.evaluate(mode => DMateGuestSession.write('appearance',
+      { mode, accent: 'blue', panelOpacity: 100 }), theme);
     await page.evaluate(async () => {
       await navigator.serviceWorker.register('/offline-service-worker.js', { scope: '/' });
       const registration = await navigator.serviceWorker.ready, worker = registration.active;

@@ -83,6 +83,10 @@
     return node;
   }
   const escapeHtml = value => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const guest = () => Boolean(window.DMateGuestSession && !window.DMateGuestSession.getOwner());
+  const ownerSuffix = () => "::" + encodeURIComponent("account:" + (window.DMateGuestSession?.getOwner() || ""));
+  const galleryKey = () => "dmate:offline:drawing-gallery:v1" + ownerSuffix();
+  const appearanceKey = () => "dmate:offline:appearance:v1" + ownerSuffix();
   function configureRenderer() {
     window.DMateAIAnswer?.configure({
       markdownToHtml(value) {
@@ -120,9 +124,31 @@
     });
   }
   function transaction(store, mode, action) {
+    if (guest()) {
+      return Promise.resolve().then(() => {
+        const records = window.DMateGuestSession.read("offline-" + store) || {};
+        const request = action({
+          get: id => ({result:records[id]}),
+          put: value => { records[value.id] = value; return {result:value.id}; },
+          delete: id => { delete records[id]; return {}; },
+          getAll: () => ({result:Object.values(records)})
+        });
+        if (mode === "readwrite" && !window.DMateGuestSession.write("offline-" + store, records))
+          throw new Error(tr("本标签页的临时存储空间不足，请释放浏览器空间后重试", "This tab could not save its changes; free browser storage and try again"));
+        return request?.result;
+      });
+    }
     return new Promise((resolve, reject) => {
       const tx = state.db.transaction(store, mode);
-      const objectStore = tx.objectStore(store);
+      const original = tx.objectStore(store), suffix = ownerSuffix();
+      const objectStore = {
+        get:id => {
+          const request = original.get(id + suffix);
+          return request;
+        },
+        put:value => original.put({...value, id:value.id + suffix}),
+        delete:id => original.delete(id + suffix)
+      };
       let request;
       try { request = action(objectStore); }
       catch (error) { reject(error); return; }
@@ -133,11 +159,16 @@
   }
   const put = (store, value) => transaction(store, "readwrite", os => os.put(value));
   async function applyOriginalAppearance() {
+    if (guest()) {
+      window.DMateOfflineAppearance?.apply(window.DMateGuestSession.read("appearance") || {},
+        await window.DMateGuestSession.readBlob("background"));
+      return;
+    }
     let saved = null;
     try { saved = await transaction("settings", "readonly", os => os.get("appearance")); } catch (_) {}
     let settings = saved?.settings || null;
     if (!settings) {
-      try { settings = JSON.parse(localStorage.getItem("dmate:offline:appearance:v1") || "null"); } catch (_) {}
+      try { settings = JSON.parse(localStorage.getItem(appearanceKey()) || "null"); } catch (_) {}
     }
     window.DMateOfflineAppearance?.apply(settings || {}, saved?.backgroundBlob || null);
   }
@@ -197,10 +228,18 @@
     try { payload = JSON.parse(sessionStorage.getItem("dmate_offline_migration_v1") || "null"); }
     catch (_) { payload = null; }
     if (!payload || typeof payload !== "object") return;
+    if (String(payload.username || "") !== (window.DMateGuestSession?.getOwner() || "")) {
+      sessionStorage.removeItem("dmate_offline_migration_v1"); return;
+    }
     if (typeof payload.drawings === "string" && payload.drawings) {
       try {
-        const key = "dmate:offline:drawing-gallery:v1", current = localStorage.getItem(key);
-        if (!current) localStorage.setItem(key, payload.drawings);
+        const key = galleryKey(), current = guest()
+          ? window.DMateGuestSession.read("drawings")?.gallery : localStorage.getItem(key);
+        const save = value => {
+          if (guest()) { if (!window.DMateGuestSession.write("drawings", {gallery:value})) throw Error("临时绘图库保存失败"); }
+          else localStorage.setItem(key, value);
+        };
+        if (!current) save(payload.drawings);
         else {
           const local = JSON.parse(current), incoming = JSON.parse(payload.drawings);
           if (Array.isArray(local?.pages) && Array.isArray(incoming?.pages)) {
@@ -209,13 +248,13 @@
               pages.push(page); ids.add(page.id);
             }
             // Local page positions, documents and the active page stay intact.
-            localStorage.setItem(key, JSON.stringify({...local, pages}));
+            save(JSON.stringify({...local, pages}));
           }
         }
       } catch (error) { toast("本机绘图库已保留，部分在线绘图未能导入：" + (error?.message || "")); }
     }
     sessionStorage.removeItem("dmate_offline_migration_v1");
-    toast("已导入当前账号的绘图到本机离线区");
+    toast(guest() ? "已导入当前标签页的绘图到离线区" : "已导入当前账号的绘图到本机离线区");
   }
 
   async function loadResources() {
@@ -713,9 +752,9 @@
     }
     try {
       state.drawingController = window.DMateDrawingWorkspace.mount(host, {
-        storageKey: "dmate:offline:drawing-gallery:v1",
-        persistent: true,
-        sessionState: {},
+        storageKey: galleryKey(),
+        persistent: !guest(),
+        sessionState: guest() ? window.DMateGuestSession.drawingState("drawings") : {},
         features: {ai:false, upload:false},
         legacyDocument: {body_text:"",graphs:[{id:"G1",name:"我的图形",directed:false,weighted:false,vertices:[],edges:[]}]},
         onChange: () => {}
@@ -731,10 +770,25 @@
   }
 
   async function saveAppearance(changes) {
+    if (guest()) {
+      const previous = window.DMateGuestSession.read("appearance") || {};
+      const next = {...previous, ...(changes?.settings || changes || {})};
+      delete next.backgroundBlob; delete next.removeBackground;
+      let blob = await window.DMateGuestSession.readBlob("background");
+      if (changes?.removeBackground) { window.DMateGuestSession.remove("background"); blob = null; }
+      else if (changes?.backgroundBlob instanceof Blob) {
+        blob = changes.backgroundBlob;
+        if (!await window.DMateGuestSession.writeBlob("background", blob)) throw Error("背景图片暂时无法保存，请释放浏览器存储空间后重试");
+      }
+      if (!window.DMateGuestSession.write("appearance", next)) throw Error("外观设置暂时无法保存，请释放浏览器存储空间后重试");
+      window.DMateOfflineAppearance?.apply(next, blob);
+      window.dispatchEvent(new CustomEvent("offline:appearance-applied", {detail:{settings:next}}));
+      return;
+    }
     const saved = await transaction("settings", "readonly", os => os.get("appearance"));
     let previous = saved?.settings;
     if (!previous) {
-      try { previous = JSON.parse(localStorage.getItem("dmate:offline:appearance:v1") || "null"); } catch (_) {}
+      try { previous = JSON.parse(localStorage.getItem(appearanceKey()) || "null"); } catch (_) {}
     }
     const patch = changes?.settings || changes || {};
     const fields = ["mode", "accent", "fontSize", "panelOpacity", "bubbleOpacity", "backgroundFit", "blur", "mask"];
@@ -744,12 +798,22 @@
     if (changes?.removeBackground) delete value.backgroundBlob;
     else if (changes?.backgroundBlob instanceof Blob) value.backgroundBlob = changes.backgroundBlob;
     await put("settings", value);
-    try { localStorage.setItem("dmate:offline:appearance:v1", JSON.stringify(next)); } catch (_) {}
+    try { localStorage.setItem(appearanceKey(), JSON.stringify(next)); } catch (_) {}
     window.DMateOfflineAppearance?.apply(next, value.backgroundBlob || null);
     window.dispatchEvent(new CustomEvent("offline:appearance-applied", {detail:{settings:next}}));
   }
 
   function bind() {
+    const checkpoint = () => {
+      if (!guest()) return;
+      const snapshot = {};
+      for (const key of ["panel", "revealed", "graphCategory", "graphSelectedNodeId", "questionCategory", "questionDifficulty", "questionType", "questionSelection", "questionQuery", "conceptCategory", "conceptSelection", "conceptQuery", "graphQuery"]) snapshot[key] = state[key];
+      snapshot.selectedQuestion = state.selectedQuestion?.id || "";
+      snapshot.selectedConcept = state.selectedConcept?.id || "";
+      if (!window.DMateGuestSession.write("offline-view", snapshot)) toast("当前标签页未能保存最新浏览位置");
+    };
+    for (const type of ["input", "change", "click"]) document.addEventListener(type, () => queueMicrotask(checkpoint));
+    window.addEventListener("pagehide", checkpoint);
     window.DMateI18n?.register?.({
       "基本定义":"Definition", "理解与说明":"Explanation", "典型例题":"Worked example", "常见错误":"Common mistakes",
       "评分要点":"Marking criteria", "细分概念":"Detailed concepts", "所属图谱知识点":"Knowledge-map topic",
@@ -823,7 +887,17 @@
       await loadLibrarySelections();
       bind();
       window.DMateI18n?.translate?.(document.body);
-      await switchPanel("graph");
+      const view = guest() && window.DMateGuestSession.read("offline-view");
+      if (view) {
+        for (const key of ["graphCategory", "graphSelectedNodeId", "questionCategory", "questionDifficulty", "questionType", "questionSelection", "questionQuery", "conceptCategory", "conceptSelection", "conceptQuery", "graphQuery"])
+          if (typeof view[key] === "string") state[key] = view[key];
+        state.revealed = view.revealed === true;
+        state.selectedQuestion = state.questions.find(item => item.id === view.selectedQuestion) || null;
+        state.selectedConcept = state.concepts.find(item => item.id === view.selectedConcept) || null;
+        $("questionSearch").value = state.questionQuery;
+        $("conceptSearch").value = state.conceptQuery;
+      }
+      await switchPanel(view?.panel || "graph");
       document.documentElement.dataset.offlineReady = "true";
     } catch (error) {
       toast(error?.message || "离线工作区初始化失败");

@@ -180,7 +180,7 @@ async function checkChatActions(page, exports) {
   const actions = page.locator('.msg.user .msg-actions');
   await actions.waitFor();
   assert.deepEqual(await actions.locator('svg[data-icon]').evaluateAll(icons => icons.map(icon => icon.dataset.icon)),
-    ['copy', 'image', 'book-plus', 'trash'], 'Text copy comes before image export, then record and delete');
+    ['copy', 'image', 'book-plus', 'pencil-line', 'trash'], 'Text copy comes before image export, then record, edit and delete');
   if (page.viewportSize().width > 1100) {
     await page.locator('.msg.user').hover(); await settle(page);
   }

@@ -63,9 +63,10 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     assert.ok(networkCSS.trim().length, 'The shared stylesheet must not be empty');
     const sharedAssets = await Promise.all(['/static/dmate-main.css?v=48', '/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
       '/static/select-controls.css?v=42', '/static/mobile-select.js?v=26', '/static/offline.css?v=51',
-      '/static/drawing-workspace.css?v=50', '/static/graph-editor.js?v=35', '/static/graph-editor-overlay.js?v=35', '/static/drawing-workspace.js?v=50', '/static/drawing-export.js?v=39',
-      '/static/graph-editor-format.js?v=31', '/static/language-catalog.js?v=48', '/static/offline-shell.js?v=33',
-      '/static/offline.js?v=47', '/static/offline-knowledge-graph.js?v=45',
+      '/static/drawing-workspace.css?v=50', '/static/graph-editor.js?v=53', '/static/graph-editor-overlay.js?v=35', '/static/drawing-workspace.js?v=53', '/static/drawing-export.js?v=39',
+      '/static/modal-chrome.css', '/static/modal-text.js?v=53', '/static/delete-confirm.js', '/static/guest-session.js?v=53', '/static/language.js?v=53',
+      '/static/graph-editor-format.js?v=31', '/static/language-catalog.js?v=53', '/static/offline-shell.js?v=33',
+      '/static/offline.js?v=53', '/static/offline-knowledge-graph.js?v=45',
       '/static/ui-tooltip.js?v=49',
       '/static/offline-knowledge-graph.css?v=51', '/static/offline-entry.js?v=45',
       '/static/search-controls.css?v=27', '/static/search-controls.js?v=27',
@@ -81,7 +82,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     // Simulate the pinned stylesheet left by the previous offline shell.
     await page.goto(new URL('/health', baseURL).href);
     await page.evaluate(async () => {
-      const cache = await caches.open('dmate-offline-shell-v51');
+      const cache = await caches.open('dmate-offline-shell-v52');
       await cache.put('/static/button-themes.css?v=43', new Response('/* obsolete shell before neutral notebook and appearance actions */'));
     });
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });
@@ -99,7 +100,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       if (canonical.length !== 1) throw new Error('Expected exactly one precached shared stylesheet');
       return { name: names[0], canonical: canonical[0].url };
     }, assetPath);
-    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 52, 'Neutral notebook and appearance actions need the refreshed offline cache');
+    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 53, 'Guest sessions and modal chrome need the refreshed offline cache');
     assert.equal((await fetchAsset(page, current.canonical)).text, networkCSS,
       'The refreshed shell loads current frameless controls instead of the obsolete stylesheet');
     for (const asset of sharedAssets) {

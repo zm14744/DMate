@@ -47,7 +47,7 @@ function mount(options){
   if(!current())currentId=state.notes[0]?.id||null;
  }
  function persist(){
-  try{options.onChange?.(copy(state));saveError=false;saved.textContent='';return true;}
+  try{options.onChange?.(copy(state));win.dispatchEvent(new Event('dmate:notebook-viewchange'));saveError=false;saved.textContent='';return true;}
   catch(error){saveError=true;saved.textContent=error?.message||'保存失败，请保留当前页面后重试。';return false;}
  }
  function invalidate(){
@@ -97,14 +97,14 @@ function mount(options){
   note[field]=value;note.updatedAt=updatedAt(note);invalidate();persist();renderList();
  }
  function askToDelete(note){
-  const settings={title:'删除这个概念？',body:'删除后无法恢复。\n'+noteName(note),content:noteName(note),confirmText:'删除概念',cancelText:'取消',confirmTone:'danger',fallbackText:uiText('确定删除“'+noteName(note)+'”吗？删除后无法恢复。','Delete “'+noteName(note)+'”? This cannot be undone.')};
+  const settings={title:'删除这个概念？',body:'删除后无法恢复。\n'+noteName(note),content:noteName(note),confirmText:'删除概念',cancelText:'取消',confirmTone:'danger',fallbackText:uiText('确定删除“'+noteName(note)+'”吗？删除后无法恢复','Delete “'+noteName(note)+'”? This cannot be undone')};
   if(typeof options.confirmDelete==='function')return options.confirmDelete(settings);
   return new Promise(resolve=>{
    const prompt=el('dialog','dcn-confirm'),head=el('header','dcn-confirm-head'),heading=el('h3','',settings.title);
    heading.id='conceptNotebookDeleteTitle';prompt.setAttribute('aria-labelledby',heading.id);
    const finish=value=>{if(deletePrompt?.node!==prompt)return;deletePrompt=null;if(prompt.open)prompt.close();prompt.remove();resolve(Boolean(value));};
    const cancel=action('',()=>finish(false),'dcn-close');cancel.setAttribute('aria-label','取消删除');cancel.title='取消删除';head.append(heading,cancel);
-   const body=el('p','dcn-confirm-body','删除后无法恢复。'),actions=el('footer','dcn-confirm-actions');
+   const body=el('p','dcn-confirm-body',uiText('删除后无法恢复','This cannot be undone')),actions=el('footer','dcn-confirm-actions');
    body.append(d.createTextNode('\n'),contentNode(el('span','',settings.content)));
    actions.append(action(settings.confirmText,()=>finish(true),'dcn-confirm-delete'));
    prompt.append(head,body,actions);dialog.append(prompt);deletePrompt={node:prompt,finish};
@@ -175,7 +175,15 @@ function mount(options){
  const onCancel=event=>{if(saveError&&!persist()){event.preventDefault();return;}invalidate();};
  title.addEventListener('input',()=>edit('title',title.value));original.addEventListener('input',()=>edit('content',original.value));
  question.addEventListener('input',()=>invalidate());search.addEventListener('input',renderList);button.addEventListener('click',open);dialog.addEventListener('close',onClose);dialog.addEventListener('cancel',onCancel);
- return {open,close,refresh,getState:()=>copy(state),destroy(){if(destroyed)return;invalidate();destroyed=true;button.removeEventListener('click',open);dialog.removeEventListener('close',onClose);dialog.removeEventListener('cancel',onCancel);if(dialog.open)dialog.close();dialog.replaceChildren();}};
+ const viewChange=()=>queueMicrotask(()=>win.dispatchEvent(new Event('dmate:notebook-viewchange')));
+ for(const type of ['input','change','click'])dialog.addEventListener(type,viewChange);
+ return {open,close,refresh,getState:()=>copy(state),getViewState:()=>({currentId,selected:[...selected],search:search.value,question:question.value}),restoreViewState(value){
+  if(!value||typeof value!=='object')return;load();
+  if(state.notes.some(note=>note.id===value.currentId))currentId=value.currentId;
+  selected=new Set((Array.isArray(value.selected)?value.selected:[]).filter(id=>state.notes.some(note=>note.id===id)));
+  search.value=typeof value.search==='string'?value.search:'';question.value=typeof value.question==='string'?value.question:'';
+  renderList();renderEditor();renderActions();
+ },destroy(){if(destroyed)return;invalidate();destroyed=true;button.removeEventListener('click',open);dialog.removeEventListener('close',onClose);dialog.removeEventListener('cancel',onCancel);for(const type of ['input','change','click'])dialog.removeEventListener(type,viewChange);if(dialog.open)dialog.close();dialog.replaceChildren();}};
 }
 root.DMateConceptNotebook={mount};
 })(typeof window!=='undefined'?window:globalThis);

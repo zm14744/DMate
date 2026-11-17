@@ -1,5 +1,5 @@
 /* Uses the public persistent drawing API inside the actual online dialog.
- * Anonymous online galleries intentionally do not persist across refreshes.
+ * Anonymous online galleries survive refresh within their tab.
  */
 'use strict';
 const assert = require('node:assert/strict');
@@ -622,7 +622,7 @@ async function runGuestBlankLifecycle(browser) {
     assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(key => /^dmate:graph-(?:gallery|drawing)/.test(key))), []);
     await page.reload({ waitUntil: 'networkidle' }); await localPermissions(page); await openOnline(page);
     const refreshed = await assertEditableBlank(page);
-    assert.notEqual(refreshed.pages[0].id, replacement.pages[0].id, 'Guest gallery does not survive refresh');
+    assert.equal(refreshed.pages[0].id, replacement.pages[0].id, 'Guest gallery survives refresh in the same tab');
     assert.deepEqual(await page.evaluate(() => window.drawingStorageWrites), []);
     assert.equal(page.modelCalls, 0); assert.deepEqual(page.regressionErrors, []);
     console.log('PASS online guest: initial blank, same-open deletion stays empty, reopen creates one, saved blank reused, no persistent writes');
@@ -717,9 +717,9 @@ async function runOfflineViewport(browser, width) {
   let modelCalls = 0;
   await page.route(/\/(?:chat|ocr|drawing\/[^?]+)(?:\?|$)/, route => { modelCalls++; return route.abort(); });
   try {
-    await page.addInitScript(value => localStorage.setItem('dmate:offline:drawing-gallery:v1', JSON.stringify(value)), gallery);
     await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await page.evaluate(value => DMateGuestSession.write('drawings', {gallery:JSON.stringify(value)}), gallery);
     if (width === 390) await page.locator('#offlineNavToggle').click();
     await page.locator('#graphDrawingBtn').click();
     await page.locator('#offlineDrawingHost .dge-overlay-viewport').waitFor();

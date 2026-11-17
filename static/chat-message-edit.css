@@ -1,0 +1,79 @@
+/* The existing painted user bubble also contains its inline editing view. */
+body[data-appearance-theme] .msg.user:has(> .msg-bubble > .chat-message-edit) {
+    width:100%;
+}
+body[data-appearance-theme] .msg.user:has(> .msg-bubble > .chat-message-edit) > .msg-bubble {
+    width:100%;
+    min-width:0;
+}
+.chat-message-edit {
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    min-width:0;
+    max-width:100%;
+}
+.chat-message-edit-input {
+    display:block;
+    box-sizing:border-box;
+    width:100%;
+    min-width:0;
+    max-width:100%;
+    min-height:4.8em;
+    max-height:min(50dvh,420px);
+    margin:0;
+    padding:0;
+    border:0!important;
+    border-radius:0;
+    background:transparent!important;
+    color:inherit;
+    font:inherit;
+    line-height:inherit;
+    resize:none;
+    overflow-y:auto;
+    white-space:pre-wrap;
+    overflow-wrap:anywhere;
+    outline:0;
+    box-shadow:none!important;
+}
+.chat-message-edit-actions {
+    display:flex;
+    justify-content:flex-end;
+    flex-wrap:wrap;
+    gap:8px;
+}
+.chat-message-edit-error {
+    margin:0;
+    color:var(--dm-danger-text,#ef4444);
+    font-size:var(--dm-filled-font-size,14px);
+}
+.chat-message-edit-error[hidden] { display:none; }
+@layer dmate-button-themes {
+    body[data-appearance-theme] #chat .msg.user .chat-message-edit-actions > button {
+        box-sizing:border-box!important;
+        min-height:var(--dm-filled-min-height,36px)!important;
+        padding:var(--dm-filled-padding,8px 12px)!important;
+        border:0!important;
+        border-radius:var(--dm-filled-radius,8px)!important;
+        background:var(--dm-filled-bg,var(--dm-selected-bg))!important;
+        background-image:none!important;
+        color:var(--dm-filled-text,var(--text-primary))!important;
+        font-family:var(--dm-filled-font-family,var(--dmate-font-ui,system-ui))!important;
+        font-size:var(--dm-filled-font-size,14px)!important;
+        font-weight:var(--dm-filled-font-weight,400)!important;
+        line-height:var(--dm-filled-line-height,normal)!important;
+        text-decoration:none!important;
+        box-shadow:none!important;
+        filter:none!important;
+        cursor:pointer;
+        transition:var(--dm-control-transition);
+    }
+    body[data-appearance-theme] #chat .msg.user .chat-message-edit-actions > button:not(:disabled):is(:hover,:focus-visible,:active) {
+        background:var(--dm-filled-hover-bg,var(--dm-selected-hover))!important;
+    }
+    body[data-appearance-theme] #chat .msg.user .chat-message-edit-actions > button:disabled {
+        color:var(--text-muted)!important;
+        opacity:.45!important;
+        cursor:not-allowed;
+    }
+}

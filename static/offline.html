@@ -8,10 +8,10 @@
 <!-- DMATE_CURRENT_ONLINE_FAVICON -->
 <title>DMate - 离散数学智能辅学系统</title>
 <script>
-/* 首帧直接沿用 DMate 当前设备的外观设置，避免离线工作区闪现另一套主题。 */
+/* Scoped appearance is applied after the tab's owner has been validated. */
 (function () {
   try {
-    var settings = JSON.parse(localStorage.getItem("dmate:offline:appearance:v1") || "null") || {};
+    var settings = {};
     var mode = ["light","dark","navy"].includes(settings.mode) ? settings.mode
       : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     var root = document.documentElement;
@@ -58,8 +58,8 @@
 <script defer src="/static/ai-answer-renderer.js?v=22"></script>
 <script defer src="/static/delete-confirm.js"></script>
 <script defer src="/static/drawing-export.js?v=39"></script>
-<script defer src="/static/graph-editor.js?v=35"></script>
-<script defer src="/static/drawing-workspace.js?v=50"></script>
+<script defer src="/static/graph-editor.js?v=53"></script>
+<script defer src="/static/drawing-workspace.js?v=53"></script>
 <script>
 window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:{inlineMath:[['\\(','\\)'],['$','$']],displayMath:[['\\[','\\]'],['$$','$$']]},svg:{fontCache:'none'},startup:{typeset:false},options:{enableMenu:false}};
 </script>
@@ -67,15 +67,17 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/vendor/marked-15.0.12/marked.umd.js"></script>
 <script defer src="/static/vendor/dompurify-3.2.6/purify.min.js"></script>
 <script defer src="/static/ui-tooltip.js?v=49"></script>
-<script defer src="/static/language-catalog.js?v=48"></script>
+<script defer src="/static/guest-session.js?v=53"></script>
+<script defer src="/static/language-catalog.js?v=53"></script>
 <script defer src="/static/language-knowledge.js"></script>
-<script defer src="/static/language.js?v=22"></script>
+<script defer src="/static/language.js?v=53"></script>
+<script defer src="/static/modal-text.js?v=53"></script>
 <script defer src="/static/offline-appearance.js?v=8"></script>
 <script defer src="/static/offline-shell.js?v=33"></script>
 <script defer src="/static/knowledge-graph-labels.js?v=17"></script>
 <script defer src="/static/offline-knowledge-graph.js?v=45"></script>
 <script defer src="/static/offline-entry.js?v=45"></script>
-<script defer src="/static/offline.js?v=47"></script>
+<script defer src="/static/offline.js?v=53"></script>
 </head>
 <body class="offline-workspace">
 <script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"light";</script>
