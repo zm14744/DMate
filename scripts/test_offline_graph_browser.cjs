@@ -153,6 +153,30 @@ async function selectFirst(page) {
         value: field.querySelector('.graph-detail-field-value').textContent.trim() })));
 }
 
+async function checkFocusedFrame(node, label, keyboard = false) {
+  const appearance = await node.evaluate(node => {
+    const mobile = node.matches('.kg-mobile-node'), marker = mobile ? node : node.querySelector('rect');
+    const css = getComputedStyle(marker), probe = document.createElement('span');
+    probe.style.color = 'var(--accent)'; document.body.append(probe);
+    const accent = getComputedStyle(probe).color; probe.remove();
+    return { focused: document.activeElement === node, focusVisible: node.matches(':focus-visible'),
+      frames: [...new Set([node, marker])].map(element => {
+        const style = getComputedStyle(element);
+        return { element: element.tagName, outlineStyle: style.outlineStyle };
+      }), color: mobile ? css.borderTopColor : css.stroke,
+      width: parseFloat(mobile ? css.borderTopWidth : css.strokeWidth),
+      radius: mobile ? parseFloat(css.borderTopLeftRadius) : marker.rx.baseVal.value, accent };
+  });
+  assert.equal(appearance.focused, true, label + ': node has actual browser focus');
+  if (keyboard) assert.equal(appearance.focusVisible, true, label + ': Tab makes keyboard focus visible');
+  for (const frame of appearance.frames) {
+    assert.equal(frame.outlineStyle, 'none', label + ': focused ' + frame.element + ' has no rectangular outer outline');
+  }
+  assert.equal(appearance.color, appearance.accent, label + ': focus uses the shared accent border');
+  assert.ok(appearance.width >= 3, label + ': focus remains visible');
+  assert.ok(appearance.radius > 0, label + ': focus follows the rounded node border');
+}
+
 async function onlineReference(browser, width, theme, available) {
   const context = await browser.newContext({ viewport: { width, height: 900 },
     isMobile: width < 761, hasTouch: width < 761, serviceWorkers: 'block' });
@@ -435,6 +459,7 @@ async function relationNavigation(page) {
     assert.equal(await selected(id).count(), 1, 'A relation selects its canonical destination node');
     assert.equal(await selected(id).evaluate(node => document.activeElement === node), true,
       'Relation navigation moves keyboard focus to the visible destination');
+    await checkFocusedFrame(selected(id), 'Relation destination ' + id);
   };
 
   await category(page, '全部');
@@ -472,6 +497,20 @@ async function relationNavigation(page) {
     near(after.x, before.x, 'An already visible relation preserves horizontal camera', 1);
     near(after.y, before.y, 'An already visible relation preserves vertical camera', 1);
     await previousNode.dispose(); await previousView.dispose();
+
+    // Keyboard focus must remain visible on a node that has not been selected,
+    // using its rounded stroke rather than the SVG group's rectangular outline.
+    const preceding = await nodes(page).evaluateAll(list => list.findIndex((node, index) =>
+      index + 1 < list.length && !list[index + 1].classList.contains('selected')));
+    assert.ok(preceding >= 0, 'The module has an unselected node to visit by keyboard');
+    await nodes(page).nth(preceding).focus();
+    await page.keyboard.press('Tab');
+    const focused = nodes(page).nth(preceding + 1);
+    await checkFocusedFrame(focused, 'Unselected keyboard destination', true);
+    assert.equal(await focused.evaluate(node => node.classList.contains('selected')), false,
+      'Keyboard focus does not change the selected knowledge node');
+    assert.equal(await selected('logic_equivalence').count(), 1,
+      'The original selected node retains its accent border while another node is focused');
   }
   await page.evaluate(() => DMateI18n.setLanguage('zh-CN', false));
   if (mobile(page)) {

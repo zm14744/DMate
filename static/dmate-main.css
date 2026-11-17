@@ -7599,10 +7599,19 @@ dialog#mobileChoiceModal[data-positioning]::backdrop { visibility:hidden!importa
     border-width:3px !important;
     box-shadow:0 0 0 2px var(--accent-bg) !important;
 }
-#knowledgeGraphModal .kg-node-group:focus-visible rect,
+#knowledgeGraphModal .kg-node-group,
+#knowledgeGraphModal .kg-node-group rect,
+#knowledgeGraphModal .kg-mobile-node {
+    outline:none;
+    outline-offset:0;
+}
+#knowledgeGraphModal .kg-node-group:focus-visible rect {
+    stroke:var(--accent);
+    stroke-width:3.5px;
+}
 #knowledgeGraphModal .kg-mobile-node:focus-visible {
-    outline:2px solid var(--accent);
-    outline-offset:3px;
+    border-color:var(--accent);
+    border-width:3px;
 }
 /* Graph nodes always use dark fills, including in the light appearance.
    Keep their labels light instead of inheriting the light page text palette. */

@@ -15,6 +15,29 @@ async function nodeLabel(page, id) {
   return page.evaluate(id => dmateKnowledgeLabel(findKnowledgeGraphNodeById(id).name), id);
 }
 
+async function checkSelectedFrame(page, id, label) {
+  const appearance = await page.locator('#knowledgeGraphCanvas .selected[data-knowledge-node-id="' + id + '"]').evaluate(node => {
+    const mobile = node.matches('.kg-mobile-node'), marker = mobile ? node : node.querySelector('rect');
+    const css = getComputedStyle(marker), probe = document.createElement('span');
+    probe.style.color = 'var(--accent)'; document.body.append(probe);
+    const accent = getComputedStyle(probe).color; probe.remove();
+    return { focused: document.activeElement === node,
+      frames: [...new Set([node, marker])].map(element => {
+        const style = getComputedStyle(element);
+        return { element: element.tagName, outlineStyle: style.outlineStyle };
+      }), color: mobile ? css.borderTopColor : css.stroke,
+      width: parseFloat(mobile ? css.borderTopWidth : css.strokeWidth),
+      radius: mobile ? parseFloat(css.borderTopLeftRadius) : marker.rx.baseVal.value, accent };
+  });
+  assert.equal(appearance.focused, true, label + ': relation destination receives actual browser focus');
+  for (const frame of appearance.frames) {
+    assert.equal(frame.outlineStyle, 'none', label + ': focused ' + frame.element + ' has no rectangular outer outline');
+  }
+  assert.equal(appearance.color, appearance.accent, label + ': focused selection retains the shared accent border');
+  assert.ok(appearance.width >= 3, label + ': focused selection remains visible');
+  assert.ok(appearance.radius > 0, label + ': focused selection retains its rounded border');
+}
+
 async function checkDecoration(page, focus, label) {
   const result = await page.evaluate(async () => {
     const decorations = target => ({
@@ -84,6 +107,7 @@ async function expectDestination(page, id, category, label) {
       && bounds.top >= frame.top - 2 && bounds.bottom <= frame.bottom + 2;
   }, id);
   assert.equal(visible, true, label + ': selected target is revealed in the graph viewport');
+  await checkSelectedFrame(page, id, label);
 }
 
 async function checkCase(browser, width, language) {
