@@ -124,7 +124,7 @@ async function checkQuestionResults(page, base, language = 'zh-CN', exact = fals
     assert.equal(await page.locator('#questionList .active').count(), 0);
     assert.equal(await page.locator('#questionDetail .detail-title').count(), 0, 'No stale exercise detail');
     assert.equal((await page.locator('#questionDetail .offline-empty').innerText()).trim(),
-      language === 'en' ? 'No matching exercises.' : '没有符合条件的题目。');
+      language === 'en' ? 'None' : '无');
   }
   return ids;
 }
@@ -148,6 +148,8 @@ async function offlineSearches(page) {
   const definitionOnly = concepts.find(item => item.definition.length > 70 && !item.definition.includes('\n'));
   await concept.fill(definitionOnly.definition);
   assert.equal(await page.locator('#conceptList .concept-item').count(), 0, 'Definitions are excluded from concept title search');
+  assert.equal((await page.locator('#conceptDetail .offline-empty').innerText()).trim(), '无',
+    'An empty concept search uses the shared None label');
   await clearSearch(concept);
   await concept.fill(definitionOnly.id);
   assert.equal(await page.locator('#conceptList .concept-item').count(), 0, 'Concept IDs are excluded from title search');
@@ -201,6 +203,12 @@ async function offlineSearches(page) {
   await checkQuestionResults(page, graph, 'en', true);
   await search.fill('__dmate_no_matching_exercise__');
   await checkQuestionResults(page, [], 'en', true);
+  await navigate(page, 'concepts');
+  await concept.fill('__dmate_no_matching_concept__');
+  assert.equal((await page.locator('#conceptDetail .offline-empty').innerText()).trim(), 'None',
+    'An English empty concept search uses the shared None label');
+  await clearSearch(concept);
+  await navigate(page, 'questions');
   await clearSearch(search);
   await checkQuestionResults(page, graph, 'en', true);
   await noOverflow(page, 'Offline search toolbar');
@@ -250,6 +258,8 @@ async function onlineSearches(page, reference) {
   await page.waitForFunction(() => document.querySelector('.dcn-search').placeholder === 'Search');
   await notebook.fill('__missing_note__');
   assert.equal(await page.locator('.dcn-list .dcn-note').count(), 0);
+  assert.equal((await page.locator('.dcn-list-empty').innerText()).trim(), 'None',
+    'An empty notebook search uses the shared None label');
   await clearSearch(notebook);
   assert.equal(await page.locator('.dcn-list .dcn-note').count(), 2);
   await noOverflow(page, 'Online wrong-book and notebook searches');

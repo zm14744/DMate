@@ -2703,6 +2703,8 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
         const newer = Number(item.updatedAt || 0) >= Number(previous.updatedAt || 0) ? item : previous;
         const older = newer === item ? previous : item;
         const merged = { ...older, ...newer };
+        const addedTimes = [older.createdAt, newer.createdAt].filter(Number.isFinite);
+        if (addedTimes.length) merged.createdAt = Math.min(...addedTimes);
         // An explicit empty value is an edit, not a missing legacy field.
         // Restoring it would revive erased notes or answers for an old question.
         if (typeof newer.question === "string" && newer.question.trim()
@@ -4630,9 +4632,7 @@ function normalizeLearningState(value) {
                         ? item.sessionId
                         : null,
                     sourceMessageId: typeof item.sourceMessageId === "string" ? item.sourceMessageId : "",
-                    createdAt: Number.isFinite(item.createdAt)
-                        ? item.createdAt
-                        : Date.now(),
+                    createdAt: wrongQuestionCreatedAt(item),
                     updatedAt: Number.isFinite(item.updatedAt)
                         ? item.updatedAt
                         : Date.now(),
@@ -7921,22 +7921,19 @@ function wrongBookStatus(item) {
 }
 
 function wrongBookSearchText(item) {
-    return [
-        item.question,
-        item.category,
-        ...(item.knowledgePoints || []),
-        ...(item.focusPoints || []),
-        item.feedback,
-        item.referenceAnswer,
-        item.answer,
-        item.analysis,
-        item.note,
-        item.lastRetestQuestion,
-        item.lastRetestFeedback
-    ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+    const nodes = window.DMateQuestionKnowledgeGraph.build(knowledgeGraphData?.nodes || [],
+        wrongQuestionGraphContext(item, null)).nodes;
+    const points = [...(item.focusPoints || []), ...nodes.map(node => node.name)];
+    return [...new Set(points.filter(Boolean))]
+        .flatMap(point => [point, dmateKnowledgeLabel(point)])
+        .join(" ").toLowerCase();
+}
+
+function wrongQuestionCreatedAt(item) {
+    if (Number.isFinite(item.createdAt)) return item.createdAt;
+    const idTime = /^wrong-(\d{11,16})-/.exec(String(item.id || ""));
+    if (idTime) return Number(idTime[1]);
+    return Number.isFinite(item.updatedAt) ? item.updatedAt : Date.now();
 }
 
 function normalizeWrongBookErrorCount(value) {
@@ -8029,6 +8026,9 @@ function openWrongBook() {
     const modal = document.getElementById("wrongBookModal");
     if (!modal) return;
 
+    // The catalog is already embedded in the page. Initialize it before
+    // filtering so search and View graph use the same registered nodes.
+    if (!knowledgeGraphData) void ensureKnowledgeGraphData().catch(() => {});
     renderWrongBook();
     modal.classList.remove("hidden");
 
@@ -9884,17 +9884,7 @@ function renderWrongBook() {
         const empty = document.createElement("div");
         empty.className = "wrong-empty";
 
-        if (!allItems.length) {
-            empty.textContent = "无";
-        } else if (wrongBookSearch) {
-            empty.textContent = "没有找到匹配的错题";
-        } else if (wrongBookFilter === "pending") {
-            empty.textContent = "目前没有待订正的错题";
-        } else if (wrongBookFilter === "corrected") {
-            empty.textContent = "目前没有已完成订正的错题";
-        } else {
-            empty.textContent = "没有符合条件的错题";
-        }
+        empty.textContent = dmateUiText("无", "None");
 
         list.appendChild(empty);
         return;
@@ -9920,7 +9910,7 @@ function renderWrongBook() {
 
         const date = document.createElement("span");
         date.className = "wrong-date";
-        date.textContent = formatLearningDate(item.updatedAt);
+        date.textContent = formatLearningDate(item.createdAt);
 
         top.appendChild(status);
         const manualPasses = Array.isArray(item.passedRetestSessionIds) ? item.passedRetestSessionIds.length : 0;

@@ -64,7 +64,7 @@ function mount(options){
  function renderList(){
   const query=search.value.trim().toLocaleLowerCase();searchClear.hidden=!search.value;list.replaceChildren();
   const visible=state.notes.filter(note=>(note.title+'\n'+note.content).toLocaleLowerCase().includes(query));
-  if(!visible.length)list.append(el('p','dcn-list-empty',state.notes.length?'没有匹配的概念。':'无'));
+  if(!visible.length)list.append(el('p','dcn-list-empty',uiText('无','None')));
   const names=new Map();for(const note of state.notes)names.set(noteName(note),(names.get(noteName(note))||0)+1);
   for(const note of visible){
    const row=el('div','dcn-note'+(note.id===currentId?' is-current':''));row.dataset.noteId=note.id;

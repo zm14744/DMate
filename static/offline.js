@@ -558,7 +558,7 @@
     else {
       state.selectedQuestion = null;
       state.revealed = false;
-      $("questionDetail").replaceChildren(el("div","offline-empty",tr("没有符合条件的题目。", "No matching exercises.")));
+      $("questionDetail").replaceChildren(el("div","offline-empty",tr("无", "None")));
     }
     syncLibraryFullView("questions");
   }
@@ -714,7 +714,7 @@
     else if (rows.length) fillConceptDetail(rows[0]);
     else {
       state.selectedConcept = null;
-      $("conceptDetail").replaceChildren(el("div","offline-empty",tr("没有找到匹配的概念。", "No matching concepts.")));
+      $("conceptDetail").replaceChildren(el("div","offline-empty",tr("无", "None")));
     }
     syncLibraryFullView("concepts");
   }
@@ -831,7 +831,7 @@
       "定义、解释与易错点":"Definitions, explanations and common mistakes",
       "查看定义、解释、公式和易错点。":"View definitions, explanations, formulas and common mistakes.",
       "查看定义、解释、公式和易错点，支持中英文切换。":"View definitions, explanations, formulas and common mistakes in Chinese or English.",
-      "搜索":"Search", "搜索概念":"Search concepts", "没有符合条件的题目。":"No matching exercises.", "没有找到匹配的概念。":"No matching concepts."
+      "搜索":"Search", "搜索概念":"Search concepts", "无":"None"
     });
     document.querySelectorAll(".offline-nav-item").forEach(item => item.addEventListener("click", () => switchPanel(item.dataset.panel)));
     $("questionCategory").addEventListener("change", event => { state.questionCategory=event.target.value; renderQuestions(); });
