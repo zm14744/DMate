@@ -47,10 +47,11 @@ async function ready(page, expectedPanel = 'graph') {
     'The removed header, save-state label, and network status are absent from the DOM');
   assert.equal(await page.locator('#exportLocalData').count(), 0, 'The local-data export entry is removed');
   assert.equal(await page.locator('#offlineSidebar button').filter({ hasText: /^导出本地数据$/ }).count(), 0);
-  for (const id of ['wrongBookBtn','conceptNotebookBtn','mistakesPanel','notesPanel','recordDialog',
-    'recordForm','recordTitle','recordContent','cancelRecord','addMistake','noteList','mistakeList']) {
+  for (const id of ['wrongBookBtn','conceptNotebookBtn','mistakesPanel','notesPanel','noteList','mistakeList']) {
     assert.equal(await page.locator('#' + id).count(), 1, 'The original local record interface is restored: ' + id);
   }
+  assert.equal(await page.locator('#addMistake,#recordDialog,#recordForm,#recordTitle,#recordContent,#cancelRecord').count(),0,
+    'Removed manual mistake controls are absent');
   assert.deepEqual(await page.locator('.offline-nav-item[data-panel]').evaluateAll(items => items.map(item => item.dataset.panel)), panels);
   const entries = await page.evaluate(() => {
     const online = document.getElementById('returnOnline'), appearance = document.getElementById('offlineAppearanceBtn');

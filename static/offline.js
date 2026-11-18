@@ -13,7 +13,6 @@
     drawingController: null, backgroundUrl: "", graphCategory: "", graphSelectedNodeId: "", questionCategory: "",
     questionDifficulty: "", questionType: "", questionSelection: "", questionQuery: "", conceptCategory: "", conceptSelection: "", conceptQuery: "", graphQuery: "", graphController: null,
     librarySelections: {concepts:new Set(), questions:new Set()}, selectionQueue: Promise.resolve(),
-    recordKind:"mistakes", editingId:null,
     selectedNoteId:null, noteQuery:"", noteRows:[], noteSaveQueue:Promise.resolve(),
     noteSelectedIds:new Set(), noteDrafts:new Map(), noteSaveStatus:new Map(), noteDeletePending:null,
     appearanceQueue: Promise.resolve()
@@ -478,8 +477,7 @@
       const card = el("article", "wrong-card");
       card.dataset.recordId = row.id;
       const top = el("div", "wrong-card-top");
-      top.append(el("span", "wrong-status" + (row.status === "resolved" ? " corrected" : ""), tr(row.status === "resolved" ? "已完成订正" : "待订正")),
-        el("span", "wrong-date", new Date(noteTime(row.createdAt || row.updatedAt)).toLocaleString()));
+      top.append(el("span", "wrong-date", new Date(noteTime(row.createdAt || row.updatedAt)).toLocaleString()));
       card.append(top, rich("wrong-question", row.statement || row.content || ""));
       const knowledgeLabels = [...new Set((row.knowledgePoints || []).map(point =>
         state.graph?.nodes?.find(node => node.id === point)?.name
@@ -492,20 +490,14 @@
         meta.append(line); card.append(meta);
       }
       card.append(answerDetails("查看答案", row.answer || tr("这条记录没有保存参考答案。", "No reference answer was saved for this record.")));
-      if (row.explanation) card.append(answerDetails("查看解析", row.explanation, "wrong-analysis-details"));
       const actions = el("div", "wrong-actions record-actions");
-      if (row.status !== "resolved") actions.append(action(tr("完成订正"), "", async () => {
-        await put("mistakes", {...row, createdAt:row.createdAt || row.updatedAt, status:"resolved", updatedAt:stamp()}); await renderMistakes();
-      }, "check"));
-      const edit = action(tr("编辑/笔记"), "secondary", () => openRecord("mistakes", row), "edit");
-      edit.dataset.action = "edit-mistake";
       const deletion = action(tr("移出错题本"), "secondary danger", async () => {
         if (await confirmDelete($("mistakesPanel"), "移出这道错题？", row.statement || row.title)) {
           await deleteOfflineRecord("mistakes", row, "mistake-deletions"); await renderMistakes();
         }
-      }, "trash");
+      });
       deletion.dataset.action = "delete-mistake";
-      actions.append(edit, deletion); card.append(actions); list.append(card);
+      actions.append(deletion); card.append(actions); list.append(card);
     }
   }
 
@@ -605,7 +597,7 @@
     host.replaceChildren();
     const sidebar = el("aside", "dcn-sidebar"), main = el("section", "dcn-main");
     sidebar.setAttribute("aria-label", tr("概念笔记列表", "Concept note list"));
-    const create = button(tr("新建概念", "New concept"), "dcn-new", createNote);
+    const create = button(tr("＋ 新概念", "＋ New concept"), "dcn-new", createNote);
     create.id = "addNote";
     const search = el("input", "dcn-search");
     search.type = "search"; search.placeholder = tr("搜索", "Search"); search.setAttribute("aria-label", tr("搜索", "Search")); search.value = state.noteQuery;
@@ -620,8 +612,8 @@
     const editor = el("section", "dcn-editor");
     const nameLabel = el("label", "", tr("概念名称", "Concept name")), name = el("input", "dcn-title");
     name.maxLength = 160; name.setAttribute("aria-label", tr("概念名称", "Concept name")); nameLabel.append(name);
-    const bodyLabel = el("label", "", tr("我的概念笔记", "My concept notes")), body = el("textarea", "dcn-original");
-    body.rows = 9; body.setAttribute("aria-label", tr("我的概念笔记", "My concept notes")); bodyLabel.append(body);
+    const bodyLabel = el("label", "", tr("概念内容", "Concept content")), body = el("textarea", "dcn-original");
+    body.rows = 9; body.setAttribute("aria-label", tr("概念内容", "Concept content")); bodyLabel.append(body);
     const saved = el("span", "dcn-saved"); saved.setAttribute("role", "status");
     editor.append(nameLabel, bodyLabel, saved);
     main.append(editor);
@@ -704,45 +696,6 @@
     const row = {id:uid(), title:"", content:"", createdAt:stamp(), updatedAt:stamp()};
     await put("notes", row); state.selectedNoteId = row.id; state.noteQuery = "";
     await renderNotes(); $("noteList").querySelector(".dcn-title")?.focus({preventScroll:true});
-  }
-
-  function openRecord(kind, row = null) {
-    requireWorkspace();
-    state.recordDialogRevision = (state.recordDialogRevision || 0) + 1;
-    state.recordKind = kind;
-    state.editingId = row?.id || null;
-    $("recordDialogTitle").textContent = tr(row ? (kind === "notes" ? "编辑笔记" : "编辑错题") : (kind === "notes" ? "新建笔记" : "添加错题"));
-    $("recordTitle").value = row?.title || "";
-    $("recordContent").value = kind === "notes" ? row?.content || "" : row?.statement || row?.content || "";
-    $("recordContent").maxLength = Math.max(12000, $("recordContent").value.length);
-    const titleLabel = $("recordTitle").closest("label");
-    const contentLabel = $("recordContent").closest("label");
-    if (titleLabel?.firstChild?.nodeType === Node.TEXT_NODE) titleLabel.firstChild.textContent = tr("题目名称");
-    if (contentLabel?.firstChild?.nodeType === Node.TEXT_NODE) contentLabel.firstChild.textContent = tr("题目内容");
-    $("recordTitle").setAttribute("aria-label", tr("题目名称"));
-    $("recordContent").setAttribute("aria-label", tr("题目内容"));
-    $("recordDialog").showModal();
-    window.DMateTextareaAutosize?.refresh?.($("recordDialog"));
-    $("recordTitle").focus();
-  }
-
-  async function saveRecord(event) {
-    event.preventDefault();
-    const title = $("recordTitle").value.trim();
-    const content = $("recordContent").value.trim();
-    if (!title || !content) return toast("标题和内容不能为空");
-    const store = state.recordKind, editingId = state.editingId, revision = state.recordDialogRevision;
-    const old = editingId ? (await all(store)).find(row => row.id === editingId) : null;
-    const row = {
-      ...(old || {}), id: editingId || uid(), title,
-      createdAt:old?.createdAt || old?.updatedAt || stamp(), updatedAt: stamp(), status: old?.status || "pending"
-    };
-    if (store === "notes") row.content = content;
-    else row.statement = content;
-    await put(store, row);
-    if (state.recordDialogRevision === revision && state.editingId === editingId) $("recordDialog").close();
-    if (store === "notes") await renderNotes(); else await renderMistakes();
-    toast(tr("已保存在本机", "Saved on this device"));
   }
 
   async function addQuestionMistake(question) {
@@ -1243,9 +1196,6 @@
       "查看答案":"View answer", "查看解析":"View explanation", "整题涉及":"Related content"
     });
     document.querySelectorAll(".offline-nav-item").forEach(item => item.addEventListener("click", () => switchPanel(item.dataset.panel)));
-    $("addMistake").addEventListener("click", () => openRecord("mistakes"));
-    $("recordForm").addEventListener("submit", event => saveRecord(event).catch(error => toast(error?.message || tr("本地保存失败", "Local save failed"))));
-    $("cancelRecord").addEventListener("click", () => $("recordDialog").close());
     $("questionCategory").addEventListener("change", event => { state.questionCategory=event.target.value; renderQuestions(); });
     $("questionDifficulty").addEventListener("change", event => { state.questionDifficulty=event.target.value; renderQuestions(); });
     $("questionType").addEventListener("change", event => { state.questionType=event.target.value; renderQuestions(); });

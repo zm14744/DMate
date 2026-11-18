@@ -34,7 +34,7 @@
 </script>
 <link rel="stylesheet" href="/static/dmate-main.css?v=66">
 
-<link rel="stylesheet" href="/static/graph-editor.css?v=25">
+<link rel="stylesheet" href="/static/graph-editor.css?v=26">
 <link rel="stylesheet" href="/static/drawing-workspace.css?v=51">
 <link rel="stylesheet" href="/static/modal-chrome.css">
 <link rel="stylesheet" href="/static/concept-notebook.css?v=1">
@@ -47,7 +47,7 @@
 <link rel="stylesheet" href="/static/textarea-autosize.css?v=1">
 <link rel="stylesheet" href="/static/button-themes.css?v=64">
 <link rel="stylesheet" href="/static/offline-knowledge-graph.css?v=54">
-<link rel="stylesheet" href="/static/offline.css?v=53">
+<link rel="stylesheet" href="/static/offline.css?v=54">
 <link rel="stylesheet" href="/static/select-controls.css?v=43">
 <link rel="stylesheet" href="/static/scrollbars.css?v=25">
 <script defer src="/static/mobile-select.js?v=26"></script>
@@ -56,7 +56,7 @@
 <script defer src="/static/scrollbars.js?v=25"></script>
 <script defer src="/static/graph-editor-model.js"></script>
 <script defer src="/static/graph-editor-format.js?v=32"></script>
-<script defer src="/static/graph-editor-overlay.js?v=38"></script>
+<script defer src="/static/graph-editor-overlay.js?v=39"></script>
 <script defer src="/static/math-markdown.js?v=22"></script>
 <script defer src="/static/ai-answer-renderer.js?v=22"></script>
 <script defer src="/static/delete-confirm.js"></script>
@@ -71,7 +71,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/vendor/dompurify-3.2.6/purify.min.js"></script>
 <script defer src="/static/ui-tooltip.js?v=49"></script>
 <script defer src="/static/guest-session.js?v=53"></script>
-<script defer src="/static/language-catalog.js?v=62"></script>
+<script defer src="/static/language-catalog.js?v=63"></script>
 <script defer src="/static/language-knowledge.js"></script>
 <script defer src="/static/language.js?v=59"></script>
 <script defer src="/static/modal-text.js?v=53"></script>
@@ -80,7 +80,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/knowledge-graph-labels.js?v=17"></script>
 <script defer src="/static/offline-knowledge-graph.js?v=60"></script>
 <script defer src="/static/offline-entry.js?v=46"></script>
-<script defer src="/static/offline.js?v=56"></script>
+<script defer src="/static/offline.js?v=57"></script>
 </head>
 <body class="offline-workspace">
 <script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"light";</script>
@@ -147,8 +147,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 
     <section class="offline-panel" id="mistakesPanel" hidden>
       <div class="offline-toolbar">
-        <div><strong id="mistakeCount">0 道错题</strong><span class="toolbar-muted">仅保存在当前设备</span></div>
-        <button type="button" class="offline-primary primary" id="addMistake"><svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>添加错题</span></button>
+        <div><strong id="mistakeCount">0 道错题</strong></div>
       </div>
       <div class="offline-list" id="mistakeList"></div>
     </section>
@@ -270,19 +269,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
   </div>
 </dialog>
 
-<dialog id="recordDialog" class="modal offline-dialog" aria-labelledby="recordDialogTitle">
-  <div class="modal-card offline-form">
-    <div class="modal-head">
-      <div id="recordDialogTitle">添加记录</div>
-      <button type="button" class="modal-close-dot" id="cancelRecord" aria-label="关闭" title="关闭"></button>
-    </div>
-    <form id="recordForm">
-      <label>标题<input id="recordTitle" maxlength="160" required></label>
-      <label>内容<textarea id="recordContent" rows="9" maxlength="12000" required></textarea></label>
-      <div class="offline-dialog-actions"><button type="submit" class="offline-primary primary">保存到本机</button></div>
-    </form>
-  </div>
-</dialog>
+
 
 <!-- BEGIN ONLINE APPEARANCE -->
 <div id="appearanceModal" class="modal hidden">

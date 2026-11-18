@@ -714,6 +714,7 @@
         "新建概念": "New concept",
         "概念名称": "Concept name",
         "我的概念笔记": "My concept notes",
+        "概念内容": "Concept content",
         "补充要求（可选）": "Additional instructions (optional)",
         "AI 解释": "AI explanation",
         "分析关联": "Analyze relationships",

@@ -1,4 +1,4 @@
-/* Scan regions remain selectable and movable without moving the image camera.
+/* Freehand scan regions are final; rectangles retain their editing gestures.
  * Region recognition is locally fulfilled; no real model/account requests run.
  */
 'use strict';
@@ -20,7 +20,9 @@ async function snapshot(page) {
     return {graph:structuredClone(state.graphRegions[0].polygon),text:structuredClone(state.textRegions[0].polygon),
       graphSelected:state.selectedGraphId||null,textSelected:state.view.selectedId??null,
       camera:[viewport.scrollLeft,viewport.scrollTop,state.view.zoom],
-      graphCount:state.graphRegions.length,textCount:state.textRegions.length};
+      graphCount:state.graphRegions.length,textCount:state.textRegions.length,
+      graphs:state.graphRegions.map(row=>({id:row.id,polygon:structuredClone(row.polygon),irregular:row.irregular})),
+      texts:state.textRegions.map(row=>({id:row.id,polygon:structuredClone(row.polygon),irregular:row.irregular}))};
   });
 }
 async function drag(page, start, delta, touch=false, shift=false, beforeRelease=null, afterPress=null) {
@@ -100,197 +102,144 @@ async function fixture(browser,width) {
   return {context,page,errors,recognition,unexpected};
 }
 
+async function tap(page, source, touch) {
+  const target=await point(page,source);
+  if(touch)await page.touchscreen.tap(target.x,target.y);else await page.mouse.click(target.x,target.y);
+  await settle(page);
+}
+async function fit(page) { await page.locator('[data-overlay-tool="zoom-fit"]').click();await settle(page); }
+async function stroke(page, points, touch) {
+  const positions=[];for(const source of points)positions.push(await point(page,source));
+  if(touch){
+    const client=await page.context().newCDPSession(page);
+    await client.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{...positions[0],id:1}]});
+    for(const position of positions.slice(1))await client.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{...position,id:1}]});
+    await client.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await client.detach();
+  }else{
+    await page.mouse.move(positions[0].x,positions[0].y);await page.mouse.down();
+    for(const position of positions.slice(1))await page.mouse.move(position.x,position.y,{steps:2});
+    await page.mouse.up();
+  }
+  await settle(page);
+}
+async function drawIrregular(page,kind,points,touch){
+  await page.locator('[data-overlay-tool="'+(kind==='graph'?'bounds':'text_rect')+'"]').click();
+  await page.locator('.dge-overlay-tools select[aria-label="选区方式"]').selectOption('irregular');
+  await fit(page);
+  const oldIds=await page.evaluate(kind=>ocrTasks.get('region-fixture').scanState[kind==='graph'?'graphRegions':'textRegions'].map(row=>row.id),kind);
+  await stroke(page,points,touch);
+  await page.waitForFunction(({kind,oldIds})=>ocrTasks.get('region-fixture').scanState[kind==='graph'?'graphRegions':'textRegions']
+    .some(row=>!oldIds.includes(row.id)&&row.status==='complete'),{kind,oldIds});
+  const row=await page.evaluate(({kind,oldIds})=>{
+    const row=ocrTasks.get('region-fixture').scanState[kind==='graph'?'graphRegions':'textRegions'].find(row=>!oldIds.includes(row.id));
+    return{id:row.id,polygon:row.polygon,irregular:row.irregular};
+  },{kind,oldIds});
+  assert.equal(row.irregular,true,'A one-stroke crop retains its irregular source marker');
+  await page.locator('[data-overlay-tool="select"]').click();await fit(page);
+  return row;
+}
+async function checkFixed(page,kind,id,interior,edge,touch,recognition,label){
+  await tap(page,interior,touch);
+  assert.equal(await page.evaluate(({kind})=>{const state=ocrTasks.get('region-fixture').scanState;
+    return kind==='graph'?state.selectedGraphId:state.view.selectedId;},{kind}),id,label+': remains selectable');
+  const prior=await snapshot(page),calls=recognition.length;
+  for(const start of [interior,edge]){
+    await drag(page,start,[21,13],touch);
+    const current=await snapshot(page);
+    assert.deepEqual(current.graphs,prior.graphs,label+': dragging never changes graph polygons');
+    assert.deepEqual(current.texts,prior.texts,label+': dragging never changes text polygons');
+    assert.equal(recognition.length,calls,label+': dragging a finished outline never recognizes a new crop');
+    await fit(page);
+  }
+}
 async function runCase(browser,width) {
   const {context,page,errors,recognition,unexpected}=await fixture(browser,width),touch=width<=760;
   try {
-    const graphPoint=await point(page,[.23,.24]);
-    if(touch)await page.touchscreen.tap(graphPoint.x,graphPoint.y);else await page.mouse.click(graphPoint.x,graphPoint.y);
-    await settle(page);
-    await selected(page,'graph',width+'/graph interior click');
-    // A visible fine adjustment must survive release. Previously any move
-    // previewed, but a different 3px commit threshold snapped it back.
+    await checkFixed(page,'graph','g1',[.23,.24],[.35,.12],touch,recognition,width+'/saved graph');
+    await checkFixed(page,'text',1,[.73,.78],[.74,.64],touch,recognition,width+'/saved text');
+    assert.equal(recognition.length,0,'Opening and selecting saved irregular crops never repeats recognition');
+
+    // Geometry inside a polygon's empty concavity remains ordinary canvas.
+    await tap(page,[.49,.47],touch);await selected(page,null,width+'/concave gap');
+    const beforePan=await snapshot(page);await drag(page,[.49,.47],[-16,-10],touch);
+    const afterPan=await snapshot(page);
+    assert.deepEqual(afterPan.graphs,beforePan.graphs);assert.deepEqual(afterPan.texts,beforePan.texts);
+    assert.notDeepEqual(afterPan.camera,beforePan.camera,'Background drag still pans the image');
+    await fit(page);
+
+    // New freehand graph and text crops each complete once, then stay fixed.
+    const graphStroke=[[.68,.12],[.89,.14],[.93,.37],[.80,.34],[.68,.41],[.68,.12]],
+      textStroke=[[.07,.70],[.35,.70],[.39,.86],[.25,.94],[.07,.87],[.07,.70]];
+    const freshGraph=await drawIrregular(page,'graph',graphStroke,touch);
+    await checkFixed(page,'graph',freshGraph.id,[.78,.23],[.78,.13],touch,recognition,width+'/new graph');
+    const freshText=await drawIrregular(page,'text',textStroke,touch);
+    await checkFixed(page,'text',freshText.id,[.22,.80],[.20,.70],touch,recognition,width+'/new text');
+    assert.deepEqual(recognition,['graph','text'],'Each finished source is recognized exactly once');
+
+    // A finished crop can be removed and redrawn with the original controls.
+    await page.locator('[data-source-picker="graph"]').click();
+    await page.locator('.dgs-source-card[data-source-id="'+freshGraph.id+'"] .dgs-source-delete').click();
+    await page.locator('.dmate-delete-confirm-delete').click();
+    await page.waitForFunction(id=>!ocrTasks.get('region-fixture').scanState.graphRegions.some(row=>row.id===id),freshGraph.id);
+    const redrawn=await drawIrregular(page,'graph',graphStroke,touch);
+    assert.notEqual(redrawn.id,freshGraph.id,'Redrawing creates a new source rather than mutating the old outline');
+    await checkFixed(page,'graph',redrawn.id,[.78,.23],[.78,.13],touch,recognition,width+'/redrawn graph');
+
+    // Existing rectangle tools retain selection, fine moves and edge resizes.
+    await page.locator('#graphEditorClose').click();await page.waitForFunction(()=>ocrEditorTaskId===null);
+    await page.evaluate(()=>{
+      const state=ocrTasks.get('region-fixture').scanState;
+      state.graphRegions[0].irregular=false;state.graphRegions[0].polygon=[[.10,.12],[.60,.12],[.60,.58],[.10,.58]];
+      state.textRegions[0].irregular=false;state.textRegions[0].polygon=[[.55,.64],[.94,.64],[.94,.96],[.55,.96]];
+      state.viewState={};editOcrTask('region-fixture');
+    });
+    await page.locator('.dge-overlay[data-geometry-ready="true"]').waitFor();await settle(page);
     const fineBefore=await snapshot(page),imageWidth=await page.locator('.dge-overlay-image').evaluate(node=>node.getBoundingClientRect().width);
     await drag(page,[.23,.24],[2.5,0],touch);
-    const fineAfter=await snapshot(page),fineDelta=fineAfter.graph[0][0]-fineBefore.graph[0][0];
-    assert.ok(Math.abs(fineDelta*imageWidth-2.5)<.15,'A 2.5px fine adjustment is retained when the pointer is released');
-    for(let index=0;index<fineBefore.graph.length;index++){
-      assert.ok(Math.abs(fineAfter.graph[index][0]-fineBefore.graph[index][0]-fineDelta)<1e-6);
-      assert.equal(fineAfter.graph[index][1],fineBefore.graph[index][1]);
-    }
+    const fineAfter=await snapshot(page);
+    assert.ok(Math.abs((fineAfter.graph[0][0]-fineBefore.graph[0][0])*imageWidth-2.5)<.15,'Rectangle fine movement commits on release');
     await page.waitForFunction(()=>ocrTasks.get('region-fixture').scanState.graphRegions[0].status==='complete');
-    const recognitionBeforeDrag=recognition.length;
-    const before=await snapshot(page);
-    const originalPoints=await page.locator('.dge-frame-hit[data-graph-id="g1"]').getAttribute('points');
+    const graphBefore=await snapshot(page),painted=await page.locator('.dge-frame-hit[data-graph-id="g1"]').getAttribute('points');
     await drag(page,[.23,.24],[24,18],touch,false,async()=>{
-      await settle(page);assert.deepEqual((await snapshot(page)).graph,before.graph,'A drag preview does not commit crop data before release');
-      assert.notEqual(await page.locator('.dge-frame-hit[data-graph-id="g1"]').getAttribute('points'),originalPoints,'The grabbed frame visibly follows the pointer before release');
-      assert.equal(recognition.length,recognitionBeforeDrag,'Pointer moves never repeat recognition before the single commit');
+      await settle(page);assert.deepEqual((await snapshot(page)).graph,graphBefore.graph,'Rectangle preview waits until release to commit crop data');
+      assert.notEqual(await page.locator('.dge-frame-hit[data-graph-id="g1"]').getAttribute('points'),painted,'A rectangle still follows the pointer');
     });
-    const moved=await snapshot(page);
-    translated(before.graph,moved.graph,width+'/graph interior drag');assert.deepEqual(moved.text,before.text,'Moving graph leaves text untouched');
-    assert.deepEqual(moved.camera,before.camera,'Region dragging does not pan or zoom its source image');
-    assert.equal(moved.graphSelected,'g1');assert.equal(moved.graphCount,1);assert.equal(moved.textCount,1);
-
-    const textPoint=await point(page,[.73,.78]);
-    if(touch)await page.touchscreen.tap(textPoint.x,textPoint.y);else await page.mouse.click(textPoint.x,textPoint.y);
-    await settle(page);await selected(page,'text',width+'/text interior click');
-    const beforeText=await snapshot(page);
+    const graphMoved=await snapshot(page);translated(graphBefore.graph,graphMoved.graph,width+'/rectangle graph move');
+    assert.deepEqual(graphMoved.texts,graphBefore.texts);assert.deepEqual(graphMoved.camera,graphBefore.camera);
+    await page.waitForFunction(()=>ocrTasks.get('region-fixture').scanState.graphRegions[0].status==='complete');
     await drag(page,[.73,.78],[-18,-12],touch);
-    const movedText=await snapshot(page);
-    translated(beforeText.text,movedText.text,width+'/text interior drag');assert.deepEqual(movedText.graph,beforeText.graph);
-    assert.deepEqual(movedText.camera,beforeText.camera);
-    assert.equal(movedText.textSelected,1);assert.equal(movedText.graphCount,1);assert.equal(movedText.textCount,1);
-    await page.waitForFunction(()=>{const state=ocrTasks.get('region-fixture').scanState;return state.graphRegions[0].status==='complete'&&state.textRegions[0].status==='complete';});
-    if(touch){
-      const prior=await snapshot(page),corner=prior.graph[0],start=await point(page,[corner[0]+.13,corner[1]+.12]);
-      const outline=await page.locator('.dge-frame-hit[data-graph-id="g1"]').getAttribute('points'),count=recognition.length;
-      const client=await context.newCDPSession(page);
-      await client.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:start.x,y:start.y,id:1}]});
-      await client.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:start.x+14,y:start.y+9,id:1}]});await settle(page);
-      assert.notEqual(await page.locator('.dge-frame-hit[data-graph-id="g1"]').getAttribute('points'),outline,'The pending single-finger move has a real visible preview');
-      await client.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:start.x+14,y:start.y+9,id:1},{x:start.x+54,y:start.y+9,id:2}]});
-      await client.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await client.detach();await settle(page);
-      const cancelled=await snapshot(page);assert.deepEqual(cancelled.graph,prior.graph);assert.deepEqual(cancelled.text,prior.text);assert.deepEqual(cancelled.camera,prior.camera);
-      assert.equal(await page.locator('.dge-frame-hit[data-graph-id="g1"]').getAttribute('points'),outline,'A second finger rolls the uncommitted preview back even without a pinch move');
-      assert.equal(recognition.length,count,'Cancelling a pending move never recognizes a new crop');
-    }
-
-    // Grabbing an actual edge still locally deforms the outline rather than
-    // translating it or silently switching to canvas navigation.
+    const textMoved=await snapshot(page);translated(graphMoved.text,textMoved.text,width+'/rectangle text move');
+    assert.deepEqual(textMoved.graphs,graphMoved.graphs);assert.deepEqual(textMoved.camera,graphMoved.camera);
+    await page.waitForFunction(()=>ocrTasks.get('region-fixture').scanState.textRegions[0].status==='complete');
     for(const kind of ['graph','text']){
       const prior=await snapshot(page),outline=prior[kind],edge=[(outline[0][0]+outline[1][0])/2,outline[0][1]];
       await drag(page,edge,[0,-12],touch);
       const current=await snapshot(page);
-      assert.notDeepEqual(current[kind],outline,width+'/'+kind+': edge drag changes the real crop');
-      assert.ok(minima(current[kind])[1]<minima(outline)[1]-.003,kind+': the grabbed top edge moves');
-      assert.ok(Math.abs(maxima(current[kind])[1]-maxima(outline)[1])<1e-6,kind+': the distant opposite edge stays fixed');
-      assert.deepEqual(current[kind==='graph'?'text':'graph'],prior[kind==='graph'?'text':'graph']);
-      assert.deepEqual(current.camera,prior.camera,kind+': elastic edge edit preserves the camera');
+      assert.ok(minima(current[kind])[1]<minima(outline)[1]-.003,kind+': a rectangular edge can still be resized');
+      assert.ok(Math.abs(maxima(current[kind])[1]-maxima(outline)[1])<1e-6,kind+': resizing retains the opposite edge');
+      assert.deepEqual(current.camera,prior.camera);
     }
+    await page.waitForFunction(()=>{const state=ocrTasks.get('region-fixture').scanState;
+      return state.graphRegions[0].status==='complete'&&state.textRegions[0].status==='complete';});
 
-    // Zoom changes the source transform, not the normalized region movement.
-    await page.locator('[data-overlay-tool="zoom-in"]').click();await settle(page);
-    const zoomed=await snapshot(page),origin=zoomed.graph[0],inside=[origin[0]+.13,origin[1]+.12];
-    await drag(page,inside,[10,8],touch);
-    const zoomMoved=await snapshot(page);
-    translated(zoomed.graph,zoomMoved.graph,width+'/zoomed graph drag');assert.deepEqual(zoomMoved.camera,zoomed.camera);
-
-    // A concave polygon's empty bounding-box corner is genuine background.
-    const shifted=zoomMoved.graph[0],notch=[shifted[0]+.38,shifted[1]+.28],notchPoint=await point(page,notch);
-    if(touch)await page.touchscreen.tap(notchPoint.x,notchPoint.y);else await page.mouse.click(notchPoint.x,notchPoint.y);
-    await settle(page);await selected(page,null,width+'/concave bounding-box gap');
-    const emptyBefore=await snapshot(page);await drag(page,notch,[-14,-9],touch);
-    const emptyAfter=await snapshot(page);
-    assert.deepEqual(emptyAfter.graph,emptyBefore.graph);assert.deepEqual(emptyAfter.text,emptyBefore.text);
-    assert.notDeepEqual(emptyAfter.camera,emptyBefore.camera,'Dragging empty background still pans the source');
-
-    // Desktop Shift is an explicit navigation gesture even over a real crop.
-    if(!touch){
-      const prior=await snapshot(page),corner=prior.graph[0];
-      await drag(page,[corner[0]+.13,corner[1]+.12],[13,9],false,true);
-      const current=await snapshot(page);assert.deepEqual(current.graph,prior.graph);assert.deepEqual(current.text,prior.text);
-      assert.notDeepEqual(current.camera,prior.camera,'Shift-drag pans without changing a region');
-    }else{
-      // Two fingers must cancel a pending region move and zoom the image.
-      const prior=await snapshot(page),area=await page.locator('.dge-overlay-viewport').boundingBox(),client=await context.newCDPSession(page);
-      const center={x:area.x+area.width/2,y:area.y+area.height/2};
+    // Pinch zoom and the desktop's explicit Shift-pan remain navigation.
+    if(touch){
+      const prior=await snapshot(page),area=await page.locator('.dge-overlay-viewport').boundingBox(),client=await context.newCDPSession(page),
+        center={x:area.x+area.width/2,y:area.y+area.height/2};
       await client.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:center.x-30,y:center.y,id:1}]});
       await client.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:center.x-30,y:center.y,id:1},{x:center.x+30,y:center.y,id:2}]});
       await client.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:center.x-44,y:center.y,id:1},{x:center.x+44,y:center.y,id:2}]});
       await client.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await client.detach();await settle(page);
-      const current=await snapshot(page);assert.deepEqual(current.graph,prior.graph);assert.deepEqual(current.text,prior.text);
-      assert.notEqual(current.camera[2],prior.camera[2],'Two-finger pinch zooms rather than moving either crop');
-    }
-    await page.waitForFunction(()=>{const state=ocrTasks.get('region-fixture').scanState;return state.graphRegions[0].status==='complete'&&state.textRegions[0].status==='complete';});
-
-    // Text is painted above graphs. Its interior must not grab a graph edge
-    // underneath it, even inside that edge's larger touch hit tolerance.
-    await page.locator('#graphEditorClose').click();await page.waitForFunction(()=>ocrEditorTaskId===null);
-    await page.evaluate(graph=>{
-      const state=ocrTasks.get('region-fixture').scanState;
-      state.graphRegions[0].polygon=graph;state.textRegions[0].polygon=[[.14,.14],[.54,.15],[.57,.54],[.16,.52]];
-      state.viewState={};
-      editOcrTask('region-fixture');
-    },GRAPH);
-    await page.locator('.dge-overlay[data-geometry-ready="true"]').waitFor();await settle(page);
-    const overlapPoint=await point(page,[.35,.31]);
-    if(touch)await page.touchscreen.tap(overlapPoint.x,overlapPoint.y);else await page.mouse.click(overlapPoint.x,overlapPoint.y);
-    await settle(page);await selected(page,'text',width+'/overlap topmost selection');
-    const overlap=await snapshot(page);await drag(page,[.35,.31],[15,10],touch);
-    const overlapMoved=await snapshot(page);
-    translated(overlap.text,overlapMoved.text,width+'/overlap text move');assert.deepEqual(overlapMoved.graph,overlap.graph);
-    assert.deepEqual(overlapMoved.camera,overlap.camera);
-    const offset=overlapMoved.text[0].map((value,index)=>value-overlap.text[0][index]);
-    const insideText=[.35+offset[0],.31+offset[1]],start=await point(page,insideText),end=await point(page,[.99,.99]);
-    await drag(page,insideText,[end.x-start.x,end.y-start.y],touch);
-    const clipped=await snapshot(page);
-    translated(overlapMoved.text,clipped.text,width+'/whole crop bounds clamp');
-    assert.ok(clipped.text.every(point=>point.every(value=>value>=0&&value<=1)),'A translated crop cannot leave the original image');
-    for(const bound of maxima(clipped.text))assert.ok(Math.abs(bound-1)<1e-6,'Clamping moves the whole shape to the image edge');
-    assert.deepEqual(clipped.graph,overlapMoved.graph);assert.deepEqual(clipped.camera,overlapMoved.camera);
-    await page.waitForFunction(()=>ocrTasks.get('region-fixture').scanState.textRegions[0].status==='complete');
-    for(const irregular of [false,true]){
-      const imageHeight=await page.locator('.dge-overlay-image').evaluate(node=>node.getBoundingClientRect().height),height=15/imageHeight,top=.42;
-      const polygon=irregular?[[.58,top],[.90,top+height*.2],[.93,top+height*.75],[.84,top+height],[.58,top+height*.8]]
-        :[[.58,top],[.92,top],[.92,top+height],[.58,top+height]];
-      await page.locator('#graphEditorClose').click();await page.waitForFunction(()=>ocrEditorTaskId===null);
-      await page.evaluate(({polygon,irregular})=>{
-        const state=ocrTasks.get('region-fixture').scanState;
-        state.textRegions[0].polygon=polygon;state.textRegions[0].irregular=irregular;state.viewState={};
-        editOcrTask('region-fixture');
-      },{polygon,irregular});
-      await page.locator('.dge-overlay[data-geometry-ready="true"]').waitFor();await settle(page);
-      const actualHeight=await page.locator('.dge-frame-hit[data-text-region-id="1"]').evaluate(node=>node.getBoundingClientRect().height);
-      assert.ok(Math.abs(actualHeight-15)<1,'The thin text fixture is really 15 screen pixels high');
-      const prior=await snapshot(page);await drag(page,[.75,top+height/2],[12,7],touch);
-      const current=await snapshot(page);translated(prior.text,current.text,width+'/'+(irregular?'irregular':'rectangular')+' narrow text move');
-      assert.equal(current.text.length,prior.text.length,'Moving a narrow crop retains its original outline vertices');
-      assert.deepEqual(current.graph,prior.graph);assert.deepEqual(current.camera,prior.camera);
-      await selected(page,'text',width+'/narrow text selection');
-      await page.waitForFunction(()=>ocrTasks.get('region-fixture').scanState.textRegions[0].status==='complete');
-    }
-    // A narrow arm inside a large irregular outline is still an interior.
-    // Its local width, rather than the whole bounding box, decides whether
-    // an apparent frame drag should deform an edge or move the whole region.
-    await page.locator('#graphEditorClose').click();await page.waitForFunction(()=>ocrEditorTaskId===null);
-    await page.evaluate(()=>{
-      const state=ocrTasks.get('region-fixture').scanState;
-      state.graphRegions[0].polygon=[[.08,.14],[.50,.14],[.50,.30],[.78,.30],[.78,.32],[.50,.32],[.50,.55],[.08,.55]];
-      state.viewState={};editOcrTask('region-fixture');
-    });
-    await page.locator('.dge-overlay[data-geometry-ready="true"]').waitFor();await settle(page);
-    const neck=await snapshot(page);await drag(page,[.65,.31],[12,10],touch,false,async()=>{
-      await settle(page);
-      const work=await page.evaluate(()=>{
-        const probe=window.regionPreviewProbe;
-        probe.mutations.push(...probe.observer.takeRecords());
-        const result={rebuilds:probe.mutations.length,layoutReads:probe.layoutReads};
-        probe.observer.disconnect();probe.svg.getBoundingClientRect=probe.original;return result;
-      });
-      assert.deepEqual(work,{rebuilds:0,layoutReads:0},'Moving a region only paints its existing shapes, without SVG rebuilds or forced layout reads');
-    },async()=>page.evaluate(()=>{
-      const svg=document.querySelector('.dge-overlay-svg'),probe={svg,original:svg.getBoundingClientRect,layoutReads:0,mutations:[]};
-      probe.observer=new MutationObserver(records=>probe.mutations.push(...records));probe.observer.observe(svg,{childList:true,subtree:true});
-      svg.getBoundingClientRect=function(){probe.layoutReads++;return probe.original.call(this);};window.regionPreviewProbe=probe;
-    }));
-    const neckMoved=await snapshot(page);translated(neck.graph,neckMoved.graph,width+'/narrow concave arm moves rigidly');
-    assert.equal(neckMoved.graph.length,neck.graph.length,'An interior drag does not resample the outline as an edge deformation');
-    const neckOffset=neckMoved.graph[0].map((value,axis)=>value-neck.graph[0][axis]);
-    await drag(page,[.65+neckOffset[0],.31+neckOffset[1]],[11,-8],touch);
-    const repeated=await snapshot(page);translated(neckMoved.graph,repeated.graph,width+'/consecutive drag starts from the last committed position');
-    assert.deepEqual(repeated.camera,neck.camera);
-    if(!touch){
-      // A final pointer event can carry a newer position than the last move
-      // delivered to the page. Releasing must commit that position directly.
-      const origin=repeated.graph[0],start=await point(page,[origin[0]+.13,origin[1]+.12]);
-      await page.mouse.move(start.x,start.y);await page.mouse.down();
-      await page.locator('.dge-overlay-svg').evaluate((svg,{x,y})=>svg.dispatchEvent(new PointerEvent('pointerup',
-        {bubbles:true,pointerId:1,pointerType:'mouse',clientX:x+21,clientY:y+14})),start);
-      await page.mouse.up();await settle(page);
-      translated(repeated.graph,(await snapshot(page)).graph,'A release with no intervening move commits the final pointer position');
+      const current=await snapshot(page);assert.deepEqual(current.graphs,prior.graphs);assert.deepEqual(current.texts,prior.texts);
+      assert.notEqual(current.camera[2],prior.camera[2],'Pinch still zooms the original image');
+    }else{
+      const prior=await snapshot(page),corner=prior.graph[0];
+      await drag(page,[corner[0]+.13,corner[1]+.12],[13,9],false,true);
+      const current=await snapshot(page);assert.deepEqual(current.graphs,prior.graphs);assert.deepEqual(current.texts,prior.texts);
+      assert.notDeepEqual(current.camera,prior.camera,'Shift-drag still pans without editing a rectangle');
     }
     assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);
-    console.log('PASS '+width+': precise irregular/15px/concave-arm movement, final release, stable previews, elastic edges and zoom/pan cancellation retain source ownership');
+    console.log('PASS '+width+': saved/new irregular regions are final, selection and redraw remain, rectangles and canvas navigation still work');
   }finally{await context.close();}
 }
 (async()=>{const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.CHROMIUM_EXECUTABLE_PATH}:{})});

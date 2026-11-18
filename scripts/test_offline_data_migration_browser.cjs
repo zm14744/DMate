@@ -130,6 +130,10 @@ async function migration(browser, legacy) {
     assert.ok(!(await page.locator('#mistakesPanel').textContent()).includes('PRIVATE'));
     assert.equal(await page.locator('#mistakeList [data-record-id="unknown-mistake"]').count(),0);
     assert.ok(!(await page.locator('#mistakeList').textContent()).includes('Other owner question'));
+    assert.equal(await page.locator('#mistakeList .wrong-status,#mistakeList .wrong-analysis-details,#mistakeList [data-action="edit-mistake"],#addMistake,#recordDialog').count(),0,
+      'Stored correction and explanation data do not recreate removed offline controls');
+    assert.equal(await page.locator('#mistakeList [data-action="delete-mistake"] svg').count(),0);
+    assert.ok((await page.locator('#mistakeList .wrong-date').count())>0,'Original capture dates remain visible');
     const gallery = await page.evaluate(key=>JSON.parse(localStorage.getItem(key)), 'dmate:offline:drawing-gallery:v1'+suffix(ownerA));
     assert.deepEqual(gallery.pages.map(row=>row.id),['shared','incoming-only']);
     if (legacy) { assert.equal(gallery.pages[0].name,'Existing drawing');assert.equal(gallery.activeId,'shared');assert.deepEqual(gallery.custom,localGallery.custom); }

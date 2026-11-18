@@ -61,13 +61,13 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     assert.equal(reference.status(), 200, 'The server must provide the shared stylesheet');
     const networkCSS = await reference.text();
     assert.ok(networkCSS.trim().length, 'The shared stylesheet must not be empty');
-    const sharedAssets = await Promise.all(['/static/dmate-main.css?v=66', '/static/graph-editor.css?v=25', '/static/button-themes.css?v=64', '/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
-      '/static/select-controls.css?v=43', '/static/mobile-select.js?v=26', '/static/offline.css?v=53',
+    const sharedAssets = await Promise.all(['/static/dmate-main.css?v=66', '/static/graph-editor.css?v=26', '/static/button-themes.css?v=64', '/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
+      '/static/select-controls.css?v=43', '/static/mobile-select.js?v=26', '/static/offline.css?v=54',
       '/static/concept-notebook.css?v=1', '/static/textarea-autosize.css?v=1', '/static/textarea-autosize.js?v=1',
-      '/static/drawing-workspace.css?v=51', '/static/graph-editor.js?v=53', '/static/graph-editor-overlay.js?v=38', '/static/drawing-workspace.js?v=54', '/static/drawing-export.js?v=39',
+      '/static/drawing-workspace.css?v=51', '/static/graph-editor.js?v=53', '/static/graph-editor-overlay.js?v=39', '/static/drawing-workspace.js?v=54', '/static/drawing-export.js?v=39',
       '/static/modal-chrome.css', '/static/modal-text.js?v=53', '/static/delete-confirm.js', '/static/guest-session.js?v=53', '/static/language.js?v=59',
-      '/static/graph-editor-format.js?v=32', '/static/language-catalog.js?v=62', '/static/offline-shell.js?v=33',
-      '/static/offline.js?v=56', '/static/offline-knowledge-graph.js?v=60',
+      '/static/graph-editor-format.js?v=32', '/static/language-catalog.js?v=63', '/static/offline-shell.js?v=33',
+      '/static/offline.js?v=57', '/static/offline-knowledge-graph.js?v=60',
       '/static/ui-tooltip.js?v=49',
       '/static/offline-knowledge-graph.css?v=54', '/static/offline-entry.js?v=46',
       '/static/search-controls.css?v=27', '/static/search-controls.js?v=27',
@@ -83,7 +83,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     // Simulate the pinned stylesheet left by the previous offline shell.
     await page.goto(new URL('/health', baseURL).href);
     await page.evaluate(async () => {
-      const cache = await caches.open('dmate-offline-shell-v73');
+      const cache = await caches.open('dmate-offline-shell-v74');
       await cache.put('/static/button-themes.css?v=54', new Response('/* obsolete graph navigation button styles */'));
     });
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });

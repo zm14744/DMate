@@ -1,5 +1,5 @@
 "use strict";
-const CACHE_NAME = "dmate-offline-shell-v74";
+const CACHE_NAME = "dmate-offline-shell-v75";
 const PRECACHE = [
   "/offline",
   "/static/icons/dmate-app-v52.ico",
@@ -9,7 +9,7 @@ const PRECACHE = [
   "/static/icons/dmate-app-v52-192.png",
   "/static/icons/dmate-app-v52-180.png",
   "/static/dmate-main.css?v=66",
-  "/static/graph-editor.css?v=25",
+  "/static/graph-editor.css?v=26",
   "/static/drawing-workspace.css?v=51",
   "/static/modal-chrome.css",
   "/static/concept-notebook.css?v=1",
@@ -20,7 +20,7 @@ const PRECACHE = [
   "/static/dmate-shared-overrides.css?v=23",
   "/static/button-themes.css?v=64",
   "/static/offline-knowledge-graph.css?v=54",
-  "/static/offline.css?v=53",
+  "/static/offline.css?v=54",
   "/static/search-controls.css?v=27",
   "/static/search-controls.js?v=27",
   "/static/select-controls.css?v=43",
@@ -31,7 +31,7 @@ const PRECACHE = [
   "/static/scrollbars.js?v=25",
   "/static/graph-editor-model.js",
   "/static/graph-editor-format.js?v=32",
-  "/static/graph-editor-overlay.js?v=38",
+  "/static/graph-editor-overlay.js?v=39",
   "/static/math-markdown.js?v=22",
   "/static/ai-answer-renderer.js?v=22",
   "/static/modal-text.js?v=53",
@@ -44,7 +44,7 @@ const PRECACHE = [
   "/static/vendor/dompurify-3.2.6/purify.min.js",
   "/static/ui-tooltip.js?v=49",
   "/static/guest-session.js?v=53",
-  "/static/language-catalog.js?v=62",
+  "/static/language-catalog.js?v=63",
   "/static/language-knowledge.js",
   "/static/language.js?v=59",
   "/static/knowledge-graph-labels.js?v=17",
@@ -52,7 +52,7 @@ const PRECACHE = [
   "/static/offline-shell.js?v=33",
   "/static/offline-knowledge-graph.js?v=60",
   "/static/offline-entry.js?v=46",
-  "/static/offline.js?v=56",
+  "/static/offline.js?v=57",
   "/static/icons/dmate-brand-v52.svg",
   "/static/offline-content/concepts.zh-CN.json?v=34",
   "/static/offline-content/questions.zh-CN.json?v=34",

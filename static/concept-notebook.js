@@ -30,7 +30,7 @@ function mount(options){
  selection.append(count);sidebar.append(newButton,searchWrap,selection,list);
  const editor=el('section','dcn-editor');
  const titleLabel=el('label','','概念名称'),title=el('input','dcn-title');title.maxLength=LIMITS.title;title.setAttribute('aria-label','概念名称');titleLabel.append(title);
- const originalLabel=el('label','','我的概念笔记'),original=el('textarea','dcn-original');original.maxLength=LIMITS.content;original.rows=9;original.setAttribute('aria-label','我的概念笔记');originalLabel.append(original);
+ const originalLabel=el('label','','概念内容'),original=el('textarea','dcn-original');original.maxLength=LIMITS.content;original.rows=9;original.setAttribute('aria-label','概念内容');originalLabel.append(original);
  const saved=el('span','dcn-saved');saved.setAttribute('role','status');editor.append(titleLabel,originalLabel,saved);
  const ai=el('section','dcn-ai');
  const questionLabel=el('label','','补充要求（可选）'),question=el('textarea','dcn-question');question.maxLength=1000;question.rows=2;question.setAttribute('aria-label','补充要求（可选）');questionLabel.append(question);
