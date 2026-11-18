@@ -50,9 +50,11 @@ async function adjust(page) {
   for (let count = 0; count < 3; count++) await page.locator('[data-overlay-tool="zoom-in"]').click();
   const area = await page.locator('.dge-overlay-viewport').boundingBox();
   await page.mouse.move(area.x + area.width * .6, area.y + area.height * .6);
+  await page.keyboard.down('Shift');
   await page.mouse.down();
   await page.mouse.move(area.x + area.width * .6 - 39, area.y + area.height * .6 - 31, { steps: 5 });
   await page.mouse.up(); await settle(page);
+  await page.keyboard.up('Shift');
   const changed = await camera(page);
   assert.notEqual(changed.zoom, before.zoom, 'The fixture actually changes the visible zoom');
   assert.ok(Math.abs(changed.cx - .5) + Math.abs(changed.cy - .5) > .01, 'The fixture actually pans the image');

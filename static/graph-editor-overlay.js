@@ -319,6 +319,18 @@ function mount(host,o){
  };
  const px=p=>[p[0]*w,p[1]*h],mouse=e=>{const r=svg.getBoundingClientRect();return [world.left+(e.clientX-r.left)/Math.max(1,r.width)*(world.right-world.left),world.top+(e.clientY-r.top)/Math.max(1,r.height)*(world.bottom-world.top)];};
  const boxOf=points=>{const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);return [Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];};
+ const insideRegion=(points,p)=>{
+  let inside=false;
+  for(let i=0,j=points.length-1;i<points.length;j=i++){
+   const a=points[i],b=points[j];
+   if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])inside=!inside;
+  }
+  return inside;
+ };
+ const regionEdgeTolerance=(points,metric,touch)=>{
+  const b=boxOf(points);
+  return Math.min(touch?24:12,(b[2]-b[0])*metric[0]/4,(b[3]-b[1])*metric[1]/4);
+ };
  const boxPoints=b=>[[b[0],b[1]],[b[2],b[1]],[b[2],b[3]],[b[0],b[3]]];
  const graphPoints=g=>g.region_polygon?.length>=3?g.region_polygon:g.bbox?.length===4?boxPoints(g.bbox):null;
  const screenPoint=p=>{const scale=Math.max(1,scroll.clientWidth)*(s.zoom||100)/100;return [p[0]*scale,p[1]*scale*h/w];};
@@ -365,10 +377,17 @@ function mount(host,o){
   op.previewEnd=[...op.end];
   return op.previewPoints=op.points.map(p=>[clamp(next[0]+(p[0]-b[0])/(b[2]-b[0])*(next[2]-next[0])),clamp(next[1]+(p[1]-b[1])/(b[3]-b[1])*(next[3]-next[1]))]);
  }
+ function regionPreviewPoints(op){
+  if(op.kind!=='move-region')return resizedPoints(op);
+  if(op.previewPoints&&op.previewEnd?.every((value,i)=>value===op.end[i]))return op.previewPoints;
+  const b=boxOf(op.points),dx=Math.max(-b[0],Math.min(1-b[2],op.end[0]-op.start[0])),
+   dy=Math.max(-b[1],Math.min(1-b[3],op.end[1]-op.start[1]));
+  op.previewEnd=[...op.end];return op.previewPoints=op.points.map(p=>[p[0]+dx,p[1]+dy]);
+ }
  const cancelResizePreview=()=>{if(resizeFrame!==null){d.defaultView.cancelAnimationFrame(resizeFrame);resizeFrame=null;}};
  function paintResizePreview(){
-  resizeFrame=null;const op=active;if(op?.kind!=='resize')return;
-  const points=resizedPoints(op),attribute=points.map(p=>px(p).join(',')).join(' '),id=String(op.id);
+  resizeFrame=null;const op=active;if(!op||!['resize','move-region'].includes(op.kind))return;
+  const points=regionPreviewPoints(op),attribute=points.map(p=>px(p).join(',')).join(' '),id=String(op.id);
   // Keep the captured SVG and the other ranges in place while the pointer
   // moves. Replacing the entire drawing tree at input-event frequency causes
   // visible stutter and makes a grabbed edge disappear under the finger.
@@ -379,7 +398,7 @@ function mount(host,o){
   for(const label of svg.querySelectorAll('[data-frame-label-id]'))if(label.dataset.frameLabelId===id&&label.dataset.frameLabelKind===(op.isText?'text':'graph')){
    label.setAttribute('x',String(b[0]*w+6/scale));label.setAttribute('y',String(b[1]*h+17/scale));
   }
-  svg.classList.toggle('is-deforming',op.polygon);
+  svg.classList.toggle('is-deforming',op.kind==='resize'&&op.polygon);
  }
  const queueResizePreview=()=>{if(resizeFrame===null)resizeFrame=d.defaultView.requestAnimationFrame(paintResizePreview);};
  function draw(){
@@ -388,6 +407,7 @@ function mount(host,o){
   // before its first layout/image event, including on a cached-image reopen.
   if(visible)visible.textContent=s.visible?'隐藏描绘':'显示描绘';svg.classList.toggle('is-hidden',!s.visible);svg.dataset.mode=s.mode;
   svg.classList.toggle('is-deforming',active?.kind==='resize'&&active.polygon);
+  svg.classList.toggle('is-moving',active?.kind==='move-region');
   regionMode.value=o.scanOnly?(s.irregular?'irregular':''):['graph_poly','text_poly'].includes(s.mode)?s.mode:'';
   regionMode.hidden=Boolean(o.scanOnly&&!['bounds','graph_poly','text_rect','text_poly'].includes(s.mode));
   for(const b of bar.querySelectorAll('[data-overlay-tool]')){const key=b.dataset.overlayTool,active=Boolean(key===s.mode||o.scanOnly&&(key==='bounds'&&s.mode==='graph_poly'||key==='text_rect'&&s.mode==='text_poly'));b.classList.toggle('is-active',active);if(['select','pan','vertex','edge','bounds','text_rect'].includes(key))b.setAttribute('aria-pressed',String(active));}
@@ -420,12 +440,12 @@ function mount(host,o){
   svg.append(defs);
   const coords=new Map(g.vertices.map((v,i)=>[v.id,pos(v,i,g)]));
   const frame=(points,css,id,isText,current,irregular)=>{
-    const preview=active?.kind==='resize'&&active.id===id&&active.isText===isText?resizedPoints(active):points;
+    const preview=['resize','move-region'].includes(active?.kind)&&active.id===id&&active.isText===isText?regionPreviewPoints(active):points;
     const shape=E(d,'polygon',{points:preview.map(p=>px(p).join(',')).join(' '),class:css+' dge-frame-hit'+(current?' is-current':''),'vector-effect':'non-scaling-stroke'});
     shape.dataset[isText?'textRegionId':'graphId']=id;svg.append(shape);
     const hit=E(d,'polygon',{points:preview.map(p=>px(p).join(',')).join(' '),class:'dge-frame-edge-hit'+(irregular?' dge-frame-elastic-hit':''),'vector-effect':'non-scaling-stroke'});
     hit.dataset[isText?'textRegionId':'graphId']=id;hit.dataset.frameResize='true';
-    hit.style.strokeWidth=touch?'24px':'14px';svg.append(hit);
+    hit.style.strokeWidth=o.scanOnly?2*regionEdgeTolerance(preview,[w*scale,h*scale],touch)+'px':touch?'24px':'14px';svg.append(hit);
     return preview;
   };
   for(const region of o.textOnly||o.drawingOnly?[]:o.model.getDocument().graphs){
@@ -624,7 +644,7 @@ function mount(host,o){
   if(!loaded||!autoFitted||o.disabled?.()||!s.visible)return;
   if(s.mode==='vertex'&&!o.graph())o.ensureGraph?.();
   pointers.set(e.pointerId,[e.clientX,e.clientY]);
-  if(pointers.size===2){cancelResizePreview();const a=[...pointers.values()];base={distance:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]),zoom:s.zoom};active=null;ghost=null;return;}if(pointers.size>2)return;
+  if(pointers.size===2){cancelResizePreview();const a=[...pointers.values()];base={distance:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]),zoom:s.zoom};active=null;ghost=null;draw();return;}if(pointers.size>2)return;
   let node=e.target.closest('[data-vertex-id]')?.dataset.vertexId;
   let edge=e.target.closest('[data-edge-id]')?.dataset.edgeId;
   const handle=e.target.closest('[data-handle-id]')?.dataset.handleId,p=mouse(e),g=o.graph();
@@ -649,7 +669,23 @@ function mount(host,o){
   let hit=e.target.closest('[data-frame-resize]'),graphId=e.target.closest('[data-graph-id]')?.dataset.graphId,
       textId=e.target.closest('[data-text-region-id]')?.dataset.textRegionId;
   const canResize=(o.scanOnly?s.mode==='select':['select','bounds','graph_poly','text_rect','text_poly'].includes(s.mode))&&!e.shiftKey;
-  if(!hit&&canResize&&!node&&!edge&&!handle){
+  if(o.scanOnly&&canResize){
+    const scale=Math.max(1,scroll.clientWidth)*(s.zoom||100)/100,metric=[scale,scale*h/w],
+      touch=Boolean(d.defaultView.navigator.maxTouchPoints||d.defaultView.matchMedia?.('(pointer: coarse)').matches);
+    const regions=[...o.model.getDocument().graphs.map(region=>({id:String(region.id),points:graphPoints(region),isText:false})),
+      ...(s.regions||[]).map(region=>({id:String(region.id),points:region.polygon,isText:true}))];
+    hit=null;graphId=null;textId=null;
+    // Match the painted stacking order and the actual polygon interior. A
+    // narrow text region still needs a centre that can move the whole frame.
+    for(let index=regions.length-1;index>=0;index--){
+      const region=regions[index];if(!region.points?.length)continue;
+      const boundary=nearestRegionBoundary(region.points,p,metric),near=boundary&&boundary.distance<=regionEdgeTolerance(region.points,metric,touch);
+      if(near||insideRegion(region.points,p)){
+        hit=near;graphId=region.isText?null:region.id;textId=region.isText?region.id:null;break;
+      }
+    }
+  }
+  if(!o.scanOnly&&!hit&&canResize&&!node&&!edge&&!handle){
     const scale=Math.max(1,scroll.clientWidth)*(s.zoom||100)/100,metric=[scale,scale*h/w],touch=Boolean(d.defaultView.navigator.maxTouchPoints||d.defaultView.matchMedia?.('(pointer: coarse)').matches);
     let nearest=null;
     const consider=(points,id,isText)=>{if(!points)return;const candidate=nearestRegionBoundary(points,p,metric);if(candidate&&(!nearest||candidate.distance<nearest.distance))nearest={...candidate,id,isText};};
@@ -664,7 +700,18 @@ function mount(host,o){
     if(points){active={kind:'resize',pointer:e.pointerId,id:isText?textId:graphId,isText:!!isText,
       polygon:isText?!!region.irregular:!!region.region_polygon,start:p,end:p,points:points.map(p=>[...p]),sides:resizeSides(points,p)};
       if(active.polygon){const scale=Math.max(1,scroll.clientWidth)*(s.zoom||100)/100;active.elastic=elasticRegionStart(points,p,[scale,scale*h/w]);}
+      if(o.scanOnly){if(isText)o.selectTextRegion?.(Number(textId));else o.selectGraph?.(graphId);}
       e.preventDefault();svg.setPointerCapture?.(e.pointerId);svg.classList.toggle('is-deforming',active.polygon);return;}
+  }
+  if(o.scanOnly&&s.mode==='select'&&!e.shiftKey&&(graphId||textId)){
+    const isText=Boolean(textId),region=isText?s.regions?.find(r=>r.id===Number(textId)):o.model.getDocument().graphs.find(r=>r.id===graphId);
+    const points=isText?region?.polygon:region&&graphPoints(region);
+    if(points){
+      active={kind:'move-region',pointer:e.pointerId,id:isText?textId:graphId,isText,
+        polygon:isText?!!region.irregular:!!region.region_polygon,start:p,end:p,points:points.map(point=>[...point])};
+      if(isText)o.selectTextRegion?.(Number(textId));else o.selectGraph?.(graphId);
+      e.preventDefault();svg.setPointerCapture?.(e.pointerId);draw();return;
+    }
   }
   if(s.mode==='graph_poly'||s.mode==='text_poly'){
     active={kind:'freehand',pointer:e.pointerId,start:p,end:p,points:[regionPoint(p)],graphId,textId};
@@ -699,7 +746,7 @@ function mount(host,o){
     return;
   }
   active.end=mouse(e);
-  if(active.kind==='resize'){queueResizePreview();return;}
+  if(['resize','move-region'].includes(active.kind)){queueResizePreview();return;}
   if(active.kind==='freehand'){
     const events=e.getCoalescedEvents?.();
     for(const event of events?.length?events:[e]){
@@ -718,9 +765,9 @@ function mount(host,o){
   if(!active||active.pointer!==e.pointerId)return;const op=active;active=null;ghost=null;const g=o.graph();
   if(!cancel){
    const choose=()=>{if(op.graphId)o.selectGraph?.(op.graphId);else if(op.textId)o.selectTextRegion?.(Number(op.textId));};
-   if(op.kind==='resize'){
+   if(['resize','move-region'].includes(op.kind)){
     if(distance(op.start,op.end)>3){
-      const points=resizedPoints(op);
+      const points=regionPreviewPoints(op);
       if(points.length===op.points.length&&points.every((p,i)=>p.every((value,j)=>Math.abs(value-op.points[i][j])<1e-10)))return draw();
       if(op.isText)o.resizeTextRegion?.(Number(op.id),points);
       else {change(()=>o.resizeRegion?.(op.id,points,op.polygon),'region');

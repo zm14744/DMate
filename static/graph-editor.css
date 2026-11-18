@@ -288,6 +288,8 @@
 .dge-scan-only .dge-overlay-viewport{flex:1;height:auto;min-height:0;max-height:none;border:1px solid var(--dge-border);border-radius:12px}
 .dge-scan-only .dge-overlay-bbox,.dge-scan-only .dge-overlay-polygon,.dge-scan-only .dge-overlay-text-region,.dge-scan-only .dge-overlay-selection,.dge-scan-only .dge-freehand-draft{stroke-width:1px;fill:none;opacity:.9;stroke-dasharray:5 4}
 .dge-scan-only .dge-overlay-text-region{stroke:#d97706}
+.dge-scan-only .dge-frame-hit.is-current{stroke-width:2px;opacity:1}
+.dge-scan-only .dge-overlay-svg.is-moving .dge-frame-hit{cursor:grabbing}
 .dgs-information{display:flex;flex-direction:column;gap:16px;min-width:0;max-height:clamp(320px,58dvh,620px);overflow:auto;padding:0;border:0}
 .dgs-information h3{margin:0 0 10px}.dgs-information h4{margin:12px 0 6px}
 .dgs-information-card{border:1px solid var(--dge-border);border-radius:12px;padding:14px;min-width:0;background:var(--dge-surface,#fff)}
