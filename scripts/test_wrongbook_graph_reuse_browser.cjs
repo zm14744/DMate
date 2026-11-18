@@ -1,4 +1,4 @@
-/* Reuse actual question/answer sources before scheduling another graph review. */
+/* Reuse actual registered question sources without inference during graph viewing. */
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
@@ -19,7 +19,7 @@ async function fixturePage(browser) {
     return route.abort();
   });
   await page.goto(baseURL, { waitUntil: 'networkidle' });
-  await page.waitForFunction(() => typeof hydrateWrongQuestionGraph === 'function' && !accountVerificationOperation);
+  await page.waitForFunction(() => typeof registeredQuestionSnapshot === 'function' && !accountVerificationOperation);
   await page.evaluate(async () => {
     DMateI18n.setLanguage('zh-CN', false);
     await ensureKnowledgeGraphData();
@@ -61,7 +61,7 @@ async function seed(page, { duplicate = false, sourceMessageId = '', analysis = 
     learningState = normalizeLearningState({ version: 9, events: [], wrongQuestions: [
       __reuseEntry(question, sourceMessageId === 'reuse-second' ? second : first, { sourceMessageId, analysis })
     ] });
-    renderAll();
+    renderAll(); saveLearningState();
   }, { question: QUESTION, first: FIRST, second: SECOND, duplicate, sourceMessageId, analysis });
 }
 
@@ -104,19 +104,29 @@ async function checkLegacyUnique(browser) {
   const { context, page, errors, calls } = await fixturePage(browser);
   try {
     await seed(page);
+    const source = await page.evaluate(question => {
+      const resolved = wrongQuestionTeachingFromConversation(learningState.wrongQuestions[0], question);
+      return { id: resolved?.sourceMessageId, solution: resolved?.solution };
+    }, QUESTION);
+    assert.deepEqual(source, { id: 'reuse-first', solution: FIRST },
+      'the independent legacy source resolver still binds the unique actual question and answer');
     await openGraph(page);
-    assert.deepEqual(await state(page), { source: 'reuse-first', solution: FIRST, status: 'semantic',
-      ids: ['set_operation'], storedSource: 'reuse-first' },
-    'a unique legacy question reuses its existing reviewed conversation result and saves its source');
-    await page.evaluate(() => {
-      closeKnowledgeGraph();
-      const stored = shouldPersistClientState() ? JSON.parse(localStorage.getItem(LEARNING_STORAGE_KEY))
+    assert.deepEqual((await state(page)).ids, ['set_operation'],
+      'a graded legacy record uses its own registered concepts immediately without waiting for chat hydration');
+    const stored = await page.evaluate(() => {
+      saveLearningState();
+      const raw = shouldPersistClientState() ? JSON.parse(localStorage.getItem(LEARNING_STORAGE_KEY))
         : DMateGuestSession.read('learning');
-      learningState = normalizeLearningState(stored);
+      learningState = normalizeLearningState(raw);
+      const entry = learningState.wrongQuestions[0], snapshot = entry.recognitionSnapshot;
+      return { question: snapshot?.question, difficulty: snapshot?.difficulty, count: snapshot?.points.length };
     });
+    assert.deepEqual(stored, { question: QUESTION, difficulty: '简单', count: 1 });
+    await page.evaluate(() => closeKnowledgeGraph());
     await openGraph(page);
+    assert.deepEqual((await state(page)).ids, ['set_operation']);
     assert.deepEqual(calls, []); assert.deepEqual(errors, []);
-    console.log('PASS wrong-book reuse: legacy unique source hydrates immediately and survives actual save/load');
+    console.log('PASS wrong-book reuse: unique actual sources and graded legacy snapshots survive save/load with zero viewing requests');
   } finally { await context.close(); }
 }
 
@@ -135,9 +145,13 @@ async function checkGeneratedComposite(browser) {
       learningState = normalizeLearningState({ version: 9, events: [], wrongQuestions: [__reuseEntry(question, answer)] });
       renderAll();
     }, { question: QUESTION, answer: FIRST, explanation: SECOND });
+    const actual = await page.evaluate(question =>
+      wrongQuestionTeachingFromConversation(learningState.wrongQuestions[0], question)?.solution, QUESTION);
+    assert.equal(actual, FIRST + '\n\n' + SECOND,
+      'generated source resolution preserves its actual hidden answer and visible explanation');
     await openGraph(page);
-    assert.deepEqual(await state(page), { source: 'generated-question', solution: FIRST + '\n\n' + SECOND,
-      status: 'semantic', ids: ['set_operation'], storedSource: 'generated-question' });
+    assert.deepEqual((await state(page)).ids, ['set_operation'],
+      'the wrong-book record displays its already registered question concepts without source re-analysis');
     assert.deepEqual(calls, []); assert.deepEqual(errors, []);
     console.log('PASS wrong-book reuse: unique generated source validates hidden answer and actual explanation composite');
   } finally { await context.close(); }
@@ -152,49 +166,39 @@ async function checkEmptyReviewedSnapshot(browser) {
       entry.questionTeaching = __reuseTeaching(question, answer);
       entry.questionTeaching.question_graph.nodes[0].id = 'obsolete-catalog-id';
       entry.graphSolution = answer;
-      if (isWrongQuestionGraphReady(wrongQuestionGraphContext(entry, null))) {
-        throw Error('Undrawable legacy metadata cannot be treated as a completed graph');
-      }
+      const recognition = entry.recognitionSnapshot || registeredQuestionSnapshot(entry.questionTeaching, question);
+      if (!recognition?.points.length) throw Error('The recognized concept list must survive an obsolete graph record');
     }, { question: QUESTION, answer: FIRST });
     await openGraph(page);
     assert.deepEqual((await state(page)).ids, ['set_operation']);
     assert.deepEqual(calls, []); assert.deepEqual(errors, []);
-    console.log('PASS wrong-book reuse: completed flags on an undrawable snapshot recover from actual reviewed sources');
+    console.log('PASS wrong-book reuse: recognized concepts survive obsolete graph records without a new request');
   } finally { await context.close(); }
 }
 
 async function checkAmbiguousAndNewAnalysis(browser) {
   const { context, page, errors, calls } = await fixturePage(browser);
-  let release = () => {};
   try {
     await seed(page, { duplicate: true });
-    assert.equal(await page.evaluate(() => hydrateWrongQuestionGraph(learningState.wrongQuestions[0])), false,
-      'a legacy entry without source identity cannot select a duplicate merely because it is active');
-    await seed(page, { analysis: ANALYSIS });
-    assert.equal(await page.evaluate(() => hydrateWrongQuestionGraph(learningState.wrongQuestions[0])), false,
-      'an independently newer wrong-book analysis cannot be replaced by a different conversation answer');
-    let requested;
-    const ready = new Promise(resolve => { requested = resolve; });
-    const allowed = new Promise(resolve => { release = resolve; });
-    await page.route('**/analyze-questions', async route => {
-      const body = route.request().postDataJSON(); requested(body); await allowed;
-      const item = body.questions[0];
-      const teaching = await page.evaluate(item => __reuseTeaching(item.text, item.solution || ''), item);
-      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ results: [{ key: item.key, teaching }] }) });
-    });
+    assert.equal(await page.evaluate(question =>
+      wrongQuestionTeachingFromConversation(learningState.wrongQuestions[0], question), QUESTION), null,
+      'a legacy entry without source identity cannot select an arbitrary duplicate conversation answer');
     await openGraph(page);
-    const body = await ready;
-    assert.equal(body.semantic_fallback, true);
-    assert.equal(body.questions[0].text, QUESTION);
-    assert.equal(body.questions[0].solution, ANALYSIS);
-    assert.deepEqual((await state(page)).ids, [], 'old conversation A is not painted while actual analysis B is reviewed');
-    release();
-    await page.waitForFunction(analysis => learningState.wrongQuestions[0].graphSolution === analysis, ANALYSIS);
-    assert.equal((await state(page)).solution, ANALYSIS);
+    assert.deepEqual((await state(page)).ids, ['set_operation'],
+      'an ambiguous conversation origin does not discard this record\'s own recognized question concepts');
+    assert.equal((await state(page)).solution, '', 'viewing the graph does not borrow a duplicate answer as its source');
+    await page.evaluate(() => closeKnowledgeGraph());
+    await seed(page, { analysis: ANALYSIS });
+    await openGraph(page);
+    assert.equal(await page.evaluate(() => getActiveKnowledgeContext().reviewSolutionText), ANALYSIS,
+      'the actual newer wrong-book analysis remains the solution source');
     assert.deepEqual((await state(page)).ids, ['set_operation']);
+    assert.deepEqual(await page.evaluate(() => knowledgeGraphDisplayedNodes().flatMap(node => node.prerequisites)), [],
+      'question-only registered concepts do not invent dependencies from another conversation answer');
+    assert.equal((await state(page)).solution, '', 'old conversation A is not copied over the newer own analysis B');
     assert.deepEqual(calls, []); assert.deepEqual(errors, []);
-    console.log('PASS wrong-book reuse: ambiguous origins abstain and new own-analysis sources receive their own review');
-  } finally { release(); await context.close(); }
+    console.log('PASS wrong-book reuse: ambiguous origins and newer analyses retain their own registered concepts without inference');
+  } finally { await context.close(); }
 }
 
 async function checkLaterUnboundAnswer(browser) {
@@ -205,9 +209,9 @@ async function checkLaterUnboundAnswer(browser) {
       const entry = learningState.wrongQuestions[0];
       sessions[0].messages.push({ role: 'ai', messageId: 'legacy-later-answer', text: later });
       return { actual: wrongQuestionTeachingFromConversation(entry, question)?.solution,
-        reused: hydrateWrongQuestionGraph(entry) };
+        stored: entry.graphSolution };
     }, { question: QUESTION, later: ANALYSIS });
-    assert.deepEqual(result, { actual: ANALYSIS, reused: false },
+    assert.deepEqual(result, { actual: ANALYSIS, stored: '' },
       'a later eligible unbound answer must supersede the earlier explicit answer through legacy ownership checks');
     assert.deepEqual(calls, []); assert.deepEqual(errors, []);
     console.log('PASS wrong-book reuse: direct source lookup retains later legacy-answer ownership checks');

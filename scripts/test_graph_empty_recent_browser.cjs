@@ -176,7 +176,7 @@ async function checkEmptyRecent(browser, width) {
       session.teaching = session.messages[0].questionTeaching;
       renderKnowledgeGraph();
     });
-    await assertEmpty(page, '知识点归类暂未完成', width + '/unmatched question concepts');
+    await assertEmpty(page, '无', width + '/unmatched question concepts');
     if (process.env.KG_SCREENSHOT_DIR) await page.screenshot({ path: process.env.KG_SCREENSHOT_DIR + '/graph-empty-recent-' + width + '.png' });
     assert.deepEqual(errors, [], width + ': browser errors');
     console.log('PASS ' + width + ': hidden unavailable recent button, empty history graph/detail, live language, export guard, full camera memory and valid-question recovery');

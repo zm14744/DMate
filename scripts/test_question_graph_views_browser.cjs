@@ -10,11 +10,6 @@ const locate = '#knowledgeGraphLocateOriginal';
 async function settle(page) {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
-async function bounded(promise,label) {
-  let timer;
-  try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label)),10000);})]);}
-  finally{clearTimeout(timer);}
-}
 async function openGraph(page, mode) {
   await page.evaluate(async mode => {
     if (document.getElementById('knowledgeGraphModal').classList.contains('hidden')) await openKnowledgeGraph();
@@ -347,10 +342,10 @@ async function checkGeneratedQuestionSources(browser) {
         return {actual:getKnowledgeGraphQuestionSubject().context.reviewSolutionText,
           expected:message.generatedAnswer+'\n\n'+explanation};
       },english);
-      assert.equal(source.actual,source.expected,'generated review input includes only its actual hidden answer and visible explanation, excluding the topics footer');
+      assert.equal(source.actual,source.expected,'generated registered sources include only the actual hidden answer and visible explanation, excluding the topics footer');
       assert.deepEqual((await snapshot(page)).ids,expected.ids,'a topics footer cannot contribute another involved concept');
     }
-    assert.equal(reviews.length,0,'a correctly bound generated answer and explanation keep their completed semantic review');
+    assert.equal(reviews.length,0,'a correctly bound generated answer and explanation reuse the registered graph');
     await page.evaluate(()=>{
       const message=getCurrent().messages.find(message=>message.messageId==='generated-source');
       message.text='【题目】\n'+message.generatedQuestion;
@@ -358,14 +353,9 @@ async function checkGeneratedQuestionSources(browser) {
       renderKnowledgeGraph();
     });
     const changed=await snapshot(page);
-    assert.deepEqual(changed.ids,[],'a graph reviewed for a replaced generated answer stays hidden until its new answer is reviewed');
+    assert.deepEqual(changed.ids,['set_operation'],'replacing an answer keeps question facts but not its old solution-only method');
     assert.deepEqual(changed.purple,changed.ids);assert.deepEqual(changed.edges,[]);
-    await page.waitForFunction(()=>{
-      const operation=knowledgeGraphQuestionAnalyses.get(getCurrent().messages[1]);
-      return operation&&operation.status!=='pending';
-    });
-    assert.equal(reviews.length,1,'replacing a generated answer invalidates its previous semantic review');
-    assert.equal(reviews[0].questions[0].solution,'答案已修改，旧解答不再存在');
+    assert.equal(reviews.length,0,'changing an answer does not turn graph viewing into another recognition request');
     assert.deepEqual(modelCalls,[]);assert.deepEqual(errors,[]);
     console.log('PASS generated question sources: own answer supports relations, replaced answers cannot validate stale evidence');
   } finally {await context.close();}
@@ -416,98 +406,38 @@ async function checkQuestionSpecificTopology(browser, width) {
   } finally {await context.close();}
 }
 
-async function checkLegacyBackfill(browser) {
+async function checkRegisteredLegacySnapshot(browser) {
   const {context,page,errors,modelCalls}=await newPage(browser,1440,'zh-CN');
-  const classifications=[];
   try {
-    await page.route('**/analyze-questions',async route=>{
-      const request=route.request().postDataJSON();
-      classifications.push(...request.questions);
-      const results=await page.evaluate(questions=>questions.map(item=>({key:item.key,
-        teaching:__graphTeachingFixture(item.text,['set_operation'])})),request.questions);
-      await route.fulfill({contentType:'application/json',body:JSON.stringify({results})});
-    });
     await page.evaluate(()=>{
-      const text='进行集合运算，计算 A 与 B 的并集';
-      const old={category:'集合与关系',knowledge_points:['集合运算'],focus_points:['集合运算'],
-        prerequisite_points:['命题推理'],knowledge_path:['集合运算','函数与映射']};
+      const text='从若干对象中无序选取一组，有多少种不同选法';
+      const old={category:'计数与组合',difficulty:'简单',knowledge_points:['排列与组合'],focus_points:['排列与组合'],
+        prerequisite_points:['命题推理'],knowledge_path:['集合运算','函数与映射'],
+        registered_snapshot:{version:1,question:text,difficulty:'简单',points:['排列与组合']}};
       sessions=[{id:'legacy',name:'旧题目',nameSource:'user',teaching:old,learningQuestion:null,deletedMessageIds:{},
         messages:[{messageId:'legacy-question',role:'user',text,manualIsQuestion:true,questionTeaching:old}]}];
       currentId='legacy';renderAll();
     });
     await openGraph(page,'focus');
-    await page.waitForFunction(()=>knowledgeGraphDisplayedNodes().length===1);
-    const graph=await snapshot(page);
-    assert.deepEqual(graph.ids,['set_operation'],'legacy classification is refreshed from its own actual question');
-    assert.deepEqual(graph.purple,['set_operation']);assert.deepEqual(graph.edges,[]);
-    assert.equal(classifications.length,1,'one local backfill refreshes old metadata without a repeated classification loop');
-    assert.equal(classifications[0].text,'进行集合运算，计算 A 与 B 的并集');
+    const expected={ids:['count_perm_comb'],purple:['count_perm_comb'],edges:[],categories:['计数与组合']};
+    assert.deepEqual(await snapshot(page),expected,'already recognized implicit knowledge displays without inferring it again');
+    await assertLiveGraph(page,1440,expected,'registered legacy');
     await openGraph(page,'full');await openGraph(page,'focus');
-    assert.equal(classifications.length,1,'the freshly evidenced graph is reused on reopening');
+    await page.evaluate(()=>{closeKnowledgeGraph();saveState();if(!loadState({guest:true}))throw Error('No saved snapshot');renderAll();});
+    await openGraph(page,'focus');
+    assert.deepEqual(await snapshot(page),expected,'the registered snapshot survives actual persistence without course-path expansion');
+    await page.evaluate(()=>{getCurrent().messages[0].text='依据复合函数的计算结果判断函数与映射的性质';renderKnowledgeGraph();});
+    assert.deepEqual((await snapshot(page)).ids,[],'edited full questions cannot reuse an old explicitly bound recognition');
+    await page.evaluate(()=>{
+      const message=getCurrent().messages[0];
+      message.questionTeaching=__graphTeachingFixture(message.text,['function_composition','function_mapping'],
+        [['function_composition','function_mapping',message.text]]);
+      renderKnowledgeGraph();
+    });
+    assert.deepEqual((await snapshot(page)).ids,['function_composition','function_mapping']);
+    assert.deepEqual((await snapshot(page)).edges,['function_composition>function_mapping']);
     assert.deepEqual(modelCalls,[]);assert.deepEqual(errors,[]);
-    console.log('PASS legacy question graph: one source-bound backfill replaces flat tags and omits stale course paths');
-  } finally {await context.close();}
-}
-
-async function checkDelayedBackfillGuards(browser) {
-  const {context,page,errors,modelCalls}=await newPage(browser,1440,'zh-CN');
-  try {
-    for (const replaceQuestion of [false,true]) {
-      let captured,release;
-      const requestReady=new Promise(resolve=>{captured=resolve;});
-      const allowResponse=new Promise(resolve=>{release=resolve;});
-      await page.route('**/analyze-questions',async route=>{
-        const request=route.request().postDataJSON();
-        const results=await page.evaluate(questions=>questions.map(item=>({key:item.key,
-          teaching:__graphTeachingFixture(item.text,['set_operation'])})),request.questions);
-        captured(request);
-        await allowResponse;
-        await route.fulfill({contentType:'application/json',body:JSON.stringify({results})});
-      });
-      await page.evaluate(()=>{
-        const text='进行集合运算，计算 A 与 B 的交集';
-        const old={category:'集合与关系',knowledge_points:['集合运算'],focus_points:['集合运算']};
-        sessions=[{id:'backfill-race',name:'异步题目分析',nameSource:'user',teaching:old,learningQuestion:null,deletedMessageIds:{},
-          messages:[{messageId:'race-question',role:'user',text,manualIsQuestion:true,questionTeaching:old}]}];
-        currentId='backfill-race';renderAll();
-      });
-      const opening=openGraph(page,'focus');
-      await requestReady;
-      await page.evaluate(replaceQuestion=>{
-        const message=getCurrent().messages[0];
-        window.__pendingQuestionGraph=knowledgeGraphQuestionAnalyses.get(message).promise;
-        if (replaceQuestion) {
-          message.text='依据复合函数的计算结果判断函数与映射的性质';
-          message.questionTeaching=__graphTeachingFixture(message.text,['function_composition','function_mapping'],
-            [['function_composition','function_mapping',message.text]]);
-        } else {
-          const solution='依据集合运算的结果求复合函数';
-          const teaching=__graphTeachingFixture(message.text,['set_operation']);
-          teaching.question_graph.sources.solution=solution;
-          teaching.question_graph.nodes.push({id:'function_composition',evidence:[{source:'solution',quote:'复合函数'}]});
-          teaching.question_graph.edges.push({from:'set_operation',to:'function_composition',evidence:[{source:'solution',quote:solution}]});
-          message.questionTeaching=teaching;
-          getCurrent().messages.push({messageId:'race-solution',role:'ai',text:solution});
-        }
-        window.__newQuestionGraph=JSON.stringify(message.questionTeaching.question_graph);
-        renderKnowledgeGraph();
-      },replaceQuestion);
-      release();
-      await opening;
-      await page.evaluate(()=>window.__pendingQuestionGraph);
-      await settle(page);
-      assert.equal(await page.evaluate(()=>JSON.stringify(getCurrent().messages[0].questionTeaching.question_graph)),
-        await page.evaluate(()=>window.__newQuestionGraph),replaceQuestion
-          ? 'a delayed analysis cannot overwrite the graph of an edited question'
-          : 'a delayed question-only analysis cannot overwrite newer solution-backed dependencies');
-      const graph=await snapshot(page);
-      assert.deepEqual(graph.ids,replaceQuestion?['function_composition','function_mapping']:['function_composition','set_operation']);
-      assert.deepEqual(graph.purple,graph.ids,'the retained source-bound graph keeps all involved nodes purple');
-      assert.deepEqual(graph.edges,[replaceQuestion?'function_composition>function_mapping':'set_operation>function_composition']);
-      await page.unroute('**/analyze-questions');
-    }
-    assert.deepEqual(modelCalls,[]);assert.deepEqual(errors,[]);
-    console.log('PASS delayed graph analyses: edited questions and newer solution-specific dependencies survive stale responses');
+    console.log('PASS registered legacy graph: implicit points, persistence and complete-question edit guards require no view-time recognition');
   } finally {await context.close();}
 }
 
@@ -552,7 +482,7 @@ async function checkLongQuestionIdentity(browser) {
     assert.equal(await page.evaluate(()=>getKnowledgeGraphQuestionSubject().reference.messageId),'long-b',
       'the latest exact question is active despite its fingerprint matching the earlier question');
     const latest=await snapshot(page);
-    assert.deepEqual(latest.ids,[],'a graph claiming another question’s answer is hidden rather than borrowing that answer');
+    assert.deepEqual(latest.ids,['function_composition'],'question facts remain visible but another question’s answer cannot contribute its method');
     assert.deepEqual(latest.purple,latest.ids);assert.deepEqual(latest.edges,[]);
     await openHistory(page);
     assert.equal(await page.locator('.kg-history-item').count(),2,'distinct full questions with the same long prefix both remain in history');
@@ -567,12 +497,12 @@ async function checkLongQuestionIdentity(browser) {
       delete getCurrent().messages.find(message=>message.messageId==='long-solution').targetQuestionMessageId;
       renderKnowledgeGraph();
     });
-    assert.deepEqual((await snapshot(page)).ids,[],
-      'an ambiguous legacy fingerprint invalidates the old reviewed answer graph for the earlier question');
+    assert.deepEqual((await snapshot(page)).ids,['set_operation'],
+      'an ambiguous legacy fingerprint cannot add the old solution method to the earlier question');
     await openHistory(page);
     await page.locator('.kg-history-item[data-message-id="long-b"] [data-history-action="graph"]').click();
-    assert.deepEqual((await snapshot(page)).ids,[],
-      'the same ambiguous legacy fingerprint cannot attest a reviewed graph for the later question either');
+    assert.deepEqual((await snapshot(page)).ids,['function_composition'],
+      'the ambiguous legacy fingerprint cannot add another question’s method to the later question');
     assert.equal(await page.evaluate(()=>getKnowledgeGraphQuestionSubject().context.solutionText),'');
     const mathCollision=await page.evaluate(()=>{
       const a='逻辑等价：判断 p∧(q∨r)',b='逻辑等价：判断 (p∧q)∨r';
@@ -586,9 +516,7 @@ async function checkLongQuestionIdentity(browser) {
     assert.equal(mathCollision,true,'the old fingerprint also removes the mathematically significant grouping parentheses');
     await openHistory(page);
     assert.equal(await page.locator('.kg-history-item').count(),2,'different mathematical groupings do not collapse distinct exact questions');
-    assert.equal(reviews.length,2,'unattested and ambiguous answer sources request fresh source-bound reviews');
-    assert.ok(reviews.every(request=>request.semantic_fallback===true&& !request.questions[0].solution),
-      'reviews do not borrow a solution whose stable or legacy owner cannot be established');
+    assert.equal(reviews.length,0,'unattested and ambiguous answer sources never cause a graph-view recognition request');
     assert.deepEqual(modelCalls,[]);assert.deepEqual(errors,[]);
     console.log('PASS question identity: long-prefix and mathematical-grouping collisions preserve history, active subject and stable answer ownership');
   } finally {await context.close();}
@@ -629,19 +557,7 @@ async function checkEqualSizeCache(browser) {
   } finally {await context.close();}
 }
 
-async function seedUnreviewedQuestion(page, question, options = {}) {
-  await page.evaluate(({question,options})=>{
-    const teaching=__graphTeachingFixture(question,[]);
-    Object.assign(teaching.question_graph,{classifier_revision:options.oldRevision?'keyword-v1':'catalog-semantic-v5',
-      classification_status:'local',classification_source:'structural_rules',needs_review:true});
-    teaching.question_graph.sources.solution=options.solution||'';
-    sessions=[{id:'semantic-source',name:'逐题知识点复核',nameSource:'user',teaching,learningQuestion:null,
-      deletedMessageIds:{},messages:[{messageId:'semantic-question',role:'user',text:question,
-        manualIsQuestion:true,questionTeaching:teaching},...(options.solution?[{role:'ai',messageId:'semantic-answer',
-          text:options.solution,targetQuestionMessageId:'semantic-question'}]:[])]}];
-    currentId='semantic-source';deletedSessionIds=Object.create(null);renderAll();
-  },{question,options});
-}
+
 
 async function reviewedTeaching(page,item,id='count_perm_comb',reason='无序选择三人组成小组，需要使用组合计数') {
   return page.evaluate(({item,id,reason})=>{
@@ -656,144 +572,11 @@ async function reviewedTeaching(page,item,id='count_perm_comb',reason='无序选
   },{item,id,reason});
 }
 
-async function checkSemanticKnowledgeReview(browser) {
-  const question='从十名学生中无序选出三人组成小组，有多少种不同选法';
-  const {context,page,errors,modelCalls}=await newPage(browser,1440,'zh-CN');
-  const requests=[];
-  let capturedSimple,releaseSimple;
-  const simpleReady=new Promise(resolve=>{capturedSimple=resolve;});
-  const simpleAllowed=new Promise(resolve=>{releaseSimple=resolve;});
-  try {
-    await page.route('**/analyze-questions',async route=>{
-      const body=route.request().postDataJSON();requests.push(body);
-      const item=body.questions[0],simple=item.text.includes('交集');
-      const teaching=await reviewedTeaching(page,item,simple?'set_operation':'count_perm_comb',
-        simple?'题目要求求两个集合的交集':'无序选择三人组成小组，需要使用组合计数');
-      if(simple){capturedSimple();await simpleAllowed;}
-      await route.fulfill({contentType:'application/json',body:JSON.stringify({results:[{key:body.questions[0].key,teaching}]})});
-    });
-    await seedUnreviewedQuestion(page,question,{oldRevision:true});
-    await openGraph(page,'full');await openHistory(page);
-    await settle(page);
-    assert.equal(requests.length,0,'course browsing and the historical list do not trigger mass semantic reviews');
-    await page.locator('.kg-history-item[data-message-id="semantic-question"] [data-history-action="graph"]').click();
-    await page.waitForFunction(()=>getCurrent().messages[0].questionTeaching.question_graph.classification_status==='semantic');
-    assert.equal(requests.length,1,'an existing empty graph with an old classifier revision is reviewed once');
-    assert.equal(requests[0].semantic_fallback,true,'the graph explicitly requests bounded semantic review');
-    assert.equal(requests[0].questions[0].text,question,'review receives the actual unnamed mathematical problem');
-    assert.deepEqual((await snapshot(page)).ids,['count_perm_comb'],'the reviewed graph uses an existing catalog point without adding prerequisite neighbors');
-    assert.deepEqual((await snapshot(page)).purple,['count_perm_comb']);
-    const persisted=await page.evaluate(()=>{
-      saveState();const loaded=loadState({guest:true});
-      const graph=getCurrent().messages[0].questionTeaching.question_graph;
-      return {loaded,revision:graph.classifier_revision,status:graph.classification_status,
-        source:graph.classification_source,needs:graph.needs_review,reason:graph.nodes[0].reason,
-        origin:graph.nodes[0].origin,usage:graph.nodes[0].usage,catalog:graph.catalog_revision,
-        reconciliation:graph.reconciliation_source,structure:graph.task_structure_ids,issues:graph.validation_issues};
-    });
-    assert.deepEqual(persisted,{loaded:true,revision:'catalog-semantic-v5',status:'semantic',
-      source:'catalog_semantic',needs:false,reason:'无序选择三人组成小组，需要使用组合计数',origin:'task_structure',usage:'assessed',
-      catalog:'f'.repeat(64),reconciliation:'task_structure',structure:['count_perm_comb'],issues:{unneeded_candidate:1}},
-    'semantic provenance, mathematical reason and task-structure reconciliation trace survive actual client normalization and storage');
-    await openGraph(page,'focus');await openGraph(page,'history');await settle(page);
-    assert.equal(requests.length,1,'a current reviewed graph is reused rather than reviewed on every page change');
-    const simple='求 A={1,2} 与 B={2,3} 的交集';
-    await seedUnreviewedQuestion(page,simple);
-    await page.evaluate(()=>{
-      const teaching=getCurrent().messages[0].questionTeaching;
-      teaching.confidence='高';
-      Object.assign(teaching.question_graph,{classification_status:'semantic',needs_review:false});
-      teaching.question_graph.nodes=[{id:'count_inclusion',evidence:[{source:'question',quote:getCurrent().messages[0].text}]}];
-    });
-    await openGraph(page,'focus');
-    await bounded(simpleReady,'A nonempty provisional graph did not request semantic review');
-    assert.deepEqual((await snapshot(page)).ids,[],'an unreviewed high-confidence false local point is not drawn while semantic review is pending');
-    assert.equal(await page.locator('#knowledgeGraphCanvas .kg-node-group,#knowledgeGraphCanvas .kg-mobile-node').count(),0,
-      'provisional local guesses cannot appear as purple confirmed knowledge nodes');
-    releaseSimple();
-    await page.waitForFunction(()=>getCurrent().messages[0].questionTeaching.question_graph.classification_source==='catalog_semantic');
-    assert.equal(requests.length,2,'a local graph is reviewed even when it claims semantic completion and high confidence');
-    assert.equal(requests[1].semantic_fallback,true);
-    assert.deepEqual((await snapshot(page)).ids,['set_operation'],'semantic review can remove a false local point instead of merely adding to existing local tags');
-    assert.deepEqual(modelCalls,[]);assert.deepEqual(errors,[]);
-    console.log('PASS semantic knowledge review: old empty metadata, unnamed problems, catalog-only results, provenance persistence and no list-wide reviews');
-  } finally {releaseSimple();await context.close();}
-}
 
-async function checkReviewFailureIsNotCompletion(browser) {
-  const {context,page,errors,modelCalls}=await newPage(browser,1440,'zh-CN');
-  try {
-    for(const unavailable of [true,false]) {
-      const requests=[];
-      await page.route('**/analyze-questions',async route=>{
-        const body=route.request().postDataJSON();requests.push(body);
-        if(!unavailable)return route.fulfill({status:429,contentType:'application/json',body:'{"error":"复核请求过于频繁"}'});
-        const item=body.questions[0];
-        const teaching=await page.evaluate(item=>{
-          const result=__graphTeachingFixture(item.text,[]);
-          Object.assign(result.question_graph,{classification_status:'unavailable',classification_source:'structural_rules',needs_review:true});
-          return result;
-        },item);
-        return route.fulfill({contentType:'application/json',body:JSON.stringify({results:[{key:item.key,teaching}]})});
-      });
-      await seedUnreviewedQuestion(page,'从九名学生中选出两人组成小组，有多少种选法');
-      await openGraph(page,'focus');
-      await page.waitForFunction(()=>{
-        const operation=knowledgeGraphQuestionAnalyses.get(getCurrent().messages[0]);
-        return operation&&operation.status!=='pending';
-      });
-      await page.evaluate(()=>{for(let index=0;index<8;index++)renderKnowledgeGraph();});
-      await settle(page);
-      const graph=await page.evaluate(()=>getCurrent().messages[0].questionTeaching.question_graph);
-      assert.notEqual(graph.classification_status,'semantic',(unavailable?'unconfigured':'rate-limited')+' review is not falsely recorded as semantic completion');
-      assert.equal(graph.needs_review,true,'unavailable review remains eligible for a later valid attempt');
-      assert.equal(requests.length,1,'repeated rendering does not create an unavailable/rate-limit request loop');
-      assert.deepEqual((await snapshot(page)).ids,[],'failure does not invent a graph from unrelated course neighbors');
-      await page.unroute('**/analyze-questions');
-    }
-    assert.deepEqual(modelCalls,[]);assert.deepEqual(errors,[]);
-    console.log('PASS semantic review failures: missing configuration and rate limits stay incomplete without request storms');
-  } finally {await context.close();}
-}
 
-async function checkCompletedAnswerStartsBackgroundReview(browser) {
-  const question='从十名学生中无序选出三人组成小组，有多少种不同选法',answer='从10人中无序选择3人，共有120种选法';
-  const {context,page,errors,modelCalls}=await newPage(browser,1440,'zh-CN');
-  let captured,release;
-  const requestReady=new Promise(resolve=>{captured=resolve;});
-  const responseAllowed=new Promise(resolve=>{release=resolve;});
-  try {
-    await page.route('**/analyze-questions',async route=>{
-      const body=route.request().postDataJSON();captured(body);await responseAllowed;
-      const teaching=await reviewedTeaching(page,body.questions[0]);
-      await route.fulfill({contentType:'application/json',body:JSON.stringify({results:[{key:body.questions[0].key,teaching}]})});
-    });
-    const local=await page.evaluate(({question,answer})=>{
-      const teaching=__graphTeachingFixture(question,[]);
-      Object.assign(teaching.question_graph,{classification_status:'local',classification_source:'structural_rules',needs_review:true});
-      teaching.question_graph.sources.solution=answer;return teaching;
-    },{question,answer});
-    await page.route('**/chat',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({reply:answer,teaching:local})}));
-    await page.evaluate(question=>{
-      const teaching=__graphTeachingFixture(question,[]);
-      sessions=[{id:'answer-review',name:'回答后复核',nameSource:'user',teaching,learningQuestion:null,deletedMessageIds:{},
-        messages:[{messageId:'answer-review-question',role:'user',text:question,manualIsQuestion:true,questionTeaching:teaching}]}];
-      currentId='answer-review';renderAll();
-    },question);
-    const sending=page.evaluate(()=>requestAiReply(getCurrent(),{completeImmediately:true}));
-    const body=await bounded(requestReady,'A completed answer did not queue its semantic review');
-    const completed=await Promise.race([sending,new Promise((_,reject)=>setTimeout(()=>reject(Error('The completed answer waited for semantic review')),5000))]);
-    assert.equal(completed.status,'success','answer completion is independent of the held semantic response');
-    assert.equal(body.semantic_fallback,true);
-    assert.equal(body.questions[0].text,question);
-    assert.equal(body.questions[0].solution,answer,'background review receives the actual newly committed answer');
-    assert.equal(await page.evaluate(answer=>getCurrent().messages.some(message=>message.role==='ai'&&message.text===answer),answer),true);
-    release();
-    await page.waitForFunction(()=>getCurrent().messages[0].questionTeaching.question_graph.classification_status==='semantic');
-    assert.deepEqual(errors,[]);assert.deepEqual(modelCalls,[]);
-    console.log('PASS answer review: committed replies trigger source-bound review without waiting for another model response');
-  } finally {release();await context.close();}
-}
+
+
+
 
 async function checkCompletedAnswerReusesInlineGraph(browser) {
   const question='从十二名学生中无序选出四人组成小组，有多少种不同选法';
@@ -820,7 +603,7 @@ async function checkCompletedAnswerReusesInlineGraph(browser) {
     const expected={ids:['count_perm_comb'],edges:[],purple:['count_perm_comb'],categories:['计数与组合']};
     await openGraph(page,'focus');
     assert.deepEqual(await snapshot(page),expected,'the completed answer graph is immediately available in the recent view');
-    assert.equal(await page.evaluate(()=>isReviewedKnowledgeGraph(getActiveKnowledgeContext())),true);
+    assert.equal(await page.evaluate(()=>getActiveKnowledgeContext().questionGraph.classification_status),'semantic');
     await assertLiveGraph(page,1440,expected,'inline answer');
     await openHistory(page);
     await page.locator('.kg-history-item[data-message-id="inline-question"] [data-history-action="graph"]').click();
@@ -852,7 +635,7 @@ async function checkCompletedAnswerReusesInlineGraph(browser) {
     const followUp=await page.evaluate(()=>requestAiReply(getCurrent(),{completeImmediately:true}));
     assert.equal(followUp.status,'success');
     assert.equal(await page.evaluate(()=>getCurrent().messages[0].questionTeaching.question_graph.sources.solution),nextAnswer,
-      'a reviewed inline follow-up graph attaches to its existing question before the review queue runs');
+      'an inline follow-up graph attaches directly to its existing question before graph viewing');
     assert.deepEqual(await snapshot(page),expected,'a completed follow-up immediately replaces its source-bound graph');
     assert.equal(reviews.length,0,'completion, follow-ups, recent/history switches, reopening and storage restoration make zero extra classification requests');
     assert.deepEqual(modelCalls,[]);assert.deepEqual(errors,[]);
@@ -887,7 +670,7 @@ async function checkGeneratedAnswerReusesInlineGraph(browser) {
     await openGraph(page,'focus');
     const expected={ids:['count_perm_comb'],edges:[],purple:['count_perm_comb'],categories:['计数与组合']};
     assert.deepEqual(await snapshot(page),expected,'the generated question graph is immediately available');
-    assert.equal(await page.evaluate(()=>isReviewedKnowledgeGraph(getActiveKnowledgeContext())),true);
+    assert.equal(await page.evaluate(()=>getActiveKnowledgeContext().questionGraph.classification_status),'semantic');
     assert.equal(await page.evaluate(()=>getActiveKnowledgeContext().reviewSolutionText),sourceSolution,
       'generated inline evidence binds independently to the private answer plus visible explanation, excluding the topic footer');
     const generatedId=await page.evaluate(()=>getCurrent().messages.find(message=>message.generatedExercise).messageId);
@@ -907,95 +690,81 @@ async function checkGeneratedAnswerReusesInlineGraph(browser) {
   } finally {await context.close();}
 }
 
-async function checkSemanticReviewRejectsOldSolution(browser) {
-  const question='证明命题 p∧q 与 q∧p 逻辑等价',oldAnswer='先研究逻辑等价',newAnswer='用真值表验证逻辑等价';
+
+
+
+
+async function checkLocalAnswerSnapshot(browser) {
+  const question='从十名学生中无序选出三人组成小组，有多少种不同选法',answer='无序选择三人，共有120种';
   const {context,page,errors,modelCalls}=await newPage(browser,1440,'zh-CN');
-  let captured,release;
-  const requestReady=new Promise(resolve=>{captured=resolve;});
-  const responseAllowed=new Promise(resolve=>{release=resolve;});
   try {
-    await page.route('**/analyze-questions',async route=>{
-      const body=route.request().postDataJSON();captured(body);
-      const teaching=await reviewedTeaching(page,body.questions[0],'logic_equivalence','题目要求证明两个命题等价');
-      await responseAllowed;
-      await route.fulfill({contentType:'application/json',body:JSON.stringify({results:[{key:body.questions[0].key,teaching}]})});
+    const teaching=await reviewedTeaching(page,{text:question,solution:answer});
+    Object.assign(teaching,{difficulty:'简单',classification_source:'local_structure',classification_status:'local',needs_review:true});
+    Object.assign(teaching.question_graph,{classifier_revision:'catalog-structure/2',classification_source:'local_structure',classification_status:'local',needs_review:true});
+    await page.route('**/chat',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({reply:answer,teaching})}));
+    await page.evaluate(question=>{
+      const teaching=__graphTeachingFixture(question,[['count_perm_comb',question]]);teaching.difficulty='简单';
+      sessions=[{id:'local-answer',name:'回答登记快照',nameSource:'user',teaching,learningQuestion:null,deletedMessageIds:{},
+        messages:[{messageId:'local-question',role:'user',text:question,manualIsQuestion:true,questionTeaching:teaching}]}];
+      currentId='local-answer';renderAll();
+    },question);
+    const completed=await page.evaluate(()=>requestAiReply(getCurrent(),{completeImmediately:true}));
+    assert.equal(completed.status,'success');
+    await openGraph(page,'focus');
+    assert.deepEqual((await snapshot(page)).ids,['count_perm_comb']);
+    const stored=await page.evaluate(()=>{
+      closeKnowledgeGraph();saveState();const loaded=loadState({guest:true});renderAll();
+      const graph=getCurrent().messages[0].questionTeaching.question_graph;
+      return {loaded,status:graph.classification_status,needs:graph.needs_review,source:graph.classification_source,solution:graph.sources.solution};
     });
-    await seedUnreviewedQuestion(page,question,{solution:oldAnswer});
-    const opening=openGraph(page,'focus');
-    const body=await bounded(requestReady,'An unreviewed solution graph did not queue its semantic review');
-    assert.equal(body.questions[0].solution,oldAnswer);
-    await page.evaluate(({question,newAnswer})=>{
-      const session=getCurrent(),message=session.messages[0];
-      window.__oldSemanticOperation=knowledgeGraphQuestionAnalyses.get(message).promise;
-      session.messages.push({role:'ai',messageId:'new-reviewed-answer',text:newAnswer,targetQuestionMessageId:message.messageId});
-      const solution=getKnowledgeGraphQuestionSubject().context.reviewSolutionText;
-      const teaching=__graphTeachingFixture(question,[['logic_equivalence','逻辑等价']]);
-      teaching.question_graph.sources.solution=solution;
-      teaching.question_graph.nodes.push({id:'logic_truth_table',reason:'最新解答实际使用真值表',evidence:[{source:'solution',quote:'真值表'}]});
-      teaching.question_graph.edges.push({from:'logic_truth_table',to:'logic_equivalence',evidence:[{source:'solution',quote:newAnswer}]});
-      message.questionTeaching=teaching;
-      window.__freshSolutionGraph=JSON.stringify(teaching.question_graph);renderKnowledgeGraph();
-    },{question,newAnswer});
-    release();await opening;await page.evaluate(()=>window.__oldSemanticOperation);await settle(page);
-    assert.equal(await page.evaluate(()=>JSON.stringify(getCurrent().messages[0].questionTeaching.question_graph)),
-      await page.evaluate(()=>window.__freshSolutionGraph),'review for an old answer cannot overwrite a newer solution-specific semantic graph');
-    assert.deepEqual((await snapshot(page)).ids,['logic_equivalence','logic_truth_table']);
-    assert.deepEqual((await snapshot(page)).edges,['logic_truth_table>logic_equivalence']);
+    assert.deepEqual(stored,{loaded:true,status:'local',needs:true,source:'local_structure',solution:answer},
+      'viewing and saving preserve local recognition provenance instead of pretending a second semantic pass occurred');
+    await openGraph(page,'focus');assert.deepEqual((await snapshot(page)).ids,['count_perm_comb']);
     assert.deepEqual(modelCalls,[]);assert.deepEqual(errors,[]);
-    console.log('PASS semantic review races: exact solution snapshots prevent old reviews from replacing newer answer dependencies');
-  } finally {release();await context.close();}
+    console.log('PASS local answer snapshot: existing answer registration supplies the graph immediately without a background review');
+  } finally {await context.close();}
 }
 
-async function checkNewAnswerHidesPreviousReview(browser) {
-  const question='证明命题 p∧q 与 q∧p 逻辑等价',oldAnswer='先研究逻辑等价',newAnswer='用真值表验证逻辑等价';
+async function checkCurrentAnswerMethodEvidence(browser) {
+  const question='证明命题 p∧q 与 q∧p 逻辑等价',a='用真值表验证逻辑等价',b='先求范式，再证明逻辑等价';
   const {context,page,errors,modelCalls}=await newPage(browser,1440,'zh-CN');
-  let captured,release;
-  const requestReady=new Promise(resolve=>{captured=resolve;});
-  const responseAllowed=new Promise(resolve=>{release=resolve;});
   try {
-    await page.route('**/analyze-questions',async route=>{
-      const body=route.request().postDataJSON();captured(body);await responseAllowed;
-      const teaching=await reviewedTeaching(page,body.questions[0],'logic_equivalence','本题要求验证交换顺序后的逻辑等价');
-      teaching.question_graph.nodes.push({id:'logic_truth_table',reason:'最新解答实际使用真值表',usage:'used',origin:'catalog_semantic',
-        evidence:[{source:'solution',quote:'真值表'}]});
-      teaching.question_graph.edges.push({from:'logic_truth_table',to:'logic_equivalence',reason:'用真值表验证等价',
-        evidence:[{source:'solution',quote:newAnswer}]});
-      await route.fulfill({contentType:'application/json',body:JSON.stringify({results:[{key:body.questions[0].key,teaching}]})});
-    });
-    await seedUnreviewedQuestion(page,question,{solution:oldAnswer});
-    await page.evaluate(({question,oldAnswer})=>{
-      const teaching=__graphTeachingFixture(question,[['logic_equivalence','逻辑等价']]);
-      teaching.question_graph.sources.solution=oldAnswer;
-      getCurrent().messages[0].questionTeaching=teaching;
-    },{question,oldAnswer});
+    await page.evaluate(({question,a})=>{
+      const teaching=__graphTeachingFixture(question,[['logic_equivalence','逻辑等价']]);teaching.difficulty='简单';
+      teaching.question_graph.sources.solution=a;
+      teaching.question_graph.nodes.push({id:'logic_truth_table',usage:'used',evidence:[{source:'solution',quote:'真值表'}]});
+      teaching.question_graph.edges.push({from:'logic_truth_table',to:'logic_equivalence',evidence:[{source:'solution',quote:a}]});
+      sessions=[{id:'method-source',name:'实际解法来源',nameSource:'user',teaching,learningQuestion:null,deletedMessageIds:{},messages:[
+        {messageId:'method-question',role:'user',text:question,manualIsQuestion:true,questionTeaching:teaching},
+        {messageId:'method-a',role:'ai',text:a,targetQuestionMessageId:'method-question'}]}];
+      currentId='method-source';renderAll();
+    },{question,a});
     await openGraph(page,'focus');
-    assert.deepEqual((await snapshot(page)).ids,['logic_equivalence'],'the initial graph is bound to its actual reviewed answer');
-    await page.evaluate(newAnswer=>{
-      getCurrent().messages.push({role:'ai',messageId:'replacement-answer',text:newAnswer,targetQuestionMessageId:'semantic-question'});
-      renderKnowledgeGraph();
-    },newAnswer);
-    const body=await bounded(requestReady,'A new actual answer did not invalidate and review the old answer graph');
-    assert.equal(body.questions[0].solution,newAnswer,'only the latest actual answer is reviewed');
-    assert.deepEqual((await snapshot(page)).ids,[],'the old A graph is not painted while answer B awaits review');
-    assert.equal(await page.locator('#knowledgeGraphCanvas .kg-node-group,#knowledgeGraphCanvas .kg-mobile-node').count(),0,
-      'no purple node from the previous answer remains in the pending graph');
-    release();
-    await page.waitForFunction(()=>getCurrent().messages[0].questionTeaching.question_graph.sources.solution===
-      getKnowledgeGraphQuestionSubject().context.reviewSolutionText);
     assert.deepEqual((await snapshot(page)).ids,['logic_equivalence','logic_truth_table']);
-    assert.deepEqual((await snapshot(page)).edges,['logic_truth_table>logic_equivalence']);
+    await page.evaluate(b=>{getCurrent().messages.push({messageId:'method-b',role:'ai',text:b,targetQuestionMessageId:'method-question'});renderKnowledgeGraph();},b);
+    assert.deepEqual((await snapshot(page)).ids,['logic_equivalence'],'known question facts remain immediate while stale answer methods lose their evidence');
+    assert.deepEqual((await snapshot(page)).edges,[]);
+    await page.evaluate(b=>{
+      const message=getCurrent().messages[0],teaching=__graphTeachingFixture(message.text,[['logic_equivalence','逻辑等价']]);
+      teaching.question_graph.sources.solution=b;
+      Object.assign(teaching.question_graph,{classification_status:'local',classification_source:'local_structure',needs_review:true});
+      teaching.question_graph.nodes.push({id:'logic_normal_form',usage:'used',evidence:[{source:'solution',quote:'求范式'}]});
+      teaching.question_graph.edges.push({from:'logic_normal_form',to:'logic_equivalence',evidence:[{source:'solution',quote:b}]});
+      message.questionTeaching=teaching;renderKnowledgeGraph();
+    },b);
+    assert.deepEqual((await snapshot(page)).ids,['logic_equivalence','logic_normal_form']);
+    assert.deepEqual((await snapshot(page)).edges,['logic_normal_form>logic_equivalence']);
     assert.deepEqual(modelCalls,[]);assert.deepEqual(errors,[]);
-    console.log('PASS answer revision display: previous reviewed graphs stay hidden until the latest actual answer is reviewed');
-  } finally {release();await context.close();}
+    console.log('PASS current answer sources: stable question facts display while each saved method belongs to its actual answer');
+  } finally {await context.close();}
 }
+
 (async()=>{
   const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.CHROMIUM_EXECUTABLE_PATH}:{})});
   try {for(const width of [1440,390])for(const language of ['zh-CN','en'])await checkView(browser,width,language);
     await checkReferenceGuards(browser);await checkEqualSizeCache(browser);await checkGeneratedQuestionSources(browser);
-    for(const width of [1440,390])await checkQuestionSpecificTopology(browser,width);await checkLegacyBackfill(browser);await checkDelayedBackfillGuards(browser);await checkLongQuestionIdentity(browser);
-    await checkSemanticKnowledgeReview(browser);await checkReviewFailureIsNotCompletion(browser);
+    for(const width of [1440,390])await checkQuestionSpecificTopology(browser,width);await checkRegisteredLegacySnapshot(browser);await checkLongQuestionIdentity(browser);
     await checkCompletedAnswerReusesInlineGraph(browser);await checkGeneratedAnswerReusesInlineGraph(browser);
-    await checkCompletedAnswerStartsBackgroundReview(browser);await checkSemanticReviewRejectsOldSolution(browser);
-    await checkNewAnswerHidesPreviousReview(browser);}
+    await checkLocalAnswerSnapshot(browser);await checkCurrentAnswerMethodEvidence(browser);}
   finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1});

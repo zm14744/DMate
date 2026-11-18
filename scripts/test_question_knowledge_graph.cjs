@@ -145,3 +145,66 @@ test('source catalog and question metadata are immutable while question prerequi
   assert.deepEqual(result.nodes.map(({prerequisites,...metadata}) => metadata),
     input.slice(0,2).map(({prerequisites,...metadata}) => metadata), 'canonical labels and categories remain available');
 });
+
+test('already registered concepts display without a graph or literal topic-name quotation', () => {
+  const questionText = '从一组学生中选出代表';
+  for (const concept of course) {
+    const result = build(course, {questionText, registeredSnapshot:{version:1, question:questionText,
+      difficulty:'简单', points:[concept.name, concept.id]}});
+    assert.deepEqual(ids(result), [concept.id]);
+    assert.deepEqual(result.edges, [], 'registration does not invent a course dependency');
+    assert.deepEqual(result.nodes[0].prerequisites, []);
+  }
+});
+
+test('registration must belong to the complete current question and contain an existing point and grade', () => {
+  const questionText = 'same long question prefix followed by problem A';
+  const registeredSnapshot = {version:1, question:questionText, difficulty:'困难', points:['集合运算', 'not-a-point']};
+  assert.deepEqual(ids(build(course, {questionText, registeredSnapshot})), ['set_operation']);
+  for (const change of [
+    {question:'same long question prefix followed by problem B'},
+    {question:questionText.replaceAll(' ', '')}, {version:2}, {difficulty:''}, {difficulty:'待识别'},
+    {points:['集合与关系']}, {points:['not-a-point']}, {points:[]}, {points:null}
+  ]) assert.deepEqual(build(course, {questionText, registeredSnapshot:{...registeredSnapshot,...change}}), empty);
+});
+
+test('registered points fill a missing legacy graph without inheriting prerequisites or paths', () => {
+  const input = [node('a'), node('b',['a']), node('unrelated',['b'])];
+  const questionText = 'mathematical task without topic names';
+  const result = build(input, {questionText, knowledgePath:['unrelated'], prerequisitePoints:['unrelated'],
+    registeredSnapshot:{version:1, question:questionText, difficulty:'中等', points:['a','b']}});
+  assert.deepEqual(ids(result), ['a','b']);
+  assert.deepEqual(result.nodes.map(concept => concept.prerequisites), [[],[]]);
+  assert.deepEqual(result.edges, []);
+});
+
+test('current graph dependencies remain available alongside separately registered points', () => {
+  const input = [node('a'),node('b'),node('c',['a'])];
+  const questionText = 'a then b';
+  const result = build(input, {...context(['a','b'], [relation('a','b',questionText)], questionText),
+    registeredSnapshot:{version:1, question:questionText, difficulty:'困难', points:['a','b','c']}});
+  assert.deepEqual(ids(result), ['a','b','c']);
+  assert.deepEqual(edges(result), [['a','b']]);
+  assert.deepEqual(result.nodes.map(concept => concept.prerequisites), [[],['a'],[]]);
+});
+
+test('registration never revives rejected old-solution records while question facts remain instant', () => {
+  const input = [node('a'),node('b')];
+  const questionText = 'question assesses a';
+  const solutionA = 'Use method b to solve a', solutionB = 'Do not use method b; solve a directly';
+  const result = build(input, {questionText, solutionText:solutionA+'\n'+solutionB, reviewSolutionText:solutionB,
+    registeredSnapshot:{version:1, question:questionText, difficulty:'中等', points:['a','b']},
+    questionGraph:{version:1, sources:{question:questionText,solution:solutionA}, nodes:[
+      record('a','assesses a'), {...record('b','method b','solution'), usage:'used'}
+    ], edges:[relation('b','a','method b','solution')]}});
+  assert.deepEqual(ids(result), ['a']);
+  assert.deepEqual(result.edges, []);
+});
+
+test('question-only registration excludes previous solution methods after that method graph is cleared', () => {
+  const questionText = 'question assesses a';
+  const result = build([node('a'),node('b')], {questionText,
+    registeredSnapshot:{version:1, question:questionText, difficulty:'简单', points:['a','b'], excludedIds:['b']}});
+  assert.deepEqual(ids(result), ['a']);
+  assert.deepEqual(result.edges, []);
+});

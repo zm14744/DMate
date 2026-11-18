@@ -14,15 +14,6 @@ async function settle(page) {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
-async function bounded(promise, label) {
-  let timer;
-  try {
-    return await Promise.race([promise, new Promise((_, reject) => {
-      timer = setTimeout(() => reject(Error(label)), 10000);
-    })]);
-  } finally { clearTimeout(timer); }
-}
-
 async function fixturePage(browser, width) {
   const context = await browser.newContext({ viewport: { width, height: 900 }, serviceWorkers: 'block',
     ...(width <= 760 ? { isMobile: true, hasTouch: true } : {}) });
@@ -70,6 +61,9 @@ async function seed(page, { duplicates = true, legacy = false } = {}) {
         text === question ? ['set_operation', 'count_perm_comb'] : ['set_operation'])
     });
     const primary = make('wrong-current', question, false, 30, 30);
+    if (legacy) {
+      primary.questionTeaching = null; primary.graphSolution = ''; primary.classificationVersion = 2;
+    }
     learningState = normalizeLearningState({ version: 9, events: [], wrongQuestions: [primary,
       ...(duplicates ? [make('wrong-earliest', question, false, 10, 40),
         make('wrong-corrected', question, true, 20, 50)] : []),
@@ -81,18 +75,6 @@ async function seed(page, { duplicates = true, legacy = false } = {}) {
     currentId = sessions[0].id;
     wrongBookFilter = 'pending'; wrongBookSearch = ''; wrongBookSort = 'recent';
     renderAll(); openWrongBook();
-    if (legacy) {
-      // Establish the already-open card first, then reproduce a legacy graph
-      // discovered at graph-opening time. This isolates graph review from the
-      // existing wrong-book batch repair that runs when its dialog opens.
-      const entry = learningState.wrongQuestions.find(item => item.id === primary.id);
-      entry.questionTeaching.classification_status = 'local';
-      entry.questionTeaching.needs_review = true;
-      entry.classificationVersion = 2;
-      Object.assign(entry.questionTeaching.question_graph, { classifier_revision: 'catalog-structure/2',
-        classification_status: 'local', classification_source: 'local_structure', needs_review: true,
-        nodes: [{ id: 'count_inclusion', evidence: [{ source: 'question', quote: question }] }], edges: [] });
-    }
     return JSON.stringify({ sessions, currentId });
   }, { question: MAIN, other: OTHER, answer: ANSWER, duplicates, legacy });
 }
@@ -258,91 +240,54 @@ async function checkWrongBookGraph(browser, width) {
   } finally { await context.close(); }
 }
 
-async function checkLegacyReviewGuards(browser) {
+async function checkLegacyRegisteredSnapshot(browser) {
   const { context, page, errors, modelCalls } = await fixturePage(browser, 1440);
-  let observed, release;
-  const received = new Promise(resolve => { observed = resolve; });
-  const allowed = new Promise(resolve => { release = resolve; });
-  const requests = [];
   try {
     await seed(page, { duplicates: false, legacy: true });
-    await page.route('**/analyze-questions', async route => {
-      const body = route.request().postDataJSON(); requests.push(body); observed(body);
-      await allowed;
-      const teaching = await page.evaluate(item => __wrongGraphTeaching(item.text, item.solution || ''), body.questions[0]);
-      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({
-        results: [{ key: body.questions[0].key, teaching }]
-      }) });
+    await clickCardGraph(page);
+    assert.deepEqual(await graphSnapshot(page), { mode: 'wrong', scope: 'wrong', ids: EXPECTED,
+      purple: EXPECTED, edges: [] }, 'a graded legacy wrong-book record renders its already recognized concepts immediately');
+    assert.doesNotMatch(await page.locator('#knowledgeGraphModal').innerText(), /正在核对|归类暂未完成|暂时无法生成图谱|重试/);
+    const saved = await page.evaluate(() => {
+      saveLearningState();
+      const raw = shouldPersistClientState() ? JSON.parse(localStorage.getItem(LEARNING_STORAGE_KEY))
+        : DMateGuestSession.read('learning');
+      learningState = normalizeLearningState(raw);
+      const item = learningState.wrongQuestions.find(entry => entry.id === 'wrong-current');
+      const snapshot = item.recognitionSnapshot || item.questionTeaching?.registered_snapshot;
+      return { question: snapshot?.question, difficulty: snapshot?.difficulty,
+        pointCount: snapshot?.points.length, edges: item.questionTeaching?.question_graph?.edges || [] };
     });
-    const opening = clickCardGraph(page);
-    const request = await bounded(received, 'A legacy wrong-book graph did not request a bounded source-specific review');
-    await opening;
-    assert.equal(request.semantic_fallback, true);
-    assert.equal(request.questions[0].text, MAIN);
-    assert.equal(request.questions[0].solution, ANSWER, 'legacy review uses this saved answer, not conversation history');
-    assert.deepEqual((await graphSnapshot(page)).ids, [], 'unreviewed wrong local labels cannot paint a purple graph');
-    assert.match(await page.locator('#knowledgeGraphCanvas').innerText(), /正在核对/);
-    await page.evaluate(other => {
-      learningState.wrongQuestions.find(item => item.id === 'wrong-current').question = other;
-      renderKnowledgeGraph();
-    }, OTHER);
-    const completed = page.waitForResponse(response => new URL(response.url()).pathname === '/analyze-questions');
-    release();
-    await (await completed).finished();
-    await settle(page);
-    await page.waitForFunction(() => ![...document.querySelectorAll('#knowledgeGraphCanvas .kg-node-group')].length);
-    const stale = await page.evaluate(() => {
-      const entry = learningState.wrongQuestions.find(item => item.id === 'wrong-current');
-      const graph = entry.questionTeaching?.question_graph;
-      return { question: entry.question, staleSemantic: graph?.classification_status === 'semantic' && graph.sources.question !== entry.question };
-    });
-    assert.deepEqual(stale, { question: OTHER, staleSemantic: false }, 'a delayed review cannot install the old question against an edited wrong-book entry');
-    assert.deepEqual((await graphSnapshot(page)).ids, []);
-    assert.equal(requests.length, 1, 'rerendering a stale wrong-book source does not start a request storm');
-    assert.deepEqual(modelCalls, [], 'legacy graph review never requests a chat answer');
-    assert.deepEqual(errors, []);
-    console.log('PASS legacy wrong-book review: exact saved source, provisional-label hiding and edited-source response guard');
-  } finally { release(); await context.close(); }
-}
-
-async function checkLegacyReviewCompletion(browser) {
-  const { context, page, errors, modelCalls } = await fixturePage(browser, 1440);
-  let observed, release;
-  const received = new Promise(resolve => { observed = resolve; });
-  const allowed = new Promise(resolve => { release = resolve; });
-  const requests = [];
-  try {
-    await seed(page, { duplicates: false, legacy: true });
-    await page.route('**/analyze-questions', async route => {
-      const body = route.request().postDataJSON(); requests.push(body); observed(body);
-      await allowed;
-      const teaching = await page.evaluate(item => __wrongGraphTeaching(item.text, item.solution || ''), body.questions[0]);
-      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({
-        results: [{ key: body.questions[0].key, teaching }]
-      }) });
-    });
-    const opening = clickCardGraph(page);
-    await bounded(received, 'A legacy wrong-book entry did not begin its graph review');
-    await opening;
-    assert.deepEqual((await graphSnapshot(page)).ids, []);
-    release();
-    await page.waitForFunction(() => learningState.wrongQuestions.find(item => item.id === 'wrong-current')
-      .questionTeaching?.question_graph?.classification_status === 'semantic');
-    assert.deepEqual((await graphSnapshot(page)).ids, EXPECTED, 'an accepted legacy review replaces the empty graph with the exact source-bound concepts');
-    assert.deepEqual(await page.evaluate(() => {
-      const entry = learningState.wrongQuestions.find(item => item.id === 'wrong-current');
-      return { version: entry.classificationVersion, solution: entry.graphSolution,
-        source: entry.questionTeaching.question_graph.sources.solution };
-    }), { version: 3, solution: ANSWER, source: ANSWER });
+    assert.deepEqual(saved, { question: MAIN, difficulty: '简单', pointCount: 2, edges: [] },
+      'recognized points persist without inventing quote evidence or course dependencies');
     await page.locator('#knowledgeGraphClose').click();
     await page.evaluate(() => openWrongBook());
     await clickCardGraph(page);
     assert.deepEqual((await graphSnapshot(page)).ids, EXPECTED);
-    assert.equal(requests.length, 1, 'the accepted legacy review is reused on reopening');
-    assert.deepEqual(modelCalls, []);
+    assert.deepEqual(modelCalls, [], 'opening the book, graph and saved legacy snapshot performs no classification or answer request');
     assert.deepEqual(errors, []);
-    console.log('PASS legacy wrong-book completion: one source-bound review is saved and reused without another request');
-  } finally { release(); await context.close(); }
+    console.log('PASS legacy wrong-book snapshot: graded recognized points display and persist without another request');
+  } finally { await context.close(); }
+}
+
+async function checkLegacyRegisteredEditGuard(browser) {
+  const { context, page, errors, modelCalls } = await fixturePage(browser, 1440);
+  try {
+    await seed(page, { duplicates: false, legacy: true });
+    await clickCardGraph(page);
+    assert.deepEqual((await graphSnapshot(page)).ids, EXPECTED);
+    await page.evaluate(other => {
+      learningState.wrongQuestions.find(item => item.id === 'wrong-current').question = other;
+      renderKnowledgeGraph();
+    }, OTHER);
+    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(), '无',
+      'changing the actual selected question cannot rebind an earlier registered snapshot to another question');
+    assert.deepEqual((await graphSnapshot(page)).ids, []);
+    assert.equal(await page.locator('#knowledgeGraphLocateOriginal').isVisible(), false);
+    assert.deepEqual(modelCalls, [], 'a stale selected source never queues a replacement inference while viewing');
+    assert.deepEqual(errors, []);
+    console.log('PASS legacy wrong-book identity: edited sources hide their old snapshots without starting recognition');
+  } finally { await context.close(); }
 }
 
 async function checkStaleWrongBookLocators(browser) {
@@ -396,8 +341,8 @@ async function checkStaleWrongBookLocators(browser) {
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
     for (const width of [390, 1440]) await checkWrongBookGraph(browser, width);
-    await checkLegacyReviewCompletion(browser);
-    await checkLegacyReviewGuards(browser);
+    await checkLegacyRegisteredSnapshot(browser);
+    await checkLegacyRegisteredEditGuard(browser);
     await checkStaleWrongBookLocators(browser);
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
