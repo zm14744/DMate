@@ -52,15 +52,19 @@ async function checkIcon(button, name, size) {
 async function drawingPaint(page, searchBackground) {
   const controls = await page.locator('.dge-view-controls').evaluate(node => {
     const css = getComputedStyle(node), minus = node.querySelector('[data-overlay-tool="zoom-out"]').getBoundingClientRect();
-    const undo = document.querySelector('[data-editor-undo]').getBoundingClientRect();
+    const undo = document.querySelector('[data-editor-undo]').getBoundingClientRect(), clear = document.querySelector('[data-editor-clear]').getBoundingClientRect(), row=node.parentElement.getBoundingClientRect();
     return { border: [css.borderTopWidth, css.borderRightWidth, css.borderBottomWidth, css.borderLeftWidth],
-      background: css.backgroundColor, image: css.backgroundImage, shadow: css.boxShadow, minusLeft: minus.left, undoLeft: undo.left };
+      background: css.backgroundColor, image: css.backgroundImage, shadow: css.boxShadow,
+      minusLeft: minus.left, clearRight: clear.right, minusCenter:minus.top+minus.height/2,undoCenter:undo.top+undo.height/2,
+      right:node.getBoundingClientRect().right,rowRight:row.right };
   });
   assert.deepEqual(controls.border, ['0px', '0px', '0px', '0px'], 'Zoom controls have no outer rectangular border');
   assert.equal(controls.background, 'rgba(0, 0, 0, 0)');
   assert.equal(controls.image, 'none');
   assert.equal(controls.shadow, 'none');
-  assert.ok(Math.abs(controls.minusLeft - controls.undoLeft) <= 1, 'Zoom minus is aligned below Undo in the same column');
+  assert.ok(controls.minusLeft>=controls.clearRight, 'Zoom controls follow Clear on the right');
+  assert.ok(Math.abs(controls.minusCenter-controls.undoCenter)<=1, 'Zoom and Undo share the same action row');
+  assert.ok(Math.abs(controls.right-controls.rowRight)<=1, 'Zoom controls align with the action row’s right edge');
   assert.equal(await page.locator('.ddw-name').evaluate(input => getComputedStyle(input).backgroundColor), searchBackground,
     'Drawing name uses the search input surface without imposing search dimensions');
   await checkIcon(page.locator('[data-editor-undo]'), 'undo-2', 24);

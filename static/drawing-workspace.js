@@ -113,7 +113,12 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   };
   function syncChrome(){
    if(destroyed)return;
-   const view=editorHost.querySelector('.dge-view-controls'),viewport=editorHost.querySelector('.dge-overlay-viewport'),palette=editorHost.querySelector('.dge-tool-palette');
+   const viewport=editorHost.querySelector('.dge-overlay-viewport'),palette=editorHost.querySelector('.dge-tool-palette');
+   // The editor rebuilds its action row while retaining the canvas. Reattach
+   // that canvas's existing zoom controls instead of replacing their handlers.
+   const view=editorHost.querySelector('.dge-view-controls')||(viewport===observedViewport?observedView:null);
+   const topLine=editorHost.querySelector(':scope > .dge-topline');
+   if(view&&topLine&&view.parentElement!==topLine)topLine.append(view);
    if(resizeObserver&&observedView!==view){if(observedView)resizeObserver.unobserve(observedView);observedView=view;if(view)resizeObserver.observe(view);}
    if(observedViewport!==viewport){
     if(observedViewport)resizeObserver?.unobserve(observedViewport);
@@ -168,7 +173,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    body.style.setProperty('--ddw-property-bottom',Math.max(12,propertyOrigin.bottom-visibleBottom+8)+'px');
    body.style.setProperty('--ddw-panel-space',Math.max(90,origin.height-top-10)+'px');
    if(panelMode)positionPopover(panel,panelMode==='history'?historyButton:panelMode==='generate'?generateButton:aiButton);
-   for(const [key,trigger] of [['graphs',settingsButton],['results',informationButton]]){const item=editorPanel(key);if(item?.open)positionPopover(item.querySelector(':scope > .dge-float-content'),trigger);}
+   for(const [key,trigger] of [['graphs',settingsButton],['results',informationButton]]){const item=editorPanel(key);if(item?.open)positionPopover(item.querySelector(':scope > .dge-float-content'),trigger,key==='graphs'&&win.innerWidth<=900);}
    if(palette?.open)positionPopover(palette.querySelector(':scope > .dge-overlay-tools'),palette.querySelector(':scope > summary'),true);
   }
   function queueChrome(){if(!chromeFrame&&!destroyed)chromeFrame=win.requestAnimationFrame(()=>{chromeFrame=0;syncChrome();});}

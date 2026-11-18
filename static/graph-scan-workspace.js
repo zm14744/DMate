@@ -33,9 +33,10 @@ function mount(container,options){
  const modes=el('div','dgs-modes');modes.setAttribute('role','tablist');modes.setAttribute('aria-label','识别模式');
  const nativeMode=button('原生识别',()=>setMode('native')),manualMode=button('自主框选',()=>setMode('manual'));
  for(const b of [nativeMode,manualMode])b.setAttribute('role','tab');modes.append(nativeMode,manualMode);
+ const toolbar=el('div','dgs-toolbar');toolbar.append(modes);
  const requestLabel=el('label','dgs-requirements-label','要求（可选）'),request=el('textarea','dgs-requirements');request.rows=2;request.maxLength=4000;request.value=options.requirements||'';request.setAttribute('aria-label','要求（可选）');request.addEventListener('input',()=>options.onRequirementsChange?.(request.value));requestLabel.append(request);
  const footer=el('div','dge-footer'),confirm=button('保存',async()=>{if(pending()||saving)return;saving=true;refresh();try{await options.onConfirm(copy(document),options.isQuestion!==false);}catch(error){status.textContent=error?.message||'确认失败，请重试。';}finally{saving=false;if(!destroyed)refresh();}});confirm.classList.add('dge-primary');footer.append(confirm);
- const content=el('div','dgs-content');content.append(modes,workspace,requestLabel);container.replaceChildren(content,footer);container.classList.add('dmate-graph-editor','dmate-graph-scan');
+ const content=el('div','dgs-content');content.append(toolbar,workspace,requestLabel);container.replaceChildren(content,footer);container.classList.add('dmate-graph-editor','dmate-graph-scan');
  let contentClip=null;
  // Stay in the native dialog's top layer without taking space from either
  // information card or being clipped by their independent scroll containers.
@@ -188,6 +189,7 @@ function mount(container,options){
  const overlay=root.DMateGraphOverlay.mount(left,{scanOnly:true,originalUrl:options.originalUrl,state:overlayState,viewState:state.viewState,onViewChange:options.onViewChange,model:{getDocument:()=>({graphs:frames()})},graph:()=>({id:state.selectedGraphId,vertices:[],edges:[]}),disabled:()=>saving,
   createRegion:(points,irregular)=>{const row={id:'g'+state.nextGraph++,graphs:[],selected:false};state.graphRegions.push(row);state.selectedGraphId=row.id;changeGraph(row,points,irregular);showNewSource('graph',row);return row.id;},resizeRegion:(id,points,irregular)=>{const row=state.graphRegions.find(r=>r.id===id);if(row)changeGraph(row,points,irregular);},selectGraph:id=>{state.selectedGraphId=id;},
   selectionChanged:(points,irregular)=>{if(!points)return;const row={id:state.nextText++,selected:false};state.textRegions.push(row);changeText(row,points,irregular);showNewSource('text',row);},resizeTextRegion:(id,points)=>{const row=state.textRegions.find(r=>r.id===id);if(row)changeText(row,points,row.irregular);},selectTextRegion:id=>{overlayState.selectedId=id;},clearSelection:()=>{state.selectedGraphId=null;overlayState.selectedId=null;}});
+ const viewControls=left.querySelector('.dge-view-controls');viewControls.classList.add('dgs-view-controls');toolbar.append(viewControls);
  assemble();if(migratingMixedManual)emit();else lastEmitted=JSON.stringify(document);refresh();void pumpGraphs();if(state.textRegions.some(r=>r.status==='queued'))void pumpText();
  return{getDocument:()=>copy(document),destroy(){destroyed=true;deletePending=null;root.DMateDeleteConfirm?.cancel(container);if(contentClip!==null)content.style.clipPath=contentClip;clearTimeout(textTimer);if(pickerFrame)d.defaultView.cancelAnimationFrame(pickerFrame);d.removeEventListener('pointerdown',outsidePicker,true);d.removeEventListener('keydown',escapePicker,true);d.removeEventListener('scroll',queuePickerPosition,true);d.defaultView.removeEventListener('resize',queuePickerPosition);pickerLayer.remove();for(const controller of active)controller.abort();overlay.destroy();container.replaceChildren();container.classList.remove('dmate-graph-editor','dmate-graph-scan');}};
 }

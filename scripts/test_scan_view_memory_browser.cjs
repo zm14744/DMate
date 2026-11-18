@@ -25,7 +25,7 @@ async function camera(page) {
   return page.locator('#graphEditorDialog .dge-overlay').evaluate(node => {
     const viewport = node.querySelector('.dge-overlay-viewport'), image = node.querySelector('img'),
       v = viewport.getBoundingClientRect(), box = image.getBoundingClientRect();
-    return { zoom: parseFloat(node.querySelector('.dge-overlay-zoom').textContent),
+    return { zoom: parseFloat(node.closest('#graphEditorDialog').querySelector('.dge-overlay-zoom').textContent),
       cx: (v.left + viewport.clientLeft + viewport.clientWidth / 2 - box.left) / box.width,
       cy: (v.top + viewport.clientTop + viewport.clientHeight / 2 - box.top) / box.height,
       scale: box.width, height: box.height,

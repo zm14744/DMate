@@ -118,7 +118,7 @@ async function checkZoomLimits(browser, width) {
             nodes:stage.querySelectorAll('.kg-mobile-node,.kg-node-group').length};
         };
         const traces = [];
-        for (const [kind,button,limit] of [['maximum',plus,mobile ? 3 : 2.5],['minimum',minus,mobile ? null : .2]]) {
+        for (const [kind,button,limit] of [['maximum',plus,mobile ? 3 : 2.5],['minimum',minus,.4]]) {
           // Reach the clamp through the actual control, including scrollbar
           // transitions; never assign a scale directly for this regression.
           let previous = null;

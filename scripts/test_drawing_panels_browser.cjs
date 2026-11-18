@@ -29,7 +29,7 @@ async function readyView(page) {
 async function viewState(page) {
   return page.locator('.dge-overlay').evaluate(node => {
     const viewport = node.querySelector('.dge-overlay-viewport'), bounds = viewport.getBoundingClientRect();
-    return { camera: [parseFloat(node.querySelector('.dge-overlay-zoom').textContent), viewport.scrollLeft, viewport.scrollTop],
+    return { camera: [parseFloat(document.querySelector('.ddw-editor .dge-overlay-zoom').textContent), viewport.scrollLeft, viewport.scrollTop],
       nodes: [...node.querySelectorAll('.dge-overlay-dot')].map(dot => {
         const rect = dot.getBoundingClientRect();
         return [rect.x - bounds.x, rect.y - bounds.y, rect.width, rect.height];
@@ -382,6 +382,14 @@ async function viewportAndPopoverChecks(page, mobile, label, online = true) {
     catch (error) {
       if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/viewport-' + label + '-' + name + '-failure.png' });
       throw new Error(label + ' ' + name + ': ' + error.message, { cause: error });
+    }
+    if(name==='settings'&&mobile){
+      const position=await page.locator(panel).evaluate(node=>{
+        const rect=node.getBoundingClientRect(),trigger=document.querySelector('.ddw-side-actions>button:first-child').getBoundingClientRect();
+        return {left:rect.left,expected:Math.max(8,Math.min(trigger.left,innerWidth-8-rect.width))};
+      });
+      assert.ok(Math.abs(position.left-position.expected)<=2,
+        label+': compact drawing settings opens toward its trigger instead of the left viewport edge');
     }
     if (['settings', 'information'].includes(name) && process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/viewport-' + label + '-' + name + '.png' });
     await page.locator(trigger).click(); await settle(page);

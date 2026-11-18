@@ -1,5 +1,5 @@
 "use strict";
-const CACHE_NAME = "dmate-offline-shell-v68";
+const CACHE_NAME = "dmate-offline-shell-v69";
 const PRECACHE = [
   "/offline",
   "/static/icons/dmate-app-v52.ico",
@@ -9,15 +9,15 @@ const PRECACHE = [
   "/static/icons/dmate-app-v52-192.png",
   "/static/icons/dmate-app-v52-180.png",
   "/static/dmate-main.css?v=65",
-  "/static/graph-editor.css?v=21",
-  "/static/drawing-workspace.css?v=50",
+  "/static/graph-editor.css?v=22",
+  "/static/drawing-workspace.css?v=51",
   "/static/modal-chrome.css",
   "/static/ai-answer-renderer.css?v=22",
   "/static/red-circle-controls.css",
   "/static/ui-tooltip.css",
   "/static/appearance-panels.css",
   "/static/dmate-shared-overrides.css?v=23",
-  "/static/button-themes.css?v=62",
+  "/static/button-themes.css?v=63",
   "/static/offline-knowledge-graph.css?v=54",
   "/static/offline.css?v=52",
   "/static/search-controls.css?v=27",
@@ -35,7 +35,7 @@ const PRECACHE = [
   "/static/delete-confirm.js",
   "/static/drawing-export.js?v=39",
   "/static/graph-editor.js?v=53",
-  "/static/drawing-workspace.js?v=53",
+  "/static/drawing-workspace.js?v=54",
   "/static/vendor/mathjax-3.2.2/es5/tex-svg.js",
   "/static/vendor/marked-15.0.12/marked.umd.js",
   "/static/vendor/dompurify-3.2.6/purify.min.js",
@@ -47,7 +47,7 @@ const PRECACHE = [
   "/static/knowledge-graph-labels.js?v=17",
   "/static/offline-appearance.js?v=8",
   "/static/offline-shell.js?v=33",
-  "/static/offline-knowledge-graph.js?v=59",
+  "/static/offline-knowledge-graph.js?v=60",
   "/static/offline-entry.js?v=45",
   "/static/offline.js?v=55",
   "/static/icons/dmate-brand-v52.svg",

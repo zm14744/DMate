@@ -814,6 +814,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
     body[data-appearance-theme] :is(
         #ocrGroupButton,
         .ocr-task-card [data-ocr-action="edit"],
+        .dmate-graph-scan .dgs-section-head > button[data-source-picker],
         #appearanceModal :is(#appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone),
         #knowledgeGraphModal .kg-history-refresh,
         #knowledgeGraphModal .kg-history-actions > button,
@@ -843,6 +844,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
     body[data-appearance-theme] :is(
         #ocrGroupButton,
         .ocr-task-card [data-ocr-action="edit"],
+        .dmate-graph-scan .dgs-section-head > button[data-source-picker],
         #appearanceModal :is(#appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone),
         #knowledgeGraphModal .kg-history-refresh,
         #knowledgeGraphModal .kg-history-actions > button,
@@ -856,6 +858,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
     body[data-appearance-theme] :is(
         #ocrGroupButton,
         .ocr-task-card [data-ocr-action="edit"],
+        .dmate-graph-scan .dgs-section-head > button[data-source-picker],
         #appearanceModal :is(#appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone),
         #knowledgeGraphModal .kg-history-refresh,
         #knowledgeGraphModal .kg-history-actions > button,
@@ -868,25 +871,5 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         --dm-filled-text:var(--text-muted);
         opacity:.45!important;
         cursor:not-allowed;
-    }
-}
-
-/* Source pickers use the drawing panel actions' existing desktop/mobile
-   geometry and neutral control palette without changing drawing controls. */
-@layer dmate-button-themes {
-    body[data-appearance-theme] .dmate-graph-scan .dgs-section-head > button[data-source-picker] {
-        min-width:0!important;
-        min-height:auto!important;
-        padding:8px 10px!important;
-        border-radius:9px!important;
-        font-size:13px!important;
-        white-space:nowrap!important;
-        box-shadow:0 3px 12px #0000000f!important;
-    }
-    @media(max-width:600px) {
-        body[data-appearance-theme] .dmate-graph-scan .dgs-section-head > button[data-source-picker] {
-            padding:7px 6px!important;
-            font-size:12px!important;
-        }
     }
 }

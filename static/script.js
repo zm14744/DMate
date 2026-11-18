@@ -19744,7 +19744,7 @@ function ensureKnowledgeGraphSelection(visibleNodes, context) {
     knowledgeGraphSelectedNodeId = visibleNodes?.[0]?.id || "";
 }
 
-function clampMobileGraphScale(value, minimum = 0.35) {
+function clampMobileGraphScale(value, minimum = 0.4) {
     const number = Number(value);
     if (!Number.isFinite(number)) return 1;
     return Math.max(minimum, Math.min(3, number));
@@ -19859,7 +19859,7 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     let pendingPinch = null;
     let suppressClickUntil = 0;
     const dragSlop = 8;
-    let minimumScale = 0.35;
+    const minimumScale = 0.4;
     let fitted = true;
     let resizeFrame = 0;
     let lastCenterAnchor = null;
@@ -19942,10 +19942,9 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
         const heightScale = availableHeight / baseHeight;
         const containedScale = Math.min(1, widthScale, heightScale);
         // Tall and wide graphs must remain readable. Allow scrolling instead
-        // of shrinking labels to a few pixels; manual zoom-out retains overview.
+        // of shrinking labels to a few pixels, even at the manual zoom limit.
         const tall = heightScale < Math.min(1, widthScale) * 0.72;
         const scale = Math.max(0.85, tall ? Math.min(1, widthScale) : containedScale);
-        minimumScale = Math.min(0.35, containedScale);
         applyScale(scale);
         fitted = true;
         viewport.style.visibility = "";
@@ -19964,10 +19963,7 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     };
 
     viewport._kgSetScale = applyScale;
-    viewport._kgRestoreScale = value => {
-        minimumScale = Math.min(minimumScale, Number(value) || 1);
-        return applyScale(value);
-    };
+    viewport._kgRestoreScale = value => applyScale(value);
     viewport._kgFit = fitGraph;
     viewport._kgReset = () => {
         applyScale(1);
@@ -21030,7 +21026,7 @@ function setKnowledgeGraphDesktopScale(value, keepCenter = true) {
     const baseWidth = Number(stage.dataset.baseWidth) || 1;
     const baseHeight = Number(stage.dataset.baseHeight) || 1;
     const previous = Number(surface.dataset.scale) || 1;
-    const next = Math.max(0.2, Math.min(2.5, Number(value) || 1));
+    const next = Math.max(0.4, Math.min(2.5, Number(value) || 1));
     // Only real zoom changes should touch the viewport. Reapplying a clamped
     // scale resets its label and anchor and can restart resize/paint work.
     if (keepCenter && previous === next) return;
