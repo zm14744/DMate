@@ -71,6 +71,12 @@ function graphLabels(graph){
  }
  return mapping;
 }
+function graphTitleLabel(graph,index){
+ const name=literal(graph.name||graph.id||'G'+(index+1)).trim();
+ const numbered=/^(?:图\s*|Graph\s*)?(G\s*\d+|\d+)$/i.exec(name.normalize('NFKC'));
+ if(numbered){const label=numbered[1].replace(/\s/g,'');return /^G/i.test(label)?markName(label):label;}
+ return (index+1)+'（'+name+'）';
+}
 function graphRows(graph,index){
  const vertices=Array.isArray(graph?.vertices)?graph.vertices:[],edges=Array.isArray(graph?.edges)?graph.edges:[];
  const geometry=geometryApi?.describeGraphGeometry?.(graph);
@@ -87,7 +93,7 @@ function graphRows(graph,index){
  const orientation=graph.direction_mode==='mixed'?'混合方向':graph.directed===true?'有向':graph.directed===false?'无向':'方向待核对';
  const weighted=graph.weighted===true?'带权':graph.weighted===false?'无权':'权值待核对';
  const graphName=literal(graph.name||graph.id||'G'+(index+1));
- const title=/^G\d+$/i.test(graphName)?'图 '+markName(graphName):'图 '+(index+1)+'（'+graphName+'）';
+ const title='图 '+graphTitleLabel(graph,index);
  const position=v=>typeof v.position_description==='string'&&v.position_description.trim()||geometry?.positions.get(String(v.id))||'';
  const positions=vertices.filter(v=>!hasLabel(v)||position(v))
   .map(v=>({id:v.id,label:get(v.id),txt:get(v.id)+'：'+(position(v)||'位置未记录')}));
@@ -108,8 +114,8 @@ function renderGraphInformation(container,documentValue,options={}){
  const graphs=Array.isArray(documentValue?.graphs)?documentValue.graphs:[];
  for(const [index,graph] of graphs.entries()){
   const row=graphRows(graph,index),section=element('section','dgs-graph'),geometry=geometryApi?.describeGraphGeometry?.(graph);
-  const graphName=literal(graph.name||graph.id||'G'+(index+1)),heading=element('h4','dgs-graph-title');
-  heading.append(element('span','',uiText('图 ','Graph ')),content(/^G\d+$/i.test(graphName)?markName(graphName):(index+1)+'（'+graphName+'）'));
+  const heading=element('h4','dgs-graph-title');
+  heading.append(element('span','',uiText('图 ','Graph ')),content(graphTitleLabel(graph,index)));
   section.append(heading);
   const typeEnglish=(graph.direction_mode==='mixed'?'Mixed directions':graph.directed===true?'Directed':graph.directed===false?'Undirected':'Direction needs review')+' '+(graph.weighted===true?'Weighted':graph.weighted===false?'Unweighted':'Weight needs review');
   if(row.showType!==false)section.append(element('p','dgs-graph-type',uiText(row.type,typeEnglish)));

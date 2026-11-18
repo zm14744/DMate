@@ -16234,6 +16234,7 @@ async function editOcrTask(id) {
             onQuestionChange: flag => { task.isQuestion = flag; },
             requirements: task.userRequest || '',
             onRequirementsChange: value => { task.userRequest = value; },
+            onViewChange: () => { void checkpointGuestOcrTasks(); },
             textState: task.textEditorState ||= { mode: 'text_rect', zoom: 100, visible: true },
             onRecognizeText: async (regions, {signal, forceRecognition = false} = {}) => {
                 const controller = new AbortController(), operationId = makeOcrRequestId();

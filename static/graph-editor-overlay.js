@@ -92,9 +92,9 @@ function mount(host,o){
  let sampleCanvas=d.createElement('canvas'),sampleCtx=null,loaded=false,autoFitted=false;
  const pointers=new Map();
  const world={left:0,top:0,right:1,bottom:1};
- // Drawing cameras belong to the page and responsive layout, independently
- // from its semantic graph. OCR/image overlays keep their existing behavior.
- const viewState=o.drawingOnly?(o.viewState&&typeof o.viewState==='object'&&!Array.isArray(o.viewState)?o.viewState:{}):null;
+ // Cameras belong to each drawing page or source image and responsive layout,
+ // independently from its semantic graph or recognized regions.
+ const viewState=o.drawingOnly||o.scanOnly?(o.viewState&&typeof o.viewState==='object'&&!Array.isArray(o.viewState)?o.viewState:{}):null;
  const mobileView=d.defaultView.matchMedia('(max-width:760px)');
  let cameraMode=mobileView.matches?'mobile':'desktop',cameraSize=null,cameraRestoring=false,cameraFrame=0,cameraFitPending=false,pendingFitFrame=0;
  const finite=x=>typeof x==='number'&&Number.isFinite(x);
@@ -389,6 +389,7 @@ function mount(host,o){
   if(visible)visible.textContent=s.visible?'隐藏描绘':'显示描绘';svg.classList.toggle('is-hidden',!s.visible);svg.dataset.mode=s.mode;
   svg.classList.toggle('is-deforming',active?.kind==='resize'&&active.polygon);
   regionMode.value=o.scanOnly?(s.irregular?'irregular':''):['graph_poly','text_poly'].includes(s.mode)?s.mode:'';
+  regionMode.hidden=Boolean(o.scanOnly&&!['bounds','graph_poly','text_rect','text_poly'].includes(s.mode));
   for(const b of bar.querySelectorAll('[data-overlay-tool]')){const key=b.dataset.overlayTool,active=Boolean(key===s.mode||o.scanOnly&&(key==='bounds'&&s.mode==='graph_poly'||key==='text_rect'&&s.mode==='text_poly'));b.classList.toggle('is-active',active);if(['select','pan','vertex','edge','bounds','text_rect'].includes(key))b.setAttribute('aria-pressed',String(active));}
   if(!scroll.clientWidth)return;
   const g=o.textOnly||o.scanOnly?{id:o.graph?.()?.id,vertices:[],edges:[]}:o.graph()||{vertices:[],edges:[]};

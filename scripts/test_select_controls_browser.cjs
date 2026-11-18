@@ -296,11 +296,18 @@ async function ocrSelectors(page) {
   await page.locator('#ocrGroupingDialog .ocr-group-close').click();
   await page.evaluate(() => editOcrTask('select-fixture'));
   const region = page.locator('#graphEditorDialog .dge-overlay-tools select');
+  assert.equal(await region.isVisible(), false, 'Region shape is hidden while selecting or panning');
+  await page.locator('#graphEditorDialog [data-overlay-tool="bounds"]').click();
   await region.waitFor({ state: 'visible' });
   assert.deepEqual(await shape(region), await shape(reference), 'Region mode shares the ordinary select surface');
   await change(region, 'irregular');
   assert.equal(await page.evaluate(() => ocrTasks.get('select-fixture').scanState.view.irregular), true,
     'A dynamic choice reaches the real region-mode handler');
+  await page.locator('#graphEditorDialog [data-overlay-tool="select"]').click();
+  assert.equal(await region.isVisible(), false, 'Returning to selection hides the region shape control');
+  await page.locator('#graphEditorDialog [data-overlay-tool="text_rect"]').click();
+  assert.equal(await region.isVisible(), true);
+  assert.equal(await region.inputValue(), 'irregular', 'Graph and text framing retain the chosen shape');
   await page.locator('#graphEditorClose').click();
   await page.evaluate(() => { ocrTasks.clear(); renderOcrTasks(); });
 }
