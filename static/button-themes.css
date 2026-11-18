@@ -58,7 +58,7 @@ body[data-appearance-theme="navy"] {
     /* Separate the light conversation rail and its actions from the canvas. */
     @media(min-width:1101px) {
         /* The notebook's creation action follows the sidebar's New chat palette. */
-        body[data-appearance-theme="light"]:not(.has-custom-background) #conceptNotebookDialog .dcn-new {
+        body[data-appearance-theme="light"]:not(.has-custom-background) :is(#conceptNotebookDialog,#notesPanel) .dcn-new {
             --dm-control-bg:#ffffff;
             --dm-control-hover-bg:#f3f7fc;
             --dm-control-border:#c3d1e2;
@@ -689,7 +689,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
 
 /* Wrong-book and notebook actions share the message toolbar's quiet feedback. */
 @layer dmate-button-themes {
-    body[data-appearance-theme] #wrongBookModal .wrong-actions > button,
+    body[data-appearance-theme] :is(#wrongBookModal,#mistakesPanel) .wrong-actions > button,
     body[data-appearance-theme] #wrongRetestReviewModal button[id^="retest-gen-"],
     body[data-appearance-theme] #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel) {
         border:0!important;
@@ -702,7 +702,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         filter:none!important;
         transition:var(--dm-control-transition);
     }
-    body[data-appearance-theme] #wrongBookModal .wrong-actions > .chat-image-copy {
+    body[data-appearance-theme] :is(#wrongBookModal,#mistakesPanel) .wrong-actions > .chat-image-copy {
         display:inline-flex!important;
         align-items:center!important;
         justify-content:center!important;
@@ -715,7 +715,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         padding:6px!important;
         line-height:1!important;
     }
-    body[data-appearance-theme] #wrongBookModal .wrong-actions > .chat-image-copy > svg {
+    body[data-appearance-theme] :is(#wrongBookModal,#mistakesPanel) .wrong-actions > .chat-image-copy > svg {
         display:block!important;
         flex:0 0 20px!important;
         width:20px!important;
@@ -726,30 +726,30 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         pointer-events:none;
     }
     @media(hover:hover) {
-        body[data-appearance-theme] #wrongBookModal .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):hover,
+        body[data-appearance-theme] :is(#wrongBookModal,#mistakesPanel) .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):hover,
         body[data-appearance-theme] #wrongRetestReviewModal button[id^="retest-gen-"]:not(:disabled):not([aria-disabled="true"]):hover,
         body[data-appearance-theme] #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel):not(:disabled):not([aria-disabled="true"]):hover {
             background:var(--dm-nav-hover,var(--dm-selected-hover))!important;
             color:var(--dm-icon-emphasis,var(--text-primary))!important;
         }
     }
-    body[data-appearance-theme] #wrongBookModal .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):is(:focus-visible,:active),
+    body[data-appearance-theme] :is(#wrongBookModal,#mistakesPanel) .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):is(:focus-visible,:active),
     body[data-appearance-theme] #wrongRetestReviewModal button[id^="retest-gen-"]:not(:disabled):not([aria-disabled="true"]):is(:focus-visible,:active),
     body[data-appearance-theme] #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel):not(:disabled):not([aria-disabled="true"]):is(:focus-visible,:active) {
         background:var(--dm-nav-hover,var(--dm-selected-hover))!important;
         color:var(--dm-icon-emphasis,var(--text-primary))!important;
     }
-    body[data-appearance-theme] #wrongBookModal .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):focus-visible,
+    body[data-appearance-theme] :is(#wrongBookModal,#mistakesPanel) .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):focus-visible,
     body[data-appearance-theme] #wrongRetestReviewModal button[id^="retest-gen-"]:not(:disabled):not([aria-disabled="true"]):focus-visible,
     body[data-appearance-theme] #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel):not(:disabled):not([aria-disabled="true"]):focus-visible {
         outline:2px solid var(--dm-selected-ring)!important;
         outline-offset:2px!important;
     }
-    body[data-appearance-theme] #wrongBookModal .wrong-actions > button.danger,
-    body[data-appearance-theme] #wrongBookModal .wrong-actions > button.danger:not(:disabled):not([aria-disabled="true"]):is(:hover,:focus-visible,:active) {
+    body[data-appearance-theme] :is(#wrongBookModal,#mistakesPanel) .wrong-actions > button.danger,
+    body[data-appearance-theme] :is(#wrongBookModal,#mistakesPanel) .wrong-actions > button.danger:not(:disabled):not([aria-disabled="true"]):is(:hover,:focus-visible,:active) {
         color:var(--dm-danger-text,#ef4444)!important;
     }
-    body[data-appearance-theme] #wrongBookModal .wrong-actions > button:is(:disabled,[aria-disabled="true"]),
+    body[data-appearance-theme] :is(#wrongBookModal,#mistakesPanel) .wrong-actions > button:is(:disabled,[aria-disabled="true"]),
     body[data-appearance-theme] #wrongRetestReviewModal button[id^="retest-gen-"]:is(:disabled,[aria-disabled="true"]) {
         opacity:.45!important;
         cursor:not-allowed;
@@ -812,7 +812,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         --dm-filled-text:var(--dm-control-text);
     }
     body[data-appearance-theme] :is(
-        #ocrGroupButton,
+        #ocrGroupButton, .offline-primary,
         .ocr-task-card [data-ocr-action="edit"],
         .dmate-graph-scan .dgs-section-head > button[data-source-picker],
         #appearanceModal :is(#appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone),
@@ -842,7 +842,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         transition:var(--dm-control-transition);
     }
     body[data-appearance-theme] :is(
-        #ocrGroupButton,
+        #ocrGroupButton, .offline-primary,
         .ocr-task-card [data-ocr-action="edit"],
         .dmate-graph-scan .dgs-section-head > button[data-source-picker],
         #appearanceModal :is(#appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone),
@@ -856,7 +856,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         background:var(--dm-filled-hover-bg)!important;
     }
     body[data-appearance-theme] :is(
-        #ocrGroupButton,
+        #ocrGroupButton, .offline-primary,
         .ocr-task-card [data-ocr-action="edit"],
         .dmate-graph-scan .dgs-section-head > button[data-source-picker],
         #appearanceModal :is(#appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone),

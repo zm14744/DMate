@@ -30,6 +30,8 @@
         : JSON.stringify({version:2,activeId:pages[0]?.id || "",pages});
       sessionStorage.setItem("dmate_offline_migration_v1", JSON.stringify({
         username: snapshot.username || "",
+        wrongQuestions: Array.isArray(snapshot.wrongQuestions) ? snapshot.wrongQuestions : [],
+        notes: Array.isArray(snapshot.notes) ? snapshot.notes : [],
         drawings
       }));
     } catch (error) {

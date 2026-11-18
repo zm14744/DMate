@@ -24264,7 +24264,7 @@ document.addEventListener(
 );
 
 
-// 离线工作区只导出当前页面已验证账号、或当前游客会话的绘图库。
+// 离线工作区只导出当前页面已验证账号、或当前游客会话的学习记录和绘图库。
 // 不从 localStorage 的旧账号标记推断身份，也不上传这份快照。
 window.DMateOfflineBridge = Object.freeze({
     async snapshot() {
@@ -24296,16 +24296,22 @@ window.DMateOfflineBridge = Object.freeze({
             const offlineOwnerSuffix = "::" + encodeURIComponent("account:" + accountState.username);
             localStorage.setItem("dmate:offline:appearance:v1" + offlineOwnerSuffix, JSON.stringify(settings));
             await new Promise((resolve, reject) => {
-                const request = indexedDB.open("dmate-offline-workspace", 2);
+                const request = indexedDB.open("dmate-offline-workspace", 3);
+                let blocked = false;
+                request.onblocked = () => {
+                    blocked = true;
+                    reject(new Error("旧版离线页面仍在使用本机数据，请关闭该页面后重试"));
+                };
                 request.onupgradeneeded = () => {
                     const db = request.result;
-                    for (const store of ["practice", "settings"]) {
+                    for (const store of ["mistakes", "notes", "practice", "settings"]) {
                         if (!db.objectStoreNames.contains(store)) db.createObjectStore(store, {keyPath:"id"});
                     }
                 };
                 request.onerror = () => reject(request.error || new Error("离线外观数据准备失败"));
                 request.onsuccess = () => {
                     const db = request.result;
+                    if (blocked) { db.close(); return; }
                     const tx = db.transaction("settings", "readwrite");
                     tx.objectStore("settings").put({
                         id:"appearance" + offlineOwnerSuffix, settings, backgroundBlob,
@@ -24332,6 +24338,10 @@ window.DMateOfflineBridge = Object.freeze({
         }
         return {
             username,
+            wrongQuestions: JSON.parse(JSON.stringify((learningState.wrongQuestions || []).filter(item =>
+                item && !learningState.deletedWrongQuestionIds?.[String(item.id)]))),
+            notes: JSON.parse(JSON.stringify((learningState.conceptNotebook?.notes || []).filter(note =>
+                note && !(Number(learningState.conceptNotebook?.deleted?.[String(note.id)]) >= Number(note.updatedAt || 0))))),
             drawings: copiedDrawings
         };
     }

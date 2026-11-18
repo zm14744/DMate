@@ -6,7 +6,7 @@ pairs are APPEARANCE and BACKGROUND VIEWER. The optional APPEARANCE ICON
 pair copies only the original sidebar appearance button SVG. Run normally to
 update those fragments, or use --check in CI.
 
-The offline workspace keeps its own navigation, four tools, layout and styles.
+The offline workspace keeps its own navigation, six tools, layout and styles.
 This script never copies the online chat shell, tool dialogs or CSS blocks.
 Keep the shared appearance-panels.css link in the offline page's existing head;
 the separate sync_offline_styles.py maintains its existing shared CSS exports.

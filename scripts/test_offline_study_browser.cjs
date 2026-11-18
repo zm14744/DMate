@@ -240,9 +240,9 @@ async function assertContent(page, kind, id, language, reference) {
     const choice = kind === 'questions' && ['单项选择', '多项选择'].includes(row.type);
     const expected = kind === 'concepts'
       ? [value.summary, value.definition, value.explanation, value.notation, value.common_mistakes]
-      : [value.statement, ...(value.options || []).map(option => option.text), choice ? row.answer.join('、') : value.answer_text, value.explanation, value.grading_criteria];
+      : [value.statement, ...(value.options || []).map(option => option.text), choice ? row.answer.join('、') : value.answer_text, value.explanation];
     const nodes = kind === 'concepts' ? [detail.querySelector('.concept-summary'), ...detail.querySelectorAll('.concept-detail-text')]
-      : [detail.querySelector('.wrong-question'), ...detail.querySelectorAll('.question-option-text'), detail.querySelector('.wrong-answer-inner'), detail.querySelector('.wrong-analysis-body'), detail.querySelector('.wrong-feedback-body')];
+      : [detail.querySelector('.wrong-question'), ...detail.querySelectorAll('.question-option-text'), detail.querySelector('.wrong-answer-inner'), detail.querySelector('.wrong-analysis-body')];
     if (nodes.length !== expected.length || nodes.some(node => !node)) throw new Error(id + ': complete content sections missing');
     const pending = await Promise.all(nodes.map(node => studyPending.get(node)));
     const styles = [], math = [];
@@ -338,7 +338,8 @@ async function plainOptions(page) {
       && style.image === 'none' && style.shadow === 'none')
     && item.controls === 0 && !item.selected), 'Options remain plain, unboxed, read-only text: ' + JSON.stringify(styles));
   assert.equal(await page.locator('#questionDetail input,#questionDetail textarea,#questionDetail select').count(), 0);
-  assert.equal(await page.locator('#questionDetail .question-actions button').count(), 1, 'Only the reference-answer toggle remains; no answer selection or save action');
+  assert.equal(await page.locator('#questionDetail [data-action="add-to-mistakes"]').count(), 1,
+    'The restored local wrong-book action accompanies the shared answer disclosures');
   await page.locator('#questionDetail .question-option').first().click();
   assert.equal(await page.locator('#questionDetail').locator('.question-option.selected,[aria-pressed],[aria-checked]').count(), 0);
 }
@@ -411,7 +412,8 @@ async function run(browser, width) {
     await page.locator('#questionsPanel').waitFor({state:'visible'});
     assert.equal(await page.locator('#questionList .question-item.active').getAttribute('data-question-id'), data.example.id);
     await openLibraryDetail(page, 'questions');
-    await page.locator('#questionDetail .question-actions button').click();
+    await page.locator('#questionDetail .wrong-answer-summary').click();
+    await page.locator('#questionDetail .wrong-analysis-summary').click();
     for (const language of ['en', 'zh-CN']) {
       await languageChoice(page, language); await setTheme(page, 'light');
       await assertContent(page, 'questions', data.example.id, language, references[language + '/light']);
@@ -429,13 +431,15 @@ async function run(browser, width) {
       await page.locator('#questionDifficulty').selectOption(question.difficulty);
       await page.locator('#questionList [data-question-id="' + question.id + '"]').click();
       await openLibraryDetail(page, 'questions');
-      await page.locator('#questionDetail .question-actions button').click();
+      await page.locator('#questionDetail .wrong-answer-summary').click();
+      await page.locator('#questionDetail .wrong-analysis-summary').click();
       for (const language of ['en', 'zh-CN']) {
         await languageChoice(page, language); await setTheme(page, 'light');
         assert.equal(await page.locator('#questionCategory').inputValue(), question.category, 'Language change preserves the chapter filter');
         assert.equal(await page.locator('#questionDifficulty').inputValue(), question.difficulty, 'Language change preserves the difficulty filter');
         assert.equal(await page.locator('#questionList .question-item.active').getAttribute('data-question-id'), question.id, 'Language change preserves the selected exercise');
-        assert.equal(await page.locator('#questionDetail .answer-panel').count(), 1, 'Language change preserves the open answer');
+        assert.equal(await page.locator('#questionDetail .wrong-answer-details[open]').count(), 1, 'Language change preserves the open answer');
+        assert.equal(await page.locator('#questionDetail .wrong-analysis-details[open]').count(), 1, 'Language change preserves the open explanation');
         if (language === 'en') {
           const count = await page.locator('#questionList .question-item').count();
           assert.equal(await page.locator('#questionCount').textContent(), count + (count === 1 ? ' exercise' : ' exercises'));

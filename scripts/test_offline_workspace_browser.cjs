@@ -5,7 +5,7 @@
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
-const panels = ['graph', 'concepts', 'questions', 'drawing'];
+const panels = ['graph', 'concepts', 'questions', 'drawing', 'mistakes', 'notes'];
 const iconReferences = { drawing: '#graphDrawingBtn svg', graph: '#knowledgeGraphBtn svg' };
 
 async function closeLibraryDetail(page) {
@@ -47,11 +47,10 @@ async function ready(page, expectedPanel = 'graph') {
     'The removed header, save-state label, and network status are absent from the DOM');
   assert.equal(await page.locator('#exportLocalData').count(), 0, 'The local-data export entry is removed');
   assert.equal(await page.locator('#offlineSidebar button').filter({ hasText: /^导出本地数据$/ }).count(), 0);
-  assert.equal(await page.locator('.offline-nav-item[data-panel="mistakes"],.offline-nav-item[data-panel="notes"],'
-    + '#wrongBookBtn,#conceptNotebookBtn,#mistakesPanel,#notesPanel,#wrongBookModal,#conceptNotebookDialog,'
-    + '#recordDialog,#recordForm,#recordTitle,#recordContent,#cancelRecord,#addMistake,#addNote,#noteList,#mistakeList').count(), 0,
-  'Removed wrong-book and notebook navigation, panels and editors are absent');
-  assert.equal(await page.locator('#questionsPanel button').filter({ hasText: '加入错题本' }).count(), 0);
+  for (const id of ['wrongBookBtn','conceptNotebookBtn','mistakesPanel','notesPanel','recordDialog',
+    'recordForm','recordTitle','recordContent','cancelRecord','addMistake','noteList','mistakeList']) {
+    assert.equal(await page.locator('#' + id).count(), 1, 'The original local record interface is restored: ' + id);
+  }
   assert.deepEqual(await page.locator('.offline-nav-item[data-panel]').evaluateAll(items => items.map(item => item.dataset.panel)), panels);
   const entries = await page.evaluate(() => {
     const online = document.getElementById('returnOnline'), appearance = document.getElementById('offlineAppearanceBtn');
@@ -66,11 +65,12 @@ async function ready(page, expectedPanel = 'graph') {
     'The mobile header has no centered application logo or panel title');
   assert.equal(await page.locator('.offline-nav-item[aria-current="page"]').getAttribute('data-panel'), expectedPanel);
   const schema = await page.evaluate(() => new Promise((resolve, reject) => {
-    const request = indexedDB.open('dmate-offline-workspace', 2);
+    const request = indexedDB.open('dmate-offline-workspace', 3);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => { const db = request.result; resolve({ version: db.version, stores: [...db.objectStoreNames] }); db.close(); };
   }));
-  assert.deepEqual(schema, { version: 2, stores: ['practice', 'settings'] }, 'Fresh databases contain only active data stores');
+  assert.deepEqual(schema, { version: 3, stores: ['mistakes', 'notes', 'practice', 'settings'] },
+    'The restored stores coexist with existing practice and settings');
 }
 
 async function readStore(page, name) {
@@ -427,9 +427,9 @@ async function practice(page) {
     assert.equal(await detail.locator('textarea,input,select,[contenteditable="true"],#questionResponse').count(), 0,
       question.type + ': the question detail has no answer input');
     assert.equal(await detail.getByRole('heading', { name: '你的作答', exact: true }).count(), 0);
-    assert.equal(await detail.getByRole('button', { name: /记录本次练习|保存记录|加入错题本/ }).count(), 0);
-    assert.equal(await detail.locator('.question-actions button').count(), 0,
-      'The old reference-answer action is replaced by the shared disclosures');
+    assert.equal(await detail.getByRole('button', { name: /记录本次练习|保存记录/ }).count(), 0);
+    assert.equal(await detail.locator('[data-action="add-to-mistakes"]').count(), 1,
+      'The original local wrong-book action accompanies the shared answer disclosures');
     assert.deepEqual(await detail.locator('.wrong-answer-summary,.wrong-analysis-summary').allTextContents(), ['查看答案', '查看解析']);
     assert.equal(await detail.locator('details[open]').count(), 0, 'Selecting a question starts both disclosures collapsed');
     assert.equal(await detail.getByRole('heading', { name: '评分要点', exact: true }).count(), 0);
@@ -900,7 +900,7 @@ async function runCase(browser, width, theme) {
     assert.deepEqual(apiRequests, [], label + ': offline work must not call server APIs');
     assert.deepEqual(failures, [], label + ': required resources must be cached');
     assert.deepEqual(errors, [], label + ': no page errors');
-    console.log('PASS ' + label + ': four panels, shared appearance/icons, read-only questions, normalized difficulty, preserved legacy records, curriculum, graph, drawing and offline reload');
+    console.log('PASS ' + label + ': six panels, shared appearance/icons, read-only questions, restored local records, curriculum, graph, drawing and offline reload');
   } catch (error) {
     const workerStatus = await page.evaluate(async () => {
       const describe = worker => worker && ({ state: worker.state, scriptURL: worker.scriptURL });
