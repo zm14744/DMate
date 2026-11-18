@@ -35,13 +35,6 @@ function initManualQuestionMode() {
     catch (_error) { manualQuestionMode = false; }
     const container = document.getElementById("manualQuestionMode");
     if (!container) return;
-    const updateUi = () => {
-        container.dataset.mode = manualQuestionMode ? "question" : "chat";
-        for (const button of container.querySelectorAll("[data-manual-question]")) {
-            const selected = (button.dataset.manualQuestion === "yes") === manualQuestionMode;
-            button.setAttribute("aria-pressed", String(selected));
-        }
-    };
     for (const button of container.querySelectorAll("[data-manual-question]")) {
         button.addEventListener("click", () => {
             manualQuestionMode = button.dataset.manualQuestion === "yes";
@@ -51,12 +44,21 @@ function initManualQuestionMode() {
                     manualQuestionMode ? "question" : "chat"
                 );
             } catch (_error) {}
-            updateUi();
+            refreshManualQuestionModeUi();
+            checkpointGuestDrafts();
         });
     }
-    updateUi();
+    refreshManualQuestionModeUi();
 }
 
+function refreshManualQuestionModeUi() {
+    const container = document.getElementById("manualQuestionMode");
+    if (!container) return;
+    container.dataset.mode = manualQuestionMode ? "question" : "chat";
+    for (const button of container.querySelectorAll("[data-manual-question]")) {
+        button.setAttribute("aria-pressed", String((button.dataset.manualQuestion === "yes") === manualQuestionMode));
+    }
+}
 
 const CLOUD_SYNC_META_KEY = "discrete_math_ai_cloud_sync_v1";
 const CLOUD_BACKUP_KEY = "discrete_math_ai_cloud_backup_v1";
@@ -1046,6 +1048,233 @@ let knowledgeGraphLoading = false;
 
 let sessions = [];
 let currentId = null;
+// Guest/home drafts belong to this tab; verified account conversation drafts also
+// survive closing the browser. Composer state never enters cloud sessions.
+const CONVERSATION_COMPOSER_DRAFTS_KEY = "dmate_conversation_composer_drafts_tab_v1";
+const ACCOUNT_COMPOSER_DRAFTS_PREFIX = "dmate_conversation_composer_drafts_account_v1:";
+let conversationComposerDrafts = Object.create(null);
+let conversationComposerOwner = null;
+let conversationComposerWorkspace = "guest";
+let conversationComposerDirty = new Set();
+let conversationComposerSaveWarningShown = false;
+
+function conversationComposerKey(sessionId) {
+    return sessionId == null ? "home" : "session:" + String(sessionId);
+}
+
+function normalizeConversationComposerDraft(value) {
+    return { text: typeof value?.text === "string" ? value.text : "", manualQuestionMode: Boolean(value?.manualQuestionMode) };
+}
+
+function restoreConversationComposerDrafts(value, legacyDraft) {
+    conversationComposerDrafts = Object.create(null);
+    conversationComposerDirty.clear();
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+        for (const [key, draft] of Object.entries(value)) {
+            if (key === "home" || key.startsWith("session:")) conversationComposerDrafts[key] = normalizeConversationComposerDraft(draft);
+        }
+    }
+    if (!Object.keys(conversationComposerDrafts).length && typeof legacyDraft === "string") {
+        conversationComposerDrafts[conversationComposerKey(currentId)] = { text: legacyDraft, manualQuestionMode };
+    }
+    conversationComposerOwner = null;
+}
+
+function accountComposerDraftStoragePrefix(workspace = conversationComposerWorkspace) {
+    return ACCOUNT_COMPOSER_DRAFTS_PREFIX + encodeURIComponent(workspace.slice(8)) + ":";
+}
+
+function accountComposerDraftStorageKey(sessionId) {
+    return accountComposerDraftStoragePrefix() + encodeURIComponent(String(sessionId));
+}
+
+function readAccountComposerDraft(sessionId) {
+    if (!accountState.authenticated || conversationComposerWorkspace !== "account:" + accountState.username) return null;
+    try {
+        const stored = JSON.parse(localStorage.getItem(accountComposerDraftStorageKey(sessionId)) || "null");
+        if (stored?.owner === conversationComposerWorkspace && stored.sessionId === String(sessionId)) return normalizeConversationComposerDraft(stored.draft);
+    } catch (_error) {}
+    return null;
+}
+
+function getConversationComposerDraft(sessionId) {
+    const key = conversationComposerKey(sessionId);
+    if (!Object.prototype.hasOwnProperty.call(conversationComposerDrafts, key) && sessionId != null) {
+        const saved = readAccountComposerDraft(sessionId);
+        if (saved && !deletedSessionIds[String(sessionId)]) conversationComposerDrafts[key] = normalizeConversationComposerDraft(saved);
+    }
+    return normalizeConversationComposerDraft(conversationComposerDrafts[key]);
+}
+
+function reportConversationComposerSaveFailure() {
+    if (conversationComposerSaveWarningShown) return;
+    conversationComposerSaveWarningShown = true;
+    showCopyToast(dmateUiText("草稿未能保存，请释放设备存储空间后重试", "The draft could not be saved; free device storage and try again"));
+}
+
+function ensureConversationComposerWorkspace() {
+    const workspace = accountState.authenticated ? "account:" + accountState.username : "guest";
+    if (workspace === conversationComposerWorkspace) return;
+    const previous = conversationComposerWorkspace;
+    conversationComposerWorkspace = workspace;
+    let saved = null;
+    try {
+        if (workspace !== "guest") {
+            const stored = JSON.parse(sessionStorage.getItem(CONVERSATION_COMPOSER_DRAFTS_KEY) || "null");
+            if (stored?.tab === window.name && stored.owner === workspace) saved = stored.drafts;
+        }
+        if (previous !== "guest" && workspace !== previous) sessionStorage.removeItem(CONVERSATION_COMPOSER_DRAFTS_KEY);
+    } catch (_error) {}
+    restoreConversationComposerDrafts(saved);
+    for (const [key, draft] of Object.entries(conversationComposerDrafts)) {
+        if (key.startsWith("session:") && (draft.text || draft.manualQuestionMode) && !readAccountComposerDraft(key.slice(8))) conversationComposerDirty.add(key);
+    }
+    const input = document.getElementById("text");
+    if (input) input.value = "";
+    manualQuestionMode = false;
+    refreshManualQuestionModeUi();
+}
+
+function captureConversationComposerDraft() {
+    ensureConversationComposerWorkspace();
+    const input = document.getElementById("text");
+    if (!input || conversationComposerOwner == null) return;
+    const id = conversationComposerOwner.startsWith("session:") ? conversationComposerOwner.slice(8) : null;
+    if (id != null && deletedSessionIds[id]) return;
+    const previous = conversationComposerDrafts[conversationComposerOwner];
+    if (previous?.text !== input.value || previous?.manualQuestionMode !== manualQuestionMode) {
+        conversationComposerDrafts[conversationComposerOwner] = { text: input.value, manualQuestionMode };
+        conversationComposerDirty.add(conversationComposerOwner);
+    }
+}
+
+function persistConversationComposerDrafts() {
+    if (conversationComposerWorkspace === "guest") {
+        if (guestWorkspaceReady && window.DMateGuestSession && !window.DMateGuestSession.getOwner()
+            && !window.DMateGuestSession.write("composer-drafts", conversationComposerDrafts)) reportGuestSaveFailure();
+        return;
+    }
+    let failed = false;
+    try {
+        sessionStorage.setItem(CONVERSATION_COMPOSER_DRAFTS_KEY, JSON.stringify({
+            tab: window.name, owner: conversationComposerWorkspace, drafts: conversationComposerDrafts
+        }));
+    } catch (_error) { failed = true; reportConversationComposerSaveFailure(); }
+    if (!conversationComposerDirty.size) return;
+    for (const key of conversationComposerDirty) {
+        try {
+            if (key.startsWith("session:")) {
+                const sessionId = key.slice(8);
+                const draft = conversationComposerDrafts[key];
+                if (!draft || deletedSessionIds[sessionId] || (!draft.text && !draft.manualQuestionMode)) localStorage.removeItem(accountComposerDraftStorageKey(sessionId));
+                else localStorage.setItem(accountComposerDraftStorageKey(sessionId), JSON.stringify({
+                    owner:conversationComposerWorkspace, sessionId, draft:normalizeConversationComposerDraft(draft)
+                }));
+            }
+            conversationComposerDirty.delete(key);
+        } catch (_error) {
+            failed = true;
+            reportConversationComposerSaveFailure();
+        }
+    }
+    if (!failed) conversationComposerSaveWarningShown = false;
+}
+
+function applyConversationComposerDraft(draft) {
+    const input = document.getElementById("text");
+    if (input) input.value = draft.text;
+    manualQuestionMode = draft.manualQuestionMode;
+    refreshManualQuestionModeUi();
+    window.dmateChatComposer?.refresh?.();
+}
+
+function syncConversationComposer() {
+    captureConversationComposerDraft();
+    for (const id of Object.keys(deletedSessionIds)) {
+        if (deletedSessionIds[id]) {
+            const key = conversationComposerKey(id);
+            delete conversationComposerDrafts[key];
+            conversationComposerDirty.add(key);
+        }
+    }
+    const key = conversationComposerKey(currentId);
+    if (conversationComposerOwner !== key) {
+        conversationComposerOwner = key;
+        const draft = getConversationComposerDraft(currentId);
+        conversationComposerDrafts[key] = draft;
+        applyConversationComposerDraft(draft);
+    }
+    persistConversationComposerDrafts();
+}
+
+function clearConversationComposerDraft(sessionId, expectedText) {
+    captureConversationComposerDraft();
+    const key = conversationComposerKey(sessionId);
+    const draft = getConversationComposerDraft(sessionId);
+    if (expectedText !== undefined && draft.text !== expectedText) return false;
+    draft.text = "";
+    conversationComposerDrafts[key] = draft;
+    conversationComposerDirty.add(key);
+    if (conversationComposerOwner === key) applyConversationComposerDraft(draft);
+    persistConversationComposerDrafts();
+    return true;
+}
+
+function resetConversationComposerDrafts({ purgePersistent = true } = {}) {
+    if (purgePersistent && conversationComposerWorkspace !== "guest") {
+        try {
+            const prefix = accountComposerDraftStoragePrefix();
+            for (const key of Object.keys(localStorage)) if (key.startsWith(prefix)) localStorage.removeItem(key);
+        }
+        catch (_error) { reportConversationComposerSaveFailure(); }
+    }
+    conversationComposerDrafts = Object.create(null);
+    conversationComposerDirty.clear();
+    conversationComposerOwner = null;
+    conversationComposerWorkspace = accountState.authenticated ? "account:" + accountState.username : "guest";
+    try {
+        sessionStorage.removeItem(CONVERSATION_COMPOSER_DRAFTS_KEY);
+        sessionStorage.removeItem(MANUAL_QUESTION_MODE_KEY);
+    } catch (_error) {}
+    applyConversationComposerDraft(normalizeConversationComposerDraft(null));
+}
+
+function remapConversationComposerDraft(previousId, nextId) {
+    captureConversationComposerDraft();
+    const previousKey = conversationComposerKey(previousId), nextKey = conversationComposerKey(nextId);
+    if (previousKey === nextKey) return;
+    const previous = conversationComposerDrafts[previousKey] || readAccountComposerDraft(previousId);
+    if (previous) {
+        conversationComposerDrafts[nextKey] = normalizeConversationComposerDraft(previous);
+        delete conversationComposerDrafts[previousKey];
+        conversationComposerDirty.add(previousKey);
+        conversationComposerDirty.add(nextKey);
+    }
+    if (conversationComposerOwner === previousKey) conversationComposerOwner = nextKey;
+    persistConversationComposerDrafts();
+}
+
+window.DMateConversationDrafts = Object.freeze({
+    get(sessionId) {
+        captureConversationComposerDraft();
+        return getConversationComposerDraft(sessionId);
+    },
+    set(sessionId, draft) {
+        captureConversationComposerDraft();
+        const key = conversationComposerKey(sessionId);
+        conversationComposerDrafts[key] = normalizeConversationComposerDraft(draft);
+        conversationComposerDirty.add(key);
+        if (conversationComposerOwner === key) applyConversationComposerDraft(conversationComposerDrafts[key]);
+        if (conversationComposerKey(currentId) === key) syncConversationComposer();
+        else persistConversationComposerDrafts();
+    },
+    clear: clearConversationComposerDraft,
+    snapshot() {
+        captureConversationComposerDraft();
+        return JSON.parse(JSON.stringify(conversationComposerDrafts));
+    },
+    sync: syncConversationComposer
+});
 // 同账号各端共享的会话删除记录；没有删除标记的按 ID 合并会把已删除会话带回来。
 let deletedSessionIds = Object.create(null);
 let learningState = createEmptyLearningState();
@@ -1146,11 +1375,13 @@ function computeChangedCloudParts(serverParts, localPartHashes) {
 }
 
 function clearLoggedOutWorkspace({ purgePersistent = true } = {}) {
+    void resetAccountOcrPersistence({purge:purgePersistent});
     cancelAccountInteractions();
     window.DMateGuestSession?.reset();
     // 退出后进入真正的游客模式：页面清空，游客数据不落地。
     sessions = [];
     currentId = null;
+    resetConversationComposerDrafts({ purgePersistent });
     deletedSessionIds = Object.create(null);
     learningState = createEmptyLearningState();
     window.dmateConceptNotebook?.refresh?.();
@@ -1403,6 +1634,10 @@ function markSessionDeleted(sessionId) {
     const key = String(sessionId ?? "");
     if (!key) return;
     cancelOcrBatchRun(sessionId);
+    discardSessionOcrTasks(sessionId);
+    const draftKey = conversationComposerKey(sessionId);
+    delete conversationComposerDrafts[draftKey];
+    conversationComposerDirty.add(draftKey);
     const request = activeAiRequests.get(key);
     if (request) {
         request.cancelled = true;
@@ -1524,6 +1759,9 @@ function applyCloudSnapshot(snapshot, { selectionId = currentId } = {}) {
         }
         if (nextLearning) learningState = nextLearning;
         preserveActiveCloudSessionIdentities(previous.sessions);
+        for (const sessionId of new Set([...ocrTasks.values()].map(task => sessionBusyKey(task.sessionId)))) {
+            if (deletedSessionIds[sessionId]) discardSessionOcrTasks(sessionId);
+        }
 
         // Do not override this device's appearance with older cloud values.
         try {
@@ -1582,6 +1820,7 @@ function preserveActiveCloudSessionIdentities(previousSessions) {
             Object.assign(message, matching.messages[index])) });
         sessions[position] = original;
         if (newKey === oldKey) continue;
+        remapConversationComposerDraft(oldId, original.id);
         activeAiRequests.delete(oldKey);
         activeAiRequests.set(newKey, request);
         if (busySessionIds.delete(oldKey)) busySessionIds.add(newKey);
@@ -1590,6 +1829,41 @@ function preserveActiveCloudSessionIdentities(previousSessions) {
         if (run?.session === original) { ocrBatchRuns.delete(oldKey); ocrBatchRuns.set(newKey, run); }
         if (ocrSolvingSessions.delete(oldId)) ocrSolvingSessions.add(original.id);
         for (const task of ocrTasks.values()) if (String(task.sessionId) === oldKey) task.sessionId = original.id;
+        void remapAccountOcrDrafts(oldId, original.id);
+    }
+    // A batch confirms its images before it creates a chat request. Cloud CAS
+    // merges during that wait must retain the batch's session object as well.
+    for (const [oldKey, run] of [...ocrBatchRuns]) {
+        const original = run.session;
+        if (run.cancelled || run.contextVersion !== cloudSyncContextVersion
+            || !previousSessions.includes(original) || sessions.includes(original)) continue;
+        const originalMessages = original.messages;
+        const candidates = sessions.filter(candidate => {
+            const id = String(candidate.id);
+            return (id === oldKey || id.startsWith(oldKey + "-sync-"))
+                && !deletedSessionIds[id] && candidate.messages.length === originalMessages.length
+                && candidate.messages.every((message, index) => cloudMessageIdentity(message) === cloudMessageIdentity(originalMessages[index]));
+        });
+        const matching = candidates.find(candidate => String(candidate.id) === oldKey)
+            || (candidates.length === 1 ? candidates[0] : null);
+        const newKey = matching ? sessionBusyKey(matching.id) : null;
+        if (!matching || ocrBatchRuns.has(newKey) && ocrBatchRuns.get(newKey) !== run
+            || activeAiRequests.has(newKey) && activeAiRequests.get(newKey).session !== original) {
+            cancelOcrBatchRun(original.id);
+            if (deletedSessionIds[oldKey]) discardSessionOcrTasks(original.id);
+            continue;
+        }
+        const position = sessions.indexOf(matching), oldId = original.id;
+        Object.assign(original, matching, { messages:originalMessages.map((message, index) =>
+            Object.assign(message, matching.messages[index])) });
+        sessions[position] = original;
+        if (newKey === oldKey) continue;
+        remapConversationComposerDraft(oldId, original.id);
+        ocrBatchRuns.delete(oldKey);
+        ocrBatchRuns.set(newKey, run);
+        if (ocrSolvingSessions.delete(oldId)) ocrSolvingSessions.add(original.id);
+        for (const task of ocrTasks.values()) if (String(task.sessionId) === oldKey) task.sessionId = original.id;
+        void remapAccountOcrDrafts(oldId, original.id);
     }
 }
 
@@ -2160,6 +2434,7 @@ function cloudUiEditInProgress() {
     if (window.DMateChatEditDraft?.snapshot()) return true;
     if (typeof busySessionIds !== "undefined" && busySessionIds.size) return true;
     if (typeof pendingAiStartSessionIds !== "undefined" && pendingAiStartSessionIds.size) return true;
+    if (typeof ocrBatchRuns !== "undefined" && [...ocrBatchRuns.values()].some(run => !run.cancelled)) return true;
     if (typeof typingTimer !== "undefined" && typingTimer) return true;
     if (typeof ocrReviewInProgress !== "undefined" && ocrReviewInProgress) return true;
     if (typeof wrongAnswerQueueBusy !== "undefined" && wrongAnswerQueueBusy) return true;
@@ -2172,6 +2447,7 @@ function cloudUiEditInProgress() {
 // Native-shell web updates must inspect the whole workspace, including work
 // in another conversation and records scoped to the current guest session.
 function dmateHasUnsavedWork() {
+    if (Object.values(window.DMateConversationDrafts.snapshot()).some(draft => draft.text.trim())) return true;
     if (cloudUiEditInProgress() || activeAiRequests.size || typingContext
         || ocrTasks.size || ocrBatchPreparing || ocrRequestInFlight
         || accountVerificationPending || accountVerificationOperation
@@ -2902,7 +3178,10 @@ async function resolveInitialCloudSync(isNewAccount = false) {
         // 同浏览器切换另一个账号时不能显示、更不能上传前一账号的资料。
         const savedMeta = readCloudSyncMeta();
         if (!retryingInitialSync) {
-            if (isNewAccount || savedMeta.username !== owner) cancelAccountInteractions();
+            if (isNewAccount || savedMeta.username !== owner) {
+                void resetAccountOcrPersistence({purge:false});
+                cancelAccountInteractions();
+            }
             if (!isNewAccount && savedMeta.username === accountState.username) {
                 if (typingTimer && typingContextIsCurrent()) forceCompleteTyping();
                 loadLearningState();
@@ -3020,8 +3299,11 @@ async function resolveInitialCloudSync(isNewAccount = false) {
         }
     } finally {
         if (isCloudSyncContextValid(owner, contextVersion)) {
-            cloudInitialSyncInFlight = false;
-            startCloudLivePolling();
+            await restoreAccountOcrTasks(owner, contextVersion);
+            if (isCloudSyncContextValid(owner, contextVersion)) {
+                cloudInitialSyncInFlight = false;
+                startCloudLivePolling();
+            }
         }
     }
 }
@@ -3520,6 +3802,7 @@ async function logoutAccount() {
     // A failed logout leaves this account active. Invalidate its pending
     // replies only after the server has actually confirmed the transition.
     const transitionVersion = bumpCloudSyncContext();
+    await resetAccountOcrPersistence({purge:true, owner});
     // 同一浏览器的下一个访客不应读取当前账号的本机背景图片。
     try { await deleteAppearanceBackgroundBlob(); } catch (_error) {}
     if (!isCloudSyncContextValid(owner, transitionVersion)) return;
@@ -3594,6 +3877,7 @@ async function deleteAccount() {
     if (!currentAccount()) return;
 
     const transitionVersion = bumpCloudSyncContext();
+    await resetAccountOcrPersistence({purge:true, owner});
     try { await deleteAppearanceBackgroundBlob(); } catch (_error) {}
     if (!isCloudSyncContextValid(owner, transitionVersion)) return;
     volatileCloudBackup = null;
@@ -3809,8 +4093,9 @@ async function initAccountSystem() {
     });
 
     // 同一浏览器其他标签退出/注销后，当前标签也应立即清空私人学习数据。
-    window.addEventListener("storage", event => {
+    window.addEventListener("storage", async event => {
         if (event.key !== ACCOUNT_LOGOUT_SIGNAL_KEY || !event.newValue) return;
+        const cleanup = resetAccountOcrPersistence({purge:true});
         stopCloudLivePolling();
         bumpCloudSyncContext();
         accountState.authenticated = false;
@@ -3821,6 +4106,7 @@ async function initAccountSystem() {
         }
         clearCloudSyncMeta();
         clearLoggedOutWorkspace();
+        await cleanup;
         window.location.reload();
     });
 
@@ -4022,7 +4308,7 @@ function handleSendOrStop() {
         return;
     }
     if (window.dmateVoiceInput?.state && window.dmateVoiceInput.state !== "idle") return;
-    if (ocrTasks.size > 0) {
+    if (getSessionOcrTasks().length > 0) {
         void sendOcrBatch();
         return;
     }
@@ -4139,7 +4425,7 @@ function refreshInputAvailability() {
 
     if (sendBtn) {
         const sendVisible = visibleMode !== "ocr";
-        const hasContent = Boolean(input?.value.trim()) || ocrTasks.size > 0;
+        const hasContent = Boolean(input?.value.trim()) || getSessionOcrTasks().length > 0;
         sendBtn.disabled = !sendVisible || (!stoppingAllowed && !hasContent);
         sendBtn.textContent = stoppingAllowed ? "停止" : "发送";
         sendBtn.classList.toggle("ai-stop-button", stoppingAllowed);
@@ -4152,15 +4438,15 @@ function refreshInputAvailability() {
         }
     }
     if (imageBtn) {
-        imageBtn.disabled = visibleMode !== "idle" || voiceActive || ocrActiveCount() >= OCR_MAX_CONCURRENT;
+        imageBtn.disabled = visibleMode !== "idle" || voiceActive || getSessionOcrTasks().length >= OCR_MAX_CONCURRENT;
         setInputControlVisible(imageBtn, visibleMode === "idle");
         imageBtn.setAttribute("aria-hidden", String(visibleMode !== "idle" || voiceActive));
     }
     if (imageInput) {
-        imageInput.disabled = visibleMode !== "idle" || voiceActive || ocrActiveCount() >= OCR_MAX_CONCURRENT;
+        imageInput.disabled = visibleMode !== "idle" || voiceActive || getSessionOcrTasks().length >= OCR_MAX_CONCURRENT;
         imageInput.setAttribute("aria-hidden", String(visibleMode !== "idle" || voiceActive));
     }
-    if (typeof ocrBatchPreparing !== "undefined" && ocrBatchPreparing) {
+    if (isOcrBatchPreparing()) {
         if (sendBtn && !imageBatchActive) sendBtn.disabled = true;
         if (imageBtn) imageBtn.disabled = true;
         if (imageInput) imageInput.disabled = true;
@@ -13467,7 +13753,6 @@ function newChat() {
         forceCompleteTyping();
     }
 
-    pauseOcrBatchRun(currentId);
     const id = makeSessionId();
 
     sessions.push({
@@ -14775,22 +15060,28 @@ function prepareQuestionNavigationMessage(session, message) {
 
 function send() {
     if (window.dmateVoiceInput?.state && window.dmateVoiceInput.state !== "idle") return;
-    if (ocrTasks.size > 0) { void sendOcrBatch(); return; }
+    if (getSessionOcrTasks().length > 0) { void sendOcrBatch(); return; }
     if (ocrReviewInProgress || isCurrentSessionTyping() || isSessionBusy(currentId)) return;
     const input = document.getElementById("text");
     if (!input) return;
     const text = input.value.trim();
+    const questionMode = manualQuestionMode;
     if (!text) return;
     if (Array.from(text).length > MAX_CHAT_MESSAGE_CHARS) {
         showCopyToast("单条文字消息最多 20000 字符，请缩短后发送");
         input.focus({ preventScroll: true });
         return;
     }
-    if (!currentId) newChat();
+    if (!currentId) {
+        clearConversationComposerDraft(null);
+        newChat();
+        manualQuestionMode = questionMode;
+        refreshManualQuestionModeUi();
+    }
     const session = getCurrent();
     if (!session) return;
     // Keep the sender's question choice fixed even when its toggle changes later.
-    const message = { role:"user", text, manualIsQuestion:manualQuestionMode, createdAt:Date.now() };
+    const message = { role:"user", text, manualIsQuestion:questionMode, createdAt:Date.now() };
     prepareRetestAnswerMessage(session, message);
     session.messages.push(message);
     queueManualQuestionClassification(session, message);
@@ -14921,7 +15212,7 @@ function notifyOcrCancelled(requestId) {
 }
 
 function cancelImageRecognition() {
-    const running = [...ocrTasks.values()].filter(task => task.state === "recognizing");
+    const running = getSessionOcrTasks().filter(task => task.state === "recognizing");
     if (running.length) {
         running.forEach(task => cancelOcrTask(task.id));
         return;
@@ -15276,6 +15567,9 @@ const ocrTasks = new Map();
 const ocrSolvingSessions = new Set();
 const ocrBatchRuns = new Map();
 let ocrBatchPreparing = false;
+const ocrRecognitionQueue = new Map();
+const ocrRecognitionRuns = new Set();
+let ocrRecognitionPumpPending = false;
 let ocrTaskTimer = null;
 let ocrEditorTaskId = null;
 let ocrEditorController = null;
@@ -15284,7 +15578,179 @@ let guestOcrRestoring = false;
 let guestWorkspaceReady = false;
 let guestOcrSaveVersion = 0;
 const guestOcrFiles = new WeakMap();
+const OCR_TASK_SNAPSHOT_FIELDS = ["id", "groupId", "sessionId", "state", "draft", "initialDocument", "confirmation",
+    "scanState", "textEditorState", "dirty", "userRequest", "isQuestion", "error", "notice", "sourceSha256",
+    "descriptions", "descriptionState", "result", "userEditedAt", "draftCreatedAt", "draftOrder"];
 let guestSaveWarningShown = false;
+
+let accountOcrDraftOwner = "";
+let accountOcrDraftGeneration = null;
+let accountOcrDraftContextVersion = null;
+let accountOcrDraftEpoch = 0;
+let accountOcrRestorePromise = null;
+let accountOcrRestoring = false;
+let accountOcrDraftsReady = false;
+let accountOcrSaveFailure = false;
+const accountOcrSavedMetadata = new Map();
+const accountOcrDiscardedTaskIds = new Set();
+
+function accountOcrDraftContext(owner, context, epoch) {
+    return accountOcrDraftOwner === owner && accountOcrDraftEpoch === epoch
+        && isCloudSyncContextValid(owner, context);
+}
+
+function reportAccountOcrSaveFailure() {
+    if (accountOcrSaveFailure) return;
+    accountOcrSaveFailure = true;
+    showCurrentError("图片草稿未能保存到本机，当前内容仍保留；请释放浏览器存储空间后重试。");
+}
+
+function checkpointOcrTasks() {
+    return shouldPersistClientState() ? checkpointAccountOcrTasks() : checkpointGuestOcrTasks();
+}
+
+async function checkpointAccountOcrTasks() {
+    if (!accountOcrDraftsReady || accountOcrRestoring || !shouldPersistClientState()
+        || accountState.username !== accountOcrDraftOwner) return false;
+    const owner = accountOcrDraftOwner, context = cloudSyncContextVersion, epoch = accountOcrDraftEpoch;
+    const live = () => accountOcrDraftContext(owner, context, epoch);
+    const rows = [], fingerprints = new Map();
+    for (const task of ocrTasks.values()) {
+        if (!isLiveOcrTask(task) || accountOcrDiscardedTaskIds.has(task.id)) continue;
+        if (!Number.isFinite(task.draftOrder)) task.draftOrder = nextOcrDraftOrder(task.sessionId);
+        if (!Number.isFinite(task.draftCreatedAt)) task.draftCreatedAt = Date.now();
+        const saved = {};
+        for (const key of OCR_TASK_SNAPSHOT_FIELDS) if (task[key] !== undefined) saved[key] = task[key];
+        const metadata = JSON.parse(JSON.stringify(saved, (key, value) => key === "controller" ? undefined : value));
+        const fingerprint = JSON.stringify(metadata);
+        if (accountOcrSavedMetadata.get(task.id) === fingerprint) continue;
+        rows.push({...metadata, name:task.file.name, type:task.file.type, file:task.file});
+        fingerprints.set(task.id, fingerprint);
+    }
+    if (!rows.length) return true;
+    try {
+        if (!window.DMateAccountImageDraftStore) throw new Error("图片草稿存储尚未加载");
+        const saved = await window.DMateAccountImageDraftStore.save(owner, accountOcrDraftGeneration, rows, null);
+        if (!live()) return false;
+        if (!saved) throw new Error("图片草稿的账号状态已变化");
+        for (const [id, fingerprint] of fingerprints) accountOcrSavedMetadata.set(id, fingerprint);
+        accountOcrSaveFailure = false;
+        return true;
+    } catch (_error) {
+        if (live()) reportAccountOcrSaveFailure();
+        return false;
+    }
+}
+
+async function restoreAccountOcrTasks(owner = accountState.username, context = cloudSyncContextVersion) {
+    if (!isCloudSyncContextValid(owner, context)) return false;
+    if (accountOcrDraftOwner === owner && accountOcrDraftContextVersion === context
+        && accountOcrRestorePromise) return accountOcrRestorePromise;
+    if (accountOcrDraftOwner) resetAccountOcrPersistence({purge:false});
+    accountOcrDraftOwner = owner;
+    accountOcrDraftContextVersion = context;
+    const epoch = accountOcrDraftEpoch;
+    const live = () => accountOcrDraftContext(owner, context, epoch);
+    accountOcrRestoring = true;
+    const pending = (async () => {
+        try {
+            if (!window.DMateAccountImageDraftStore) throw new Error("图片草稿存储尚未加载");
+            const saved = await window.DMateAccountImageDraftStore.load(owner, live);
+            if (!live() || !saved) return false;
+            accountOcrDraftGeneration = saved.generation;
+            const groups = new Map();
+            for (const row of saved.rows) {
+                if (accountOcrDiscardedTaskIds.has(row.id)) continue;
+                const session = sessions.find(item => sessionBusyKey(item.id) === sessionBusyKey(row.sessionId));
+                if (!session || deletedSessionIds[sessionBusyKey(row.sessionId)]) continue;
+                const interrupted = row.state === "recognizing";
+                const value = {...row, state:interrupted ? "failed" : row.state,
+                    error:interrupted ? "上次关闭中断了图片识别，可以直接编辑原图和已有内容。" : row.error};
+                if (!groups.has(session.id)) groups.set(session.id, []);
+                groups.get(session.id).push(value);
+            }
+            for (const [sessionId, rows] of groups) {
+                rows.sort((a, b) => Number(a.draftOrder || 0) - Number(b.draftOrder || 0)
+                    || Number(a.draftCreatedAt || 0) - Number(b.draftCreatedAt || 0));
+                const existing = new Set(ocrTasks.keys());
+                importConversationOcrTasks(sessionId, rows);
+                for (const row of rows) if (!existing.has(row.id) && ocrTasks.has(row.id))
+                    ocrTasks.get(row.id).restoredFromAccountDraft = true;
+            }
+            accountOcrDraftsReady = true;
+            return true;
+        } catch (_error) {
+            if (live()) reportAccountOcrSaveFailure();
+            return false;
+        } finally {
+            if (live()) {
+                accountOcrRestoring = false;
+                void checkpointAccountOcrTasks();
+            }
+        }
+    })();
+    accountOcrRestorePromise = pending;
+    void pending.then(restored => {
+        if (!restored && live() && accountOcrRestorePromise === pending) accountOcrRestorePromise = null;
+    });
+    return pending;
+}
+
+function resetAccountOcrPersistence({purge = false, owner = accountOcrDraftOwner} = {}) {
+    accountOcrDraftEpoch++;
+    accountOcrDraftOwner = "";
+    accountOcrDraftGeneration = null;
+    accountOcrDraftContextVersion = null;
+    accountOcrRestorePromise = null;
+    accountOcrRestoring = false;
+    accountOcrDraftsReady = false;
+    accountOcrSaveFailure = false;
+    accountOcrSavedMetadata.clear();
+    accountOcrDiscardedTaskIds.clear();
+    return purge && owner ? window.DMateAccountImageDraftStore?.clearOwner(owner).catch(() => {
+        showCurrentError("退出账号后的图片草稿未能从本机清除，请检查浏览器存储权限。");
+        return false;
+    }) : Promise.resolve(true);
+}
+
+function consumeAccountOcrDraft(task) {
+    if (!shouldPersistClientState() || accountState.username !== accountOcrDraftOwner) return;
+    const owner = accountOcrDraftOwner, context = cloudSyncContextVersion, epoch = accountOcrDraftEpoch;
+    accountOcrDiscardedTaskIds.add(task.id);
+    accountOcrSavedMetadata.delete(task.id);
+    const live = () => accountOcrDraftContext(owner, context, epoch);
+    void window.DMateAccountImageDraftStore?.remove(owner, accountOcrDraftGeneration, task.sessionId, [task.id], null)
+        .catch(() => { if (live()) reportAccountOcrSaveFailure(); });
+}
+
+function consumeSessionAccountOcrDrafts(sessionId) {
+    if (!shouldPersistClientState() || accountState.username !== accountOcrDraftOwner) return;
+    const owner = accountOcrDraftOwner, context = cloudSyncContextVersion, epoch = accountOcrDraftEpoch;
+    for (const task of getSessionOcrTasks(sessionId)) accountOcrDiscardedTaskIds.add(task.id);
+    const live = () => accountOcrDraftContext(owner, context, epoch);
+    void window.DMateAccountImageDraftStore?.removeSession(owner, accountOcrDraftGeneration, sessionId, null)
+        .catch(() => { if (live()) reportAccountOcrSaveFailure(); });
+}
+
+function remapAccountOcrDrafts(previousId, nextId) {
+    if (sessionBusyKey(previousId) === sessionBusyKey(nextId) || !shouldPersistClientState()
+        || accountState.username !== accountOcrDraftOwner) return Promise.resolve(false);
+    const owner = accountOcrDraftOwner, context = cloudSyncContextVersion, epoch = accountOcrDraftEpoch;
+    const live = () => accountOcrDraftContext(owner, context, epoch);
+    for (const task of ocrTasks.values()) {
+        if ([sessionBusyKey(previousId), sessionBusyKey(nextId)].includes(sessionBusyKey(task.sessionId)))
+            accountOcrSavedMetadata.delete(task.id);
+    }
+    return window.DMateAccountImageDraftStore.remapSession(owner, accountOcrDraftGeneration, previousId, nextId, null)
+        .then(() => live() ? checkpointAccountOcrTasks() : false)
+        .catch(() => { if (live()) reportAccountOcrSaveFailure(); return false; });
+}
+
+window.DMateAccountOcrDrafts = Object.freeze({
+    ready: () => restoreAccountOcrTasks(),
+    flush: () => checkpointAccountOcrTasks(),
+    reset: resetAccountOcrPersistence
+});
 
 function reportGuestSaveFailure() {
     if (guestSaveWarningShown || shouldPersistClientState()) return;
@@ -15295,6 +15761,9 @@ function reportGuestSaveFailure() {
 }
 
 function checkpointGuestDrafts() {
+    captureConversationComposerDraft();
+    persistConversationComposerDrafts();
+    void checkpointOcrTasks();
     if (!guestWorkspaceReady || shouldPersistClientState() || !window.DMateGuestSession || window.DMateGuestSession.getOwner()) return;
     if (!window.DMateGuestSession.write("draft", document.getElementById("text")?.value || "")) reportGuestSaveFailure();
     if (!window.DMateGuestSession.write("edit", window.DMateChatEditDraft?.snapshot?.() || null)) reportGuestSaveFailure();
@@ -15303,15 +15772,13 @@ function checkpointGuestDrafts() {
         question:document.getElementById("wrongEditQuestion")?.value || "",
         note:document.getElementById("wrongEditNote")?.value || ""} : null;
     if (!window.DMateGuestSession.write("workspace-view", {wrongEdit, wrongBookFilter, wrongBookSearch, wrongBookSort})) reportGuestSaveFailure();
-    void checkpointGuestOcrTasks();
 }
 
 async function checkpointGuestOcrTasks() {
     const storage = window.DMateGuestSession;
     if (!guestWorkspaceReady || guestOcrRestoring || shouldPersistClientState() || !storage || storage.getOwner()) return;
     const version = ++guestOcrSaveVersion, context = cloudSyncContextVersion, rows = [];
-    const fields = ["id", "groupId", "sessionId", "state", "draft", "initialDocument", "confirmation", "scanState", "textEditorState",
-        "dirty", "userRequest", "isQuestion", "error", "notice", "sourceSha256", "descriptions", "descriptionState", "result"];
+
     for (const task of ocrTasks.values()) {
         const section = "ocr-file-" + task.id;
         let pending = guestOcrFiles.get(task.file);
@@ -15322,7 +15789,7 @@ async function checkpointGuestOcrTasks() {
         if (!await pending) { guestOcrFiles.delete(task.file); reportGuestSaveFailure(); return; }
         if (version !== guestOcrSaveVersion || context !== cloudSyncContextVersion || shouldPersistClientState() || storage.getOwner()) return;
         const row = {name:task.file.name, type:task.file.type};
-        for (const key of fields) if (task[key] !== undefined) row[key] = task[key];
+        for (const key of OCR_TASK_SNAPSHOT_FIELDS) if (task[key] !== undefined) row[key] = task[key];
         if (row.scanState) row.scanState = JSON.parse(JSON.stringify(row.scanState,
             (key, value) => key === "controller" ? undefined : value));
         rows.push(row);
@@ -15340,14 +15807,16 @@ async function restoreGuestOcrTasks() {
     let missing = 0;
     guestOcrRestoring = true;
     try {
-        for (const row of saved.slice(0, OCR_MAX_CONCURRENT)) {
+        for (const row of saved) {
             const blob = await storage.readBlob("ocr-file-" + row.id);
             if (context !== cloudSyncContextVersion || shouldPersistClientState() || storage.getOwner()) return;
             if (!blob) { missing++; continue; }
-            if (!sessions.some(session => session.id === row.sessionId) || ocrTasks.has(row.id)) continue;
+            if (!sessions.some(session => sessionBusyKey(session.id) === sessionBusyKey(row.sessionId))
+                || ocrTasks.has(row.id) || getSessionOcrTasks(row.sessionId).length >= OCR_MAX_CONCURRENT) continue;
             const file = new File([blob], row.name || "图片.png", {type:row.type || blob.type});
             const interrupted = row.state === "recognizing";
-            const task = {...row, file, originalUrl:URL.createObjectURL(file), controller:new AbortController(),
+            const task = {...row, file, contextVersion:cloudSyncContextVersion,
+                originalUrl:URL.createObjectURL(file), controller:new AbortController(),
                 startedAt:performance.now(), finishedAt:performance.now(), confirming:false, sending:false,
                 state:interrupted ? "failed" : row.state,
                 error:interrupted ? "页面刷新中断了识别，请重新识别这张图片" : row.error};
@@ -15361,10 +15830,65 @@ async function restoreGuestOcrTasks() {
     }
 }
 
-function isOcrSendInProgress() {
-    // Sending changes the visible workspace, while originals and confirmed
-    // drafts stay available until their own request succeeds.
-    return ocrSolvingSessions.size > 0;
+function getSessionOcrTasks(sessionId = currentId) {
+    const key = sessionBusyKey(sessionId);
+    return key ? [...ocrTasks.values()].filter(task => sessionBusyKey(task.sessionId) === key) : [];
+}
+
+function exportConversationOcrTasks(sessionId) {
+    return getSessionOcrTasks(sessionId).map(task => {
+        if (!Number.isFinite(task.draftOrder)) task.draftOrder = nextOcrDraftOrder(task.sessionId);
+        if (!Number.isFinite(task.draftCreatedAt)) task.draftCreatedAt = Date.now();
+        const saved = {};
+        for (const key of OCR_TASK_SNAPSHOT_FIELDS) if (task[key] !== undefined) saved[key] = task[key];
+        return { ...JSON.parse(JSON.stringify(saved, (key, value) => key === "controller" ? undefined : value)),
+            file:task.file };
+    });
+}
+
+function importConversationOcrTasks(sessionId, rows, {replaceRestored = false} = {}) {
+    if (!Array.isArray(rows) || !sessions.some(session => sessionBusyKey(session.id) === sessionBusyKey(sessionId))) return 0;
+    let imported = 0;
+    for (const row of rows) {
+        if (!row || typeof row.id !== "string" || !(row.file instanceof Blob)) continue;
+        const previous = ocrTasks.get(row.id);
+        if (previous && (!replaceRestored || !previous.restoredFromAccountDraft || previous.sending || previous.confirming)) continue;
+        if (previous) { ocrTasks.delete(previous.id); URL.revokeObjectURL(previous.originalUrl); }
+        if (getSessionOcrTasks(sessionId).length >= OCR_MAX_CONCURRENT) break;
+        const saved = {};
+        for (const key of OCR_TASK_SNAPSHOT_FIELDS) if (row[key] !== undefined) saved[key] = row[key];
+        const value = JSON.parse(JSON.stringify(saved, (key, item) => key === "controller" ? undefined : item));
+        const file = row.file instanceof File ? row.file : new File([row.file], row.name || "图片.png", {type:row.file.type});
+        const interrupted = row.state === "recognizing";
+        ocrTasks.set(row.id, { ...value, file, sessionId, contextVersion:cloudSyncContextVersion,
+            originalUrl:URL.createObjectURL(file), controller:null, startedAt:performance.now(), finishedAt:performance.now(),
+            confirming:false, sending:false, state:interrupted ? "failed" : row.state === "ready" ? "ready" : "failed",
+            error:interrupted ? "图片仍在原标签页识别，请在识别完成后重新打开或手动编辑。" : value.error });
+        imported++;
+    }
+    renderOcrTasks();
+    return imported;
+}
+
+function isOcrBatchPreparing(sessionId = currentId) {
+    const run = ocrBatchRuns.get(sessionBusyKey(sessionId));
+    return Boolean(run?.preparing && !run.cancelled);
+}
+
+function syncOcrBatchPreparing() {
+    // Cloud/account guards need the aggregate; composer controls use their owner.
+    ocrBatchPreparing = [...ocrBatchRuns.values()].some(run => run.preparing && !run.cancelled);
+}
+
+function isOcrSendInProgress(sessionId = currentId) {
+    const key = sessionBusyKey(sessionId);
+    return [...ocrSolvingSessions].some(id => sessionBusyKey(id) === key);
+}
+
+function isLiveOcrTask(task) {
+    return ocrTasks.get(task?.id) === task && task.contextVersion === cloudSyncContextVersion
+        && sessions.some(session => sessionBusyKey(session.id) === sessionBusyKey(task.sessionId))
+        && !deletedSessionIds[sessionBusyKey(task.sessionId)];
 }
 
 function cloneOcrDocument(value) {
@@ -15391,7 +15915,7 @@ function ocrTaskSeconds(task) {
 }
 
 function updateOcrTaskTimes() {
-    for (const task of ocrTasks.values()) {
+    for (const task of getSessionOcrTasks()) {
         const card = document.querySelector(`[data-ocr-task-id="${task.id}"]`);
         if (card) card.dataset.elapsedSeconds = String(ocrTaskSeconds(task));
         const slow = card?.querySelector(".ocr-task-slow");
@@ -15403,13 +15927,17 @@ function ocrTaskLabel(task) {
     if (task.sending) return "正在解题";
     if (task.confirming) return "正在保存";
     if (task.confirmation) return "已核对";
-    if (task.state === "recognizing") return "识别中";
+    if (task.state === "recognizing") return task.waitingForRecognition ? "等待识别" : "识别中";
     if (task.state === "failed") return "识别失败";
     return task.dirty ? "待保存" : "待核对";
 }
 
-function nextOcrGroupId() {
-    const used = new Set([...ocrTasks.values()].map(task => String(task.groupId ?? task.id)));
+function nextOcrDraftOrder(sessionId) {
+    return Math.max(0, ...getSessionOcrTasks(sessionId).map(task => Number(task.draftOrder) || 0)) + 1;
+}
+
+function nextOcrGroupId(sessionId = currentId) {
+    const used = new Set(getSessionOcrTasks(sessionId).map(task => String(task.groupId ?? task.id)));
     return ["1", "2", "3", "4"].find(id => !used.has(id)) || "1";
 }
 
@@ -15438,14 +15966,15 @@ function renderOcrGrouping(panel, hasImages) {
         button.addEventListener("click", openOcrGrouping);
         heading.append(button);
     }
-    const locked = ocrBatchPreparing || ocrSolvingSessions.size > 0;
+    const tasks = getSessionOcrTasks();
+    const locked = isOcrBatchPreparing() || isOcrSendInProgress();
     button.disabled = locked;
     const dialog = document.getElementById("ocrGroupingDialog");
     if (!hasImages && dialog?.open) dialog.close();
     if (!dialog?.open) return;
     // Recognition can complete while this popup is open. Rebuild only when its
     // own values change so an in-flight pointer/keyboard action stays intact.
-    const fingerprint = JSON.stringify([locked, [...ocrTasks.values()].map(task =>
+    const fingerprint = JSON.stringify([sessionBusyKey(currentId), locked, tasks.map(task =>
         [task.id, task.groupId, task.isQuestion !== false])]);
     if (dialog.dataset.fingerprint === fingerprint) return;
     dialog.dataset.fingerprint = fingerprint;
@@ -15455,7 +15984,7 @@ function renderOcrGrouping(panel, hasImages) {
         question: focused.dataset.groupQuestion, field: focused.dataset.groupField } : null;
     list.replaceChildren();
     let index = 0;
-    for (const task of ocrTasks.values()) {
+    for (const task of tasks) {
         index += 1;
         const row = document.createElement("section");
         row.className = "ocr-group-row";
@@ -15517,10 +16046,11 @@ function renderOcrGrouping(panel, hasImages) {
 }
 
 function openOcrGrouping() {
-    if (!ocrTasks.size || ocrBatchPreparing || ocrSolvingSessions.size) return;
+    const tasks = getSessionOcrTasks();
+    if (!tasks.length || isOcrBatchPreparing() || isOcrSendInProgress()) return;
     // Older in-memory uploads and imported drawing tasks also get independent
     // defaults. Changing the select is the only action which combines images.
-    for (const task of ocrTasks.values()) {
+    for (const task of tasks) {
         if (!["1", "2", "3", "4"].includes(String(task.groupId))) task.groupId = nextOcrGroupId();
     }
     let dialog = document.getElementById("ocrGroupingDialog");
@@ -15545,8 +16075,11 @@ function openOcrGrouping() {
         dialog.addEventListener("click", event => {
             const choice = event.target.closest("button[data-group-question]");
             const task = ocrTasks.get(choice?.dataset.taskId);
-            if (!task || ocrBatchPreparing || ocrSolvingSessions.size) return;
+            if (!task || sessionBusyKey(task.sessionId) !== sessionBusyKey(currentId)
+                || isOcrBatchPreparing() || isOcrSendInProgress()) return;
+            task.restoredFromAccountDraft = false; task.userEditedAt = Date.now();
             task.isQuestion = choice.dataset.groupQuestion === "true";
+            void checkpointOcrTasks();
             // Keep the controls mounted so the selection can slide and focus stays put.
             const modeSwitch = choice.closest(".ocr-group-question");
             modeSwitch.dataset.mode = task.isQuestion ? "question" : "chat";
@@ -15557,8 +16090,11 @@ function openOcrGrouping() {
         dialog.addEventListener("change", event => {
             const select = event.target.closest("select[data-group-field]");
             const task = ocrTasks.get(select?.dataset.taskId);
-            if (!task || ocrBatchPreparing || ocrSolvingSessions.size) return;
+            if (!task || sessionBusyKey(task.sessionId) !== sessionBusyKey(currentId)
+                || isOcrBatchPreparing() || isOcrSendInProgress()) return;
+            task.restoredFromAccountDraft = false; task.userEditedAt = Date.now();
             task.groupId = select.value;
+            void checkpointOcrTasks();
             renderOcrGrouping(document.getElementById("ocrTaskPanel"), true);
         });
         document.body.append(dialog);
@@ -15568,13 +16104,14 @@ function openOcrGrouping() {
 }
 
 function renderOcrTasks() {
-    void checkpointGuestOcrTasks();
+    void checkpointOcrTasks();
     const panel = document.getElementById("ocrTaskPanel");
     const list = document.getElementById("ocrTaskList");
     if (!panel || !list) return;
     const focused = list.contains(document.activeElement) ? document.activeElement : null;
     const focusInfo = focused ? { taskId: focused.dataset.taskId, action: focused.dataset.ocrAction } : null;
-    const hasImages = ocrTasks.size > 0 && !isOcrSendInProgress();
+    const tasks = getSessionOcrTasks();
+    const hasImages = tasks.length > 0 && !isOcrSendInProgress();
     if (typeof renderOcrGrouping === "function") renderOcrGrouping(panel, hasImages);
     panel.hidden = !hasImages;
     const stage = document.getElementById("ocrUploadStage");
@@ -15610,7 +16147,7 @@ function renderOcrTasks() {
         if (text !== undefined) node.textContent = text;
         return node;
     };
-    for (const task of ocrTasks.values()) {
+    for (const task of tasks) {
         const card = element("article", "ocr-task-card");
         card.dataset.ocrTaskId = task.id;
         card.dataset.state = task.state;
@@ -15700,12 +16237,42 @@ async function originalImageDigest(file) {
     return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function queueOcrRecognition(task) {
+    task.waitingForRecognition = true;
+    const result = new Promise(resolve => ocrRecognitionQueue.set(task, resolve));
+    pumpOcrRecognitionQueue();
+    return result;
+}
+
+function pumpOcrRecognitionQueue() {
+    if (ocrRecognitionPumpPending) return;
+    ocrRecognitionPumpPending = true;
+    // Defer until a complete upload/cancellation/account switch has finished.
+    queueMicrotask(() => {
+        ocrRecognitionPumpPending = false;
+        for (const [task, resolve] of ocrRecognitionQueue) {
+            if (ocrRecognitionRuns.size >= OCR_MAX_CONCURRENT) break;
+            ocrRecognitionQueue.delete(task);
+            if (!isLiveOcrTask(task) || task.state !== "recognizing") { resolve(); continue; }
+            task.waitingForRecognition = false;
+            task.startedAt = performance.now();
+            ocrRecognitionRuns.add(task);
+            void recognizeOcrTask(task).finally(() => {
+                ocrRecognitionRuns.delete(task);
+                resolve();
+                pumpOcrRecognitionQueue();
+            });
+        }
+        renderOcrTasks();
+    });
+}
+
 async function recognizeOcrTask(task) {
     // Each upload has its own editable Qwen draft and evidence-triggered
     // review. Text OCR runs only for regions selected in its separate tab.
     try {
         await ensureGraphSession();
-        if (task.state !== "recognizing" || !ocrTasks.has(task.id)) return;
+        if (task.state !== "recognizing" || !isLiveOcrTask(task)) return;
         const formData = new FormData();
         formData.append("image", task.file);
         formData.append("request_id", task.id);
@@ -15713,7 +16280,7 @@ async function recognizeOcrTask(task) {
         const response = await fetch("/ocr", { method: "POST", body: formData,
             signal: task.controller.signal });
         const data = await parseResponseJson(response);
-        if (task.state !== "recognizing" || !ocrTasks.has(task.id)) return;
+        if (task.state !== "recognizing" || !isLiveOcrTask(task)) return;
         if (data?.cancelled) {
             discardOcrTask(task);
             return;
@@ -15747,7 +16314,7 @@ async function recognizeOcrTask(task) {
                     ? "识别未完成；你可以对照原图手动录入。其他图片会继续处理。"
                     : "请对照原图检查节点、连边和题干，确认后再解题。");
     } catch (error) {
-        if (task.state !== "recognizing" || !ocrTasks.has(task.id)) return;
+        if (task.state !== "recognizing" || !isLiveOcrTask(task)) return;
         if (error?.name === "AbortError") {
             discardOcrTask(task);
         } else {
@@ -15756,9 +16323,8 @@ async function recognizeOcrTask(task) {
         }
     } finally {
         task.controller = null;
-        if (ocrTasks.has(task.id)) renderOcrTasks();
+        if (ocrTasks.get(task.id) === task) renderOcrTasks();
         if (task.finishedAt === null) {
-            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
             task.finishedAt = performance.now();
             updateOcrTaskTimes();
         }
@@ -15766,38 +16332,56 @@ async function recognizeOcrTask(task) {
 }
 
 function discardOcrTask(task) {
-    if (!task || !ocrTasks.has(task.id)) return;
+    if (!task || ocrTasks.get(task.id) !== task) return;
     // A cancelled upload is removed, never kept as an "已取消" card.
     // Late HTTP responses and finally blocks cannot resurrect this task.
     task.state = "cancelled";
     task.finishedAt = performance.now();
     task.controller?.abort();
     task.controller = null;
+    const queued = ocrRecognitionQueue.get(task);
+    ocrRecognitionQueue.delete(task);
+    queued?.();
     ocrTasks.delete(task.id);
     URL.revokeObjectURL(task.originalUrl);
     renderOcrTasks();
+    pumpOcrRecognitionQueue();
+}
+
+function discardSessionOcrTasks(sessionId) {
+    consumeSessionAccountOcrDrafts(sessionId);
+    for (const task of getSessionOcrTasks(sessionId)) {
+        if (task.state === "recognizing" && !task.waitingForRecognition) notifyOcrCancelled(task.id);
+        if (ocrEditorTaskId === task.id) document.getElementById("graphEditorDialog")?.close();
+        discardOcrTask(task);
+    }
 }
 
 function cancelOcrTask(id) {
     const task = ocrTasks.get(id);
-    if (!task || task.state !== "recognizing") return;
-    const requestId = task.id;
+    if (!task || task.state !== "recognizing"
+        || sessionBusyKey(task.sessionId) !== sessionBusyKey(currentId)) return;
+    consumeAccountOcrDraft(task);
+    const requestId = task.waitingForRecognition ? null : task.id;
     discardOcrTask(task); // Immediate UI removal, no cancelled/manual-entry state.
     notifyOcrCancelled(requestId);
 }
 
 function removeOcrTask(id) {
     const task = ocrTasks.get(id);
-    if (!task || task.state === "recognizing" || task.confirming || task.sending || ocrEditorTaskId === id) return;
+    if (!task || sessionBusyKey(task.sessionId) !== sessionBusyKey(currentId)
+        || task.state === "recognizing" || task.confirming || task.sending || ocrEditorTaskId === id) return;
+    consumeAccountOcrDraft(task);
     URL.revokeObjectURL(task.originalUrl);
     ocrTasks.delete(id);
     renderOcrTasks();
 }
 
 function openImagePicker() {
-    if (ocrEditorTaskId || isCurrentSessionTyping() || isSessionBusy(currentId)) return;
-    if (ocrActiveCount() >= OCR_MAX_CONCURRENT) {
-        showCurrentError("最多同时识别 4 张图片，请等其中一张结束后再添加。");
+    if (ocrEditorTaskId || isOcrBatchPreparing() || isCurrentSessionTyping()
+        || isSessionBusy(currentId) || isSessionPendingAiStart(currentId)) return;
+    if (getSessionOcrTasks().length >= OCR_MAX_CONCURRENT) {
+        showCurrentError("每个对话最多 4 张图片，请发送或移除已有图片后再添加。");
         return;
     }
     const input = document.getElementById("imageInput");
@@ -15822,8 +16406,10 @@ async function handleImageSelected(event) {
 async function enqueueOcrFiles(files) {
     const selected = Array.from(files || []);
     if (!selected.length || ocrEditorTaskId) return;
-    if (ocrBatchPreparing || selected.length > OCR_MAX_CONCURRENT || selected.length + ocrTasks.size > OCR_MAX_CONCURRENT) {
-        showCurrentError("每批最多 4 张图片，请发送或移除已有图片后再添加。");
+    if (isOcrBatchPreparing() || isOcrSendInProgress() || isSessionBusy(currentId)
+        || isSessionPendingAiStart(currentId) || isCurrentSessionTyping()) return;
+    if (selected.length > OCR_MAX_CONCURRENT || selected.length + getSessionOcrTasks().length > OCR_MAX_CONCURRENT) {
+        showCurrentError("每个对话最多 4 张图片，请发送或移除已有图片后再添加。");
         return;
     }
     if (!currentId) newChat();
@@ -15841,14 +16427,15 @@ async function enqueueOcrFiles(files) {
             continue;
         }
         const task = {
-            id: makeOcrRequestId(), file, sessionId: session.id, originalUrl: URL.createObjectURL(file),
+            id: makeOcrRequestId(), file, sessionId: session.id, contextVersion:cloudSyncContextVersion, originalUrl: URL.createObjectURL(file),
+            draftCreatedAt:Date.now(), draftOrder:nextOcrDraftOrder(session.id),
             state: "recognizing", startedAt: performance.now(), finishedAt: null,
             controller: new AbortController(), draft: { body_text: "", graphs: [] },
             initialDocument: { body_text: "", graphs: [] }, confirmation: null,
             dirty: false, userRequest: "", isQuestion: true, error: "", notice: "", sourceSha256: null,
             descriptions: null, descriptionState: null
         };
-        task.groupId = nextOcrGroupId();
+        task.groupId = nextOcrGroupId(session.id);
         ocrTasks.set(task.id, task);
         accepted.push(task);
     }
@@ -15858,7 +16445,7 @@ async function enqueueOcrFiles(files) {
     // also pans the page/hidden shell while a native picker restores its
     // viewport, producing a visible jump before the viewport settles.
     // Independent promises: one failed image cannot reject or cancel its peers.
-    return Promise.allSettled(accepted.map(recognizeOcrTask));
+    return Promise.allSettled(accepted.map(queueOcrRecognition));
 }
 
 async function requestGraphDescriptions(task, confirmation) {
@@ -15911,6 +16498,8 @@ async function confirmOcrTask(task, documentValue, options = {}) {
         await ensureGraphSession();
         if (!/^[a-f0-9]{64}$/i.test(task.sourceSha256 || "")) task.sourceSha256 = await originalImageDigest(task.file);
         if (!task.sourceSha256) throw new Error("无法校验原图，请使用支持安全连接的浏览器后重试。");
+        if (options.signal?.aborted || !isLiveOcrTask(task))
+            throw Object.assign(new Error("图片已取消"), { name: "AbortError" });
         const submitted = cloneOcrDocument(documentValue);
         const response = await fetch("/graph/confirm", {
             method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
@@ -15918,7 +16507,7 @@ async function confirmOcrTask(task, documentValue, options = {}) {
             body: JSON.stringify({ document: submitted, source_sha256: task.sourceSha256, request_id: task.id, confirmed: true })
         });
         const data = await parseResponseJson(response);
-        if (options.signal?.aborted) throw Object.assign(new Error("已停止发送"), { name: "AbortError" });
+        if (options.signal?.aborted || !isLiveOcrTask(task)) throw Object.assign(new Error("已停止发送"), { name: "AbortError" });
         if (!response.ok || data?.error) throw new Error(data?.error || "修改后的图形未通过校验，请检查节点和连边。");
         if (!data?.document || !data?.confirmation_token || !data?.semantic_context) {
             throw new Error("结构确认响应不完整，请重新确认。");
@@ -16035,7 +16624,7 @@ function collectLearningReviewDrawings() {
 
 async function uploadDrawingResult(blob, metadata = {}) {
     if (ocrEditorTaskId !== "standalone-drawing") throw new Error("请先打开绘图工作区。");
-    if (ocrBatchPreparing || ocrTasks.size >= OCR_MAX_CONCURRENT)
+    if (isOcrBatchPreparing() || getSessionOcrTasks().length >= OCR_MAX_CONCURRENT)
         throw new Error("每批最多 4 张图片，请先发送或移除已有图片。");
     if (isCurrentSessionTyping() || isSessionBusy(currentId) || isSessionPendingAiStart(currentId))
         throw new Error("当前对话仍在回答，请结束后再上传绘图。");
@@ -16057,15 +16646,15 @@ async function uploadDrawingResult(blob, metadata = {}) {
         throw new Error("绘图上传响应不完整，请重试。");
     if (drawingStorageOwner() !== owner || currentId !== selectedSession || ocrEditorTaskId !== "standalone-drawing")
         throw new Error("账号或对话已切换，请重新上传绘图。");
-    if (ocrBatchPreparing || ocrTasks.size >= OCR_MAX_CONCURRENT)
+    if (isOcrBatchPreparing() || getSessionOcrTasks().length >= OCR_MAX_CONCURRENT)
         throw new Error("本批图片已满，请发送或移除已有图片后重试。");
     if (!currentId) newChat();
     const session = getCurrent();
-    if (!session || [...ocrTasks.values()].some(task => task.sessionId !== session.id))
-        throw new Error("已有图片属于其他对话，请先发送或移除后重试。");
+    if (!session) throw new Error("当前对话不存在，请重新上传绘图。");
     const now = performance.now(), documentValue = cloneOcrDocument(result.document);
-    ocrTasks.set(requestId, {id: requestId, groupId: nextOcrGroupId(), file, sessionId: session.id,
-        originalUrl: URL.createObjectURL(file), state: "ready", startedAt: now, finishedAt: now,
+    ocrTasks.set(requestId, {id: requestId, groupId: nextOcrGroupId(session.id), file, sessionId: session.id, contextVersion:cloudSyncContextVersion,
+        originalUrl: URL.createObjectURL(file), draftCreatedAt:Date.now(), draftOrder:nextOcrDraftOrder(session.id),
+        state: "ready", startedAt: now, finishedAt: now,
         controller: null, draft: documentValue, initialDocument: cloneOcrDocument(documentValue),
         confirmation: null, dirty: true, userRequest: String(metadata.requirements || "").slice(0, 4000),
         isQuestion: true, error: "", notice: "绘图已上传，发送时将使用你绘制的结构。",
@@ -16195,7 +16784,8 @@ function openGraphDrawing() {
 
 async function editOcrTask(id) {
     const task = ocrTasks.get(id);
-    if (!task || task.state === "recognizing" || task.confirming || task.sending || ocrEditorTaskId) return;
+    if (!task || sessionBusyKey(task.sessionId) !== sessionBusyKey(currentId)
+        || task.state === "recognizing" || task.confirming || task.sending || ocrEditorTaskId) return;
     const dialog = document.getElementById("graphEditorDialog");
     const mount = document.getElementById("graphEditorMount");
     const title = document.getElementById("graphEditorTitle");
@@ -16231,10 +16821,10 @@ async function editOcrTask(id) {
             document: cloneOcrDocument(task.draft), initialDocument: cloneOcrDocument(task.initialDocument),
             originalUrl: task.originalUrl,
             isQuestion: task.isQuestion !== false,
-            onQuestionChange: flag => { task.isQuestion = flag; },
+            onQuestionChange: flag => { task.restoredFromAccountDraft = false; task.userEditedAt = Date.now(); task.isQuestion = flag; void checkpointOcrTasks(); },
             requirements: task.userRequest || '',
-            onRequirementsChange: value => { task.userRequest = value; },
-            onViewChange: () => { void checkpointGuestOcrTasks(); },
+            onRequirementsChange: value => { task.restoredFromAccountDraft = false; task.userEditedAt = Date.now(); task.userRequest = value; void checkpointOcrTasks(); },
+            onViewChange: () => { task.restoredFromAccountDraft = false; task.userEditedAt = Date.now(); void checkpointOcrTasks(); },
             textState: task.textEditorState ||= { mode: 'text_rect', zoom: 100, visible: true },
             onRecognizeText: async (regions, {signal, forceRecognition = false} = {}) => {
                 const controller = new AbortController(), operationId = makeOcrRequestId();
@@ -16293,12 +16883,14 @@ async function editOcrTask(id) {
                 ...(Array.isArray(task.result?.review?.reasons) ? task.result.review.reasons : []),
                 ...(task.error ? [task.error] : [])],
             onChange: value => {
+                task.restoredFromAccountDraft = false; task.userEditedAt = Date.now();
                 task.draft = cloneOcrDocument(value);
                 task.dirty = true;
                 task.confirmation = null;
                 task.descriptions = null;
                 task.descriptionState = null;
                 task.error = "";
+                void checkpointOcrTasks();
             },
             onConfirm: async (value, isQuestion) => {
                 task.isQuestion = isQuestion;
@@ -16320,7 +16912,8 @@ async function editOcrTask(id) {
 
 async function solveOcrTask(id) {
     const task = ocrTasks.get(id);
-    if (!task?.confirmation || task.dirty || task.sending || ocrEditorTaskId) return;
+    if (!task?.confirmation || sessionBusyKey(task.sessionId) !== sessionBusyKey(currentId)
+        || task.dirty || task.sending || ocrEditorTaskId) return;
     const session = sessions.find(item => item.id === task.sessionId);
     if (!session) { task.error = "原会话已删除，请重新上传图片。"; renderOcrTasks(); return; }
     if (ocrSolvingSessions.has(session.id) || isSessionBusy(session.id) || isSessionPendingAiStart(session.id)
@@ -16350,10 +16943,10 @@ async function solveOcrTask(id) {
         renderOcrTasks();
         return;
     }
+    const contextVersion = cloudSyncContextVersion;
     task.sending = true;
     task.error = "";
     ocrSolvingSessions.add(session.id);
-    currentId = session.id;
     const message = { role: "user", text: combinedText, source: "ocr", createdAt:Date.now(),
         ocrIsQuestion: task.isQuestion !== false,
         apiText, semanticContext: context };
@@ -16367,27 +16960,30 @@ async function solveOcrTask(id) {
     try {
         const result = await requestAiReply(session, { completeImmediately: true, expectedUserMessage: message });
         if (result?.status === "success" && ocrTasks.get(task.id) === task) {
+            consumeAccountOcrDraft(task);
             ocrTasks.delete(task.id);
             URL.revokeObjectURL(task.originalUrl);
         }
     }
-    finally { task.sending = false; ocrSolvingSessions.delete(session.id); renderOcrTasks(); }
+    finally {
+        task.sending = false;
+        if (contextVersion === cloudSyncContextVersion) ocrSolvingSessions.delete(session.id);
+        renderOcrTasks();
+    }
 }
 
 function cancelOcrBatchRun(sessionId) {
     const run = ocrBatchRuns.get(sessionBusyKey(sessionId));
     if (!run) return;
     run.cancelled = true;
+    run.preparing = false;
     run.controller.abort();
-}
-
-function pauseOcrBatchRun(sessionId) {
-    const run = ocrBatchRuns.get(sessionBusyKey(sessionId));
-    if (run) run.paused = true;
+    syncOcrBatchPreparing();
 }
 
 function ocrBatchCanContinue(run) {
-    return !run.cancelled && !run.paused && currentId === run.session.id
+    return !run.cancelled && !run.controller.signal.aborted
+        && run.contextVersion === cloudSyncContextVersion
         && sessions.includes(run.session) && !deletedSessionIds[sessionBusyKey(run.session.id)];
 }
 
@@ -16417,13 +17013,10 @@ function buildOcrGroupMessage(group, sharedRequest) {
 }
 
 async function sendOcrBatch() {
-    if (ocrBatchPreparing || ocrEditorTaskId || !ocrTasks.size) return;
-    const tasks = [...ocrTasks.values()];
-    const session = sessions.find(item => item.id === tasks[0].sessionId);
-    if (!session || tasks.some(task => task.sessionId !== session.id)) {
-        showCurrentError("这些图片不属于同一个会话，请移除其他会话的图片后再发送。");
-        return;
-    }
+    const tasks = getSessionOcrTasks();
+    if (isOcrBatchPreparing() || ocrEditorTaskId || !tasks.length) return;
+    const session = getCurrent();
+    if (!session || tasks.some(task => !isLiveOcrTask(task))) return;
     if (currentId !== session.id || ocrSolvingSessions.has(session.id) || isSessionBusy(session.id)
         || isSessionPendingAiStart(session.id) || isCurrentSessionTyping()) return;
     if (tasks.some(task => task.state === "recognizing" || task.confirming)) {
@@ -16436,11 +17029,13 @@ async function sendOcrBatch() {
         return;
     }
     const typed = document.getElementById("text");
-    const sharedRequest = typed?.value?.trim() || "";
-    const run = { session, cancelled: false, paused: false, controller: new AbortController() };
+    const submittedDraft = typed?.value || "";
+    const sharedRequest = submittedDraft.trim();
+    const run = { session, cancelled: false, preparing: true, contextVersion:cloudSyncContextVersion,
+        controller: new AbortController() };
     const key = sessionBusyKey(session.id);
     ocrBatchRuns.set(key, run);
-    ocrBatchPreparing = true;
+    syncOcrBatchPreparing();
     ocrSolvingSessions.add(session.id);
     tasks.forEach(task => { task.sending = true; });
     renderOcrTasks();
@@ -16460,7 +17055,8 @@ async function sendOcrBatch() {
             group.tasks.forEach(task => { task.pendingSharedRequest = request; });
             return { ...group, message: buildOcrGroupMessage(group, request) };
         });
-        ocrBatchPreparing = false;
+        run.preparing = false;
+        syncOcrBatchPreparing();
         let lastMessage = getLatestUserMessage(session);
         let clearedInput = false;
         for (const group of groups) {
@@ -16482,9 +17078,8 @@ async function sendOcrBatch() {
                 maybeAutoNameSession(session, group.tasks[0].draft.body_text || group.tasks[0].file.name || "图片识题", "ocr");
             }
             lastMessage = message;
-            if (!clearedInput && typed) {
-                typed.value = "";
-                typed.dispatchEvent(new Event("input", { bubbles: true }));
+            if (!clearedInput) {
+                clearConversationComposerDraft(session.id, submittedDraft);
                 clearedInput = true;
             }
             saveState(); renderChat(); renderSessions(); renderInfo(); renderOcrTasks();
@@ -16494,22 +17089,27 @@ async function sendOcrBatch() {
             if (result?.status !== "success") break;
             for (const task of group.tasks) {
                 if (ocrTasks.get(task.id) !== task) continue;
+                consumeAccountOcrDraft(task);
                 ocrTasks.delete(task.id);
                 URL.revokeObjectURL(task.originalUrl);
             }
             renderOcrTasks();
         }
     } catch (error) {
-        if (!run.cancelled && error?.name !== "AbortError" && sessions.includes(session)
+        if (ocrBatchCanContinue(run) && error?.name !== "AbortError" && sessions.includes(session)
             && !deletedSessionIds[key]) showAssistantMessage(session,
                 error?.message || "图片未能发送，请稍后重试。", { isError: true });
     } finally {
-        ocrBatchPreparing = false;
+        run.preparing = false;
+        syncOcrBatchPreparing();
         tasks.forEach(task => { task.sending = false; });
-        ocrSolvingSessions.delete(session.id);
-        if (ocrBatchRuns.get(key) === run) ocrBatchRuns.delete(key);
         const currentKey = sessionBusyKey(session.id);
-        if (ocrBatchRuns.get(currentKey) === run) ocrBatchRuns.delete(currentKey);
+        if (ocrBatchRuns.get(key) === run || ocrBatchRuns.get(currentKey) === run) {
+            ocrSolvingSessions.delete(session.id);
+            if (ocrBatchRuns.get(key) === run) ocrBatchRuns.delete(key);
+            if (ocrBatchRuns.get(currentKey) === run) ocrBatchRuns.delete(currentKey);
+        }
+        syncOcrBatchPreparing();
         renderOcrTasks();
     }
 }
@@ -16531,7 +17131,7 @@ function initializeVoiceInput() {
         onError: message => showCurrentError(message),
         onStateChange: () => refreshInputAvailability(),
         getContextKey: () => `${accountState.authenticated ? "account:" + accountState.username : "guest"}:${currentId ?? ""}`,
-        isBusy: () => Boolean(ocrReviewInProgress || ocrBatchPreparing || ocrTasks.size > 0 || isSessionBusy(currentId)
+        isBusy: () => Boolean(ocrReviewInProgress || isOcrBatchPreparing() || getSessionOcrTasks().length > 0 || isSessionBusy(currentId)
             || isSessionPendingAiStart(currentId) || isCurrentSessionTyping()) });
 }
 
@@ -18039,7 +18639,6 @@ function renderSessions() {
                 if (isMobileAppShell()) closeMobileShellDrawers();
                 return;
             }
-            if (currentId !== session.id) pauseOcrBatchRun(currentId);
             if (typingTimer) forceCompleteTyping();
             currentId = session.id;
             saveState();
@@ -21518,7 +22117,6 @@ function locateKnowledgeGraphQuestion(reference, context) {
         || document.getElementById("knowledgeGraphModal")?.classList.contains("hidden")) return;
     const resolved = resolveKnowledgeGraphHistoryQuestion(reference);
     if (!resolved) return;
-    if (String(currentId) !== String(resolved.session.id)) pauseOcrBatchRun(currentId);
     if (typingTimer) forceCompleteTyping();
     currentId = resolved.session.id;
     saveState();
@@ -22887,6 +23485,8 @@ function installMobileVisualViewportFix() {
 // 全刷新
 // -----------------------------
 function renderAll() {
+    syncConversationComposer();
+    renderOcrTasks();
     renderSessions();
     renderChat();
     renderInfo();
@@ -23575,8 +24175,7 @@ document.addEventListener(
         loadState({guest:true});
         const guestLearning = window.DMateGuestSession?.read("learning");
         if (guestLearning) learningState = normalizeLearningState(guestLearning);
-        const guestDraft = window.DMateGuestSession?.read("draft");
-        if (input && typeof guestDraft === "string") input.value = guestDraft;
+        restoreConversationComposerDrafts(window.DMateGuestSession?.read("composer-drafts"), window.DMateGuestSession?.read("draft"));
         const guestView = window.DMateGuestSession?.read("workspace-view");
         if (["pending", "corrected"].includes(guestView?.wrongBookFilter)) wrongBookFilter = guestView.wrongBookFilter;
         if (typeof guestView?.wrongBookSearch === "string") wrongBookSearch = guestView.wrongBookSearch;
