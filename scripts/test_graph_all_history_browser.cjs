@@ -1,4 +1,4 @@
-/* Independent history mode follows sidebar conversations and each message sequence.
+/* Independent history mode lists live conversation questions by first appearance.
  * All model/account paths are mocked; no paid requests or cloud writes occur.
  */
 'use strict';
@@ -73,22 +73,22 @@ async function seedConversations(page) {
         {messageId:'top-ocr',role:'user',text:'【题目文字】\n'+ocrQuestion,source:'ocr',ocrIsQuestion:true,questionTeaching:sets,createdAt:900},
         {messageId:'top-generated',role:'ai',text:generated,generatedQuestion:generated,
           generatedTeaching:teaching('命题逻辑','逻辑等价',generated,'logic_equivalence','双重否定','困难','证明题'),createdAt:1},
-        {messageId:'top-duplicate',role:'user',text:shared,manualIsQuestion:true,questionTeaching:logical},
-        {messageId:'top-explicit-no',role:'user',text:'证明集合 A 的双重补等于 A。',manualIsQuestion:false,questionTeaching:sets},
-        {messageId:'top-image-no',role:'user',text:'【题目文字】\n求函数 f 的复合。',source:'ocr',ocrIsQuestion:false},
-        {messageId:'top-request',role:'user',text:'我要简单题',manualIsQuestion:true}
+        {messageId:'top-duplicate',role:'user',text:shared,manualIsQuestion:true,questionTeaching:logical,createdAt:1200},
+        {messageId:'top-explicit-no',role:'user',text:'证明集合 A 的双重补等于 A。',manualIsQuestion:false,questionTeaching:sets,createdAt:1300},
+        {messageId:'top-image-no',role:'user',text:'【题目文字】\n求函数 f 的复合。',source:'ocr',ocrIsQuestion:false,createdAt:1400},
+        {messageId:'top-request',role:'user',text:'我要简单题',manualIsQuestion:true,createdAt:1500}
       ]};
     const empty = {id:'history-empty',name:'没有题目的中间对话',nameSource:'user',createdAt:8888,updatedAt:8888,deletedMessageIds:{},
-      teaching:null,learningQuestion:null,messages:[{messageId:'empty-user',role:'user',text:'你好',manualIsQuestion:false},
-        {messageId:'empty-ai',role:'ai',text:'你好，有什么需要帮助的？'}]};
+      teaching:null,learningQuestion:null,messages:[{messageId:'empty-user',role:'user',text:'你好',manualIsQuestion:false,createdAt:8888},
+        {messageId:'empty-ai',role:'ai',text:'你好，有什么需要帮助的？',createdAt:8889}]};
     const lower = {id:'history-lower',name:'底部对话',nameSource:'user',createdAt:9999,updatedAt:9999,deletedMessageIds:{},learningQuestion:null,
       teaching:sets,messages:[
         {messageId:'lower-shared',role:'user',text:shared,manualIsQuestion:true,questionTeaching:logical,createdAt:9000},
         {messageId:'lower-follow-up',role:'user',text:'详细解释一下',manualIsQuestion:false,createdAt:5000},
         {messageId:'lower-later',role:'user',text:powerQuestion,manualIsQuestion:true,
           questionTeaching:teaching('集合与关系','集合运算',powerQuestion,'set_operation','幂集','中等','计算题'),createdAt:2},
-        {messageId:'lower-answer',role:'user',text:'这是学生的解答',manualIsQuestion:true,isRetestAnswer:true},
-        {messageId:'lower-reply',role:'ai',text:'应当逐个检查这些子集'}
+        {messageId:'lower-answer',role:'user',text:'这是学生的解答',manualIsQuestion:true,isRetestAnswer:true,createdAt:9001},
+        {messageId:'lower-reply',role:'ai',text:'应当逐个检查这些子集',createdAt:9002}
       ]};
     sessions=[top,empty,lower]; currentId=lower.id; deletedSessionIds=Object.create(null);
     // Completed semantic fixtures bind their review to each question's actual
@@ -112,7 +112,7 @@ async function seedConversations(page) {
     delete top.messages[3].generatedExercise;
     const snapshot=JSON.stringify(sessions.map(session=>({id:session.id,messages:session.messages})));
     return {snapshot,conversationOrder:[top.id,empty.id,lower.id],names:[top.name,lower.name],
-      questionIds:['top-manual','top-ocr','top-generated','lower-shared','lower-later']};
+      questionIds:['top-generated','lower-later','top-ocr','top-manual','top-duplicate','lower-shared']};
   });
 }
 
@@ -147,19 +147,16 @@ async function checkCase(browser,width,language) {
     assert.equal(await page.locator('#knowledgeGraphLocateOriginal').count(),0,label+': an unselected historical detail has no source locator');
     await page.locator('#knowledgeGraphHistoryTab').click();
     assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(),true,label+': the sidebar returns to the historical list before a selection');
-    assert.equal(await page.locator('#knowledgeGraphHistoryTab').innerText(),language==='en'?'Past questions (5)':'历史题目 (5)',
-      label+': independent history mode counts all conversations, with only within-conversation duplicate removal');
-    assert.deepEqual(await page.locator('#knowledgeGraphHistory .kg-history-conversation').evaluateAll(nodes=>nodes.map(node=>node.dataset.sessionId)),
-      ['history-top','history-lower'],label+': nonempty groups follow the exact visible sidebar order');
-    assert.deepEqual(await page.locator('#knowledgeGraphHistory .kg-history-conversation-title').allTextContents(),fixture.names,
-      label+': custom conversation names remain literal user text');
-    assert.equal(await page.locator('#knowledgeGraphHistory .kg-history-conversation-title b').count(),0,
-      label+': custom title HTML is displayed as text');
+    assert.equal(await page.locator('#knowledgeGraphHistoryTab').innerText(),language==='en'?'Past questions (6)':'历史题目 (6)',
+      label+': every separate question message remains in history, including identical question text');
+    assert.equal(await page.locator('#knowledgeGraphHistory .kg-history-conversation-title').count(),0,
+      label+': conversation titles do not appear in the flat question list');
     assert.deepEqual(await page.locator(cards).evaluateAll(nodes=>nodes.map(node=>node.dataset.messageId)),fixture.questionIds,
-      label+': each conversation shows questions oldest to newest by message order');
-    assert.deepEqual(await page.locator(cards+' .kg-history-number').allTextContents(),language==='en'
-      ?['Question 1','Question 2','Question 3','Question 1','Question 2']:['第 1 题','第 2 题','第 3 题','第 1 题','第 2 题'],
-      label+': per-conversation numbering restarts for each group');
+      label+': questions from all conversations interleave by their own first-appearance times');
+    assert.equal(await page.locator(cards+' .kg-history-number').count(),0,
+      label+': the flat list has no per-conversation question numbers');
+    assert.equal(await page.locator('#knowledgeGraphHistory time,#knowledgeGraphHistory [datetime],#knowledgeGraphHistory .kg-history-time').count(),0,
+      label+': ordering timestamps are not rendered');
     assert.match(await page.locator('.kg-history-item[data-message-id="top-manual"] .kg-history-preview').innerText(),/为真。$/,
       label+': question punctuation is protected user content');
     assert.equal(await page.evaluate(()=>window.__historyInjected),undefined,label+': no injected title markup executes');
@@ -237,7 +234,7 @@ async function checkCase(browser,width,language) {
     assert.equal(await page.locator('#knowledgeGraphModal').isVisible(),true,label+': stale account/context action keeps the current page');
     assert.deepEqual(modelCalls,[],label+': history rendering/navigation never calls a model');
     assert.deepEqual(errors,[],label+': no browser errors');
-    console.log('PASS '+label+': all-conversation history ordering, strict question identity, raw names/content, independent history UI, graph/source actions and stale identity/context guards');
+    console.log('PASS '+label+': chronological flat history, strict question identity, title/number-free content, graph/source actions and stale identity/context guards');
   } finally {await context.close();}
 }
 
@@ -314,6 +311,137 @@ async function checkModeTransitions(browser,width) {
   } finally {await context.close();}
 }
 
+async function checkChronologyAndConversationDeletion(browser,width) {
+  const label=width+'/chronology and deletion',mobile=width<=760;
+  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',
+    ...(mobile?{isMobile:true,hasTouch:true}:{})});
+  const page=await context.newPage(),errors=[],modelCalls=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  await page.route('**/auth/me',route=>route.fulfill({contentType:'application/json',body:'{"configured":true,"authenticated":false}'}));
+  await page.route(/\/(?:chat|analyze-questions|classify|conversation\/title|ocr)(?:\?|$)/,route=>{
+    modelCalls.push(new URL(route.request().url()).pathname);return route.abort();
+  });
+  const order=()=>page.locator(cards).evaluateAll(nodes=>nodes.map(node=>node.dataset.messageId));
+  const removeConversation=async id=>{
+    await page.locator('#sessions>.session[data-session-id="'+id+'"] .del').evaluate(button=>button.click());
+    await page.locator('#appConfirmModal').waitFor({state:'visible'});
+    await page.locator('#appConfirmConfirm').click();
+    await page.waitForFunction(id=>!sessions.some(session=>String(session.id)===id),id);
+    await settle(page);
+  };
+  try {
+    await page.goto(baseURL,{waitUntil:'networkidle'});
+    await page.waitForFunction(()=>!accountVerificationOperation);
+    await page.evaluate(()=>{
+      const base=Date.UTC(2026,10,18,2,0);
+      const message=(id,offset)=>{
+        const text='求集合 A={1,2,'+(offset+100)+'} 与 B={2,3} 的交集';
+        return {messageId:id,role:'user',text,manualIsQuestion:true,createdAt:base+offset,
+          questionTeaching:{category:'集合与关系',difficulty:'简单',knowledge_points:['集合运算'],focus_points:['集合运算'],
+            question_graph:{version:1,sources:{question:text,solution:''},
+              nodes:[{id:'set_operation',evidence:[{source:'question',quote:'交集'}]}],edges:[]}}};
+      };
+      const session=(id,title,messages,offset)=>({id,name:title,nameSource:'user',createdAt:base-offset,
+        updatedAt:base+offset,deletedMessageIds:{},learningQuestion:null,messages});
+      sessions=[session('chrono-a','Alpha conversation title',[message('a-early',10),message('a-tombstone',15),message('a-late',50)],100),
+        session('chrono-b','Beta conversation title',[message('b-first',20),message('b-second',40)],200),
+        session('chrono-c','Gamma conversation title',[message('c-middle',30)],300),
+        session('chrono-removed','Removed conversation title',[message('removed-question',5)],400)];
+      sessions[0].deletedMessageIds['a-tombstone']=base+1000;
+      deletedSessionIds=Object.assign(Object.create(null),{'chrono-removed':base+1000});
+      currentId='chrono-a';
+      // A retained wrong-book entry is independent of its deleted chat. It is
+      // deliberately present to ensure history never uses it as a fallback.
+      learningState=normalizeLearningState({version:9,events:[],wrongQuestions:[{id:'retained-wrong-b',
+        question:sessions[1].messages[0].text,sessionId:'chrono-b',createdAt:base,updatedAt:base,
+        difficulty:'简单',category:'集合与关系',knowledgePoints:['集合运算'],focusPoints:['集合运算'],
+        referenceAnswer:'{2}',answer:'{2}',corrected:false}]});
+      window.__chronologyBase=base;
+      window.__chronologyMessage=message;
+      renderAll();
+    });
+    await openHistory(page);
+    assert.deepEqual(await order(),['a-early','b-first','c-middle','b-second','a-late'],
+      label+': message creation time globally interleaves live questions and excludes both tombstone kinds');
+    assert.equal(await page.locator('#knowledgeGraphHistory .kg-history-conversation-title,#knowledgeGraphHistory .kg-history-number,#knowledgeGraphHistory time,#knowledgeGraphHistory [datetime]').count(),0,
+      label+': title, numbering and time widgets are absent');
+    const text=await page.locator('#knowledgeGraphHistory').innerText();
+    assert.doesNotMatch(text,/Alpha conversation title|Beta conversation title|Gamma conversation title|Removed conversation title|2026-11-18|2026\/11\/18/,
+      label+': neither conversation headings nor ordering dates appear as text');
+
+    await page.evaluate(()=>{
+      sessions.reverse();
+      const first=sessions.find(session=>session.id==='chrono-a');
+      first.name='Renamed conversation title';first.updatedAt=__chronologyBase+999999;
+      first.messages[0].updatedAt=__chronologyBase+999999;
+      renderAll();renderKnowledgeGraph();
+    });
+    assert.deepEqual(await order(),['a-early','b-first','c-middle','b-second','a-late'],
+      label+': sidebar movement, renaming and edits do not move an existing question');
+    await page.evaluate(()=>{
+      sessions.find(session=>session.id==='chrono-a').messages.push(__chronologyMessage('a-synced-middle',25));
+      renderKnowledgeGraph();
+    });
+    assert.deepEqual(await order(),['a-early','b-first','a-synced-middle','c-middle','b-second','a-late'],
+      label+': a newly received older question is inserted by its original appearance, not append or session order');
+    await page.evaluate(()=>{
+      sessions.find(session=>session.id==='chrono-a').messages.push(__chronologyMessage('a-tie',25));
+      sessions.find(session=>session.id==='chrono-b').messages.push(__chronologyMessage('b-tie',25));
+      renderKnowledgeGraph();
+    });
+    const tiedOrder=['a-early','b-first','a-synced-middle','a-tie','b-tie','c-middle','b-second','a-late'];
+    assert.deepEqual(await order(),tiedOrder,label+': equal timestamps retain separate messages with stable source identity');
+    await page.evaluate(()=>{sessions.reverse();renderAll();renderKnowledgeGraph();});
+    assert.deepEqual(await order(),tiedOrder,label+': equal-time ordering does not depend on the sidebar order');
+
+    const stale=await page.locator('.kg-history-item[data-message-id="b-first"] [data-history-action="locate"]').elementHandle();
+    await removeConversation('chrono-b');
+    assert.equal(await page.locator('#knowledgeGraphModal').isVisible(),true,label+': deleting a different conversation leaves history open');
+    assert.deepEqual(await order(),['a-early','a-synced-middle','a-tie','c-middle','a-late'],
+      label+': the real delete handler removes all of that conversation\'s questions immediately');
+    assert.equal(await page.locator('#knowledgeGraphHistoryTab').innerText(),'历史题目 (5)',label+': deletion updates the visible count');
+    assert.equal(await page.evaluate(()=>learningState.wrongQuestions.length),1,label+': retained wrong-book data does not recreate deleted chat history');
+    await stale.evaluate(button=>button.click());
+    assert.equal(await page.evaluate(()=>currentId),'chrono-a',label+': an old removed-conversation action cannot navigate');
+
+    await page.locator('.kg-history-item[data-message-id="c-middle"] [data-history-action="graph"]').click();
+    assert.deepEqual(await page.evaluate(()=>knowledgeGraphDisplayedNodes().map(node=>node.id)),['set_operation']);
+    await removeConversation('chrono-c');
+    assert.equal(await page.evaluate(()=>getKnowledgeGraphQuestionSubject()),null,
+      label+': deleting the selected graph\'s conversation invalidates the displayed question source');
+    assert.deepEqual(await page.evaluate(()=>knowledgeGraphDisplayedNodes().map(node=>node.id)),[],
+      label+': a deleted selected question leaves no purple graph behind');
+    await page.locator('#knowledgeGraphHistoryTab').click();
+    assert.deepEqual(await order(),['a-early','a-synced-middle','a-tie','a-late']);
+    assert.equal(await page.locator('#knowledgeGraphHistoryTab').innerText(),'历史题目 (4)');
+    const restored=await page.evaluate(()=>{
+      const session=sessions.find(item=>item.id==='chrono-a');
+      const index=session.messages.findIndex(message=>message.messageId==='a-late');
+      const original=session.messages[index],edited=editedUserMessage(original,original.text);
+      edited.messageId=original.messageId;
+      // A cloud copy's estimated clock cannot replace the actual first
+      // appearance, even when the content has been edited on another device.
+      session.messages[index]=mergeCloudMessage({...edited,createdAt:__chronologyBase+1,createdAtEstimated:true},edited);
+      session.messages.splice(session.messages.findIndex(message=>message.messageId==='a-early'),1);
+      const legacy={id:'old-record-without-clock',messages:[{role:'user',text:'求两个集合的交集'}]};
+      const first=questionMessageAppearedAt(legacy,legacy.messages[0],0),now=Date.now;
+      let legacyStable;
+      try {Date.now=()=>now()+999999999;legacyStable=first===questionMessageAppearedAt(legacy,legacy.messages[0],0);}
+      finally {Date.now=now;}
+      saveState();sessions=[];currentId=null;
+      const loaded=loadState({guest:true});renderAll();
+      return {loaded,legacyStable};
+    });
+    assert.deepEqual(restored,{loaded:true,legacyStable:true},label+': old missing clocks remain stable rather than acquiring render time');
+    await openHistory(page);
+    assert.deepEqual(await order(),['a-synced-middle','a-tie','a-late'],
+      label+': saved first-appearance order survives edits, prior-message deletion, cloud clock recovery and actual save/load');
+    assert.deepEqual(modelCalls,[],label+': ordering and deletion require no identification or answer request');
+    assert.deepEqual(errors,[],label+': no browser errors');
+    console.log('PASS '+label+': global question time order, hidden titles/numbers/time and live conversation deletion');
+  } finally {await context.close();}
+}
+
 async function checkReplyRetention(browser) {
   const context=await browser.newContext({viewport:{width:1440,height:900},serviceWorkers:'block'});
   const page=await context.newPage(),errors=[],requests=[];
@@ -334,7 +462,7 @@ async function checkReplyRetention(browser) {
     assert.equal(requests.length,1,'exactly one explicit generated-question request is pending');
     await page.evaluate(()=>setKnowledgeGraphFilter('函数'));
     await openHistory(page);
-    assert.match(await page.locator('#knowledgeGraphHistoryTab').innerText(),/5/);
+    assert.match(await page.locator('#knowledgeGraphHistoryTab').innerText(),/6/);
     const generated='证明对于任意命题 p，p 与 p 的合取和 p 等价。';
     const teaching={category:'命题逻辑',knowledge_points:['逻辑等价'],focus_points:['逻辑等价'],
       prerequisite_points:[],knowledge_path:['逻辑等价'],difficulty:'简单',question_type:'证明题',
@@ -345,23 +473,23 @@ async function checkReplyRetention(browser) {
       reply:generated,generated_question:generated,generated_teaching:teaching})+'\n\n'});
     await page.waitForFunction(text=>getCurrent().messages.some(message=>message.generatedQuestion===text),generated);
     assert.equal((await page.evaluate(()=>window.historyReplyPromise)).status,'success','the real answer commit path completes');
-    await page.waitForFunction(()=>document.getElementById('knowledgeGraphHistoryTab').textContent.includes('6'));
+    await page.waitForFunction(()=>document.getElementById('knowledgeGraphHistoryTab').textContent.includes('7'));
     assert.deepEqual(await page.evaluate(()=>({mode:knowledgeGraphViewMode,category:knowledgeGraphFilter})),
       {mode:'history',category:'函数'},'an incoming answer preserves independent history mode and the remembered module filter');
     assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(),true,'the active question-history pane stays open');
-    assert.equal(await page.locator(cards).count(),6,'a committed generated question refreshes the aggregate count');
-    assert.equal(await page.locator(cards).last().getAttribute('data-session-id'),'history-lower','new questions stay in their sidebar conversation group');
+    assert.equal(await page.locator(cards).count(),7,'a committed generated question refreshes the aggregate count');
+    assert.equal(await page.locator(cards).last().getAttribute('data-session-id'),'history-lower','new questions retain their original conversation identity');
     assert.match(await page.locator(cards).last().locator('.kg-history-preview').innerText(),/p 与 p 的合取和 p 等价/,
-      'the generated question follows the older questions in its conversation');
+      'the generated question follows older questions across all conversations');
     assert.equal(await page.locator('#knowledgeGraphModal .graph-status-pill.current').count(),0,'the history list remains free of current-question decorations');
     assert.equal(requests.length,1,'history refresh does not repeat the model request');
     assert.deepEqual(errors,[],'incoming answer history checks have no browser errors');
-    console.log('PASS incoming generated answer: independent history and remembered filter remain selected and the new question appears in its conversation order');
+    console.log('PASS incoming generated answer: independent history and remembered filter remain selected and the new question appears by first-appearance time');
   } finally {await context.close();}
 }
 
 (async()=>{
   const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.CHROMIUM_EXECUTABLE_PATH}:{})});
-  try {for(const width of [1440,390])for(const language of ['zh-CN','en'])await checkCase(browser,width,language);for(const width of [1440,390])await checkModeTransitions(browser,width);await checkReplyRetention(browser);}
+  try {for(const width of [1440,390])for(const language of ['zh-CN','en'])await checkCase(browser,width,language);for(const width of [1440,390])await checkModeTransitions(browser,width);for(const width of [1440,390])await checkChronologyAndConversationDeletion(browser,width);await checkReplyRetention(browser);}
   finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1});

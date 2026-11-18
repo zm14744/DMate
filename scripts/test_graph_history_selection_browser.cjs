@@ -22,18 +22,22 @@ async function checkCase(browser, width) {
     await page.waitForFunction(() => !accountVerificationOperation);
     const fixture = await page.evaluate(async () => {
       const teaching = { category: '证明与归纳', knowledge_points: ['数学归纳法'], focus_points: ['数学归纳法'] };
+      const base = Date.UTC(2026,10,18,1,0);
       sessions = Array.from({ length: 50 }, (_, conversation) => ({
         id: 'selection-history-' + conversation, name: 'Performance fixture ' + conversation, nameSource: 'user',
+        createdAt:base+conversation*1000000,updatedAt:base+conversation*1000000,
         deletedMessageIds: {}, learningQuestion: null, teaching,
         messages: Array.from({ length: 100 }, (_, index) => {
           const text = index % 10 === 0 ? '使用数学归纳法证明命题 p 与 ' + index + ' 的关系。' + '条件 '.repeat(100) : '解释内容 '.repeat(120);
           return { messageId: conversation + '-' + index, role: index % 2 ? 'ai' : 'user', text,
+            createdAt:base+index*100+conversation,
             manualIsQuestion: index % 10 === 0, questionTeaching: index % 10 === 0 ? {...teaching,
               question_graph: {version: 1,classifier_revision:'catalog-semantic-v5',classification_status:'semantic',classification_source:'catalog_semantic',needs_review:false, sources: {question: text, solution: '解释内容 '.repeat(120)},
                 nodes: [{id: 'proof_induction', evidence: [{source: 'question', quote: '数学归纳法'}]}], edges: []}} : null };
         })
       }));
       currentId = sessions[0].id;
+      window.__selectionHistoryBase = base;
       const bytes = new TextEncoder().encode(JSON.stringify(sessions)).length;
       const before = JSON.stringify(sessions);
       await openKnowledgeGraph();
@@ -79,6 +83,7 @@ async function checkCase(browser, width) {
       const session = sessions[0];
       const text = '用真值表证明命题 p 的双重否定与 p 等价';
       session.messages.push({ role: 'user', messageId: 'selection-new-question-1', text,
+        createdAt:__selectionHistoryBase+50000,
         manualIsQuestion: true, questionTeaching: {category: '命题逻辑', knowledge_points: ['逻辑等价'], focus_points: ['逻辑等价'],
           question_graph: {version: 1,classifier_revision:'catalog-semantic-v5',classification_status:'semantic',classification_source:'catalog_semantic',needs_review:false, sources: {question: text, solution: ''},
             nodes: [{id: 'logic_truth_table', evidence: [{source: 'question', quote: '真值表'}]},
@@ -97,6 +102,12 @@ async function checkCase(browser, width) {
     assert.ok(await page.evaluate(() => window.__selectionHistoryCalls) > 0, width + ': entering the history page reads current message contents');
     assert.equal(await page.locator('#knowledgeGraphHistoryTab').innerText(), '历史题目 (501)');
     assert.equal(await page.locator('#knowledgeGraphHistory .kg-history-item').count(), 501);
+    assert.deepEqual(await page.locator('#knowledgeGraphHistory .kg-history-item').evaluateAll(nodes=>nodes.slice(0,5).map(node=>node.dataset.messageId)),
+      ['0-0','1-0','2-0','3-0','4-0'],width+': the large history globally interleaves source conversations by question time');
+    assert.equal(await page.locator('#knowledgeGraphHistory .kg-history-item').last().getAttribute('data-message-id'),'selection-new-question-1',
+      width+': the latest new question follows all older source messages');
+    assert.equal(await page.locator('#knowledgeGraphHistory .kg-history-conversation-title,#knowledgeGraphHistory .kg-history-number,#knowledgeGraphHistory time,#knowledgeGraphHistory [datetime]').count(),0,
+      width+': large flat history does not render titles, question numbers or timestamps');
     await page.locator('#knowledgeGraphHistory .kg-history-item[data-message-id="selection-new-question-1"] [data-history-action="graph"]').click();
     if (mobile) await page.locator('.kg-mobile-expand').click();
     await page.evaluate(() => { window.__selectionHistoryCalls = 0; });
@@ -108,6 +119,7 @@ async function checkCase(browser, width) {
     await page.evaluate(() => {
       const text = '证明命题 p 与 q 的双重否定定律';
       sessions[0].messages.push({ role: 'user', messageId: 'selection-new-question-2', text,
+        createdAt:__selectionHistoryBase-1,
         manualIsQuestion: true, questionTeaching: {category: '命题逻辑', knowledge_points: ['逻辑等价'], focus_points: ['逻辑等价'],
           question_graph: {version: 1,classifier_revision:'catalog-semantic-v5',classification_status:'semantic',classification_source:'catalog_semantic',needs_review:false, sources: {question: text, solution: ''},
             nodes: [{id: 'logic_equivalence', evidence: [{source: 'question', quote: '双重否定'}]}], edges: []}} });
@@ -119,6 +131,8 @@ async function checkCase(browser, width) {
     assert.equal(await page.locator('#knowledgeGraphHistoryTab').innerText(), '历史题目 (502)');
     assert.equal(await page.locator('#knowledgeGraphHistory .kg-history-item').count(), 502);
     assert.equal(await page.locator('#knowledgeGraphHistory .kg-history-item[data-message-id="selection-new-question-2"]').count(), 1);
+    assert.equal(await page.locator('#knowledgeGraphHistory .kg-history-item').first().getAttribute('data-message-id'),'selection-new-question-2',
+      width+': a newly synchronized older question is placed by original time instead of append position');
     await page.evaluate(() => { window.__selectionHistoryCalls = 0; selectKnowledgeGraphDisplayMode('focus'); });
     assert.equal(await page.evaluate(() => window.__selectionHistoryCalls), 0, width + ': recent mode does not aggregate global history');
     assert.equal(await page.locator('#knowledgeGraphHistoryTab').isVisible(), false);

@@ -163,6 +163,12 @@ async function seedCrossModule(page) {
         source('current-group'),{role:'ai',messageId:'current-explanation',text:'逐项核对定义',targetQuestionMessageId:'current-group'},
         {role:'user',messageId:'current-chat',text:'继续解释',manualIsQuestion:false}]}
     ];
+    sessions.forEach((session, sessionIndex) => {
+      session.createdAt = 1700000000000 + sessionIndex * 1000;
+      session.messages.forEach((message, messageIndex) => {
+        message.createdAt = session.createdAt + messageIndex + 1;
+      });
+    });
     currentId='current-conversation'; deletedSessionIds=Object.create(null); __bindQuestionGraphFixtures(); renderAll();
     return JSON.stringify(sessions);
   });

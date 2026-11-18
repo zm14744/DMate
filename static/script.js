@@ -2381,11 +2381,48 @@ function legacyCloudMessageId(key, occurrence) {
     return `legacy-v1:${key.length}:${(left >>> 0).toString(36)}:${(right >>> 0).toString(36)}:${occurrence}`;
 }
 
+function messageAppearanceTimestamp(value) {
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value)) value = Date.parse(value);
+    const number = typeof value === "number" || typeof value === "string" && value.trim() ? Number(value) : NaN;
+    return Number.isFinite(number) && number > 0 ? number : 0;
+}
+
+function sessionFirstAppearance(session) {
+    const recorded = messageAppearanceTimestamp(session?.createdAt);
+    if (recorded) return recorded;
+    const baseId = String(session?.id ?? "").split("-sync-")[0];
+    if (/^\d+$/.test(baseId)) return messageAppearanceTimestamp(baseId);
+    if (session?.createdAt === 0) return 0;
+    let first = 0;
+    for (const message of session?.messages || []) {
+        if (message?.createdAtEstimated === true) continue;
+        const at = messageAppearanceTimestamp(message?.createdAt);
+        if (at && (!first || at < first)) first = at;
+    }
+    return first;
+}
+
+function questionMessageAppearedAt(session, message, index) {
+    const recorded = messageAppearanceTimestamp(message?.createdAt);
+    if (recorded) return recorded;
+    const idTime = /^message-v1:(\d{11,16})-/.exec(String(message?.messageId || ""));
+    if (idTime) return Number(idTime[1]);
+    // Older clients did not save message times. Preserve their original
+    // position relative to the session's creation instead of using render time.
+    return sessionFirstAppearance(session) + (Math.max(0, Number(index) || 0) + 1) / 1000;
+}
+
 function ensureSessionMessageIds(session, legacy = false) {
     if (!session || !Array.isArray(session.messages)) return session;
+    if (!messageAppearanceTimestamp(session.createdAt)) session.createdAt = sessionFirstAppearance(session);
     const occurrences = new Map(), seen = new Set();
-    for (const message of session.messages) {
+    for (let index = 0; index < session.messages.length; index++) {
+        const message = session.messages[index];
         if (!message || typeof message !== "object") continue;
+        if (!messageAppearanceTimestamp(message.createdAt)) {
+            message.createdAt = questionMessageAppearedAt(session, message, index);
+            message.createdAtEstimated = true;
+        }
         const key = legacy ? cloudMessageKey(message) : "";
         const occurrence = (occurrences.get(key) || 0) + 1;
         if (legacy) occurrences.set(key, occurrence);
@@ -2431,6 +2468,15 @@ function normalizeCloudSessionMessages(session, sharedDeletions = {}) {
 
 function mergeCloudMessage(left, right) {
     const merged = { ...left, ...right };
+    const dated = [left, right].filter(message => messageAppearanceTimestamp(message?.createdAt));
+    const recorded = dated.filter(message => message.createdAtEstimated !== true);
+    const first = (recorded.length ? recorded : dated).sort((a, b) =>
+        messageAppearanceTimestamp(a.createdAt) - messageAppearanceTimestamp(b.createdAt))[0];
+    if (first) {
+        merged.createdAt = messageAppearanceTimestamp(first.createdAt);
+        if (first.createdAtEstimated === true) merged.createdAtEstimated = true;
+        else delete merged.createdAtEstimated;
+    }
     // 旧设备的分析结果可能较少；不应抹掉已有的题目/参考答案。
     for (const key of [
         "generatedQuestion", "generatedAnswer", "generatedTeaching",
@@ -2549,9 +2595,11 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
                 // side's active question and retest state, including nulls.
                 contextSource = filteredSessions.has(localSession) ? cloudSession : localSession;
             }
+            const creationTimes = [sessionFirstAppearance(cloudSession), sessionFirstAppearance(localSession)].filter(Boolean);
             resultSessions[index] = {
                 ...cloudSession,
                 ...localSession,
+                createdAt: creationTimes.length ? Math.min(...creationTimes) : 0,
                 ...mergeSessionTitleFields(localSession, cloudSession),
                 messages: longer.map((message, i) => (
                     i < shared ? mergeCloudMessage(cloudMessages[i], localMessages[i]) : message
@@ -8466,10 +8514,12 @@ function startWrongQuestionRetest(id) {
 
     const session = {
         id: idValue,
+        createdAt: Date.now(),
         name: dmateUiText(`复测：${targetName}`, `Retest: ${englishTarget}`).slice(0, dmateUiLanguage() === "en" ? 48 : 22),
         nameSource: "retest",
         messages: [{
             role: "user",
+            createdAt: Date.now(),
             text: visiblePrompt,
             apiText: buildRetestPrompt(entry),
             isRetestPrompt: true
@@ -10644,6 +10694,8 @@ function loadState({ guest = false } = {}) {
 
                 messages.push({
                     messageId: typeof message.messageId === "string" ? message.messageId : undefined,
+                    createdAt: messageAppearanceTimestamp(message.createdAt) || undefined,
+                    createdAtEstimated: message.createdAtEstimated === true || undefined,
                     role: message.role,
                     text,
                     source: message.source === "ocr" ? "ocr" : undefined,
@@ -10685,6 +10737,7 @@ function loadState({ guest = false } = {}) {
 
             loadedSessions.push(normalizeCloudSessionMessages({
                 id: session.id,
+                createdAt: messageAppearanceTimestamp(session.createdAt) || undefined,
                 name: typeof session.name === "string" && session.name.trim()
                     ? session.name
                     : "新对话",
@@ -13429,6 +13482,7 @@ function newChat() {
 
     sessions.push({
         id,
+        createdAt: Date.now(),
         name: "新对话",
         nameSource: "default",
         messages: [],
@@ -14746,7 +14800,7 @@ function send() {
     const session = getCurrent();
     if (!session) return;
     // Keep the sender's question choice fixed even when its toggle changes later.
-    const message = { role:"user", text, manualIsQuestion:manualQuestionMode };
+    const message = { role:"user", text, manualIsQuestion:manualQuestionMode, createdAt:Date.now() };
     prepareRetestAnswerMessage(session, message);
     session.messages.push(message);
     queueManualQuestionClassification(session, message);
@@ -16311,7 +16365,7 @@ async function solveOcrTask(id) {
     task.error = "";
     ocrSolvingSessions.add(session.id);
     currentId = session.id;
-    const message = { role: "user", text: combinedText, source: "ocr",
+    const message = { role: "user", text: combinedText, source: "ocr", createdAt:Date.now(),
         ocrIsQuestion: task.isQuestion !== false,
         apiText, semanticContext: context };
     session.messages.push(message);
@@ -16432,6 +16486,7 @@ async function sendOcrBatch() {
                 && session.messages.includes(previous.message)) message = previous.message;
             else {
                 message = group.message;
+                message.createdAt = Date.now();
                 session.messages.push(message);
                 const submission = { signature, message };
                 group.tasks.forEach(task => { task.submission = submission; });
@@ -17052,7 +17107,8 @@ window.DMateChatEditDraft = {
 
 function editedUserMessage(original, value) {
     let text = value.trim();
-    const message = { role:"user", text };
+    const message = { role:"user", text, createdAt:messageAppearanceTimestamp(original.createdAt) || Date.now() };
+    if (original.createdAtEstimated === true) message.createdAtEstimated = true;
     if (typeof original.manualIsQuestion === "boolean") message.manualIsQuestion = original.manualIsQuestion;
     if (original.source === "ocr") {
         const marker = "\n\n【我的要求】\n";
@@ -17229,6 +17285,7 @@ async function deleteChatMessage(sessionId, messageIndex) {
     renderSessions();
     renderInfo();
     renderLearningSummary();
+    renderKnowledgeGraph();
 }
 
 
@@ -17244,6 +17301,7 @@ function addAssistantMessage(
 
     session.messages.push({
         role: "ai",
+        createdAt: messageAppearanceTimestamp(meta.createdAt) || Date.now(),
         text,
         generatedExercise: Boolean(
             meta.generatedExercise
@@ -17465,6 +17523,7 @@ function startTyping(
     typingContext = { session, userMessage: getLatestUserMessage(session), version: cloudSyncContextVersion,
         onCommit, onCancel };
     typingMeta = {
+        createdAt: messageAppearanceTimestamp(meta.createdAt) || Date.now(),
         generatedExercise: Boolean(
             meta.generatedExercise
         ),
@@ -18558,7 +18617,7 @@ function looksLikeFormalStudyQuestionForHistory(
 }
 
 
-function collectConversationQuestionCandidates(session) {
+function collectConversationQuestionCandidates(session, {deduplicate = true} = {}) {
     if (
         !session
         || !Array.isArray(session.messages)
@@ -18647,7 +18706,7 @@ function collectConversationQuestionCandidates(session) {
 
         if (
             !fingerprint
-            || seen.has(identity)
+            || deduplicate && seen.has(identity)
         ) {
             continue;
         }
@@ -19370,14 +19429,15 @@ function getConversationKnowledgeContext() {
 
 
 function getConversationQuestionHistory(
-    session = getCurrent()
+    session = getCurrent(),
+    options = {}
 ) {
     if (!session) {
         return [];
     }
 
     const candidates = collectConversationQuestionCandidates(
-        session
+        session, options
     );
 
     return candidates.map(
@@ -21400,25 +21460,32 @@ function selectKnowledgeGraphNode(nodeId, sourceElement = null) {
 function knowledgeGraphSessionHistory(session) {
     // Legacy question recovery can add metadata. Browsing must only read copies.
     const snapshot = { ...session, messages:JSON.parse(JSON.stringify(session.messages || [])) };
-    return getConversationQuestionHistory(snapshot);
+    // Keep message indices aligned with the actual conversation while excluding
+    // deleted records before duplicate handling or legacy question recovery.
+    snapshot.messages = snapshot.messages.map(message =>
+        message?.messageId && session.deletedMessageIds?.[message.messageId] ? null : message);
+    return getConversationQuestionHistory(snapshot, {deduplicate:false});
 }
 
 function getKnowledgeGraphQuestionHistory() {
-    // The sidebar renders this exact array order; timestamps never reorder it.
-    return sessions.flatMap(session => {
-        const items = knowledgeGraphSessionHistory(session);
-        if (!items.length) return [];
-        return [{ sessionId:String(session.id), name:sessionDisplayName(session), items:items.map(item => ({
+    const items = sessions.filter(session => session && !deletedSessionIds[String(session.id)]).flatMap(session => {
+        const questions = knowledgeGraphSessionHistory(session);
+        return questions.map(item => ({
             ...item,
             sessionId:String(session.id),
             messageId:session.messages[item.index]?.messageId || "",
-            fingerprint:wrongQuestionFingerprint(item.text)
-        })) }];
+            fingerprint:wrongQuestionFingerprint(item.text),
+            appearedAt:questionMessageAppearedAt(session, session.messages[item.index], item.index)
+        }));
     });
+    const compareId = (left, right) => left < right ? -1 : left > right ? 1 : 0;
+    return items.sort((left, right) => left.appearedAt - right.appearedAt
+        || compareId(left.sessionId, right.sessionId) || left.index - right.index
+        || compareId(left.messageId, right.messageId));
 }
 
 function resolveKnowledgeGraphHistoryQuestion(reference) {
-    const session = sessions.find(item => String(item.id) === reference.sessionId);
+    const session = sessions.find(item => String(item.id) === reference.sessionId && !deletedSessionIds[String(item.id)]);
     if (!session) return null;
     const index = reference.messageId
         ? session.messages.findIndex(message => message.messageId === reference.messageId)
@@ -21525,11 +21592,11 @@ function locateWrongQuestionGraphOriginal(reference, context) {
     });
 }
 
-function renderKnowledgeGraphHistory(groups) {
+function renderKnowledgeGraphHistory(items) {
     const list = document.getElementById("knowledgeGraphHistory");
     if (!list) return;
     list.replaceChildren();
-    const total = groups.reduce((sum, group) => sum + group.items.length, 0);
+    const total = items.length;
     if (!total) {
         const empty = document.createElement("div");
         empty.className = "graph-detail-empty";
@@ -21544,51 +21611,37 @@ function renderKnowledgeGraphHistory(groups) {
     summary.textContent = dmateUiText(`全部对话共 ${total} 道题`,
         `${total} ${total === 1 ? "question" : "questions"} across all conversations`);
     list.append(summary);
-    for (const group of groups) {
-        const section = document.createElement("section");
-        section.className = "kg-history-conversation";
-        section.dataset.sessionId = group.sessionId;
-        const heading = document.createElement("h3");
-        heading.className = "kg-history-conversation-title";
-        heading.setAttribute("data-i18n-content", "");
-        heading.textContent = group.name;
-        section.append(heading);
-        for (const item of group.items) {
-            const card = document.createElement("div");
-            card.className = "kg-history-item";
-            card.dataset.sessionId = group.sessionId;
-            card.dataset.messageIndex = String(item.index);
-            card.dataset.messageId = item.messageId;
-            const number = document.createElement("div");
-            number.className = "kg-history-number";
-            number.textContent = dmateUiText(`第 ${item.order} 题`, `Question ${item.order}`);
-            const preview = document.createElement("div");
-            preview.className = "kg-history-preview ai-content";
-            preview.setAttribute("data-i18n-content", "");
-            preview.innerHTML = markdownToHtml(prepareAiDisplayText(item.text));
-            const points = document.createElement("div");
-            points.className = "kg-history-points";
-            points.textContent = item.knowledgePoints.length ? dmateKnowledgeList(item.knowledgePoints)
-                : dmateUiText("知识点暂未识别");
-            const actions = document.createElement("div");
-            actions.className = "kg-history-actions";
-            const graph = document.createElement("button");
-            graph.type = "button";
-            graph.className = "kg-history-graph";
-            graph.dataset.historyAction = "graph";
-            graph.textContent = dmateUiText("查看图谱");
-            graph.addEventListener("click", () => viewKnowledgeGraphHistoryQuestion(item, context));
-            const locate = document.createElement("button");
-            locate.type = "button";
-            locate.className = "kg-history-locate secondary";
-            locate.dataset.historyAction = "locate";
-            locate.textContent = dmateUiText("定位原题");
-            locate.addEventListener("click", () => locateKnowledgeGraphHistoryQuestion(item, context));
-            actions.append(graph, locate);
-            card.append(number, preview, points, actions);
-            section.append(card);
-        }
-        list.append(section);
+    for (const item of items) {
+        const card = document.createElement("div");
+        card.className = "kg-history-item";
+        card.dataset.sessionId = item.sessionId;
+        card.dataset.messageIndex = String(item.index);
+        card.dataset.messageId = item.messageId;
+        const preview = document.createElement("div");
+        preview.className = "kg-history-preview ai-content";
+        preview.setAttribute("data-i18n-content", "");
+        preview.innerHTML = markdownToHtml(prepareAiDisplayText(item.text));
+        const points = document.createElement("div");
+        points.className = "kg-history-points";
+        points.textContent = item.knowledgePoints.length ? dmateKnowledgeList(item.knowledgePoints)
+            : dmateUiText("知识点暂未识别");
+        const actions = document.createElement("div");
+        actions.className = "kg-history-actions";
+        const graph = document.createElement("button");
+        graph.type = "button";
+        graph.className = "kg-history-graph";
+        graph.dataset.historyAction = "graph";
+        graph.textContent = dmateUiText("查看图谱");
+        graph.addEventListener("click", () => viewKnowledgeGraphHistoryQuestion(item, context));
+        const locate = document.createElement("button");
+        locate.type = "button";
+        locate.className = "kg-history-locate secondary";
+        locate.dataset.historyAction = "locate";
+        locate.textContent = dmateUiText("定位原题");
+        locate.addEventListener("click", () => locateKnowledgeGraphHistoryQuestion(item, context));
+        actions.append(graph, locate);
+        card.append(preview, points, actions);
+        list.append(card);
     }
     renderMath(list);
 }
@@ -21606,10 +21659,10 @@ function renderKnowledgeGraphSide({refreshHistory = true} = {}) {
     if (tabs) tabs.hidden = !historical;
     // Selecting a node cannot change questions. Keep the displayed count until
     // a data render or history opening refreshes it; history itself is always read fresh.
-    const groups = historical ? (refreshHistory || history ? getKnowledgeGraphQuestionHistory() : null) : [];
+    const items = historical ? (refreshHistory || history ? getKnowledgeGraphQuestionHistory() : null) : [];
     const historyTab = document.getElementById("knowledgeGraphHistoryTab");
-    if (historyTab && groups !== null) {
-        const count = groups.reduce((sum, group) => sum + group.items.length, 0);
+    if (historyTab && items !== null) {
+        const count = items.length;
         historyTab.textContent = dmateUiText(`历史题目 (${count})`, `Past questions (${count})`);
     }
     for (const [id, selected] of [["knowledgeGraphDetailTab", !history], ["knowledgeGraphHistoryTab", history]]) {
@@ -21621,7 +21674,7 @@ function renderKnowledgeGraphSide({refreshHistory = true} = {}) {
         const page = document.getElementById(id);
         if (page) { page.hidden = !shown; page.classList.toggle("hidden", !shown); }
     }
-    if (history) renderKnowledgeGraphHistory(groups);
+    if (history) renderKnowledgeGraphHistory(items);
     else {
         document.getElementById("knowledgeGraphHistory")?.replaceChildren();
         renderKnowledgeGraphDetail();
@@ -21873,6 +21926,15 @@ function renderKnowledgeGraph() {
     }
 
     if (!knowledgeGraphData) return;
+
+    if (knowledgeGraphViewMode === "history" && knowledgeGraphQuestionReference
+        && (!isKnowledgeGraphHistoryOwnerCurrent(knowledgeGraphQuestionReference)
+            || !resolveKnowledgeGraphHistoryQuestion(knowledgeGraphQuestionReference))) {
+        knowledgeGraphQuestionReference = null;
+        knowledgeGraphRenderedQuestion = null;
+        knowledgeGraphSelectedNodeId = "";
+        knowledgeGraphSideMode = "history";
+    }
 
     fillKnowledgeGraphCategoryOptions();
     updateKnowledgeGraphScopeButton();
