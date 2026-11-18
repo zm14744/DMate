@@ -302,7 +302,7 @@
 .dmate-graph-information .dgs-relation{padding-left:8px}
 .dgs-status{font-size:13px;color:var(--text-subtle);overflow-wrap:anywhere}
 .dgs-requirements-label{display:block;margin-top:16px;font-size:14px}
-.dgs-requirements{display:block;width:100%;resize:vertical;margin-top:7px;padding:9px}
+.dmate-graph-editor textarea.dgs-requirements{display:block;width:100%;min-height:74px;resize:none;margin-top:6px;padding:10px;border-radius:9px;background:var(--surface-2,#f8fafc);font:400 var(--font-base,16px) var(--dmate-font-ui,system-ui);line-height:normal;box-shadow:none}
 @media(max-width:760px){.dgs-workspace{grid-template-columns:minmax(0,1fr);gap:12px}.dgs-source{height:44dvh;min-height:300px}.dgs-information{max-height:none;overflow:visible}.dge-scan-only .dge-overlay-tools button{padding:6px 8px}}
 .dge-overlay-svg[data-mode=select] .dge-frame-hit{cursor:pointer}
 

@@ -115,9 +115,9 @@ async function online(page,width) {
   await scanRequest.evaluate(node=>node.style.removeProperty('width'));await settle(page);
   assert.ok(Math.abs((await metrics(scanRequest)).height-wide.height)<=2,'Restoring width shrinks wrapped content again');
   await scanRequest.fill('');await settle(page);const normalFont=await metrics(scanRequest);
-  await scanRequest.evaluate(node=>node.parentElement.style.fontSize='24px');await settle(page);
-  assert.ok((await metrics(scanRequest)).height>normalFont.height+8,'An ancestor font change remeasures the minimum visible line');
-  await scanRequest.evaluate(node=>node.parentElement.style.removeProperty('font-size'));await settle(page);
+  await scanRequest.evaluate(node=>node.parentElement.style.setProperty('--font-base','64px'));await settle(page);
+  assert.ok((await metrics(scanRequest)).height>normalFont.height+8,'A shared input font change remeasures the minimum visible line');
+  await scanRequest.evaluate(node=>node.parentElement.style.removeProperty('--font-base'));await settle(page);
   await page.locator('.dgs-requirements').fill('第一行');await page.locator('.dgs-requirements').press('End');await page.locator('.dgs-requirements').press('Enter');
   assert.equal(await page.locator('.dgs-requirements').inputValue(),'第一行\n','Supplementary request Enter remains a native newline');
   await page.locator('#graphEditorClose').click();

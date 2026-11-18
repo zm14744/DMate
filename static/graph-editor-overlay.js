@@ -7,9 +7,12 @@ const regionSignedArea=points=>points.reduce((sum,p,i)=>{const q=points[(i+1)%po
 function regionIsSimple(points){
  const cross=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
  const on=(a,b,p)=>Math.abs(cross(a,b,p))<1e-10&&p[0]>=Math.min(a[0],b[0])-1e-10&&p[0]<=Math.max(a[0],b[0])+1e-10&&p[1]>=Math.min(a[1],b[1])-1e-10&&p[1]<=Math.max(a[1],b[1])+1e-10;
+ const segments=points.map((a,i)=>{const b=points[(i+1)%points.length];return{a,b,left:Math.min(a[0],b[0]),right:Math.max(a[0],b[0]),top:Math.min(a[1],b[1]),bottom:Math.max(a[1],b[1])};});
  for(let i=0;i<points.length;i++)for(let j=i+1;j<points.length;j++){
   if(j===i+1||i===0&&j===points.length-1)continue;
-  const a=points[i],b=points[(i+1)%points.length],c=points[j],d=points[(j+1)%points.length];
+  const first=segments[i],second=segments[j];
+  if(first.right<second.left-1e-10||second.right<first.left-1e-10||first.bottom<second.top-1e-10||second.bottom<first.top-1e-10)continue;
+  const {a,b}=first,{a:c,b:d}=second;
   const x=cross(a,b,c),y=cross(a,b,d),u=cross(c,d,a),v=cross(c,d,b);
   if(x*y<0&&u*v<0||on(a,b,c)||on(a,b,d)||on(c,d,a)||on(c,d,b))return false;
  }
@@ -384,6 +387,20 @@ function mount(host,o){
    dy=Math.max(-b[1],Math.min(1-b[3],op.end[1]-op.start[1]));
   op.previewEnd=[...op.end];return op.previewPoints=op.points.map(p=>[p[0]+dx,p[1]+dy]);
  }
+ function startRegionGesture(event,op){
+  // A layout/recognition update may move the SVG during a held pointer. Keep
+  // the gesture's image-space displacement relative to its original camera.
+  const box=svg.getBoundingClientRect();
+  active={...op,pointer:event.pointerId,pointerOrigin:[event.clientX,event.clientY],
+   dragThreshold:event.pointerType==='touch'?2:1,
+   pointerUnits:[(world.right-world.left)/Math.max(1,box.width),(world.bottom-world.top)/Math.max(1,box.height)],
+   labelScale:Math.max(.0001,box.width/((world.right-world.left)*w))};
+ }
+ const regionPointerEnd=(op,event)=>{
+  const delta=[event.clientX-op.pointerOrigin[0],event.clientY-op.pointerOrigin[1]];
+  if(Math.hypot(...delta)>=op.dragThreshold)op.dragging=true;
+  return op.start.map((value,axis)=>value+delta[axis]*op.pointerUnits[axis]);
+ };
  const cancelResizePreview=()=>{if(resizeFrame!==null){d.defaultView.cancelAnimationFrame(resizeFrame);resizeFrame=null;}};
  function paintResizePreview(){
   resizeFrame=null;const op=active;if(!op||!['resize','move-region'].includes(op.kind))return;
@@ -391,11 +408,13 @@ function mount(host,o){
   // Keep the captured SVG and the other ranges in place while the pointer
   // moves. Replacing the entire drawing tree at input-event frequency causes
   // visible stutter and makes a grabbed edge disappear under the finger.
-  for(const shape of svg.querySelectorAll('.dge-frame-hit,.dge-frame-edge-hit')){
-   if((op.isText?shape.dataset.textRegionId:shape.dataset.graphId)===id)shape.setAttribute('points',attribute);
+  if(!op.previewShapes?.[0]?.isConnected){
+   op.previewShapes=[...svg.querySelectorAll('.dge-frame-hit,.dge-frame-edge-hit')].filter(shape=>(op.isText?shape.dataset.textRegionId:shape.dataset.graphId)===id);
+   op.previewLabels=[...svg.querySelectorAll('[data-frame-label-id]')].filter(label=>label.dataset.frameLabelId===id&&label.dataset.frameLabelKind===(op.isText?'text':'graph'));
   }
-  const b=boxOf(points),scale=Math.max(.0001,svg.getBoundingClientRect().width/((world.right-world.left)*w));
-  for(const label of svg.querySelectorAll('[data-frame-label-id]'))if(label.dataset.frameLabelId===id&&label.dataset.frameLabelKind===(op.isText?'text':'graph')){
+  for(const shape of op.previewShapes)shape.setAttribute('points',attribute);
+  const b=boxOf(points),scale=op.labelScale;
+  for(const label of op.previewLabels){
    label.setAttribute('x',String(b[0]*w+6/scale));label.setAttribute('y',String(b[1]*h+17/scale));
   }
   svg.classList.toggle('is-deforming',op.kind==='resize'&&op.polygon);
@@ -421,6 +440,7 @@ function mount(host,o){
   // and labels instead use a constant on-screen size, including at 400% zoom.
   const radius=Math.max(5,Math.min(w,h)*.008);
   const scale=Math.max(.0001,svg.getBoundingClientRect().width/((world.right-world.left)*w));
+  if(active&&['resize','move-region'].includes(active.kind))active.labelScale=scale;
   const browser = d.defaultView;
   const touch=Boolean(browser?.navigator?.maxTouchPoints
       || browser?.matchMedia?.('(pointer: coarse)')?.matches);
@@ -644,7 +664,7 @@ function mount(host,o){
   if(!loaded||!autoFitted||o.disabled?.()||!s.visible)return;
   if(s.mode==='vertex'&&!o.graph())o.ensureGraph?.();
   pointers.set(e.pointerId,[e.clientX,e.clientY]);
-  if(pointers.size===2){cancelResizePreview();const a=[...pointers.values()];base={distance:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]),zoom:s.zoom};active=null;ghost=null;draw();return;}if(pointers.size>2)return;
+  if(pointers.size===2){e.preventDefault();svg.setPointerCapture?.(e.pointerId);cancelResizePreview();const a=[...pointers.values()];base={distance:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]),zoom:s.zoom};active=null;ghost=null;draw();return;}if(pointers.size>2)return;
   let node=e.target.closest('[data-vertex-id]')?.dataset.vertexId;
   let edge=e.target.closest('[data-edge-id]')?.dataset.edgeId;
   const handle=e.target.closest('[data-handle-id]')?.dataset.handleId,p=mouse(e),g=o.graph();
@@ -679,8 +699,11 @@ function mount(host,o){
     // narrow text region still needs a centre that can move the whole frame.
     for(let index=regions.length-1;index>=0;index--){
       const region=regions[index];if(!region.points?.length)continue;
-      const boundary=nearestRegionBoundary(region.points,p,metric),near=boundary&&boundary.distance<=regionEdgeTolerance(region.points,metric,touch);
-      if(near||insideRegion(region.points,p)){
+      const boundary=nearestRegionBoundary(region.points,p,metric),inside=insideRegion(region.points,p),
+        near=boundary&&boundary.distance<=regionEdgeTolerance(region.points,metric,touch)&&(!inside||boundary.distance<=1.5);
+      // The wide outside hit band helps grab an edge, but must not consume a
+      // narrow neck or tip inside an otherwise large irregular region.
+      if(near||inside){
         hit=near;graphId=region.isText?null:region.id;textId=region.isText?region.id:null;break;
       }
     }
@@ -697,18 +720,19 @@ function mount(host,o){
     const isText=o.textOnly||o.scanOnly&&!!textId;
     const region=isText?s.regions?.find(r=>r.id===Number(textId)):o.model.getDocument().graphs.find(r=>r.id===graphId);
     const points=isText?region?.polygon:region&&graphPoints(region);
-    if(points){active={kind:'resize',pointer:e.pointerId,id:isText?textId:graphId,isText:!!isText,
-      polygon:isText?!!region.irregular:!!region.region_polygon,start:p,end:p,points:points.map(p=>[...p]),sides:resizeSides(points,p)};
+    if(points){startRegionGesture(e,{kind:'resize',id:isText?textId:graphId,isText:!!isText,
+      polygon:isText?!!region.irregular:!!region.region_polygon,start:p,end:p,points:points.map(p=>[...p]),sides:resizeSides(points,p)});
       if(active.polygon){const scale=Math.max(1,scroll.clientWidth)*(s.zoom||100)/100;active.elastic=elasticRegionStart(points,p,[scale,scale*h/w]);}
+      if(o.scanOnly&&active.polygon&&!active.elastic)active.kind='move-region';
       if(o.scanOnly){if(isText)o.selectTextRegion?.(Number(textId));else o.selectGraph?.(graphId);}
-      e.preventDefault();svg.setPointerCapture?.(e.pointerId);svg.classList.toggle('is-deforming',active.polygon);return;}
+      e.preventDefault();svg.setPointerCapture?.(e.pointerId);if(active.kind==='move-region')draw();else svg.classList.toggle('is-deforming',active.polygon);return;}
   }
   if(o.scanOnly&&s.mode==='select'&&!e.shiftKey&&(graphId||textId)){
     const isText=Boolean(textId),region=isText?s.regions?.find(r=>r.id===Number(textId)):o.model.getDocument().graphs.find(r=>r.id===graphId);
     const points=isText?region?.polygon:region&&graphPoints(region);
     if(points){
-      active={kind:'move-region',pointer:e.pointerId,id:isText?textId:graphId,isText,
-        polygon:isText?!!region.irregular:!!region.region_polygon,start:p,end:p,points:points.map(point=>[...point])};
+      startRegionGesture(e,{kind:'move-region',id:isText?textId:graphId,isText,
+        polygon:isText?!!region.irregular:!!region.region_polygon,start:p,end:p,points:points.map(point=>[...point])});
       if(isText)o.selectTextRegion?.(Number(textId));else o.selectGraph?.(graphId);
       e.preventDefault();svg.setPointerCapture?.(e.pointerId);draw();return;
     }
@@ -745,8 +769,8 @@ function mount(host,o){
     scroll.scrollLeft=x;scroll.scrollTop=y;rememberCamera();
     return;
   }
+  if(['resize','move-region'].includes(active.kind)){active.end=regionPointerEnd(active,e);if(active.dragging)queueResizePreview();return;}
   active.end=mouse(e);
-  if(['resize','move-region'].includes(active.kind)){queueResizePreview();return;}
   if(active.kind==='freehand'){
     const events=e.getCoalescedEvents?.();
     for(const event of events?.length?events:[e]){
@@ -762,11 +786,13 @@ function mount(host,o){
  function release(e,cancel=false){
   cancelResizePreview();
   pointers.delete(e.pointerId);if(pointers.size<2)base=null;
-  if(!active||active.pointer!==e.pointerId)return;const op=active;active=null;ghost=null;const g=o.graph();
+  if(!active||active.pointer!==e.pointerId)return;const op=active;
+  if(!cancel&&['resize','move-region'].includes(op.kind))op.end=regionPointerEnd(op,e);
+  active=null;ghost=null;const g=o.graph();
   if(!cancel){
    const choose=()=>{if(op.graphId)o.selectGraph?.(op.graphId);else if(op.textId)o.selectTextRegion?.(Number(op.textId));};
    if(['resize','move-region'].includes(op.kind)){
-    if(distance(op.start,op.end)>3){
+    if(op.dragging){
       const points=regionPreviewPoints(op);
       if(points.length===op.points.length&&points.every((p,i)=>p.every((value,j)=>Math.abs(value-op.points[i][j])<1e-10)))return draw();
       if(op.isText)o.resizeTextRegion?.(Number(op.id),points);
@@ -803,6 +829,7 @@ function mount(host,o){
   }draw();
  }
  svg.addEventListener('pointerup',e=>release(e));svg.addEventListener('pointercancel',e=>release(e,true));
+ svg.addEventListener('lostpointercapture',e=>release(e,true));
  scroll.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();zoom(s.zoom*(e.deltaY>0?0.9:1.1));draw();rememberCamera();},{passive:false});
  const syncGeometryReady=()=>{const ready=loaded&&autoFitted&&scroll.clientWidth>0&&scroll.clientHeight>0;root.dataset.geometryReady=String(ready);svg.setAttribute('aria-busy',String(!ready));};
  function validCamera(camera){

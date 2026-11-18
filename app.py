@@ -669,6 +669,8 @@ def _check_rate_limit(ip, route_name):
     limit = (
         RATE_LIMIT_CHAT if route_name == "chat" else
         45 if route_name == "ocr_cancel" else
+        240 if route_name == "ocr_status" else
+        120 if route_name == "graph_source" else
         30 if route_name == "figure_type" else RATE_LIMIT_OCR
     )
 
@@ -3318,6 +3320,58 @@ def graph_confirmation_session():
     return response
 
 
+def _check_draft_owner_header():
+    expected = request.headers.get("X-DMate-Draft-Owner")
+    if expected is None:
+        return None
+    from urllib.parse import unquote
+    try:
+        expected = unquote(expected, errors="strict") if len(expected) <= 1024 else ""
+    except UnicodeError:
+        expected = ""
+    user = _current_auth_user() if expected and len(expected) <= 256 else None
+    if not user or user.get("username") != expected:
+        response = jsonify({"error": "登录状态已变化，请重新登录后继续图片识别",
+                            "error_code": "draft_owner_mismatch"})
+        response.status_code = 401
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    return None
+
+
+@app.route("/graph/source", methods=["POST"])
+def restore_graph_source():
+    """Rebind retained original bytes without recognizing or altering the draft."""
+    rejected = _check_draft_owner_header()
+    if rejected is not None:
+        return rejected
+    if not _check_rate_limit(_get_client_ip(), "graph_source"):
+        return jsonify({"error": "原图恢复请求过于频繁，请稍后重试"}), 429
+    request_id = _normalize_ocr_request_id(request.form.get("request_id"))
+    source_sha = request.form.get("source_sha256", "")
+    uploaded = request.files.get("image") or request.files.get("file")
+    if not request_id or uploaded is None or not re.fullmatch(r"[a-f0-9]{64}", source_sha):
+        return jsonify({"error": "缺少原图或有效图片任务标识"}), 400
+    raw = uploaded.read(MAX_IMAGE_BYTES + 1)
+    if not raw or len(raw) > MAX_IMAGE_BYTES:
+        return jsonify({"error": "原图为空或超过上传上限"}), 413
+    if not hmac.compare_digest(hashlib.sha256(raw).hexdigest(), source_sha):
+        return jsonify({"error": "原图内容与图片任务不匹配", "error_code": "task_source_mismatch"}), 409
+    from graph_confirmation import ConfirmationError, confirmation_owner, register_recognition
+    from image_evidence import decode_document_image
+    try:
+        image = decode_document_image(raw, max_pixels=MAX_IMAGE_PIXELS)
+        image.close()
+        register_recognition(confirmation_owner(), request_id, source_sha)
+    except ConfirmationError as exc:
+        return jsonify({"error": exc.message, "error_code": exc.code}), exc.status
+    except (ValueError, TypeError, OSError):
+        return jsonify({"error": "原图无法读取，请重新选择图片"}), 400
+    response = jsonify({"ok": True, "request_id": request_id, "source_sha256": source_sha})
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.route("/conversation/title", methods=["POST"])
 def conversation_title():
     """Name a conversation without delaying or changing its teaching reply."""
@@ -4967,17 +5021,119 @@ def cancel_ocr():
 
 @app.route("/ocr", methods=["POST"])
 def ocr():
+    rejected = _check_draft_owner_header()
+    if rejected is not None:
+        return rejected
+    if request.form.get("workflow") != "auto_graph":
+        return _ocr_uncached()
+    request_id = _normalize_ocr_request_id(request.form.get("request_id")) or secrets.token_hex(16)
+    uploaded = request.files.get("image") or request.files.get("file")
+    if uploaded is None:
+        return jsonify({"error": "没有检测到图片，请重新上传"}), 400
+    raw = uploaded.read(MAX_IMAGE_BYTES + 1)
+    if not raw:
+        return jsonify({"error": "图片内容为空，请重新上传"}), 400
+    if len(raw) > MAX_IMAGE_BYTES:
+        return jsonify({"error": "图片过大，请上传不超过 20MB 的图片"}), 413
+    sha = hashlib.sha256(raw).hexdigest()
+    supplied_sha = request.form.get("source_sha256")
+    if supplied_sha and not hmac.compare_digest(supplied_sha, sha):
+        return jsonify({"error": "原图内容与图片任务不匹配", "error_code": "task_source_mismatch"}), 409
+    from graph_confirmation import ConfirmationError, confirmation_owner, register_recognition
+    from ocr_task_registry import OCR_TASKS, OcrTaskCapacity, OcrTaskConflict
+    owner = confirmation_owner()
+    try:
+        receipt = OCR_TASKS.claim(owner, request_id, sha)
+    except OcrTaskConflict:
+        return jsonify({"error": "图片任务与原图不匹配", "error_code": "task_source_mismatch"}), 409
+    except OcrTaskCapacity:
+        return jsonify({"error": "当前图片任务较多，请稍后继续", "error_code": "recognition_capacity", "retryable": True}), 429
+    except Exception as exc:
+        print(f"图片任务记录暂时不可用：{type(exc).__name__}")
+        return jsonify({"error": "图片任务暂时无法保存，请稍后继续", "error_code": "ocr_task_store_unavailable", "retryable": True}), 503
+    if receipt["status"] == "processing":
+        response = jsonify(receipt)
+        response.status_code = 202
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Retry-After"] = "2"
+        return response
+    if receipt["status"] != "claimed":
+        try:
+            register_recognition(owner, request_id, sha)
+        except ConfirmationError as exc:
+            return jsonify({"error": exc.message, "error_code": exc.code}), exc.status
+        response = jsonify(receipt["result"])
+        response.status_code = receipt["http_status"]
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    token = receipt["token"]
+    if not _check_rate_limit(_get_client_ip(), "ocr"):
+        OCR_TASKS.abandon(owner, request_id, token)
+        return jsonify({"error": "图片识别请求过于频繁，请稍后再试", "retryable": True}), 429
+    try:
+        response = make_response(_ocr_uncached(request_id=request_id, raw=raw, admitted_rate=True))
+    except Exception as exc:
+        print(f"图片识别任务异常：{type(exc).__name__}")
+        response = make_response(jsonify({"error": "图片识别未完成，请编辑原图或稍后手动重试",
+            "error_code": "ocr_unexpected_failure", "recognition_status": "failed",
+            "request_id": request_id, "source_sha256": sha}), 500)
+    payload = response.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {"error": "图片识别响应未完成", "recognition_status": "failed", "request_id": request_id}
+    try:
+        # Capacity rejection starts no inference and must allow the same upload
+        # to enter later; a terminal model failure must never auto-run again.
+        if payload.get("error_code") in ("recognition_capacity", "duplicate_active_task"):
+            OCR_TASKS.abandon(owner, request_id, token)
+            payload["retryable"] = True
+            response = make_response(jsonify(payload), response.status_code)
+        else:
+            OCR_TASKS.finish(owner, request_id, token, payload, response.status_code)
+    except Exception as exc:
+        print(f"图片识别结果保存失败：{type(exc).__name__}")
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.route("/ocr/status", methods=["GET"])
+def ocr_status():
+    rejected = _check_draft_owner_header()
+    if rejected is not None:
+        return rejected
+    if not _check_rate_limit(_get_client_ip(), "ocr_status"):
+        return jsonify({"error": "图片状态查询过于频繁，请稍后继续", "retryable": True}), 429
+    request_id = _normalize_ocr_request_id(request.args.get("request_id"))
+    sha = request.args.get("source_sha256", "")
+    if not request_id or not re.fullmatch(r"[a-f0-9]{64}", sha):
+        return jsonify({"error": "图片任务标识无效"}), 400
+    from graph_confirmation import confirmation_owner
+    from ocr_task_registry import OCR_TASKS, OcrTaskConflict
+    try:
+        payload = OCR_TASKS.get(confirmation_owner(), request_id, sha)
+    except OcrTaskConflict:
+        return jsonify({"error": "图片任务与原图不匹配", "error_code": "task_source_mismatch"}), 409
+    except Exception as exc:
+        print(f"图片任务查询暂时不可用：{type(exc).__name__}")
+        return jsonify({"error": "图片任务暂时无法读取，请稍后继续", "retryable": True}), 503
+    response = jsonify(payload)
+    response.headers["Cache-Control"] = "no-store"
+    if payload["status"] == "processing":
+        response.headers["Retry-After"] = "2"
+    return response
+
+
+def _ocr_uncached(*, request_id=None, raw=None, admitted_rate=False):
     started_at = time.monotonic()
     # 普通 OCR 与 Vision 互为兜底。即使 PaddleOCR 暂时不可用，
     # 也允许 Vision 处理“只有图、没有文字”的题目。
     ip = _get_client_ip()
 
-    if not _check_rate_limit(ip, "ocr"):
+    if not admitted_rate and not _check_rate_limit(ip, "ocr"):
         return jsonify({
             "error": "图片识别请求过于频繁，请稍后再试"
         }), 429
 
-    request_id = _normalize_ocr_request_id(
+    request_id = request_id or _normalize_ocr_request_id(
         request.form.get("request_id", "")
     ) or secrets.token_hex(16)
 
@@ -4990,12 +5146,13 @@ def ocr():
         or request.files.get("file")
     )
 
-    if uploaded is None:
+    if raw is None and uploaded is None:
         return jsonify({
             "error": "没有检测到图片，请重新上传"
         }), 400
 
-    raw = uploaded.read(MAX_IMAGE_BYTES + 1)
+    if raw is None:
+        raw = uploaded.read(MAX_IMAGE_BYTES + 1)
 
     if not raw:
         return jsonify({

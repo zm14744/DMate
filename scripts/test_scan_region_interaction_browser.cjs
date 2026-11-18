@@ -23,17 +23,19 @@ async function snapshot(page) {
       graphCount:state.graphRegions.length,textCount:state.textRegions.length};
   });
 }
-async function drag(page, start, delta, touch=false, shift=false, beforeRelease=null) {
+async function drag(page, start, delta, touch=false, shift=false, beforeRelease=null, afterPress=null) {
   const target=await point(page,start);
   if(touch){
     const client=await page.context().newCDPSession(page);
     await client.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:target.x,y:target.y,id:1}]});
+    if(afterPress)await afterPress();
     for(let step=1;step<=6;step++)await client.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:target.x+delta[0]*step/6,y:target.y+delta[1]*step/6,id:1}]});
     if(beforeRelease)await beforeRelease();
     await client.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await client.detach();
   }else{
     if(shift)await page.keyboard.down('Shift');
     await page.mouse.move(target.x,target.y);await page.mouse.down();
+    if(afterPress)await afterPress();
     await page.mouse.move(target.x+delta[0],target.y+delta[1],{steps:6});
     if(beforeRelease)await beforeRelease();
     await page.mouse.up();
@@ -105,12 +107,24 @@ async function runCase(browser,width) {
     if(touch)await page.touchscreen.tap(graphPoint.x,graphPoint.y);else await page.mouse.click(graphPoint.x,graphPoint.y);
     await settle(page);
     await selected(page,'graph',width+'/graph interior click');
+    // A visible fine adjustment must survive release. Previously any move
+    // previewed, but a different 3px commit threshold snapped it back.
+    const fineBefore=await snapshot(page),imageWidth=await page.locator('.dge-overlay-image').evaluate(node=>node.getBoundingClientRect().width);
+    await drag(page,[.23,.24],[2.5,0],touch);
+    const fineAfter=await snapshot(page),fineDelta=fineAfter.graph[0][0]-fineBefore.graph[0][0];
+    assert.ok(Math.abs(fineDelta*imageWidth-2.5)<.15,'A 2.5px fine adjustment is retained when the pointer is released');
+    for(let index=0;index<fineBefore.graph.length;index++){
+      assert.ok(Math.abs(fineAfter.graph[index][0]-fineBefore.graph[index][0]-fineDelta)<1e-6);
+      assert.equal(fineAfter.graph[index][1],fineBefore.graph[index][1]);
+    }
+    await page.waitForFunction(()=>ocrTasks.get('region-fixture').scanState.graphRegions[0].status==='complete');
+    const recognitionBeforeDrag=recognition.length;
     const before=await snapshot(page);
     const originalPoints=await page.locator('.dge-frame-hit[data-graph-id="g1"]').getAttribute('points');
     await drag(page,[.23,.24],[24,18],touch,false,async()=>{
       await settle(page);assert.deepEqual((await snapshot(page)).graph,before.graph,'A drag preview does not commit crop data before release');
       assert.notEqual(await page.locator('.dge-frame-hit[data-graph-id="g1"]').getAttribute('points'),originalPoints,'The grabbed frame visibly follows the pointer before release');
-      assert.deepEqual(recognition,[],'Pointer moves never repeat recognition before the single commit');
+      assert.equal(recognition.length,recognitionBeforeDrag,'Pointer moves never repeat recognition before the single commit');
     });
     const moved=await snapshot(page);
     translated(before.graph,moved.graph,width+'/graph interior drag');assert.deepEqual(moved.text,before.text,'Moving graph leaves text untouched');
@@ -235,8 +249,48 @@ async function runCase(browser,width) {
       await selected(page,'text',width+'/narrow text selection');
       await page.waitForFunction(()=>ocrTasks.get('region-fixture').scanState.textRegions[0].status==='complete');
     }
+    // A narrow arm inside a large irregular outline is still an interior.
+    // Its local width, rather than the whole bounding box, decides whether
+    // an apparent frame drag should deform an edge or move the whole region.
+    await page.locator('#graphEditorClose').click();await page.waitForFunction(()=>ocrEditorTaskId===null);
+    await page.evaluate(()=>{
+      const state=ocrTasks.get('region-fixture').scanState;
+      state.graphRegions[0].polygon=[[.08,.14],[.50,.14],[.50,.30],[.78,.30],[.78,.32],[.50,.32],[.50,.55],[.08,.55]];
+      state.viewState={};editOcrTask('region-fixture');
+    });
+    await page.locator('.dge-overlay[data-geometry-ready="true"]').waitFor();await settle(page);
+    const neck=await snapshot(page);await drag(page,[.65,.31],[12,10],touch,false,async()=>{
+      await settle(page);
+      const work=await page.evaluate(()=>{
+        const probe=window.regionPreviewProbe;
+        probe.mutations.push(...probe.observer.takeRecords());
+        const result={rebuilds:probe.mutations.length,layoutReads:probe.layoutReads};
+        probe.observer.disconnect();probe.svg.getBoundingClientRect=probe.original;return result;
+      });
+      assert.deepEqual(work,{rebuilds:0,layoutReads:0},'Moving a region only paints its existing shapes, without SVG rebuilds or forced layout reads');
+    },async()=>page.evaluate(()=>{
+      const svg=document.querySelector('.dge-overlay-svg'),probe={svg,original:svg.getBoundingClientRect,layoutReads:0,mutations:[]};
+      probe.observer=new MutationObserver(records=>probe.mutations.push(...records));probe.observer.observe(svg,{childList:true,subtree:true});
+      svg.getBoundingClientRect=function(){probe.layoutReads++;return probe.original.call(this);};window.regionPreviewProbe=probe;
+    }));
+    const neckMoved=await snapshot(page);translated(neck.graph,neckMoved.graph,width+'/narrow concave arm moves rigidly');
+    assert.equal(neckMoved.graph.length,neck.graph.length,'An interior drag does not resample the outline as an edge deformation');
+    const neckOffset=neckMoved.graph[0].map((value,axis)=>value-neck.graph[0][axis]);
+    await drag(page,[.65+neckOffset[0],.31+neckOffset[1]],[11,-8],touch);
+    const repeated=await snapshot(page);translated(neckMoved.graph,repeated.graph,width+'/consecutive drag starts from the last committed position');
+    assert.deepEqual(repeated.camera,neck.camera);
+    if(!touch){
+      // A final pointer event can carry a newer position than the last move
+      // delivered to the page. Releasing must commit that position directly.
+      const origin=repeated.graph[0],start=await point(page,[origin[0]+.13,origin[1]+.12]);
+      await page.mouse.move(start.x,start.y);await page.mouse.down();
+      await page.locator('.dge-overlay-svg').evaluate((svg,{x,y})=>svg.dispatchEvent(new PointerEvent('pointerup',
+        {bubbles:true,pointerId:1,pointerType:'mouse',clientX:x+21,clientY:y+14})),start);
+      await page.mouse.up();await settle(page);
+      translated(repeated.graph,(await snapshot(page)).graph,'A release with no intervening move commits the final pointer position');
+    }
     assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);
-    console.log('PASS '+width+': irregular and 15px text selection, rigid moves/clamps, elastic edges, overlapping hits and zoom/pan cancellation retain source ownership');
+    console.log('PASS '+width+': precise irregular/15px/concave-arm movement, final release, stable previews, elastic edges and zoom/pan cancellation retain source ownership');
   }finally{await context.close();}
 }
 (async()=>{const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.CHROMIUM_EXECUTABLE_PATH}:{})});

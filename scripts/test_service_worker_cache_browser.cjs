@@ -61,10 +61,10 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     assert.equal(reference.status(), 200, 'The server must provide the shared stylesheet');
     const networkCSS = await reference.text();
     assert.ok(networkCSS.trim().length, 'The shared stylesheet must not be empty');
-    const sharedAssets = await Promise.all(['/static/dmate-main.css?v=66', '/static/graph-editor.css?v=24', '/static/button-themes.css?v=63', '/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
+    const sharedAssets = await Promise.all(['/static/dmate-main.css?v=66', '/static/graph-editor.css?v=25', '/static/button-themes.css?v=63', '/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
       '/static/select-controls.css?v=43', '/static/mobile-select.js?v=26', '/static/offline.css?v=52',
       '/static/textarea-autosize.css?v=1', '/static/textarea-autosize.js?v=1',
-      '/static/drawing-workspace.css?v=51', '/static/graph-editor.js?v=53', '/static/graph-editor-overlay.js?v=37', '/static/drawing-workspace.js?v=54', '/static/drawing-export.js?v=39',
+      '/static/drawing-workspace.css?v=51', '/static/graph-editor.js?v=53', '/static/graph-editor-overlay.js?v=38', '/static/drawing-workspace.js?v=54', '/static/drawing-export.js?v=39',
       '/static/modal-chrome.css', '/static/modal-text.js?v=53', '/static/delete-confirm.js', '/static/guest-session.js?v=53', '/static/language.js?v=59',
       '/static/graph-editor-format.js?v=32', '/static/language-catalog.js?v=62', '/static/offline-shell.js?v=33',
       '/static/offline.js?v=55', '/static/offline-knowledge-graph.js?v=60',
@@ -83,7 +83,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     // Simulate the pinned stylesheet left by the previous offline shell.
     await page.goto(new URL('/health', baseURL).href);
     await page.evaluate(async () => {
-      const cache = await caches.open('dmate-offline-shell-v71');
+      const cache = await caches.open('dmate-offline-shell-v72');
       await cache.put('/static/button-themes.css?v=54', new Response('/* obsolete graph navigation button styles */'));
     });
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });

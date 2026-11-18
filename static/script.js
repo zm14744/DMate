@@ -15580,7 +15580,7 @@ let guestOcrSaveVersion = 0;
 const guestOcrFiles = new WeakMap();
 const OCR_TASK_SNAPSHOT_FIELDS = ["id", "groupId", "sessionId", "state", "draft", "initialDocument", "confirmation",
     "scanState", "textEditorState", "dirty", "userRequest", "isQuestion", "error", "notice", "sourceSha256",
-    "descriptions", "descriptionState", "result", "userEditedAt", "draftCreatedAt", "draftOrder"];
+    "descriptions", "descriptionState", "result", "userEditedAt", "draftCreatedAt", "draftOrder", "recoveryPending"];
 let guestSaveWarningShown = false;
 
 let accountOcrDraftOwner = "";
@@ -15663,17 +15663,14 @@ async function restoreAccountOcrTasks(owner = accountState.username, context = c
                 if (accountOcrDiscardedTaskIds.has(row.id)) continue;
                 const session = sessions.find(item => sessionBusyKey(item.id) === sessionBusyKey(row.sessionId));
                 if (!session || deletedSessionIds[sessionBusyKey(row.sessionId)]) continue;
-                const interrupted = row.state === "recognizing";
-                const value = {...row, state:interrupted ? "failed" : row.state,
-                    error:interrupted ? "上次关闭中断了图片识别，可以直接编辑原图和已有内容。" : row.error};
                 if (!groups.has(session.id)) groups.set(session.id, []);
-                groups.get(session.id).push(value);
+                groups.get(session.id).push(row);
             }
             for (const [sessionId, rows] of groups) {
                 rows.sort((a, b) => Number(a.draftOrder || 0) - Number(b.draftOrder || 0)
                     || Number(a.draftCreatedAt || 0) - Number(b.draftCreatedAt || 0));
                 const existing = new Set(ocrTasks.keys());
-                importConversationOcrTasks(sessionId, rows);
+                importConversationOcrTasks(sessionId, rows, {resumeRecognition:true});
                 for (const row of rows) if (!existing.has(row.id) && ocrTasks.has(row.id))
                     ocrTasks.get(row.id).restoredFromAccountDraft = true;
             }
@@ -15686,6 +15683,7 @@ async function restoreAccountOcrTasks(owner = accountState.username, context = c
             if (live()) {
                 accountOcrRestoring = false;
                 void checkpointAccountOcrTasks();
+                resumeRestoredOcrTasks();
             }
         }
     })();
@@ -15814,17 +15812,19 @@ async function restoreGuestOcrTasks() {
             if (!sessions.some(session => sessionBusyKey(session.id) === sessionBusyKey(row.sessionId))
                 || ocrTasks.has(row.id) || getSessionOcrTasks(row.sessionId).length >= OCR_MAX_CONCURRENT) continue;
             const file = new File([blob], row.name || "图片.png", {type:row.type || blob.type});
-            const interrupted = row.state === "recognizing";
+            const interrupted = ocrTaskNeedsRecovery(row);
             const task = {...row, file, contextVersion:cloudSyncContextVersion,
                 originalUrl:URL.createObjectURL(file), controller:new AbortController(),
-                startedAt:performance.now(), finishedAt:performance.now(), confirming:false, sending:false,
-                state:interrupted ? "failed" : row.state,
-                error:interrupted ? "页面刷新中断了识别，请重新识别这张图片" : row.error};
+                startedAt:performance.now(), finishedAt:interrupted ? null : performance.now(), confirming:false, sending:false,
+                sourceNeedsRebind:true, recovering:interrupted,
+                state:interrupted ? "recognizing" : row.state,
+                error:interrupted ? "" : row.error};
             guestOcrFiles.set(file, Promise.resolve(true));
             ocrTasks.set(task.id, task);
         }
     } finally {
         guestOcrRestoring = false; renderOcrTasks();
+        resumeRestoredOcrTasks();
         if (missing && context === cloudSyncContextVersion && !shouldPersistClientState())
             showCurrentError("部分待发送图片无法从本标签页恢复，请重新选择图片");
     }
@@ -15846,7 +15846,7 @@ function exportConversationOcrTasks(sessionId) {
     });
 }
 
-function importConversationOcrTasks(sessionId, rows, {replaceRestored = false} = {}) {
+function importConversationOcrTasks(sessionId, rows, {replaceRestored = false, resumeRecognition = false} = {}) {
     if (!Array.isArray(rows) || !sessions.some(session => sessionBusyKey(session.id) === sessionBusyKey(sessionId))) return 0;
     let imported = 0;
     for (const row of rows) {
@@ -15859,15 +15859,37 @@ function importConversationOcrTasks(sessionId, rows, {replaceRestored = false} =
         for (const key of OCR_TASK_SNAPSHOT_FIELDS) if (row[key] !== undefined) saved[key] = row[key];
         const value = JSON.parse(JSON.stringify(saved, (key, item) => key === "controller" ? undefined : item));
         const file = row.file instanceof File ? row.file : new File([row.file], row.name || "图片.png", {type:row.file.type});
-        const interrupted = row.state === "recognizing";
+        const interrupted = ocrTaskNeedsRecovery(row);
+        const recovering = interrupted && resumeRecognition;
         ocrTasks.set(row.id, { ...value, file, sessionId, contextVersion:cloudSyncContextVersion,
-            originalUrl:URL.createObjectURL(file), controller:null, startedAt:performance.now(), finishedAt:performance.now(),
-            confirming:false, sending:false, state:interrupted ? "failed" : row.state === "ready" ? "ready" : "failed",
-            error:interrupted ? "图片仍在原标签页识别，请在识别完成后重新打开或手动编辑。" : value.error });
+            originalUrl:URL.createObjectURL(file), controller:recovering ? new AbortController() : null,
+            startedAt:performance.now(), finishedAt:recovering ? null : performance.now(),
+            sourceNeedsRebind:true, recovering, confirming:false, sending:false,
+            state:recovering ? "recognizing" : interrupted ? "failed" : row.state === "ready" ? "ready" : "failed",
+            error:recovering ? "" : interrupted ? "图片仍在原标签页识别，请在识别完成后重新打开或手动编辑。" : value.error });
         imported++;
     }
     renderOcrTasks();
     return imported;
+}
+
+function ocrTaskNeedsRecovery(task) {
+    // Older drafts stored an interrupted HTTP request as a permanent failure.
+    // User edits remain authoritative when that old draft is opened again.
+    if (task.dirty && (task.draft?.body_text?.trim() || task.draft?.graphs?.length)) return false;
+    return task.recoveryPending === true || task.state === "recognizing" || task.state === "failed"
+        && /(?:上次关闭中断了图片识别|页面刷新中断了识别|图片仍在原标签页识别)/.test(task.error || "");
+}
+
+function resumeRestoredOcrTasks() {
+    for (const task of ocrTasks.values()) {
+        if (task.recovering && task.state === "recognizing" && isLiveOcrTask(task)
+            && !ocrRecognitionRuns.has(task) && !ocrRecognitionQueue.has(task)) void queueOcrRecognition(task);
+    }
+}
+
+function ocrTaskOwnerHeaders() {
+    return shouldPersistClientState() ? {"X-DMate-Draft-Owner":encodeURIComponent(accountState.username)} : {};
 }
 
 function isOcrBatchPreparing(sessionId = currentId) {
@@ -16270,22 +16292,29 @@ function pumpOcrRecognitionQueue() {
 async function recognizeOcrTask(task) {
     // Each upload has its own editable Qwen draft and evidence-triggered
     // review. Text OCR runs only for regions selected in its separate tab.
+    const originalDraft = JSON.stringify(task.draft);
+    task.recoveryPending = false;
     try {
         await ensureGraphSession();
         if (task.state !== "recognizing" || !isLiveOcrTask(task)) return;
-        const formData = new FormData();
-        formData.append("image", task.file);
-        formData.append("request_id", task.id);
-        formData.append("workflow", "auto_graph");
-        const response = await fetch("/ocr", { method: "POST", body: formData,
-            signal: task.controller.signal });
-        const data = await parseResponseJson(response);
+        if (!task.sourceSha256) task.sourceSha256 = await originalImageDigest(task.file);
+        if (task.state !== "recognizing" || !isLiveOcrTask(task)) return;
+        if (!task.sourceSha256) throw new Error("无法校验原图，请使用支持安全连接的浏览器后重试。");
+        void checkpointOcrTasks();
+        const data = await window.DMateOcrTaskClient.recognize({id:task.id, file:task.file,
+            sourceSha256:task.sourceSha256, recover:task.recovering,
+            signal:task.controller.signal, headers:ocrTaskOwnerHeaders(), isLive:() => isLiveOcrTask(task)});
         if (task.state !== "recognizing" || !isLiveOcrTask(task)) return;
         if (data?.cancelled) {
+            consumeAccountOcrDraft(task);
             discardOcrTask(task);
             return;
         }
-        if (!response.ok || data?.error) throw new Error(data?.error || fallbackHttpError(response.status));
+        if (JSON.stringify(task.draft) !== originalDraft) {
+            task.state = "ready";
+            return;
+        }
+        if (data?.error) throw new Error(data.error);
         if (!data || typeof data !== "object" || (!Array.isArray(data.graph_structures)
             && typeof data.text !== "string" && !Array.isArray(data.document?.graphs))) {
             throw new Error("识别响应不完整，请稍后重试。其他图片会继续处理。");
@@ -16294,6 +16323,7 @@ async function recognizeOcrTask(task) {
         task.draft = draftFromOcrResponse(data);
         task.initialDocument = cloneOcrDocument(task.draft);
         task.sourceSha256 = data?.source_sha256 || data?.diagnostics?.semantic_workflow?.source_sha256 || null;
+        task.sourceNeedsRebind = Boolean(task.recovering);
         task.state = data?.manual_mode === true ? "ready"
             : data?.recognition_status === "failed"
                 || !task.draft.body_text.trim() && !task.draft.graphs.length ? "failed" : "ready";
@@ -16318,10 +16348,12 @@ async function recognizeOcrTask(task) {
         if (error?.name === "AbortError") {
             discardOcrTask(task);
         } else {
+            task.recoveryPending = error?.status === 401;
             task.state = "failed";
             task.error = error?.message || "图片识别请求失败，请检查网络。其他图片会继续处理。";
         }
     } finally {
+        task.recovering = false;
         task.controller = null;
         if (ocrTasks.get(task.id) === task) renderOcrTasks();
         if (task.finishedAt === null) {
@@ -16490,12 +16522,27 @@ function ensureGraphSession() {
     return graphSessionPromise;
 }
 
+async function ensureOcrTaskSource(task, {signal} = {}) {
+    if (!task.sourceNeedsRebind) return;
+    await ensureGraphSession();
+    if (!task.sourceSha256) task.sourceSha256 = await originalImageDigest(task.file);
+    if (!isLiveOcrTask(task) || signal?.aborted) throw Object.assign(new Error("图片已取消"), {name:"AbortError"});
+    if (!task.sourceSha256) throw new Error("无法校验原图，请使用支持安全连接的浏览器后重试。");
+    await window.DMateOcrTaskClient.bindSource({id:task.id, file:task.file, sourceSha256:task.sourceSha256,
+        signal, headers:ocrTaskOwnerHeaders(), isLive:() => isLiveOcrTask(task)});
+    task.sourceNeedsRebind = false;
+    // A new browser/source lease needs a fresh signature for the saved document.
+    // This signs the existing structure; it never recognizes the image again.
+    task.confirmation = null;
+}
+
 async function confirmOcrTask(task, documentValue, options = {}) {
     task.confirming = true;
     task.error = "";
     renderOcrTasks();
     try {
         await ensureGraphSession();
+        await ensureOcrTaskSource(task, options);
         if (!/^[a-f0-9]{64}$/i.test(task.sourceSha256 || "")) task.sourceSha256 = await originalImageDigest(task.file);
         if (!task.sourceSha256) throw new Error("无法校验原图，请使用支持安全连接的浏览器后重试。");
         if (options.signal?.aborted || !isLiveOcrTask(task))
@@ -16836,6 +16883,7 @@ async function editOcrTask(id) {
                 signal?.addEventListener("abort", abort, {once:true});
                 if (signal?.aborted) abort();
                 try {
+                    await ensureOcrTaskSource(task, {signal:controller.signal});
                     if (!/^[a-f0-9]{64}$/i.test(task.sourceSha256 || ''))
                         task.sourceSha256 = await originalImageDigest(task.file);
                     const selected = new FormData();
@@ -16867,6 +16915,7 @@ async function editOcrTask(id) {
                 signal?.addEventListener('abort', abort, {once:true});
                 if (signal?.aborted) abort();
                 try {
+                    await ensureOcrTaskSource(task, {signal:controller.signal});
                     if (!/^[a-f0-9]{64}$/i.test(task.sourceSha256 || '')) task.sourceSha256 = await originalImageDigest(task.file);
                     const selected = new FormData();
                     selected.append('image',task.file); selected.append('request_id',task.id);
@@ -17045,6 +17094,7 @@ async function sendOcrBatch() {
         // partially submitted batch with its first image already answered.
         for (const task of tasks) {
             if (!ocrBatchCanContinue(run)) return;
+            await ensureOcrTaskSource(task, {signal:run.controller.signal});
             const saved = task.confirmation?.drawing_document || task.confirmation?.document;
             if (!task.confirmation || task.dirty || JSON.stringify(task.draft) !== JSON.stringify(saved))
                 await confirmOcrTask(task, task.draft, { signal: run.controller.signal });

@@ -35,6 +35,15 @@ async function launch() {
       return route.fulfill(json({ok:true,revision:account.revision,data:clone(account.data)}));
     }
     if(endpoint==='/graph/session'||endpoint==='/ocr/cancel')return route.fulfill(json({ok:true}));
+    if(endpoint==='/ocr/status'){
+      const query=new URL(request.url()).searchParams;
+      return route.fulfill(json({status:'processing',request_id:query.get('request_id'),source_sha256:query.get('source_sha256'),retry_after:2}));
+    }
+    if(endpoint==='/graph/source'){
+      const encoded=request.postDataBuffer().toString('utf8');
+      const field=name=>new RegExp('name="'+name+'"\\r\\n\\r\\n([^\\r]*)').exec(encoded)?.[1];
+      return route.fulfill(json({ok:true,request_id:field('request_id'),source_sha256:field('source_sha256')}));
+    }
     if(endpoint==='/ocr'){
       server.recognitions++;if(server.hold)return;
       return route.fulfill(json({text:'Recognized initial text',document:{body_text:'Recognized initial text',graphs:[]},source_sha256:'a'.repeat(64)}));
@@ -99,7 +108,7 @@ async function reopen(){await context.close();return launch();}
   assert.equal(restored.ready.draft.body_text,'PRIVATE_EDITED_TEXT');assert.deepEqual(restored.ready.draft.graphs,[graph]);
   assert.equal(restored.ready.scan.camera.zoom,135);assert.equal(restored.ready.text.regions[0].text,'PRIVATE_TEXT_REGION');
   assert.equal(restored.ready.request,'Keep my edited graph');assert.equal(restored.ready.bytes,image('PRIVATE_READY_SOURCE'));
-  assert.equal(restored.pending.state,'failed');assert.equal(restored.pending.bytes,image('PRIVATE_PENDING_SOURCE'));
+  assert.equal(restored.pending.state,'recognizing');assert.equal(restored.pending.bytes,image('PRIVATE_PENDING_SOURCE'));
   assert.equal(await page.evaluate(()=>imageBlobWrites),0,'Restoring existing drafts does not rewrite original blobs');
   await select(page,ids[0]);assert.equal(await page.locator('[data-ocr-task-id]').count(),2);
   assert.deepEqual(await page.evaluate(()=>getSessionOcrTasks().map(task=>task.id)),[aReady,aSecond],'Upload order survives restart even when random IDs sort backwards');
