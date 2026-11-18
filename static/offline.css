@@ -148,6 +148,7 @@ html[data-ui-language="en"] .question-option{line-height:var(--dmate-reading-lin
 .answer-panel { margin-top:18px; padding:16px; border:1px solid var(--border-strong); border-radius:12px; background:var(--surface-2); }
 .answer-panel h3 { margin:0 0 8px; color:var(--text-muted); font-size:14px; }
 .answer-panel p { margin:0 0 12px; line-height:1.8; font-size:14px; white-space:pre-wrap; }
+body.offline-workspace #questionDetail :is(.wrong-answer-details,.wrong-analysis-details) > .dmate-chat-answer { padding:12px!important; }
 .concept-summary { margin:0 0 16px; color:var(--text-secondary); font-size:14px; line-height:1.8; }
 .concept-detail .detail-section { padding-top:14px; border-top:1px solid var(--surface-3); }
 .prereq-list { display:flex; gap:7px; flex-wrap:wrap; }

@@ -15405,7 +15405,7 @@ function ocrTaskLabel(task) {
     if (task.confirmation) return "已核对";
     if (task.state === "recognizing") return "识别中";
     if (task.state === "failed") return "识别失败";
-    return task.dirty ? "修改未保存" : "待核对";
+    return task.dirty ? "待保存" : "待核对";
 }
 
 function nextOcrGroupId() {

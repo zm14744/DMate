@@ -9,7 +9,7 @@
   const state = {
     db: null, concepts: [], questions: [], graph: null, translations: {concepts:{},questions:{}},
     panel: "graph", selectedQuestion: null, selectedConcept: null,
-    revealed: false,
+    revealed: false, analysisRevealed: false,
     drawingController: null, backgroundUrl: "", graphCategory: "", graphSelectedNodeId: "", questionCategory: "",
     questionDifficulty: "", questionType: "", questionSelection: "", questionQuery: "", conceptCategory: "", conceptSelection: "", conceptQuery: "", graphQuery: "", graphController: null,
     librarySelections: {concepts:new Set(), questions:new Set()}, selectionQueue: Promise.resolve(),
@@ -441,6 +441,7 @@
     if (!questionMatchesSearch(question, normalizedSearch($("questionSearch").value))) $("questionSearch").value = "";
     state.selectedQuestion = question;
     state.revealed = false;
+    state.analysisRevealed = false;
     switchPanel("questions");
     $("questionDetail").scrollTop = 0;
     libraryScroll.questions = 0;
@@ -558,6 +559,7 @@
     else {
       state.selectedQuestion = null;
       state.revealed = false;
+      state.analysisRevealed = false;
       $("questionDetail").replaceChildren(el("div","offline-empty",tr("无", "None")));
     }
     syncLibraryFullView("questions");
@@ -566,6 +568,7 @@
   function selectQuestion(question) {
     state.selectedQuestion = question;
     state.revealed = false;
+    state.analysisRevealed = false;
     document.querySelectorAll(".question-item").forEach(node => {
       const selected = node.dataset.questionId === question.id;
       node.classList.toggle("active", selected); node.setAttribute("aria-current", String(selected));
@@ -613,28 +616,28 @@
       detail.append(options);
     }
 
-    const actions = el("div", "question-actions wrong-actions");
-    actions.append(action(state.revealed ? tr("收起参考答案", "Hide reference answer") : tr("查看参考答案", "View reference answer"), "offline-primary", () => {
-      const restoreFocus = actions.contains(document.activeElement);
-      state.revealed = !state.revealed;
-      renderQuestionDetail(question);
-      if (restoreFocus) detail.querySelector(".question-actions button")?.focus({preventScroll:true});
-    }));
-    detail.append(actions);
-
-    if (state.revealed) {
-      const answer = el("section", "answer-panel wrong-answer-details");
-      answer.append(el("h3", "", tr("参考答案", "Reference answer")));
-      const choice = ["单项选择", "多项选择"].includes(question.type);
-      answer.append(choice ? contentText("div", "wrong-answer-inner", (question.answer || []).join("、"))
-        : rich("wrong-answer-inner", display.answer_text || ""));
-      answer.append(el("h3", "", tr("解析", "Explanation")));
-      answer.append(rich("wrong-analysis-body", display.explanation || tr("暂无解析。", "No explanation available.")));
-      if (question.grading_criteria) {
-        answer.append(el("h3", "", tr("评分要点", "Marking criteria")), rich("wrong-feedback-body", display.grading_criteria));
-      }
-      detail.append(answer);
-    }
+    const disclosure = (kind, key, caption, englishCaption, body) => {
+      const box = el("details", "wrong-" + kind + "-details");
+      box.open = state[key];
+      const summary = el("summary", "wrong-" + kind + "-summary", tr(caption, englishCaption));
+      summary.addEventListener("click", event => {
+        event.preventDefault();
+        if (!box.isConnected || state.selectedQuestion?.id !== question.id) return;
+        box.open = !box.open;
+        state[key] = box.open;
+      });
+      box.append(summary, body);
+      box.addEventListener("toggle", () => {
+        if (box.isConnected && state.selectedQuestion?.id === question.id) state[key] = box.open;
+      });
+      detail.append(box);
+    };
+    const choice = ["单项选择", "多项选择"].includes(question.type);
+    disclosure("answer", "revealed", "查看答案", "View answer", choice
+      ? contentText("div", "wrong-answer-inner", (question.answer || []).join("、"))
+      : rich("wrong-answer-inner", display.answer_text || ""));
+    disclosure("analysis", "analysisRevealed", "查看解析", "View explanation",
+      rich("wrong-analysis-body", display.explanation || tr("暂无解析。", "No explanation available.")));
     syncLibraryFullView("questions");
   }
 
@@ -807,12 +810,13 @@
     const checkpoint = () => {
       if (!guest()) return;
       const snapshot = {};
-      for (const key of ["panel", "revealed", "graphCategory", "graphSelectedNodeId", "questionCategory", "questionDifficulty", "questionType", "questionSelection", "questionQuery", "conceptCategory", "conceptSelection", "conceptQuery", "graphQuery"]) snapshot[key] = state[key];
+      for (const key of ["panel", "revealed", "analysisRevealed", "graphCategory", "graphSelectedNodeId", "questionCategory", "questionDifficulty", "questionType", "questionSelection", "questionQuery", "conceptCategory", "conceptSelection", "conceptQuery", "graphQuery"]) snapshot[key] = state[key];
       snapshot.selectedQuestion = state.selectedQuestion?.id || "";
       snapshot.selectedConcept = state.selectedConcept?.id || "";
       if (!window.DMateGuestSession.write("offline-view", snapshot)) toast("当前标签页未能保存最新浏览位置");
     };
     for (const type of ["input", "change", "click"]) document.addEventListener(type, () => queueMicrotask(checkpoint));
+    document.addEventListener("toggle", () => requestAnimationFrame(checkpoint), true);
     window.addEventListener("pagehide", checkpoint);
     window.DMateI18n?.register?.({
       "基本定义":"Definition", "理解与说明":"Explanation", "典型例题":"Worked example", "常见错误":"Common mistakes",
@@ -892,6 +896,7 @@
         for (const key of ["graphCategory", "graphSelectedNodeId", "questionCategory", "questionDifficulty", "questionType", "questionSelection", "questionQuery", "conceptCategory", "conceptSelection", "conceptQuery", "graphQuery"])
           if (typeof view[key] === "string") state[key] = view[key];
         state.revealed = view.revealed === true;
+        state.analysisRevealed = view.analysisRevealed === true;
         state.selectedQuestion = state.questions.find(item => item.id === view.selectedQuestion) || null;
         state.selectedConcept = state.concepts.find(item => item.id === view.selectedConcept) || null;
         $("questionSearch").value = state.questionQuery;

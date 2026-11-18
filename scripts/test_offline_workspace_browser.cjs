@@ -428,8 +428,12 @@ async function practice(page) {
       question.type + ': the question detail has no answer input');
     assert.equal(await detail.getByRole('heading', { name: '你的作答', exact: true }).count(), 0);
     assert.equal(await detail.getByRole('button', { name: /记录本次练习|保存记录|加入错题本/ }).count(), 0);
-    assert.deepEqual(await detail.locator('.question-actions button').allTextContents(), ['查看参考答案'],
-      'Only the reference-answer action remains');
+    assert.equal(await detail.locator('.question-actions button').count(), 0,
+      'The old reference-answer action is replaced by the shared disclosures');
+    assert.deepEqual(await detail.locator('.wrong-answer-summary,.wrong-analysis-summary').allTextContents(), ['查看答案', '查看解析']);
+    assert.equal(await detail.locator('details[open]').count(), 0, 'Selecting a question starts both disclosures collapsed');
+    assert.equal(await detail.getByRole('heading', { name: '评分要点', exact: true }).count(), 0);
+    assert.equal(await detail.locator('.wrong-feedback-body').count(), 0, 'Grading criteria are not rendered as a separate section');
     assert.equal(await detail.locator('.question-option.selected,[aria-pressed],[aria-checked]').count(), 0,
       question.type + ': there is no choice-selection state');
     const actual = await detail.locator('.question-option').evaluateAll(nodes => nodes.map(node => ({
@@ -460,19 +464,33 @@ async function practice(page) {
     for (const [index, option] of (question.options || []).entries()) {
       await studyOutput(detail.locator('.question-option-text').nth(index), option.text);
     }
-    const reveal = detail.getByRole('button', { name: '查看参考答案', exact: true });
-    assert.equal(await reveal.locator('svg').count(), 0, 'The reference-answer toggle has no eye icon');
-    assert.equal(await detail.locator('.answer-panel').count(), 0);
+    const answer = detail.locator('details.wrong-answer-details'), analysis = detail.locator('details.wrong-analysis-details');
+    const reveal = answer.locator('summary.wrong-answer-summary');
+    assert.equal(await reveal.locator('svg').count(), 0, 'The shared answer summary has no extra eye icon');
+    assert.equal(await answer.locator('.wrong-answer-inner').isVisible(), false);
+    assert.equal(await analysis.locator('.wrong-analysis-body').isVisible(), false);
     await reveal.click();
-    const answer = detail.locator('.answer-panel');
-    await answer.waitFor();
-    assert.match(await answer.textContent(), /参考答案/);
-    await studyOutput(answer.locator('.wrong-answer-inner').first(), question.answer_text || (question.answer || []).join('、'));
-    await studyOutput(answer.locator('.wrong-analysis-body'), question.explanation);
-    const collapse = detail.getByRole('button', { name: '收起参考答案', exact: true });
-    assert.equal(await collapse.locator('svg').count(), 0);
-    await collapse.click();
-    assert.equal(await detail.locator('.answer-panel').count(), 0, 'The reference answer can be collapsed');
+    assert.equal(await answer.evaluate(node => node.open), true);
+    assert.equal(await analysis.evaluate(node => node.open), false, 'Opening the answer leaves the explanation collapsed');
+    await studyOutput(answer.locator('.wrong-answer-inner'), question.answer_text || (question.answer || []).join('、'));
+    await analysis.locator('summary.wrong-analysis-summary').click();
+    assert.equal(await analysis.evaluate(node => node.open), true);
+    await studyOutput(analysis.locator('.wrong-analysis-body'), question.explanation);
+    if (question.type === '证明') {
+      await page.evaluate(() => DMateI18n.setLanguage('en', false));
+      await page.waitForFunction(() => document.querySelector('#questionDetail .wrong-answer-summary')?.textContent === 'View answer');
+      assert.deepEqual(await detail.locator('.wrong-answer-summary,.wrong-analysis-summary').allTextContents(), ['View answer', 'View explanation']);
+      assert.deepEqual(await detail.locator('details.wrong-answer-details,details.wrong-analysis-details').evaluateAll(nodes => nodes.map(node => node.open)),
+        [true, true], 'Language changes preserve the independent disclosure choices');
+      await page.evaluate(() => DMateI18n.setLanguage('zh-CN', false));
+      await page.waitForFunction(() => document.querySelector('#questionDetail .wrong-answer-summary')?.textContent === '查看答案');
+      assert.equal(await detail.locator('details[open]').count(), 2);
+    }
+    await reveal.click();
+    assert.equal(await answer.evaluate(node => node.open), false, 'The answer can be collapsed');
+    assert.equal(await analysis.evaluate(node => node.open), true, 'Collapsing the answer preserves the explanation choice');
+    await analysis.locator('summary.wrong-analysis-summary').click();
+    assert.equal(await detail.locator('details[open]').count(), 0, 'Both disclosures can return to their collapsed state');
   }
   // All choice questions, rather than just the first example, retain all four
   // option bodies while losing their old selection/save behavior.
@@ -495,7 +513,7 @@ async function practice(page) {
     };
   }), legacy);
   await select(representatives.at(-1));
-  await detail.getByRole('button', { name: '查看参考答案', exact: true }).click();
+  await detail.locator('summary.wrong-answer-summary').click();
   assert.deepEqual(await readStore(page, 'practice'), legacy, 'Existing practice content and metadata are untouched');
   return legacy;
 }
@@ -511,7 +529,7 @@ async function concepts(page) {
   await closeLibraryDetail(page);
   await page.locator('#conceptSearch').fill('不存在的概念 xyzzy');
   assert.equal(await page.locator('#conceptList .concept-item').count(), 0);
-  assert.match(await page.locator('#conceptDetail').textContent(), /没有找到/);
+  assert.equal((await page.locator('#conceptDetail .offline-empty').innerText()).trim(), '无');
   await page.locator('#conceptSearch').fill('');
 }
 
@@ -567,8 +585,9 @@ async function curriculum(page) {
     await related.locator('[data-question-id="' + question.id + '"]').click();
     await page.locator('#questionsPanel').waitFor({ state: 'visible' });
     await studyOutput(page.locator('#questionDetail .detail-title'), question.title);
-    await page.locator('#questionDetail').getByRole('button', {name:'查看参考答案', exact:true}).click();
-    assert.ok((await page.locator('#questionDetail .answer-panel').innerText()).includes('评分要点'));
+    await page.locator('#questionDetail summary.wrong-answer-summary').click();
+    assert.equal(await page.locator('#questionDetail').getByRole('heading', { name: '评分要点', exact: true }).count(), 0);
+    assert.equal(typeof question.grading_criteria, 'string', 'The authored grading data stays in the source pack');
     await studyOutput(page.locator('#questionDetail .wrong-answer-inner').first(), child.example);
     await page.locator('#questionDetail .question-concept-links [data-concept-id="' + child.id + '"]').click();
     await page.locator('#conceptsPanel').waitFor({ state: 'visible' });

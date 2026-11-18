@@ -61,12 +61,12 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     assert.equal(reference.status(), 200, 'The server must provide the shared stylesheet');
     const networkCSS = await reference.text();
     assert.ok(networkCSS.trim().length, 'The shared stylesheet must not be empty');
-    const sharedAssets = await Promise.all(['/static/dmate-main.css?v=64', '/static/graph-editor.css?v=21', '/static/button-themes.css?v=62', '/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
-      '/static/select-controls.css?v=43', '/static/mobile-select.js?v=26', '/static/offline.css?v=51',
+    const sharedAssets = await Promise.all(['/static/dmate-main.css?v=65', '/static/graph-editor.css?v=21', '/static/button-themes.css?v=62', '/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
+      '/static/select-controls.css?v=43', '/static/mobile-select.js?v=26', '/static/offline.css?v=52',
       '/static/drawing-workspace.css?v=50', '/static/graph-editor.js?v=53', '/static/graph-editor-overlay.js?v=36', '/static/drawing-workspace.js?v=53', '/static/drawing-export.js?v=39',
       '/static/modal-chrome.css', '/static/modal-text.js?v=53', '/static/delete-confirm.js', '/static/guest-session.js?v=53', '/static/language.js?v=59',
-      '/static/graph-editor-format.js?v=32', '/static/language-catalog.js?v=61', '/static/offline-shell.js?v=33',
-      '/static/offline.js?v=54', '/static/offline-knowledge-graph.js?v=59',
+      '/static/graph-editor-format.js?v=32', '/static/language-catalog.js?v=62', '/static/offline-shell.js?v=33',
+      '/static/offline.js?v=55', '/static/offline-knowledge-graph.js?v=59',
       '/static/ui-tooltip.js?v=49',
       '/static/offline-knowledge-graph.css?v=54', '/static/offline-entry.js?v=45',
       '/static/search-controls.css?v=27', '/static/search-controls.js?v=27',
@@ -82,7 +82,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     // Simulate the pinned stylesheet left by the previous offline shell.
     await page.goto(new URL('/health', baseURL).href);
     await page.evaluate(async () => {
-      const cache = await caches.open('dmate-offline-shell-v66');
+      const cache = await caches.open('dmate-offline-shell-v67');
       await cache.put('/static/button-themes.css?v=54', new Response('/* obsolete graph navigation button styles */'));
     });
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });
@@ -100,7 +100,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       if (canonical.length !== 1) throw new Error('Expected exactly one precached shared stylesheet');
       return { name: names[0], canonical: canonical[0].url };
     }, assetPath);
-    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 67, 'Image view memory and graph titles need the refreshed offline cache');
+    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 68, 'Offline answer disclosures and pending-save labels need the refreshed offline cache');
     assert.equal((await fetchAsset(page, current.canonical)).text, networkCSS,
       'The refreshed shell loads current frameless controls instead of the obsolete stylesheet');
     for (const asset of sharedAssets) {

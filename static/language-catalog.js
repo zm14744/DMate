@@ -647,7 +647,7 @@
         "正在解题": "Solving…",
         "正在保存": "Saving…",
         "识别中": "Recognizing…",
-        "修改未保存": "Unsaved changes",
+        "待保存": "Pending save",
         "暂无记录": "No records yet",
         "有错误记录": "Mistakes recorded",
         "已有正确记录": "Correct answers recorded",

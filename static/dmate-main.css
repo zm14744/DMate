@@ -789,6 +789,10 @@ body[data-appearance-theme="light"] #sendBtn.ai-stop-button:hover {
     color:var(--text-subtle);
 }
 
+.wrong-meta-row.focus .wrong-meta-label {
+    min-width:0;
+}
+
 .wrong-meta-value {
     color:var(--text-muted);
 }
