@@ -150,7 +150,7 @@ async function expectConceptRows(page, expected, language = 'zh-CN') {
     assert.equal(await page.locator('#conceptList .active').count(), 0, 'Empty results have no stale selection');
     assert.equal(await page.locator('#conceptDetail .detail-title').count(), 0, 'Empty results clear the old detail');
     assert.equal((await page.locator('#conceptDetail .offline-empty').innerText()).trim(),
-      language === 'en' ? 'No matching concepts.' : '没有找到匹配的概念。');
+      language === 'en' ? 'None' : '无');
     return;
   }
   const active = page.locator('#conceptList .concept-item.active');
@@ -234,8 +234,13 @@ async function offlineCase(browser, width, theme) {
 async function onlineCase(browser, width, theme) {
   const context = await browser.newContext({ viewport: { width, height: 900 }, serviceWorkers: 'block',
     ...(width <= 1100 ? { isMobile: true, hasTouch: true } : {}) });
-  const page = await context.newPage(), errors = [];
+  const page = await context.newPage(), errors = [], modelRequests = [];
   page.on('pageerror', error => errors.push(error.message));
+  await page.route('**/auth/me', route => route.fulfill({ contentType: 'application/json',
+    body: '{"configured":true,"authenticated":false}' }));
+  await page.route(/\/(?:chat|ocr(?:\/[^?]*)?|graph\/[^?]*|analyze-questions|classify|conversation\/title)(?:\?|$)/, route => {
+    modelRequests.push(new URL(route.request().url()).pathname); return route.abort();
+  });
   try {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
     await page.evaluate(mode => { appearanceSettings.mode = mode; applyAppearanceSettings({ save: false }); openKnowledgeGraph(); }, theme);
@@ -246,9 +251,58 @@ async function onlineCase(browser, width, theme) {
     await checkNativeStyle(page);
     await choose(page, 'knowledgeGraphCategory', '图论', '#knowledgeGraphCategoryTrigger');
     await noOverflow(page, 'Online graph choices');
+    await ocrSelectors(page);
+    assert.deepEqual(modelRequests, [], 'Changing OCR grouping and region mode never recognizes images');
     assert.deepEqual(errors, [], 'No online selection script errors');
     console.log('PASS online ' + width + '/' + theme + ': shared mobile choices and native desktop selects');
   } finally { await context.close(); }
+}
+
+async function ocrSelectors(page) {
+  await page.evaluate(() => {
+    closeKnowledgeGraph();
+    const originalUrl = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="white"/></svg>');
+    ocrTasks.clear();
+    ocrTasks.set('select-fixture', { id: 'select-fixture', groupId: '1', isQuestion: true, state: 'ready',
+      file: new File(['local fixture'], 'local-selector.png', { type: 'image/png' }), sessionId: currentId,
+      originalUrl, startedAt: performance.now(), finishedAt: performance.now(),
+      draft: { body_text: '本地选择器测试', graphs: [] }, initialDocument: { body_text: '本地选择器测试', graphs: [] } });
+    renderOcrTasks(); openOcrGrouping();
+  });
+  const group = page.locator('#ocrGroupingDialog select[data-group-field="groupId"]');
+  const change = async (select, value) => {
+    const label = await select.evaluate((node, value) => [...node.options].find(option => option.value === value).label, value);
+    if (mobile(page)) {
+      await select.tap(); await modal(page).waitFor({ state: 'visible' });
+      await checkChooser(page, await select.evaluate(node => node.selectedOptions[0].label));
+      await modal(page).getByRole('radio', { name: label, exact: true }).tap();
+      await modal(page).waitFor({ state: 'hidden' });
+    } else {
+      await select.selectOption(value);
+      assert.equal(await modal(page).evaluate(node => node.open), false);
+    }
+    assert.equal(await select.inputValue(), value);
+  };
+  const shape = async select => select.evaluate(node => {
+    node.blur();
+    const css = getComputedStyle(node);
+    return ['borderTopStyle', 'borderTopWidth', 'borderTopLeftRadius', 'backgroundColor', 'color']
+      .map(key => css[key]);
+  });
+  const reference = page.locator(mobile(page) ? '#knowledgeGraphCategoryTrigger' : '#knowledgeGraphCategory');
+  assert.deepEqual(await shape(group), await shape(reference), 'OCR group choice shares the ordinary select surface');
+  await change(group, '2');
+  assert.equal(await page.evaluate(() => ocrTasks.get('select-fixture').groupId), '2', 'A dynamic choice reaches the real grouping handler');
+  await page.locator('#ocrGroupingDialog .ocr-group-close').click();
+  await page.evaluate(() => editOcrTask('select-fixture'));
+  const region = page.locator('#graphEditorDialog .dge-overlay-tools select');
+  await region.waitFor({ state: 'visible' });
+  assert.deepEqual(await shape(region), await shape(reference), 'Region mode shares the ordinary select surface');
+  await change(region, 'irregular');
+  assert.equal(await page.evaluate(() => ocrTasks.get('select-fixture').scanState.view.irregular), true,
+    'A dynamic choice reaches the real region-mode handler');
+  await page.locator('#graphEditorClose').click();
+  await page.evaluate(() => { ocrTasks.clear(); renderOcrTasks(); });
 }
 
 async function disconnectedCase(browser) {

@@ -89,7 +89,8 @@ body[data-appearance-theme="navy"] {
         .kg-mobile-zoom-btn,.kg-mobile-zoom-fit,.kg-mobile-expand,.kg-mobile-node,
         .kg-desktop-zoom-controls button,.kg-mobile-zoom-controls button,
         .mobile-choice-option,.dge-review-relation,.dcn-note-open,.ddw-history-open,
-        [data-overlay-tool="zoom-in"],[data-overlay-tool="zoom-out"]
+        [data-overlay-tool="zoom-in"],[data-overlay-tool="zoom-out"],
+        .dmate-graph-scan [data-overlay-tool="zoom-fit"]
     )) {
         background-color:var(--dm-control-bg)!important;
         background-image:none!important;
@@ -113,7 +114,8 @@ body[data-appearance-theme="navy"] {
         .kg-mobile-zoom-btn,.kg-mobile-zoom-fit,.kg-mobile-expand,.kg-mobile-node,
         .kg-desktop-zoom-controls button,.kg-mobile-zoom-controls button,
         .mobile-choice-option,.dge-review-relation,.dcn-note-open,.ddw-history-open,
-        [data-overlay-tool="zoom-in"],[data-overlay-tool="zoom-out"]
+        [data-overlay-tool="zoom-in"],[data-overlay-tool="zoom-out"],
+        .dmate-graph-scan [data-overlay-tool="zoom-fit"]
     )):not(:disabled):not([aria-disabled="true"]):hover {
         background-color:var(--dm-control-hover-bg)!important;
         border-color:var(--dm-control-hover-border)!important;
@@ -584,7 +586,8 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         .msg-actions > button,
         #knowledgeGraphCopyBtn,.ddw-header-export,
         .kg-desktop-zoom-controls button,
-        .kg-mobile-zoom-controls button
+        .kg-mobile-zoom-controls button,
+        .dmate-graph-scan .dge-view-controls > button[data-overlay-tool^="zoom-"]
     ) {
         border:0!important;
         border-radius:8px!important;
@@ -629,7 +632,8 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
             .msg-actions > button,
             #knowledgeGraphCopyBtn,.ddw-header-export,
             .kg-desktop-zoom-controls button,
-            .kg-mobile-zoom-controls button
+            .kg-mobile-zoom-controls button,
+            .dmate-graph-scan .dge-view-controls > button[data-overlay-tool^="zoom-"]
         ):not(:disabled):not([aria-disabled="true"]):hover {
             background:var(--dm-nav-hover,var(--dm-selected-hover))!important;
             color:var(--dm-icon-emphasis,var(--text-primary))!important;
@@ -639,7 +643,8 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         .msg-actions > button,
         #knowledgeGraphCopyBtn,.ddw-header-export,
         .kg-desktop-zoom-controls button,
-        .kg-mobile-zoom-controls button
+        .kg-mobile-zoom-controls button,
+        .dmate-graph-scan .dge-view-controls > button[data-overlay-tool^="zoom-"]
     ):not(:disabled):not([aria-disabled="true"]):is(:focus-visible,:active) {
         background:var(--dm-nav-hover,var(--dm-selected-hover))!important;
         color:var(--dm-icon-emphasis,var(--text-primary))!important;
@@ -648,7 +653,8 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         .msg-actions > button,
         #knowledgeGraphCopyBtn,.ddw-header-export,
         .kg-desktop-zoom-controls button,
-        .kg-mobile-zoom-controls button
+        .kg-mobile-zoom-controls button,
+        .dmate-graph-scan .dge-view-controls > button[data-overlay-tool^="zoom-"]
     ):not(:disabled):not([aria-disabled="true"]):focus-visible {
         outline:2px solid var(--dm-selected-ring)!important;
         outline-offset:2px!important;
@@ -806,6 +812,8 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         --dm-filled-text:var(--dm-control-text);
     }
     body[data-appearance-theme] :is(
+        #ocrGroupButton,
+        .ocr-task-card [data-ocr-action="edit"],
         #appearanceModal :is(#appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone),
         #knowledgeGraphModal .kg-history-refresh,
         #knowledgeGraphModal .kg-history-actions > button,
@@ -833,6 +841,8 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         transition:var(--dm-control-transition);
     }
     body[data-appearance-theme] :is(
+        #ocrGroupButton,
+        .ocr-task-card [data-ocr-action="edit"],
         #appearanceModal :is(#appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone),
         #knowledgeGraphModal .kg-history-refresh,
         #knowledgeGraphModal .kg-history-actions > button,
@@ -844,6 +854,8 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         background:var(--dm-filled-hover-bg)!important;
     }
     body[data-appearance-theme] :is(
+        #ocrGroupButton,
+        .ocr-task-card [data-ocr-action="edit"],
         #appearanceModal :is(#appearanceBackgroundUpload,#appearanceBackgroundRemove,#appearanceReset,#appearanceDone),
         #knowledgeGraphModal .kg-history-refresh,
         #knowledgeGraphModal .kg-history-actions > button,
@@ -856,5 +868,25 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         --dm-filled-text:var(--text-muted);
         opacity:.45!important;
         cursor:not-allowed;
+    }
+}
+
+/* Source pickers use the drawing panel actions' existing desktop/mobile
+   geometry and neutral control palette without changing drawing controls. */
+@layer dmate-button-themes {
+    body[data-appearance-theme] .dmate-graph-scan .dgs-section-head > button[data-source-picker] {
+        min-width:0!important;
+        min-height:auto!important;
+        padding:8px 10px!important;
+        border-radius:9px!important;
+        font-size:13px!important;
+        white-space:nowrap!important;
+        box-shadow:0 3px 12px #0000000f!important;
+    }
+    @media(max-width:600px) {
+        body[data-appearance-theme] .dmate-graph-scan .dgs-section-head > button[data-source-picker] {
+            padding:7px 6px!important;
+            font-size:12px!important;
+        }
     }
 }

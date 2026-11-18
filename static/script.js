@@ -15628,10 +15628,8 @@ function renderOcrTasks() {
             slow.hidden = ocrTaskSeconds(task) < 120;
             content.append(slow);
         }
-        if (task.error) {
+        if (task.error && task.state !== "failed") {
             content.append(element("p", "ocr-task-notice", task.error));
-        } else if (!task.confirmation && task.result?.manual_mode && task.notice) {
-            content.append(element("p", "ocr-task-notice", task.notice));
         }
         const actions = element("div", "ocr-task-actions");
         const button = (text, action, primary = false) => {

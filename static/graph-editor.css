@@ -322,12 +322,14 @@
 .dgs-section-head>button{flex:0 0 auto;min-height:30px;padding:4px 8px;font-size:12px}
 .dgs-source-picker-layer{position:fixed;inset:0;z-index:40;pointer-events:none}
 .dgs-source-picker-layer:empty{display:none}
-.dgs-source-picker{position:fixed;display:flex;flex-direction:column;gap:12px;padding:12px;box-sizing:border-box;min-width:0;border:1px solid var(--dge-border);border-radius:12px;background:var(--dge-surface,#fff);box-shadow:0 6px 22px #0002;pointer-events:auto;overflow:hidden}
+.dgs-source-picker{position:fixed;display:flex;flex-direction:column;gap:12px;padding:12px;box-sizing:border-box;min-width:0;border:1px solid var(--border-strong,#cbd5e1);border-radius:12px;background:var(--surface-1,#fff);box-shadow:0 6px 22px #0002;pointer-events:auto;overflow:hidden}
 .dgs-source-list{display:flex;flex-direction:column;gap:8px;min-height:0;overflow:auto;overscroll-behavior:contain}
 .dgs-source-choice{display:flex;align-items:center;gap:9px;min-height:44px;font-size:13px;line-height:1.4;cursor:pointer}
 .dgs-source-picker .dgs-source-choice input[type=checkbox]{appearance:none;-webkit-appearance:none;flex:0 0 25px;width:25px;height:25px;min-width:25px;margin:0;border:2px solid var(--text-subtle,#64748b);border-radius:50%;background:transparent;cursor:pointer}
 .dgs-source-picker .dgs-source-choice input[type=checkbox]:checked{background:var(--accent,#3b82f6);border-color:var(--accent,#3b82f6)}
-.dgs-source-picker-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:0 0 auto}
+.dgs-source-picker-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:0 0 auto}
+.dgs-source-picker-head>h3{margin:0;font-family:var(--dmate-font-ui);font-size:var(--font-base,16px);font-weight:400;line-height:inherit}
+@media(max-width:900px){.dgs-source-picker{padding:10px;gap:8px}.dgs-source-picker-head{gap:8px}}
 .dmate-graph-editor :is(.dge-panel-close,.dgs-source-delete){appearance:none;-webkit-appearance:none;flex:0 0 20px;width:20px;min-width:20px;max-width:20px;height:20px;min-height:20px;max-height:20px;padding:0!important;border:0!important;border-radius:50%;background:#ef4444!important;box-shadow:none!important;font-size:0}
 .dmate-graph-editor :is(.dge-panel-close,.dgs-source-delete):hover{background:#dc2626!important}
 .dgs-source-card{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:6px 10px;border:1px solid var(--dge-border);border-radius:8px}
