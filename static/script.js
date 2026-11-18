@@ -21560,14 +21560,10 @@ function locateWrongQuestionGraphOriginal(reference, context) {
         || document.getElementById("knowledgeGraphModal")?.classList.contains("hidden")) return;
     const current = getWrongQuestionGraphSubject();
     if (!current || knowledgeGraphReferenceKey(current.reference) !== knowledgeGraphReferenceKey(reference)) return;
-    // Repeated entries are independent records. Locate this exact problem,
-    // preferring a corrected copy; otherwise use its oldest pending entry.
-    const matches = learningState.wrongQuestions.filter(item => item.question === reference.question
-        && !learningState.deletedWrongQuestionIds?.[String(item.id)]).sort((left, right) =>
-            Number(Boolean(right.corrected)) - Number(Boolean(left.corrected))
-            || (Number(left.createdAt) || 0) - (Number(right.createdAt) || 0)
-            || String(left.id).localeCompare(String(right.id)));
-    const target = matches[0];
+    // Identical questions can belong to separate wrong-book records. Return
+    // to the record that opened this graph, preserving its own status and id.
+    const target = learningState.wrongQuestions.find(item => String(item.id) === reference.id
+        && item.question === reference.question && !learningState.deletedWrongQuestionIds?.[reference.id]);
     if (!target) return;
     wrongBookFilter = target.corrected ? "corrected" : "pending";
     wrongBookSearch = "";

@@ -1,5 +1,5 @@
 /* Wrong-question graphs use their own saved source pair and return to the
- * matching wrong-book record. Model/account routes are isolated in this suite.
+ * exact clicked wrong-book record. Model/account routes are isolated in this suite.
  */
 'use strict';
 const assert = require('node:assert/strict');
@@ -68,10 +68,10 @@ async function seed(page, { duplicates = true, legacy = false } = {}) {
       ...(duplicates ? [make('wrong-earliest', question, false, 10, 40),
         make('wrong-corrected', question, true, 20, 50)] : []),
       make('wrong-unrelated', other, true, 1, 60)] });
-    sessions = [{ id: 'wrongbook-current-conversation', name: '保持当前对话', nameSource: 'user',
+    sessions = [{ id: 'wrongbook-current-conversation', name: '保持当前对话', nameSource: 'user', createdAt: 1700000000000,
       deletedMessageIds: {}, learningQuestion: null, messages: [
-        { messageId: 'wrongbook-greeting', role: 'user', text: '你好', manualIsQuestion: false },
-        { messageId: 'wrongbook-reply', role: 'ai', text: '你好' }] }];
+        { messageId: 'wrongbook-greeting', role: 'user', text: '你好', manualIsQuestion: false, createdAt: 1700000000001 },
+        { messageId: 'wrongbook-reply', role: 'ai', text: '你好', createdAt: 1700000000002 }] }];
     currentId = sessions[0].id;
     wrongBookFilter = 'pending'; wrongBookSearch = ''; wrongBookSort = 'recent';
     renderAll(); openWrongBook();
@@ -173,16 +173,18 @@ async function checkWrongBookGraph(browser, width) {
     assert.doesNotMatch(await page.locator('#knowledgeGraphCanvas .kg-section-title').textContent(), /错题/);
     assert.deepEqual((await graphSnapshot(page)).ids, EXPECTED, label + ': language changes preserve the exact source graph');
     await page.evaluate(() => DMateI18n.setLanguage('zh-CN', false));
-    await locateAndExpect(page, 'wrong-corrected', 'corrected', conversation, label + '/corrected first');
+    await locateAndExpect(page, 'wrong-current', 'pending', conversation, label + '/clicked newer pending');
 
-    // Deliberately reverse update order and creation order. The locator follows
-    // the oldest retained question, independently of the current sorting UI.
-    await page.evaluate(() => {
-      learningState.wrongQuestions = learningState.wrongQuestions.filter(item => item.id !== 'wrong-corrected');
-      wrongBookFilter = 'pending'; wrongBookSearch = ''; renderWrongBook();
-    });
-    await clickCardGraph(page);
-    await locateAndExpect(page, 'wrong-earliest', 'pending', conversation, label + '/oldest uncorrected');
+    // These cards have identical question text but different creation/update
+    // orders and statuses. Each graph must return to the card that opened it.
+    for (const [id, filter] of [['wrong-earliest', 'pending'], ['wrong-corrected', 'corrected']]) {
+      await page.evaluate(filter => {
+        wrongBookFilter = filter; wrongBookSearch = ''; renderWrongBook();
+      }, filter);
+      await clickCardGraph(page, id);
+      await locateAndExpect(page, id, filter, conversation, label + '/clicked ' + id);
+    }
+    await page.evaluate(() => { wrongBookFilter = 'pending'; renderWrongBook(); });
 
     // Actual storage round-trip must retain the reviewed graph and its exact
     // solution pair, rather than rebuilding a graph from a four-name tag list.
@@ -236,7 +238,7 @@ async function checkWrongBookGraph(browser, width) {
     assert.deepEqual((await graphSnapshot(page)).ids, []);
     assert.deepEqual(modelCalls, [], label + ': reviewed graph opening, navigation and persistence request no model output');
     assert.deepEqual(errors, []);
-    console.log('PASS ' + width + ': wrong-card graph action, exact purple graph, no redundant navigation, corrected/oldest locator and source persistence');
+    console.log('PASS ' + width + ': wrong-card graph action, exact purple graph, no redundant navigation, exact clicked duplicate locator and source persistence');
   } finally { await context.close(); }
 }
 
@@ -295,7 +297,7 @@ async function checkStaleWrongBookLocators(browser) {
   try {
     const conversation = await seed(page);
     await clickCardGraph(page);
-    const removed = await page.evaluate(() => {
+    const removed = await page.evaluate(question => {
       const stale = document.getElementById('knowledgeGraphLocateOriginal');
       learningState.wrongQuestions = learningState.wrongQuestions.filter(item => item.id !== 'wrong-current');
       renderKnowledgeGraph();
@@ -303,11 +305,15 @@ async function checkStaleWrongBookLocators(browser) {
       stale.click();
       return { before: JSON.stringify(before), after: JSON.stringify({ filter: wrongBookFilter, currentId, sessions }),
         graphOpen: !document.getElementById('knowledgeGraphModal').classList.contains('hidden'),
-        highlighted: document.querySelectorAll('#wrongBookList .wrong-card.history-locate-flash').length };
-    });
+        highlighted: document.querySelectorAll('#wrongBookList .wrong-card.history-locate-flash').length,
+        retainedDuplicates: learningState.wrongQuestions.filter(item => item.question === question).map(item => item.id).sort() };
+    }, MAIN);
     assert.equal(removed.before, removed.after, 'a detached locator cannot act after its selected wrong-book entry was deleted');
     assert.equal(removed.graphOpen, true, 'a deleted source does not navigate to another retained duplicate');
     assert.equal(removed.highlighted, 0);
+    assert.deepEqual(removed.retainedDuplicates, ['wrong-corrected', 'wrong-earliest'],
+      'both corrected and pending copies remain available but cannot replace the deleted source');
+    assert.equal(await page.locator('#knowledgeGraphLocateOriginal').isVisible(), false);
     assert.equal(await page.evaluate(() => JSON.stringify({ sessions, currentId })), conversation);
     assert.deepEqual((await graphSnapshot(page)).ids, []);
     await page.locator('#knowledgeGraphClose').click();
