@@ -783,6 +783,10 @@ body[data-appearance-theme="light"] #sendBtn.ai-stop-button:hover {
     line-height:1.55;
 }
 
+.wrong-meta-row.focus {
+    gap:12px;
+}
+
 .wrong-meta-label {
     flex:0 0 auto;
     min-width:84px;
@@ -797,9 +801,12 @@ body[data-appearance-theme="light"] #sendBtn.ai-stop-button:hover {
     color:var(--text-muted);
 }
 
-.wrong-meta-row.focus .wrong-meta-label,
-.wrong-meta-row.focus .wrong-meta-value {
+.wrong-meta-row.focus .wrong-meta-label {
     color:var(--accent-pale);
+}
+
+.wrong-meta-row.focus .wrong-meta-value {
+    color:var(--text-primary);
 }
 
 .wrong-question {
@@ -8073,8 +8080,7 @@ body[data-appearance-theme] #ocrCancelBtn:not([hidden]) {
 
 /* 2026-10-12：三主题统一识图/停止按键与浅色可读性。 */
 /* 选中的考试知识点和文字复制按钮：浅色主题用深色，不再使用淡蓝或浅灰。 */
-body[data-appearance-theme="light"] .wrong-meta-row.focus .wrong-meta-label,
-body[data-appearance-theme="light"] .wrong-meta-row.focus .wrong-meta-value {
+body[data-appearance-theme="light"] .wrong-meta-row.focus .wrong-meta-label {
     color:#1d4ed8 !important;
     -webkit-text-fill-color:#1d4ed8 !important;
 }

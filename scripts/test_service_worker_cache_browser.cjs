@@ -61,7 +61,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     assert.equal(reference.status(), 200, 'The server must provide the shared stylesheet');
     const networkCSS = await reference.text();
     assert.ok(networkCSS.trim().length, 'The shared stylesheet must not be empty');
-    const sharedAssets = await Promise.all(['/static/dmate-main.css?v=65', '/static/graph-editor.css?v=22', '/static/button-themes.css?v=63', '/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
+    const sharedAssets = await Promise.all(['/static/dmate-main.css?v=66', '/static/graph-editor.css?v=22', '/static/button-themes.css?v=63', '/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
       '/static/select-controls.css?v=43', '/static/mobile-select.js?v=26', '/static/offline.css?v=52',
       '/static/drawing-workspace.css?v=51', '/static/graph-editor.js?v=53', '/static/graph-editor-overlay.js?v=36', '/static/drawing-workspace.js?v=54', '/static/drawing-export.js?v=39',
       '/static/modal-chrome.css', '/static/modal-text.js?v=53', '/static/delete-confirm.js', '/static/guest-session.js?v=53', '/static/language.js?v=59',
@@ -82,7 +82,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     // Simulate the pinned stylesheet left by the previous offline shell.
     await page.goto(new URL('/health', baseURL).href);
     await page.evaluate(async () => {
-      const cache = await caches.open('dmate-offline-shell-v68');
+      const cache = await caches.open('dmate-offline-shell-v69');
       await cache.put('/static/button-themes.css?v=54', new Response('/* obsolete graph navigation button styles */'));
     });
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });
@@ -100,7 +100,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       if (canonical.length !== 1) throw new Error('Expected exactly one precached shared stylesheet');
       return { name: names[0], canonical: canonical[0].url };
     }, assetPath);
-    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 69, 'Shared toolbars and graph zoom limits need the refreshed offline cache');
+    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 70, 'Focus metadata spacing and text colours need the refreshed offline cache');
     assert.equal((await fetchAsset(page, current.canonical)).text, networkCSS,
       'The refreshed shell loads current frameless controls instead of the obsolete stylesheet');
     for (const asset of sharedAssets) {
