@@ -69,6 +69,7 @@ public final class MainActivity extends Activity {
     private String guestSessionToken;
     private ScriptHandler systemThemeStartScript;
     private String documentStartSystemTheme;
+    private OfflineVaultBridge offlineVaultBridge;
     private ValueCallback<Uri[]> pendingFileCallback;
     private boolean filePickerTriedDocuments;
     private boolean filePickerMultiple;
@@ -219,6 +220,7 @@ public final class MainActivity extends Activity {
 
         installGallerySaveBridge();
         installLanguageBridge();
+        offlineVaultBridge = OfflineVaultBridge.install(this, webView);
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             guestSessionStartScript = WebViewCompat.addDocumentStartJavaScript(
                 webView, GuestSession.script(guestSessionToken), Collections.singleton("https://" + HOME_HOST));
@@ -523,6 +525,7 @@ public final class MainActivity extends Activity {
     private final class DmateWebViewClient extends WebViewClient {
         @Override
         public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+            if (offlineVaultBridge != null) offlineVaultBridge.navigated();
             cancelPendingMicrophoneRequest();
             super.onPageStarted(view, url, favicon);
         }
@@ -764,6 +767,10 @@ public final class MainActivity extends Activity {
         }
         pendingLegacySave = null;
         imageSaver.shutdown();
+        if (offlineVaultBridge != null) {
+            offlineVaultBridge.close();
+            offlineVaultBridge = null;
+        }
         if (webView != null) {
             if (guestSessionStartScript != null) {
                 guestSessionStartScript.remove();
