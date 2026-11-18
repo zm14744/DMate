@@ -32,9 +32,9 @@ async function runCase(browser, width) {
         state:'ready',isQuestion:true,originalUrl:URL.createObjectURL(file),startedAt:performance.now(),finishedAt:performance.now(),
         draft:structuredClone(draft),initialDocument:structuredClone(draft),
         scanState:{mode:'manual',sourcesVersion:3,nativeDocument:structuredClone(draft),
-          graphRegions:graphs.map((graph,index)=>({id:'g'+(index+1),status:'complete',selected:true,
+          graphRegions:graphs.map((graph,index)=>({id:'g'+(index+1),status:index?'complete':'partial',error:index?'':'图形待核对说明 label=null',selected:true,
             polygon:[[.1,.1],[.9,.1],[.9,.8],[.1,.8]],graphs:[graph]})),
-          textRegions:[{id:1,status:'complete',selected:true,polygon:[[.1,.1],[.9,.1],[.9,.8],[.1,.8]],text:body_text}]}});
+          textRegions:[{id:1,status:'partial',error:'文字待核对说明',selected:true,polygon:[[.1,.1],[.9,.1],[.9,.8],[.1,.8]],text:body_text}]}});
       renderOcrTasks();editOcrTask('continuous-scan');
     });
     await page.locator('#graphEditorDialog .dge-overlay[data-geometry-ready="true"]').waitFor();await settle(page);
@@ -54,6 +54,10 @@ async function runCase(browser, width) {
     const sourceButtons=page.locator('.dgs-section-head [data-source-picker]');
     assert.equal(await sourceButtons.count(),2);
     for(const button of await sourceButtons.all())assert.equal(await button.evaluate(node=>getComputedStyle(node).borderTopWidth),'0px');
+    assert.equal(await page.locator('.dgs-region-state').count(),0,'Text and graph information omit technical review notes');
+    assert.doesNotMatch(await page.locator('.dgs-information').innerText(),/待核对说明|label=null/);
+    assert.equal(await page.evaluate(()=>ocrTasks.get('continuous-scan').scanState.graphRegions[0].error),'图形待核对说明 label=null',
+      'Hiding a note does not erase the stored review result');
     assert.equal(await page.locator('.dge-overlay-tools select').isVisible(),false,'Selection/pan mode hides the region-shape choice');
     await page.locator('[data-overlay-tool="bounds"]').click();
     assert.equal(await page.locator('.dge-overlay-tools select').isVisible(),true);
@@ -86,6 +90,11 @@ async function runCase(browser, width) {
     await page.locator('[data-source-picker="graph"]').click();
     const popup=page.locator('.dgs-source-picker');await popup.waitFor({state:'visible'});await settle(page);
     assert.equal(await popup.locator('.dgs-source-choice input[type="checkbox"]').count(),8);
+    for(const row of await popup.locator('.dgs-source-card').all()){
+      const dimensions=await row.evaluate(node=>{const left=node.querySelector('input').getBoundingClientRect(),right=node.querySelector('.dgs-source-delete').getBoundingClientRect();
+        return {border:getComputedStyle(node).borderTopWidth,left:[left.width,left.height],right:[right.width,right.height]};});
+      assert.equal(dimensions.border,'0px');assert.deepEqual(dimensions.right,dimensions.left,'Source selection and deletion circles have equal diameters');
+    }
     const within=()=>popup.evaluate(node=>{
       const box=node.getBoundingClientRect(),dialog=node.closest('dialog').getBoundingClientRect();
       return box.left>=Math.max(0,dialog.left)-1&&box.right<=Math.min(innerWidth,dialog.right)+1&&box.top>=Math.max(0,dialog.top)-1&&box.bottom<=Math.min(innerHeight,dialog.bottom)+1;

@@ -115,27 +115,14 @@ function mount(container,options){
   }
   box.append(list);return box;
  }
- function regionStatus(row,kind){
-  const line=el('p','dgs-region-state');line.setAttribute('role','status');
-  line.append(el('span','',label(row,kind)),d.createTextNode(': '));
-  const stateText={queued:'等待识别。',running:'正在识别。',partial:'待核对。',empty:kind==='graph'?'未识别到图形。':'未识别到文字。',error:'识别失败。'}[row.status]||'待识别。';
-  if(row.status==='error'&&row.error){
-   const detail=String(row.error).replace(/^(?:选区|框内|局部)?(?:文字|图形)?识别(?:失败|未完成)[，,。:\s]*/,'');
-   line.append(el('span','',uiText(detail?'识别失败：':stateText)),el('span','',uiText(detail)));
-  }else if(row.status==='partial'&&row.error)line.append(el('span','',uiText('待核对：')),el('span','',uiText(row.error)));
-  else line.append(el('span','',uiText(stateText)));
-  return line;
- }
  function heading(section,kind,title){const head=el('div','dgs-section-head');head.append(el('h3','',title));if(state.mode==='manual'){const choose=button('选择信息',()=>openPicker(kind));choose.dataset.sourcePicker=kind;choose.setAttribute('aria-label',kind==='graph'?'选择图形信息':'选择文字信息');choose.setAttribute('aria-expanded',String(picker===kind));head.append(choose);}section.replaceChildren(head);}
  function refresh(){
   if(destroyed)return;assemble();nativeMode.setAttribute('aria-selected',String(state.mode==='native'));manualMode.setAttribute('aria-selected',String(state.mode==='manual'));nativeMode.disabled=saving;manualMode.disabled=saving;
   const textStates=state.mode==='manual'?selected('text').filter(row=>blocked(row)||row.status==='partial'):[],graphStates=state.mode==='manual'?selected('graph').filter(row=>blocked(row)||row.status==='partial'):[];
   heading(textSection,'text','文字信息');if(document.body_text||!textStates.length){const body=el('div','dgs-body',document.body_text||'暂无文字信息。');if(document.body_text)body.setAttribute('data-i18n-content','');body.style.whiteSpace='pre-wrap';textSection.append(body);}
-  for(const row of textStates)textSection.append(regionStatus(row,'text'));
   heading(graphSection,'graph','图形信息');
   const graphInformation=el('div','dgs-graph-information');
   root.DMateGraphFormat.renderGraphInformation(graphInformation,document,{showEmpty:!graphStates.length});graphSection.append(graphInformation);
-  for(const row of graphStates)graphSection.append(regionStatus(row,'graph'));
   confirm.disabled=saving||pending();confirm.textContent=saving?'正在保存…':'保存';request.disabled=saving;
   // Recognition updates the information cards, but must not remove a source
   // checkbox or drag target underneath an in-progress pointer action.

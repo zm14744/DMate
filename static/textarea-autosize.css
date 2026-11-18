@@ -1,0 +1,5 @@
+textarea.dmate-textarea-autosize {
+    box-sizing:border-box!important;
+    resize:none!important;
+    overflow-x:hidden;
+}
