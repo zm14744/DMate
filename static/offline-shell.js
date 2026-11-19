@@ -8,6 +8,7 @@
     check:'<path d="m20 6-11 11-5-5"/>',
     save:'<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
     eye:'<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+    'eye-off':'<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
     'book-open':'<path d="M12 7v14M3 18V3a1 1 0 0 1 1-1h2a6 6 0 0 1 6 3 6 6 0 0 1 6-3h2a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1h-3a6 6 0 0 0-5 2 6 6 0 0 0-5-2H4a1 1 0 0 1-1-1Z"/>',
     'clipboard-list':'<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M12 11h4M12 16h4M8 11h.01M8 16h.01"/>',
     export:'<path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/>',
@@ -29,6 +30,43 @@
   };
   const $ = id => document.getElementById(id);
   const mobile = window.matchMedia('(max-width:1100px)');
+  const privacyButtons = [...document.querySelectorAll('[data-offline-privacy]')];
+  const privacyRegions = [...document.querySelectorAll('.offline-panel,.offline-nav,.offline-sidebar-bottom,.offline-sidebar-heading')];
+  const previousInert = new Map();
+  let interfaceHidden = false;
+  window.DMateI18n?.register({'隐藏界面':'Hide interface','显示界面':'Show interface'});
+  function syncPrivacyControls() {
+    const action = interfaceHidden ? '显示界面' : '隐藏界面';
+    const label = window.DMateI18n?.t(action) || action;
+    const iconName = interfaceHidden ? 'eye' : 'eye-off';
+    for (const control of privacyButtons) {
+      control.setAttribute('aria-label',label);
+      control.setAttribute('title',label);
+      control.dataset.privacyState = interfaceHidden ? 'hidden' : 'visible';
+      const icon = window.DMateOfflineIcons.create(iconName);
+      // Header icons inherit the sidebar control's 22/24px size and 2px stroke.
+      icon.removeAttribute('class');
+      icon.dataset.icon = iconName;
+      control.replaceChildren(icon);
+    }
+  }
+  function togglePrivacy() {
+    interfaceHidden = !interfaceHidden;
+    document.body.classList.toggle('offline-content-hidden',interfaceHidden);
+    for (const region of privacyRegions) {
+      if (interfaceHidden) {
+        previousInert.set(region,region.inert);
+        region.inert = true;
+      } else {
+        region.inert = previousInert.get(region) || false;
+      }
+    }
+    if (!interfaceHidden) previousInert.clear();
+    syncPrivacyControls();
+  }
+  privacyButtons.forEach(control => control.addEventListener('click',togglePrivacy));
+  window.addEventListener('dmate:languagechange',syncPrivacyControls);
+  syncPrivacyControls();
   let lastDrawerTrigger = null;
   function updateDrawer() {
     const open = mobile.matches ? document.body.classList.contains('offline-nav-open')
@@ -48,7 +86,7 @@
     lastDrawerTrigger = $('offlineNavToggle');
     document.body.classList.add('offline-nav-open');
     updateDrawer();
-    requestAnimationFrame(() => document.querySelector('.offline-nav-item.active')?.focus({preventScroll:true}));
+    requestAnimationFrame(() => (interfaceHidden ? $('offlineDrawerPrivacyToggle') : document.querySelector('.offline-nav-item.active'))?.focus({preventScroll:true}));
   });
   $('offlineNavClose').addEventListener('click',() => closeDrawer());
   $('offlineNavBackdrop').addEventListener('click',() => closeDrawer());
@@ -66,13 +104,18 @@
   document.addEventListener('keydown',event => {
     if (event.key === 'Escape' && document.body.classList.contains('offline-nav-open')) closeDrawer();
     if (event.key === 'Tab' && mobile.matches && document.body.classList.contains('offline-nav-open')) {
-      const controls = [...$('offlineSidebar').querySelectorAll('button:not(:disabled),a[href]')].filter(node => node.getClientRects().length);
+      const controls = [...$('offlineSidebar').querySelectorAll('button:not(:disabled),a[href]')]
+        .filter(node => node.getClientRects().length && !node.closest('[inert]') && getComputedStyle(node).visibility !== 'hidden');
       const first = controls[0], last = controls.at(-1);
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     }
   });
-  mobile.addEventListener('change',() => closeDrawer(false));
+  mobile.addEventListener('change',() => {
+    const restorePrivacyFocus = document.activeElement?.matches('[data-offline-privacy]');
+    closeDrawer(false);
+    if (restorePrivacyFocus) $(mobile.matches ? 'offlineMobilePrivacyToggle' : 'offlineDesktopPrivacyToggle').focus({preventScroll:true});
+  });
   updateDrawer();
   function syncPanelNavigation() {
     document.querySelectorAll('.offline-nav-item[data-panel]').forEach(button => {

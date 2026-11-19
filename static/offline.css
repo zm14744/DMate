@@ -209,9 +209,12 @@ body.offline-workspace :is(.question-parent-concepts,.question-graph-modules,.of
 .offline-icon-button svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 .offline-sidebar-toggle { position:absolute; top:15px; right:10px; }
 #offlineDesktopSidebarOpen { position:absolute; z-index:10; top:12px; left:12px; display:none; }
+#offlineDesktopPrivacyToggle { position:absolute; z-index:10; top:12px; left:12px; }
 html[data-offline-sidebar="collapsed"] body.offline-workspace .offline-layout { grid-template-columns:0 minmax(0,1fr); }
 html[data-offline-sidebar="collapsed"] body.offline-workspace .offline-sidebar { visibility:hidden; padding-inline:0 !important; }
 html[data-offline-sidebar="collapsed"] #offlineDesktopSidebarOpen { display:inline-flex; }
+html[data-offline-sidebar="collapsed"] #offlineDesktopPrivacyToggle { left:58px; }
+body.offline-workspace.offline-content-hidden :is(.offline-panel,.offline-nav,.offline-sidebar-bottom,.offline-sidebar-heading) { visibility:hidden !important; opacity:0 !important; pointer-events:none !important; }
 body.offline-workspace.has-custom-background .offline-main { background:transparent; }
 body.offline-workspace.has-custom-background .offline-sidebar { background:rgba(var(--surface-1-rgb),var(--shell-alpha)); }
 body.offline-workspace.has-custom-background .offline-panel { background:rgba(var(--surface-2-rgb),var(--panel-alpha)); }
@@ -222,7 +225,7 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
   body.offline-workspace[data-appearance-theme] #offlineSidebar .offline-nav-item.active { background:var(--dm-selected-bg,var(--surface-3)) !important; font-weight:500; }
   body.offline-workspace[data-appearance-theme] #offlineSidebar :is(.offline-nav-item,.offline-return):hover { background:var(--dm-nav-hover,var(--surface-3)) !important; }
   body.offline-workspace[data-appearance-theme] :is(#offlineMain,#libraryDetailDialog) .offline-primary { background:var(--accent) !important; border-color:var(--accent) !important; color:#fff !important; -webkit-text-fill-color:#fff !important; }
-  body.offline-workspace[data-appearance-theme] :is(#offlineDesktopSidebarToggle,#offlineDesktopSidebarOpen,#offlineNavToggle):is(.offline-icon-button,.mobile-topbar-button) { border:0 !important; background:transparent !important; box-shadow:none !important; color:var(--text-primary) !important; }
+  body.offline-workspace[data-appearance-theme] :is(#offlineDesktopSidebarToggle,#offlineDesktopSidebarOpen,#offlineNavToggle,.offline-privacy-toggle):is(.offline-icon-button,.mobile-topbar-button) { border:0 !important; background:transparent !important; box-shadow:none !important; color:var(--text-primary) !important; }
   body.offline-workspace[data-appearance-theme] #offlineMain :is(.question-item,.concept-item) { background:transparent !important; border-color:transparent !important; box-shadow:none !important; color:var(--text-primary) !important; }
   body.offline-workspace[data-appearance-theme] #offlineMain :is(.question-item.active,.concept-item.active) { background:var(--dm-selected-bg,var(--surface-3)) !important; }
   /* The global button hover rule includes an ID in :not(). Scope this reset
@@ -243,18 +246,19 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
 }
 @media(max-width:1100px) {
   body.offline-workspace .offline-layout { display:block !important; grid-template-columns:1fr; padding-top:calc(56px + env(safe-area-inset-top)); }
-  body.offline-workspace .offline-topbar { position:absolute; display:flex !important; align-items:center; top:0; left:0; right:0; z-index:70; height:calc(56px + env(safe-area-inset-top)); padding:env(safe-area-inset-top) 10px 0; }
-  .offline-topbar .mobile-topbar-button { display:flex; align-items:center; justify-content:center; width:42px; height:42px; padding:8px; margin:0; border:0; background:transparent; }
-  .offline-topbar .mobile-topbar-button svg { width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  body.offline-workspace .offline-topbar { position:absolute; display:flex !important; align-items:center; gap:8px; top:0; left:0; right:0; z-index:70; height:calc(56px + env(safe-area-inset-top)); padding:env(safe-area-inset-top) 10px 0; }
+  :is(.offline-topbar,.offline-drawer-head) .mobile-topbar-button { display:flex; align-items:center; justify-content:center; flex:none; width:42px; min-width:42px; height:42px; min-height:42px; padding:8px; margin:0; border:0; background:transparent; }
+  :is(.offline-topbar,.offline-drawer-head) .mobile-topbar-button svg { width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
   body.offline-workspace .offline-sidebar.left { position:fixed !important; z-index:200; top:0; bottom:0; left:0; display:flex !important; width:min(320px,88vw) !important; height:100dvh !important; max-height:100dvh !important; padding:12px !important; visibility:hidden; transform:translateX(-100%) !important; transition:transform .2s ease,visibility .2s ease; }
   body.offline-workspace.offline-nav-open .offline-sidebar.left { visibility:visible; transform:translateX(0) !important; }
   body.offline-workspace .offline-nav-backdrop { position:fixed; z-index:190; inset:0; display:block; background:rgba(0,0,0,.46); }
   .offline-drawer-head { display:flex; align-items:center; justify-content:space-between; min-height:42px; margin-bottom:14px; color:var(--text-primary); font-size:16px; font-weight:600; }
+  .offline-drawer-actions { display:flex; align-items:center; flex:none; gap:8px; }
   .offline-sidebar-heading,.offline-drawer-head>span { font-size:14px; font-weight:650; }
   body[data-appearance-theme="light"] :is(.offline-sidebar-heading,.offline-drawer-head>span) { color:var(--text-secondary); }
   .offline-drawer-head .mobile-drawer-close { display:block; width:22px; min-width:22px; height:22px; padding:0; border:0; border-radius:50%; color:transparent; font-size:0; }
   .offline-sidebar .dmate-brand { padding:0; margin-bottom:22px; }
-  .offline-sidebar-toggle,#offlineDesktopSidebarOpen { display:none !important; }
+  .offline-sidebar-toggle,#offlineDesktopSidebarOpen,#offlineDesktopPrivacyToggle { display:none !important; }
   body.offline-workspace .offline-main.center { height:100% !important; padding:0; }
   .offline-panel { width:calc(100% - 16px); margin:8px auto; padding:14px; border-radius:14px; }
   .offline-toolbar { align-items:flex-start; gap:10px; flex-wrap:wrap; }
@@ -290,7 +294,8 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
 }
 @media(max-width:600px) { body.offline-workspace { --offline-topbar-height:54px; } }
 
-/* Keep the sidebar reopening control usable without restoring a header row. */
+/* Keep the visibility and sidebar controls clear of content without a header row. */
 @media(min-width:1101px) {
-  html[data-offline-sidebar="collapsed"] body.offline-workspace .offline-main.center { padding-left:48px; }
+  body.offline-workspace .offline-main.center { padding-left:48px; }
+  html[data-offline-sidebar="collapsed"] body.offline-workspace .offline-main.center { padding-left:94px; }
 }
