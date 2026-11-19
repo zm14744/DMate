@@ -12,7 +12,7 @@ const executablePath = process.env.CHROMIUM_EXECUTABLE_PATH;
 const launch = {headless:true,...(executablePath ? {executablePath} : {})};
 const owner = 'vault-ui-account';
 const secret = {title:'VAULT-UI-PRIVATE-NOTE-71',content:'VAULT-UI-PRIVATE-CONTENT-73',
-  drawing:'VAULT-UI-PRIVATE-DRAWING-79',filename:'VAULT-UI-PRIVATE-BACKGROUND-83.png'};
+  drawing:'VAULT-UI-PRIVATE-DRAWING-79',filename:'VAULT-UI-PRIVATE-BACKGROUND-83.png',wrong:'VAULT-UI-PRIVATE-MISTAKE-89'};
 const ready = async page => {
   await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
   await revealInterface(page);
@@ -108,8 +108,14 @@ async function accountUI(browser) {
     await context.setOffline(true);
     await createNote(page,secret.title,secret.content);
     const note=(await records(page,'notes'))[0];
-    await navigate(page,'questions');await page.locator('#questionDetail [data-action="add-to-mistakes"]').click();
-    await page.waitForFunction(async()=>(await __offlineTestStore.all('mistakes')).length===1);
+    await navigate(page,'questions');
+    assert.equal(await page.locator('#questionDetail [data-action="add-to-mistakes"]').count(),0,
+      'Offline exercises omit the removed add-to-mistake control');
+    await page.evaluate(async statement=>{
+      const now=new Date().toISOString();
+      await __offlineTestStore.put('mistakes',{id:'saved-private-wrong-89',title:'Existing wrong question',
+        statement,answer:'A saved reference answer',focusPoints:['集合运算'],createdAt:now,updatedAt:now});
+    },secret.wrong);
     await navigate(page,'mistakes');
     assert.equal(await page.locator('#mistakeList .wrong-status,#mistakeList .wrong-analysis-details,#mistakeList [data-action="edit-mistake"],#addMistake').count(),0);
     assert.equal(await page.locator('[data-action="delete-mistake"] svg').count(),0);
@@ -138,8 +144,8 @@ async function accountUI(browser) {
     await page.waitForFunction(()=>document.getElementById('appearanceBackgroundPreview').dataset.hasBackground==='true'&&!document.getElementById('appearanceDone').disabled);
     await page.locator('#appearanceDone').click();await page.locator('#appearanceModal').waitFor({state:'hidden'});
     const imageBytes=await page.evaluate(async()=>Array.from(new Uint8Array(await DMateOfflineAppearance.getBackground().arrayBuffer())));
-    // The public question statement also belongs in the static curriculum
-    // cache. Its newly captured record identity and capture time are private.
+    // The existing wrong question is private just like the note. Its record
+    // identity and saved timestamp must also stay out of the static cache.
     const privateMarkers=[...Object.values(secret),note.id,...(await records(page,'mistakes')).flatMap(value=>[value.id,value.createdAt])];
     let raw=await inspectPersistence(page,privateMarkers,imageBytes);
     assert.deepEqual(raw.findings,[],'Text, image names and background bytes are absent from all raw browser persistence and caches');

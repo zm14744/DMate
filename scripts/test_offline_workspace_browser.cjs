@@ -421,8 +421,8 @@ async function practice(page) {
       question.type + ': the question detail has no answer input');
     assert.equal(await detail.getByRole('heading', { name: '你的作答', exact: true }).count(), 0);
     assert.equal(await detail.getByRole('button', { name: /记录本次练习|保存记录/ }).count(), 0);
-    assert.equal(await detail.locator('[data-action="add-to-mistakes"]').count(), 1,
-      'The original local wrong-book action accompanies the shared answer disclosures');
+    assert.equal(await detail.locator('[data-action="add-to-mistakes"]').count(), 0,
+      'Offline exercises omit the removed add-to-mistake-book action');
     assert.deepEqual(await detail.locator('.wrong-answer-summary,.wrong-analysis-summary').allTextContents(), ['查看答案', '查看解析']);
     assert.equal(await detail.locator('details[open]').count(), 0, 'Selecting a question starts both disclosures collapsed');
     assert.equal(await detail.getByRole('heading', { name: '评分要点', exact: true }).count(), 0);
@@ -655,8 +655,11 @@ async function drawing(page, reference) {
   });
   assert.ok(previousNames.length >= 2, 'The same guest tab retains drawings made in the online reference');
   assert.equal(await page.locator('#offlineDrawingTitle').innerText(), '绘图');
-  assert.deepEqual(await drawingShellStyle(page, '#drawingPanel'), reference.outer,
-    'Online/offline drawing shell background, outline, typography, padding and heading match');
+  const actualOuter=await drawingShellStyle(page, '#drawingPanel');
+  assert.ok(parseFloat(actualOuter.shell.borderRadius)>0,'The embedded offline drawing panel retains rounded corners');
+  const expectedOuter={...reference.outer,shell:{...reference.outer.shell,borderRadius:actualOuter.shell.borderRadius}};
+  assert.deepEqual(actualOuter, expectedOuter,
+    'Drawing retains shared background, outline, typography and padding in its rounded embedded panel');
   assert.equal(await page.locator('#drawingPanel .offline-intro').count(), 0, 'The old standalone drawing introduction is removed');
   assert.equal(await workspace.getByRole('button', { name: /AI指导|上传|AI生成/ }).count(), 0);
   assert.equal(await workspace.locator('.ddw-ai-requirement,.ddw-ai-label,.ddw-ai-actions,.ddw-ai-answer,'

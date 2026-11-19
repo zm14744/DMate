@@ -4,6 +4,8 @@ const assert = require('node:assert/strict');
 const {chromium} = require('playwright');
 const {installStorageProbe,records, revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
+const savedQuestion = require('../static/offline-content/questions.zh-CN.json').questions
+  .find(question => question.statement && (question.answer_text || question.answer?.length));
 const styleKeys = ['fontFamily','fontSize','fontWeight','lineHeight','color','backgroundColor',
   'borderTopWidth','borderTopStyle','borderTopColor','borderRadius','boxShadow','paddingTop','paddingRight'];
 const style = locator => locator.evaluate((node, keys) => Object.fromEntries(keys.map(key => [key,getComputedStyle(node)[key]])),styleKeys);
@@ -98,14 +100,15 @@ async function exercise(page,reference,width) {
   assert.equal((await page.locator('#mistakesPanel .offline-toolbar').innerText()).includes('仅保存在当前设备'),false);
   await navigate(page,'questions');
   if(width<=1100)await page.locator('#questionFullView').click();
-  const add=page.locator('#questionDetail [data-action="add-to-mistakes"]');await add.waitFor({state:'visible'});await add.click();
-  await page.waitForFunction(async()=>(await __offlineTestStore.all('mistakes')).length===1);
-  const first=(await records(page,'mistakes'))[0];
-  assert.ok(first.questionId&&first.statement&&first.answer&&first.createdAt,'Practice capture retains the question, reference answer and capture time');
-  await add.click();
-  const repeated=(await records(page,'mistakes'));
-  assert.equal(repeated.length,1,'Adding the same practice question updates its original record');
-  assert.equal(repeated[0].createdAt,first.createdAt,'Repeated capture never changes the original capture time');
+  assert.equal(await page.locator('#questionDetail [data-action="add-to-mistakes"]').count(),0,
+    'The offline library offers answers without an add-to-mistake action');
+  // Wrong-book actions operate on records already saved or brought online,
+  // independently of the removed practice-capture control.
+  const existingMistake={id:'saved-reference-one',questionId:savedQuestion.id,title:savedQuestion.title,
+    statement:savedQuestion.statement,answer:savedQuestion.answer_text || (savedQuestion.answer || []).join('、'),
+    explanation:savedQuestion.explanation,knowledgePoints:savedQuestion.knowledge_points || [],
+    focusPoints:savedQuestion.knowledge_points || [],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+  await page.evaluate(value=>__offlineTestStore.put('mistakes',value),existingMistake);
   await navigate(page,'mistakes');
   const card=page.locator('#mistakeList .wrong-card');await card.waitFor({state:'visible'});
   assert.equal(await card.locator('.wrong-status,.wrong-analysis-details,[data-action="edit-mistake"]').count(),0,
@@ -128,8 +131,8 @@ async function exercise(page,reference,width) {
   assert.equal((await page.locator('#mistakeList').innerText()).trim(),'无');
   await navigate(page,'questions');
   if(width<=1100)await page.locator('#questionFullView').click();
-  await page.locator('#questionDetail [data-action="add-to-mistakes"]').click();
-  await page.waitForFunction(async()=>(await __offlineTestStore.all('mistakes')).length===1);
+  assert.equal(await page.locator('#questionDetail [data-action="add-to-mistakes"]').count(),0);
+  await page.evaluate(value=>__offlineTestStore.put('mistakes',{...value,id:'saved-reference-two'}),existingMistake);
   await navigate(page,'mistakes');
   await noOverflow(page,'mistakes');
   if(width===390&&process.env.OFFLINE_RECORDS_SCREENSHOTS==='1')await page.screenshot({path:'/tmp/dmate-offline-records-390-mistakes.png'});
@@ -175,7 +178,7 @@ async function exercise(page,reference,width) {
   await page.locator('.dcn-note[data-note-id="'+firstNote.id+'"] .dcn-note-delete').click();await confirmDeletion(page);
   await page.waitForFunction(async()=>(await __offlineTestStore.all('notes')).length===1);
   await navigate(page,'mistakes');await page.locator('#mistakeList .wrong-card').waitFor({state:'visible'});
-  assert.equal(await page.locator('.wrong-card').count(),1,'Practice capture survives the same offline refresh');
+  assert.equal(await page.locator('.wrong-card').count(),1,'The existing saved wrong question survives the same offline refresh');
 }
 async function run(browser,width,theme) {
   const context=await browser.newContext({viewport:{width,height:900},isMobile:width<=1100,hasTouch:width<=1100,serviceWorkers:'allow'});
@@ -198,7 +201,7 @@ async function run(browser,width,theme) {
     assert.deepEqual(await records(fresh,'notes'),[],'An ordinary new guest tab never inherits private notes');await fresh.close();
     assert.deepEqual(errors,[]);assert.deepEqual(apiRequests,[],'Local record actions make no online AI, OCR or study API calls');
     assert.deepEqual(failures,[],'The restored pages and their resources are fully cached');
-    console.log('PASS '+width+'/'+theme+': simplified wrong-book actions, shared concept labels and online controls, immutable capture dates and true offline persistence');
+    console.log('PASS '+width+'/'+theme+': simplified wrong-book actions, shared concept labels and online controls, saved wrong-question records and true offline persistence');
   }finally{await context.close();if(workerProtocol)await workerProtocol.detach().catch(()=>{});}
 }
 async function recordRaces(browser){

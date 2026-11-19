@@ -670,20 +670,6 @@
     await renderNotes(); $("noteList").querySelector(".dcn-title")?.focus({preventScroll:true});
   }
 
-  async function addQuestionMistake(question) {
-    const rows = await all("mistakes");
-    const existing = rows.find(row => row.questionId === question.id);
-    const record = {
-      id: existing?.id || uid(), questionId: question.id, title: question.title,
-      statement: question.statement, answer: question.answer_text || (question.answer || []).join("、"),
-      explanation: question.explanation, knowledgePoints: question.knowledge_points || [],
-      status: "pending", createdAt:existing?.createdAt || existing?.updatedAt || stamp(), updatedAt: stamp()
-    };
-    await put("mistakes", record);
-    toast(existing ? tr("已更新错题记录", "Mistake updated") : tr("已加入错题本", "Added to mistake book"));
-    if (state.panel === "mistakes") renderMistakes();
-  }
-
   function chapterCategories() {
     const graphCategories = (state.graph?.nodes || []).map(node => node.category).filter(Boolean);
     const categories = graphCategories.length ? graphCategories
@@ -958,10 +944,6 @@
       : rich("wrong-answer-inner", display.answer_text || ""));
     disclosure("analysis", "analysisRevealed", "查看解析", "View explanation",
       rich("wrong-analysis-body", display.explanation || tr("暂无解析。", "No explanation available.")));
-    const actions = el("div", "question-actions");
-    const add = action(tr("加入错题本", "Add to mistake book"), "secondary", () => addQuestionMistake(question), "book-open");
-    add.dataset.action = "add-to-mistakes";
-    actions.append(add); detail.append(actions);
     syncLibraryFullView("questions");
   }
 

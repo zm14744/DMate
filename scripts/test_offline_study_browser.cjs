@@ -339,8 +339,8 @@ async function plainOptions(page) {
       && style.image === 'none' && style.shadow === 'none')
     && item.controls === 0 && !item.selected), 'Options remain plain, unboxed, read-only text: ' + JSON.stringify(styles));
   assert.equal(await page.locator('#questionDetail input,#questionDetail textarea,#questionDetail select').count(), 0);
-  assert.equal(await page.locator('#questionDetail [data-action="add-to-mistakes"]').count(), 1,
-    'The restored local wrong-book action accompanies the shared answer disclosures');
+  assert.equal(await page.locator('#questionDetail [data-action="add-to-mistakes"]').count(), 0,
+    'Offline exercises omit the removed add-to-mistake-book action');
   await page.locator('#questionDetail .question-option').first().click();
   assert.equal(await page.locator('#questionDetail').locator('.question-option.selected,[aria-pressed],[aria-checked]').count(), 0);
 }

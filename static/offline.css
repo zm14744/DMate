@@ -35,8 +35,15 @@ body.offline-workspace .offline-main.center { position:relative; display:flex !i
 .offline-primary { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:36px; padding:8px 12px; border:1px solid var(--accent); border-radius:9px; background:var(--accent); color:white; font:inherit; font-size:14px; cursor:pointer; }
 .offline-primary .dmate-lucide-icon { width:18px; height:18px; }
 .offline-list { display:grid; gap:12px; }
+#mistakeList { grid-template-columns:minmax(0,1fr); }
+#mistakeList > .wrong-card { min-width:0; max-width:100%; }
+/* Offline cards continue in the page scrollport instead of clipping each
+   question to the online modal's compact preview height. */
+#mistakesPanel .wrong-question { max-height:none; overflow:visible; }
+#mistakesPanel .wrong-question :is(pre,table) { display:block; max-width:100%; overflow-x:auto; }
 .record-actions { flex-wrap:wrap; }
 #mistakesPanel .wrong-card-top { justify-content:flex-end; }
+#mistakesPanel .wrong-date { min-width:0; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
 .record-actions button { display:inline-flex; align-items:center; justify-content:center; gap:6px; }
 /* The notebook keeps the shared component's controls inside a page panel. */
 #notesPanel.offline-notebook { display:flex; flex-direction:column; height:auto; max-height:none; min-height:0; }
@@ -153,8 +160,6 @@ body.offline-workspace #libraryDetailHost > :is(#questionDetail,#conceptDetail) 
 html[data-ui-language="en"] .question-option{line-height:var(--dmate-reading-line,1.72)}
 .question-answer { display:grid; gap:8px; margin-top:11px; }
 .question-answer textarea { width:100%; min-height:100px; padding:10px; border:1px solid var(--border-strong); border-radius:9px; background:var(--surface-2); color:var(--text-primary); font:inherit; line-height:1.7; }
-.question-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; }
-.question-actions button { min-height:36px; padding:8px 12px; border:1px solid var(--border-strong); border-radius:9px; font:inherit; font-size:14px; }
 .answer-panel { margin-top:18px; padding:16px; border:1px solid var(--border-strong); border-radius:12px; background:var(--surface-2); }
 .answer-panel h3 { margin:0 0 8px; color:var(--text-muted); font-size:14px; }
 .answer-panel p { margin:0 0 12px; line-height:1.8; font-size:14px; white-space:pre-wrap; }
@@ -335,7 +340,7 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
   .offline-filters select { width:var(--offline-filter-select-width); }
   .offline-filters > :is(.offline-search,.dmate-search-wrap) { width:var(--offline-filter-search-width); }
 }
-@media(max-width:760px) { #drawingPanel.graph-editor-dialog { padding:12px; border-radius:0; } }
+@media(max-width:760px) { #drawingPanel.graph-editor-dialog { padding:12px; } }
 @media(max-width:680px) {
   .offline-search { width:100%; min-width:0; }
   .offline-card-grid { grid-template-columns:1fr; }

@@ -177,7 +177,8 @@ async function fullDetails(page, kind, record) {
   await expand(page, kind);
   const detail = page.locator('#' + p + 'Detail');
   assert.equal((await detail.locator('.detail-title').innerText()).trim(), record.title);
-  if (kind === 'questions') await detail.locator('.question-actions button').click();
+  if (kind === 'questions' && !await detail.locator('.wrong-answer-details').evaluate(node => node.open))
+    await detail.locator('.wrong-answer-summary').click();
   await detail.evaluate(node => { node.scrollTop = Math.min(160, node.scrollHeight - node.clientHeight); }); await settle(page);
   const offset = await detail.evaluate(node => node.scrollTop);
   if (mobile(page)) {
@@ -189,11 +190,11 @@ async function fullDetails(page, kind, record) {
     await expand(page, kind);
     assert.ok(Math.abs(await detail.evaluate(node => node.scrollTop) - offset) <= 1, 'Reopening retains the detail scroll position');
     if (kind === 'questions') {
-      assert.equal(await detail.locator('.answer-panel').count(), 1, 'The revealed answer survives close and reopen');
+      assert.equal(await detail.locator('.wrong-answer-details[open] .wrong-answer-inner').count(), 1, 'The revealed answer survives close and reopen');
       await page.evaluate(() => window.DMateI18n.setLanguage('en', false)); await settle(page);
       assert.equal((await page.locator('#libraryDetailTitle').innerText()).trim(), 'Exercise details');
       assert.equal((await detail.locator('.detail-title').innerText()).trim(), title(record, kind, 'en'));
-      assert.equal(await detail.locator('.answer-panel').count(), 1, 'Language changes retain an open answer in full view');
+      assert.equal(await detail.locator('.wrong-answer-details[open] .wrong-answer-inner').count(), 1, 'Language changes retain an open answer in full view');
       await page.evaluate(() => window.DMateI18n.setLanguage('zh-CN', false)); await settle(page);
     }
     await closeDetail(page);
@@ -272,8 +273,9 @@ async function disconnectedCase(browser) {
     await page.locator('#questionSearch').fill(translations.questions[linkedQuestion.id].title);
     assert.deepEqual(await ids(page, 'questions'), [linkedQuestion.id], 'Saved selection and title search remain usable offline');
     await page.locator('#questionList [data-question-id="' + linkedQuestion.id + '"]').click(); await expand(page, 'questions');
-    await page.locator('#questionDetail .question-actions button').click();
-    assert.equal(await page.locator('#questionDetail .answer-panel').count(), 1);
+    if (!await page.locator('#questionDetail .wrong-answer-details').evaluate(node => node.open))
+      await page.locator('#questionDetail .wrong-answer-summary').click();
+    assert.equal(await page.locator('#questionDetail .wrong-answer-details[open] .wrong-answer-inner').count(), 1);
     await closeDetail(page);
     console.log('PASS disconnected reload: title-only search, selected records and complete exercise/answer view');
   } finally { await context.close(); }
