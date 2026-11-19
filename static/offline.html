@@ -47,7 +47,7 @@
 <link rel="stylesheet" href="/static/textarea-autosize.css?v=1">
 <link rel="stylesheet" href="/static/button-themes.css?v=65">
 <link rel="stylesheet" href="/static/offline-knowledge-graph.css?v=54">
-<link rel="stylesheet" href="/static/offline.css?v=57">
+<link rel="stylesheet" href="/static/offline.css?v=58">
 <link rel="stylesheet" href="/static/select-controls.css?v=43">
 <link rel="stylesheet" href="/static/scrollbars.css?v=25">
 <script defer src="/static/mobile-select.js?v=26"></script>
@@ -76,7 +76,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/language.js?v=59"></script>
 <script defer src="/static/modal-text.js?v=53"></script>
 <script defer src="/static/offline-appearance.js?v=8"></script>
-<script defer src="/static/offline-shell.js?v=34"></script>
+<script defer src="/static/offline-shell.js?v=35"></script>
 <script defer src="/static/knowledge-graph-labels.js?v=17"></script>
 <script defer src="/static/offline-knowledge-graph.js?v=60"></script>
 <script defer src="/static/offline-vault.js?v=2"></script>
@@ -266,6 +266,14 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
     </section>
   </main>
 </div>
+
+<dialog id="offlinePrivacyCover" aria-label="DMate 防窥界面">
+  <button id="offlinePrivacyRestore" class="offline-icon-button offline-privacy-toggle" type="button" aria-label="显示界面" autofocus></button>
+  <div class="offline-privacy-mark" role="img" aria-label="DMate">
+    <img class="offline-privacy-mark-black" src="/static/icons/dmate-tab-black-v52.svg" width="256" height="256" alt="" draggable="false">
+    <img class="offline-privacy-mark-white" src="/static/icons/dmate-tab-white-v52.svg" width="256" height="256" alt="" draggable="false">
+  </div>
+</dialog>
 
 <dialog id="libraryDetailDialog" class="offline-library-dialog" aria-labelledby="libraryDetailTitle">
   <div class="offline-library-dialog-card">

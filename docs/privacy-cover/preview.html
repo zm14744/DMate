@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DMate · 防窥页面适配预览</title>
+<style>
+  * {box-sizing:border-box}
+  html,body {margin:0;width:100%;min-height:100%;background:#e9edf2;color:#202936;font:14px/1.5 system-ui,-apple-system,"Microsoft YaHei",sans-serif;}
+  body {height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+  header {flex:none;display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:14px 20px;background:#fff;border-bottom:1px solid #d9e0e8;}
+  header h1 {margin:0;font-size:17px;letter-spacing:.01em;font-weight:650;}
+  .toolbar {display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  label {display:flex;gap:7px;align-items:center;font-size:13px;color:#475569}
+  select,input,button {font:inherit;min-height:36px;border:1px solid #ccd3dd;background:#fff;color:#1f2937;border-radius:9px;padding:6px 10px;}
+  select {min-width:100px}
+  input {width:75px;}
+  button {cursor:pointer}
+  button:hover {background:#f8fafc}
+  .workspace {display:grid;place-items:center;position:relative;flex:1 1 auto;min-height:0;overflow:auto;padding:24px;}
+  .size-hint {position:absolute;bottom:14px;right:18px;font-size:12px;color:#64748b;text-align:right;}
+  .device-frame {flex:none;background:#111827;box-shadow:0 12px 50px rgba(13,22,37,.16),0 1px 3px rgba(13,22,37,.13);border-radius:2px;position:relative;overflow:hidden}
+  .device-frame iframe {display:block;position:absolute;inset:0;border:0;transform-origin:top left;}
+  @media(max-width:900px) {header {padding:12px;} .workspace{padding:12px;} header h1{font-size:15px}}
+  @media(max-height:500px) {header {gap:4px;padding:7px;} .workspace{padding:5px;}}
+</style>
+</head>
+<body>
+<header>
+  <h1>DMate 防窥界面 · 屏幕比例预览</h1>
+  <div class="toolbar">
+    <label>主题 <select id="theme"><option value="light">浅色</option><option value="dark" selected>深黑</option><option value="navy">深蓝</option></select></label>
+    <label>设备 <select id="preset">
+      <option value="390x844">手机 390×844</option>
+      <option value="360x800">安卓手机 360×800</option>
+      <option value="844x390">手机横屏 844×390</option>
+      <option value="768x1024">平板 768×1024</option>
+      <option value="1024x768">平板横屏 1024×768</option>
+      <option value="1440x900">Mac 16:10</option>
+      <option value="1920x1080" selected>电脑 16:9</option>
+      <option value="2256x1504">电脑 3:2</option>
+      <option value="2560x1080">超宽屏 21:9</option>
+      <option value="3840x1080">超宽屏 32:9</option>
+      <option value="custom">自定义</option>
+    </select></label>
+    <label>宽 <input id="w" type="number" min="160" max="7680" value="1920"></label>
+    <label>高 <input id="h" type="number" min="120" max="4320" value="1080"></label>
+    <button id="swap" title="互换宽高">旋转 ↻</button>
+  </div>
+</header>
+<section class="workspace" id="workspace">
+  <div class="device-frame" id="frame"><iframe id="screen" title="DMate 防窥界面"></iframe></div>
+  <div class="size-hint" id="sizeHint"></div>
+</section>
+<script>
+(() => {
+ const $=id=>document.getElementById(id);
+ const f=$('frame'), s=$('screen'), workspace=$('workspace');
+ const size=()=>{
+   const w=Math.min(7680,Math.max(160,Number($('w').value)||1920));
+   const h=Math.min(4320,Math.max(120,Number($('h').value)||1080));
+   const rw=Math.max(1,workspace.clientWidth-42),rh=Math.max(1,workspace.clientHeight-42);
+   const z=Math.min(rw/w,rh/h,1);
+   f.style.width=Math.floor(w*z)+'px';f.style.height=Math.floor(h*z)+'px';
+   s.style.width=w+'px';s.style.height=h+'px';s.style.transform='scale('+z+')';
+   $('sizeHint').textContent=`${w} × ${h} · 缩放 ${(z*100).toFixed(1)}%`;
+ };
+ const rerender=()=>{
+   s.src='index.html?theme='+encodeURIComponent($('theme').value);
+   size();
+ };
+ $('theme').addEventListener('change',rerender);
+ $('preset').addEventListener('change',()=>{
+  if($('preset').value!=='custom'){
+   const [w,h]=$('preset').value.split('x');$('w').value=w;$('h').value=h;
+  }size();
+ });
+ for (const key of ['w','h']) $(key).addEventListener('input',()=>{$('preset').value='custom';size()});
+ $('swap').addEventListener('click',()=>{const w=$('w').value;$('w').value=$('h').value;$('h').value=w;$('preset').value='custom';size()});
+ window.addEventListener('resize',size);
+ new ResizeObserver(size).observe(workspace);
+ rerender();
+})();
+</script>
+</body>
+</html>

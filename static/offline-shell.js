@@ -31,17 +31,19 @@
   const $ = id => document.getElementById(id);
   const mobile = window.matchMedia('(max-width:1100px)');
   const privacyButtons = [...document.querySelectorAll('[data-offline-privacy]')];
-  const privacyRegions = [...document.querySelectorAll('.offline-panel,.offline-nav,.offline-sidebar-bottom,.offline-sidebar-heading')];
-  const previousInert = new Map();
+  const privacyCover = $('offlinePrivacyCover'), privacyRestore = $('offlinePrivacyRestore');
+  const layout = document.querySelector('.offline-layout');
+  let privacyReturnFocus = null, layoutWasInert = false;
   let interfaceHidden = false;
-  window.DMateI18n?.register({'隐藏界面':'Hide interface','显示界面':'Show interface'});
+  window.DMateI18n?.register({'隐藏界面':'Hide interface','显示界面':'Show interface','DMate 防窥界面':'DMate privacy screen'});
   function syncPrivacyControls() {
-    const action = interfaceHidden ? '显示界面' : '隐藏界面';
-    const label = window.DMateI18n?.t(action) || action;
-    const iconName = interfaceHidden ? 'eye' : 'eye-off';
-    for (const control of privacyButtons) {
+    for (const control of [...privacyButtons,privacyRestore]) {
+      const restoring = control === privacyRestore;
+      const action = restoring ? '显示界面' : '隐藏界面';
+      const label = window.DMateI18n?.t(action) || action;
+      const iconName = restoring ? 'eye' : 'eye-off';
       control.setAttribute('aria-label',label);
-      control.setAttribute('title',label);
+      if (!restoring) control.setAttribute('title',label);
       control.dataset.privacyState = interfaceHidden ? 'hidden' : 'visible';
       const icon = window.DMateOfflineIcons.create(iconName);
       // Header icons inherit the sidebar control's 22/24px size and 2px stroke.
@@ -50,21 +52,54 @@
       control.replaceChildren(icon);
     }
   }
-  function togglePrivacy() {
-    interfaceHidden = !interfaceHidden;
-    document.body.classList.toggle('offline-content-hidden',interfaceHidden);
-    for (const region of privacyRegions) {
-      if (interfaceHidden) {
-        previousInert.set(region,region.inert);
-        region.inert = true;
-      } else {
-        region.inert = previousInert.get(region) || false;
-      }
-    }
-    if (!interfaceHidden) previousInert.clear();
+  function hideInterface(trigger) {
+    if (interfaceHidden) return;
+    privacyReturnFocus = trigger;
+    privacyCover.showModal();
+    interfaceHidden = true;
+    layoutWasInert = layout.inert;
+    layout.inert = true;
+    document.body.classList.add('offline-content-hidden');
     syncPrivacyControls();
+    privacyRestore.focus({preventScroll:true});
   }
-  privacyButtons.forEach(control => control.addEventListener('click',togglePrivacy));
+  function showInterface() {
+    if (!interfaceHidden) return;
+    interfaceHidden = false;
+    document.body.classList.remove('offline-content-hidden');
+    layout.inert = layoutWasInert;
+    if (privacyCover.open) privacyCover.close();
+    updateDrawer();
+    syncPrivacyControls();
+    // An existing modal remains open behind the cover and retains its own focus.
+    if (!document.querySelector('dialog:modal')) {
+      const previous = privacyReturnFocus;
+      const usable = previous?.isConnected && previous.getClientRects().length
+        && !previous.closest('[inert]') && getComputedStyle(previous).visibility !== 'hidden';
+      const fallback = mobile.matches
+        ? $(document.body.classList.contains('offline-nav-open') ? 'offlineDrawerPrivacyToggle' : 'offlineMobilePrivacyToggle')
+        : $('offlineDesktopPrivacyToggle');
+      (usable ? previous : fallback).focus({preventScroll:true});
+    }
+    privacyReturnFocus = null;
+  }
+  privacyButtons.forEach(control => control.addEventListener('click',() => hideInterface(control)));
+  privacyRestore.addEventListener('click',showInterface);
+  privacyCover.addEventListener('cancel',event => event.preventDefault());
+  privacyCover.addEventListener('close',() => {
+    if (interfaceHidden && !privacyCover.open) showInterface();
+  });
+  // Async notices may enter the top layer while hidden. Keep their state behind
+  // the cover, then let the user handle them after choosing the eye button.
+  new MutationObserver(records => {
+    if (!interfaceHidden || !privacyCover.open) return;
+    const newerModal = records.some(({target}) => target !== privacyCover
+      && target instanceof HTMLDialogElement && target.open && target.matches(':modal'));
+    if (newerModal) {
+      privacyCover.close(); privacyCover.showModal();
+      privacyRestore.focus({preventScroll:true});
+    }
+  }).observe(document.body,{subtree:true,attributes:true,attributeFilter:['open']});
   window.addEventListener('dmate:languagechange',syncPrivacyControls);
   syncPrivacyControls();
   let lastDrawerTrigger = null;
@@ -86,7 +121,9 @@
     lastDrawerTrigger = $('offlineNavToggle');
     document.body.classList.add('offline-nav-open');
     updateDrawer();
-    requestAnimationFrame(() => (interfaceHidden ? $('offlineDrawerPrivacyToggle') : document.querySelector('.offline-nav-item.active'))?.focus({preventScroll:true}));
+    requestAnimationFrame(() => {
+      if (!interfaceHidden) document.querySelector('.offline-nav-item.active')?.focus({preventScroll:true});
+    });
   });
   $('offlineNavClose').addEventListener('click',() => closeDrawer());
   $('offlineNavBackdrop').addEventListener('click',() => closeDrawer());
@@ -102,6 +139,7 @@
   });
   document.querySelectorAll('.offline-nav-item[data-panel]').forEach(button => button.addEventListener('click',() => closeDrawer(false)));
   document.addEventListener('keydown',event => {
+    if (interfaceHidden) return;
     if (event.key === 'Escape' && document.body.classList.contains('offline-nav-open')) closeDrawer();
     if (event.key === 'Tab' && mobile.matches && document.body.classList.contains('offline-nav-open')) {
       const controls = [...$('offlineSidebar').querySelectorAll('button:not(:disabled),a[href]')]
@@ -114,7 +152,8 @@
   mobile.addEventListener('change',() => {
     const restorePrivacyFocus = document.activeElement?.matches('[data-offline-privacy]');
     closeDrawer(false);
-    if (restorePrivacyFocus) $(mobile.matches ? 'offlineMobilePrivacyToggle' : 'offlineDesktopPrivacyToggle').focus({preventScroll:true});
+    if (interfaceHidden) privacyRestore.focus({preventScroll:true});
+    else if (restorePrivacyFocus) $(mobile.matches ? 'offlineMobilePrivacyToggle' : 'offlineDesktopPrivacyToggle').focus({preventScroll:true});
   });
   updateDrawer();
   function syncPanelNavigation() {
