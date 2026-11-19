@@ -66,9 +66,9 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       '/static/concept-notebook.css?v=3', '/static/textarea-autosize.css?v=1', '/static/textarea-autosize.js?v=1',
       '/static/drawing-workspace.css?v=52', '/static/graph-editor.js?v=53', '/static/graph-editor-overlay.js?v=39', '/static/drawing-workspace.js?v=56', '/static/drawing-export.js?v=39',
       '/static/modal-chrome.css', '/static/modal-text.js?v=53', '/static/delete-confirm.js', '/static/guest-session.js?v=53', '/static/offline-interface-state.js?v=1', '/static/language.js?v=59',
-      '/static/graph-editor-format.js?v=32', '/static/language-catalog.js?v=64', '/static/offline-shell.js?v=36',
+      '/static/graph-editor-format.js?v=32', '/static/language-catalog.js?v=64', '/static/offline-shell.js?v=37',
       '/static/offline-vault.js?v=2', '/static/offline-handoff.js?v=1', '/static/offline-storage.js?v=1',
-      '/static/offline.js?v=62', '/static/offline-knowledge-graph.js?v=60',
+      '/static/offline.js?v=63', '/static/offline-knowledge-graph.js?v=60',
       '/static/ui-tooltip.js?v=49',
       '/static/offline-knowledge-graph.css?v=54', '/static/offline-entry.js?v=47',
       '/static/search-controls.css?v=27', '/static/search-controls.js?v=27',
@@ -84,7 +84,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     // Simulate the pinned stylesheet left by the previous offline shell.
     await page.goto(new URL('/health', baseURL).href);
     await page.evaluate(async () => {
-      const cache = await caches.open('dmate-offline-shell-v87');
+      const cache = await caches.open('dmate-offline-shell-v88');
       await cache.put('/static/button-themes.css?v=54', new Response('/* obsolete graph navigation button styles */'));
     });
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });
@@ -102,7 +102,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       if (canonical.length !== 1) throw new Error('Expected exactly one precached shared stylesheet');
       return { name: names[0], canonical: canonical[0].url };
     }, assetPath);
-    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 88, 'Encrypted offline storage needs the refreshed offline cache');
+    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 89, 'Encrypted offline storage needs the refreshed offline cache');
     assert.equal((await fetchAsset(page, current.canonical)).text, networkCSS,
       'The refreshed shell loads current frameless controls instead of the obsolete stylesheet');
     for (const asset of sharedAssets) {

@@ -17,6 +17,62 @@ const account = 'interface-lifecycle-account';
 const content = 'An unfinished concept remains in its original offline workspace';
 const ready = page => page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
 
+async function observeRestoredPanel(page) {
+  // Delay a real startup resource so the browser has time to paint the shell
+  // before the encrypted view is read. Final-state assertions miss that flash.
+  let delayedLoads = 0;
+  await page.route('**/static/offline-content/concepts.zh-CN.json*',async route => {
+    delayedLoads++;
+    await new Promise(resolve => setTimeout(resolve,400));
+    await route.continue();
+  });
+  await page.addInitScript(() => {
+    if (location.pathname !== '/offline') return;
+    const frames = window.__offlineRestorationFrames = [];
+    let running = true;
+    window.__stopOfflineRestorationFrames = () => {running = false;};
+    const shown = node => {
+      if (!node || !node.getClientRects().length) return false;
+      const style = getComputedStyle(node);
+      return style.display !== 'none' && style.visibility === 'visible' && Number(style.opacity) > 0;
+    };
+    function sample(time) {
+      if (!running) return;
+      const layout = document.querySelector('.offline-layout');
+      if (layout) frames.push({
+        time, ready:document.documentElement.dataset.offlineReady === 'true',
+        shown:shown(layout) && !document.getElementById('offlinePrivacyCover')?.open
+          && !document.body.classList.contains('offline-content-hidden'),
+        active:[...document.querySelectorAll('.offline-nav-item[data-panel].active')].map(node => node.dataset.panel),
+        panels:[...document.querySelectorAll('.offline-panel')].filter(shown).map(node => node.id)
+      });
+      requestAnimationFrame(sample);
+    }
+    addEventListener('pageshow',event => {
+      if (!event.persisted) return;
+      frames.length = 0;
+      running = true;
+      requestAnimationFrame(sample);
+    });
+    requestAnimationFrame(sample);
+  });
+  return () => delayedLoads;
+}
+
+async function assertRestorationFrames(page,panel,label,loading=true) {
+  const frames = await page.evaluate(async () => {
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    __stopOfflineRestorationFrames();
+    return __offlineRestorationFrames;
+  });
+  const visible = frames.filter(frame => frame.shown);
+  if (loading) assert.ok(frames.some(frame => !frame.ready),label+': startup was observed before initialization completed');
+  assert.ok(visible.length >= 2,label+': the restored workspace actually painted');
+  const wrong = visible.filter(frame => frame.active.length !== 1 || frame.active[0] !== panel
+    || frame.panels.length !== 1 || frame.panels[0] !== panel+'Panel');
+  assert.deepEqual(wrong.slice(0,8),[],label+': every visible frame goes directly to '+panel+', without painting the graph or another selection');
+}
+
 async function prepare(context, username='', nativeLaunch) {
   await installStorageProbe(context);
   const modelCalls = [];
@@ -110,10 +166,17 @@ async function navigationSession(browser, width, username) {
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('#offlinePrivacyCover').evaluate(node => node.open),true,'Escape does not expose a hidden workspace');
     await revealInterface(page);await createNote(page);
+    const delayedLoads = await observeRestoredPanel(page);
+    let beforeLoad = delayedLoads();
     await page.reload({waitUntil:'networkidle'});await ready(page);
     await assertVisible(page,'visible refresh');
+    assert.ok(delayedLoads()>beforeLoad,'Visible refresh exercised delayed startup I/O');
+    await assertRestorationFrames(page,'notes','visible refresh');
+    beforeLoad = delayedLoads();
     await page.goto(baseURL+'/offline',{waitUntil:'networkidle'});await ready(page);
     await assertVisible(page,'same live tab direct navigation');
+    assert.ok(delayedLoads()>beforeLoad,'Direct navigation exercised delayed startup I/O');
+    await assertRestorationFrames(page,'notes','same live tab direct navigation');
     await hide(page);await page.reload({waitUntil:'networkidle'});await ready(page);
     await assertHidden(page,'hidden refresh');
     assert.equal(await page.locator('#notesPanel').evaluate(node => node.hidden),false,'Hidden refresh retains the current module behind its cover');
@@ -144,14 +207,19 @@ async function navigationSession(browser, width, username) {
       const opener = page.locator('#desktopSidebarOpen');
       if(await opener.getAttribute('aria-expanded')!=='true')await opener.click();
     } else await page.locator('#mobileNavBtn').click();
+    beforeLoad = delayedLoads();
     await page.locator('#offlineWorkspaceBtn').click();
     await page.waitForURL('**/offline');await ready(page);
     await assertVisible(page,'same-tab online round trip');
+    assert.ok(delayedLoads()>beforeLoad,'Online round trip exercised delayed startup I/O');
+    await assertRestorationFrames(page,'notes','same-tab online round trip');
     await page.goBack({waitUntil:'domcontentloaded'});
     await page.waitForFunction(() => document.documentElement.dataset.accountStateKnown==='1'
       && !accountVerificationOperation && !cloudInitialSyncInFlight);
+    beforeLoad = delayedLoads();
     await page.goForward({waitUntil:'domcontentloaded'});await ready(page);
     await assertVisible(page,'same-session history back and forward');
+    await assertRestorationFrames(page,'notes','same-session history back and forward',delayedLoads()>beforeLoad);
     // A real window.open receives an opener copy of sessionStorage in Chromium;
     // it must still start hidden and must not mutate the source tab's state.
     const copied = page.waitForEvent('popup');
@@ -173,7 +241,7 @@ async function navigationSession(browser, width, username) {
     if(username)assert.ok(restored.some(note=>note.content===content),'Account data remains available behind a new-session cover');
     else assert.deepEqual(restored,[],'A new guest tab does not adopt the old guest note');
     assert.deepEqual(models,[]);assert.deepEqual(errors,[]);
-    console.log('PASS interface session '+width+'/'+(username?'account':'guest')+': default cover, refresh, drawer state, real online hop and copied/new tabs');
+    console.log('PASS interface session '+width+'/'+(username?'account':'guest')+': default cover, frame-by-frame restored panel, refresh, drawer state, real online hop and copied/new tabs');
   } finally {await context.close();}
 }
 

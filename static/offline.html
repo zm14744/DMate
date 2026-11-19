@@ -77,14 +77,14 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/language.js?v=59"></script>
 <script defer src="/static/modal-text.js?v=53"></script>
 <script defer src="/static/offline-appearance.js?v=8"></script>
-<script defer src="/static/offline-shell.js?v=36"></script>
+<script defer src="/static/offline-shell.js?v=37"></script>
 <script defer src="/static/knowledge-graph-labels.js?v=17"></script>
 <script defer src="/static/offline-knowledge-graph.js?v=60"></script>
 <script defer src="/static/offline-vault.js?v=2"></script>
 <script defer src="/static/offline-handoff.js?v=1"></script>
 <script defer src="/static/offline-storage.js?v=1"></script>
 <script defer src="/static/offline-entry.js?v=47"></script>
-<script defer src="/static/offline.js?v=62"></script>
+<script defer src="/static/offline.js?v=63"></script>
 </head>
 <body class="offline-workspace offline-content-hidden">
 <script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"light";</script>
@@ -116,7 +116,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 
     <div class="offline-sidebar-heading">学习工具</div>
     <nav class="offline-nav" aria-label="离线学习模块">
-      <button type="button" id="knowledgeGraphBtn" class="offline-nav-item active" data-panel="graph" aria-current="page">
+      <button type="button" id="knowledgeGraphBtn" class="offline-nav-item" data-panel="graph">
         <svg class="dmate-lucide-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
         <span>知识图谱</span>
       </button>
@@ -184,7 +184,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
     </section>
 
 
-    <section class="offline-panel" id="graphPanel">
+    <section class="offline-panel" id="graphPanel" hidden>
       <div id="knowledgeGraphModal" class="offline-graph-inline offline-knowledge-graph" data-graph-ready="false">
         <div class="modal-card graph-modal-card">
           <div class="modal-head">

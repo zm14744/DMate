@@ -5,7 +5,7 @@
   const libraryScroll = {concepts:0, questions:0};
   let libraryDetail = null;
   const state = {
-    storage: null, concepts: [], questions: [], graph: null, translations: {concepts:{},questions:{}},
+    storage: null, ready:false, concepts: [], questions: [], graph: null, translations: {concepts:{},questions:{}},
     panel: "graph", selectedQuestion: null, selectedConcept: null,
     revealed: false, analysisRevealed: false,
     drawingController: null, backgroundUrl: "", graphCategory: "", graphSelectedNodeId: "", questionCategory: "",
@@ -110,6 +110,7 @@
   function invalidateWorkspace(resetGuest = false) {
     if (!workspaceActive) return;
     workspaceActive = false;
+    state.ready = false;
     state.noteRows = []; state.noteDrafts.clear();
     state.drawingController?.destroy?.();
     const storage = state.storage; state.storage = null;
@@ -1096,7 +1097,7 @@
 
   function bind() {
     const checkpoint = () => {
-      if (!workspaceCurrent() || !state.storage) return;
+      if (!state.ready || !workspaceCurrent() || !state.storage) return;
       const snapshot = {};
       for (const key of ["panel", "revealed", "analysisRevealed", "graphCategory", "graphSelectedNodeId", "questionCategory", "questionDifficulty", "questionType", "questionSelection", "questionQuery", "conceptCategory", "conceptSelection", "conceptQuery", "graphQuery", "selectedNoteId", "noteQuery"]) snapshot[key] = state[key];
       snapshot.selectedQuestion = state.selectedQuestion?.id || "";
@@ -1205,12 +1206,18 @@
         $("questionSearch").value = state.questionQuery;
         $("conceptSearch").value = state.conceptQuery;
       }
-      await switchPanel(view?.panel || "graph");
+      await switchPanel(Object.hasOwn(panelMeta,view?.panel) ? view.panel : "graph");
+      requireWorkspace();
+      state.ready = true;
       document.documentElement.dataset.offlineReady = "true";
       $("offlineMain").inert = false;
       for (const button of startupControls) button.disabled = false;
     } catch (error) {
       toast(storageError(error));
+    } finally {
+      // Reveal the selected page only after its saved view has been restored.
+      // Failed initialization still leaves the return-online control reachable.
+      delete document.documentElement.dataset.offlineInterfacePending;
     }
   }
   const startupControls = [...document.querySelectorAll(".offline-nav-item")];

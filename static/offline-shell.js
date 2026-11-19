@@ -169,7 +169,6 @@
   updateDrawer();
   if (initialInterface.hidden) hideInterface();
   else document.body.classList.remove('offline-content-hidden');
-  delete document.documentElement.dataset.offlineInterfacePending;
   requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.add('offline-shell-ready')));
   function syncPanelNavigation() {
     document.querySelectorAll('.offline-nav-item[data-panel]').forEach(button => {
