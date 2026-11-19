@@ -766,17 +766,70 @@ async function runOfflineViewport(browser, width) {
   } finally { await page.close(); }
 }
 
+async function runOfflinePopoverLayer(browser) {
+  for (const [width, height] of [[820, 390], [390, 500]]) {
+    const page = await browser.newPage({ viewport:{width,height}, isMobile:true, hasTouch:true, serviceWorkers:'block' });
+    await installStorageProbe(page);
+    const errors = []; let modelCalls = 0;
+    page.on('pageerror', error => errors.push(error.message));
+    await page.route(/\/(?:chat|ocr|drawing\/[^?]+)(?:\?|$)/, route => { modelCalls++; return route.abort(); });
+    try {
+      await page.goto(baseURL + '/offline', {waitUntil:'networkidle'});
+      await revealInterface(page);
+      await page.evaluate(value => __offlineTestStore.put('drawings', {
+        id:'gallery', gallery:JSON.stringify(value), updatedAt:Date.now()
+      }), gallery);
+      await page.locator('#offlineNavToggle').click();
+      await page.locator('#graphDrawingBtn').click();
+      await readyView(page);
+      for (const [name, trigger, panel] of [
+        ['tools', '.dge-tool-palette>summary', '.dge-tool-palette[open]>.dge-overlay-tools'],
+        ['settings', '.ddw-side-actions>button:first-child', '.dge-float-panel[data-panel-key="graphs"][open]>.dge-float-content'],
+        ['information', '.ddw-side-actions>button:nth-child(2)', '.dge-float-panel[data-panel-key="results"][open]>.dge-float-content']
+      ]) {
+        await page.locator(trigger).click();
+        await page.locator(panel).waitFor({state:'visible'});
+        await settle(page);
+        const paint = await page.locator(panel).evaluate(node => {
+          const rect = node.getBoundingClientRect();
+          const points = [[rect.left + rect.width / 2, rect.top + 2],
+            [rect.left + 24, rect.top + Math.min(48, rect.height / 2)],
+            [rect.left + rect.width / 2, rect.bottom - 8]];
+          return points.map(([x,y]) => {
+            const hit = document.elementFromPoint(x,y);
+            return {x,y,inside:hit === node || node.contains(hit),hit:hit?.id || hit?.className};
+          });
+        });
+        assert.ok(paint.every(point => point.inside),
+          'Offline ' + width + 'x' + height + ' ' + name + ' stays above the topbar and surrounding page: ' + JSON.stringify(paint));
+        await page.locator(trigger).click();
+        await page.locator(panel).waitFor({state:'hidden'});
+        await settle(page);
+        assert.equal(await page.locator('.dmate-drawing-workspace').getAttribute('data-panel-open'),'false',
+          'Closing the drawing popover restores its ordinary workspace state');
+      }
+      assert.equal(modelCalls,0); assert.deepEqual(errors,[]);
+      console.log('PASS offline popover layer ' + width + 'x' + height + ': all three panels remain clickable and close normally');
+    } finally { await page.close(); }
+  }
+}
+
 (async () => {
   if (process.env.OFFLINE_SCREENSHOT_DIR) require('node:fs').mkdirSync(process.env.OFFLINE_SCREENSHOT_DIR, { recursive: true });
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
+    if (process.env.DMATE_TEST_DRAWING_POPOVERS_ONLY === '1') {
+      await runOfflinePopoverLayer(browser);
+      return;
+    }
     for (const width of [390, 1440]) await runCase(browser, width);
     for (const width of [390, 1440]) await runOfflineViewport(browser, width);
     await runGuestBlankLifecycle(browser);
     await runAccountGalleryLifecycle(browser);
     await runDefaultEmptyContract(browser);
     await runOCRDirectionContract(browser);
+    await runOfflinePopoverLayer(browser);
   }
   finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
