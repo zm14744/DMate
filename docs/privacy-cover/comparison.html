@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>DMate · 隐藏界面动效对比</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font:14px/1.5 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+body{background:#e9edf2;color:#17202e;}
+.page{min-height:100dvh;display:flex;flex-direction:column}
+header{display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:20px clamp(18px,4vw,56px);background:#fff;border-bottom:1px solid #dfe4ea}
+h1{font-size:18px;font-weight:650;margin:0;letter-spacing:-.02em}
+header p{margin:5px 0 0;color:#64748b;font-size:12px}
+.controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.controls label{display:flex;gap:8px;align-items:center;color:#64748b;font-size:12px}
+select,button{font:inherit;border:1px solid #cbd3dd;border-radius:9px;min-height:38px;background:#fff;color:#1f2937;padding:7px 14px}
+button{cursor:pointer;background:#17202e;color:#fff;border-color:#17202e;font-weight:550}
+button:hover{background:#303948}
+button:focus-visible,select:focus-visible{outline:2px solid #64748b;outline-offset:3px}
+main{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:20px;padding:clamp(16px,3vw,40px);width:100%;max-width:1680px;margin:auto;flex:1}
+.card{min-width:0;overflow:hidden;border:1px solid #d9e0e8;border-radius:14px;background:white;box-shadow:0 8px 28px rgba(31,41,55,.04)}
+.card-head{padding:16px 20px;display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.card-head h2{margin:0;font-size:14px;font-weight:600;letter-spacing:.01em}
+.card-head small{color:#64748b;white-space:nowrap;font-size:12px}
+.stage{position:relative;width:100%;aspect-ratio:16/10;display:grid;place-items:center;overflow:hidden;isolation:isolate;background:var(--bg);color:var(--ink)}
+.stage .mark{position:relative;width:min(68%,420px);aspect-ratio:1;transform-origin:center center;will-change:transform,opacity}
+.stage svg{display:block;position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.mark svg{fill:none;stroke:currentColor;stroke-width:4.5;stroke-linecap:round;stroke-linejoin:round}
+:root[data-theme="light"]{--bg:#f8fafc;--ink:#000}
+:root[data-theme="dark"]{--bg:#0d0d0d;--ink:#fff}
+:root[data-theme="navy"]{--bg:#0f172a;--ink:#fff}
+.card-desc{font-size:12px;color:#64748b;margin:0;padding:15px 20px 18px;line-height:1.6}
+footer{font-size:11px;color:#64748b;padding:0 20px 18px;text-align:center}
+@media(max-width:760px){header{padding:14px 16px}.controls{gap:8px}main{grid-template-columns:1fr;padding:14px;gap:14px}.card-head{padding:12px 15px}.card-desc{padding:12px 15px 16px}h1{font-size:16px}}
+@media(prefers-reduced-motion:reduce){.mark{will-change:auto}}
+</style>
+</head>
+<body>
+<div class="page">
+<header>
+ <div><h1>DMate · 隐藏界面动效比对</h1><p>原版 v52 图标 · 相同尺寸 · 同步开始 · 停止后保持静止</p></div>
+ <div class="controls"><label>背景主题<select id="theme"><option value="light">浅色</option><option value="dark" selected>深黑</option><option value="navy">深蓝</option></select></label><button id="replay" type="button">重新播放两种动画</button></div>
+</header>
+<main>
+ <section class="card"><div class="card-head"><h2>01　拓扑生长</h2><small>740 ms</small></div><div class="stage" id="topologyStage"><div class="mark" role="img" aria-label="DMate 拓扑生长动画"><svg viewBox="0 0 256 256" focusable="false" aria-hidden="true"><g id="edges"></g></svg></div></div><p class="card-desc">从中央线段出发，沿原图标连接关系扩展，最后形成完整的外轮廓。</p></section>
+ <section class="card"><div class="card-head"><h2>02　旋转放大</h2><small>780 ms</small></div><div class="stage" id="rotationStage"><div class="mark" id="rotationMark" role="img" aria-label="DMate 旋转放大动画"><svg viewBox="0 0 256 256" focusable="false" aria-hidden="true"><g>
+ <path d="M59 73 L103 48 L154 39 L205 84 L215 129 L201 188 L139 215 L94 217 L51 170 L41 126 L59 73"/>
+ <path d="M59 73 L69 82 L127 66 L154 39"/>
+ <path d="M69 82 L61 145 L51 170"/>
+ <path d="M127 66 L162 116 L215 129"/>
+ <path d="M162 116 L119 165 L61 145"/>
+ <path d="M119 165 L139 215"/>
+ </g></svg></div></div><p class="card-desc">完整图标从近似一个点的尺寸开始，旋转并逐渐放大，减速后精确停在原始位置。</p></section>
+</main>
+<footer>独立的视觉评估页面，不包含实际隐藏功能；动画结束后没有循环或额外装饰。</footer>
+</div>
+<script>
+(()=>{
+'use strict';
+// Same geometry and topology calculation as topology-growth.html.
+const vertices={A:[59,73],B:[103,48],C:[154,39],D:[205,84],E:[215,129],F:[201,188],G:[139,215],H:[94,217],I:[51,170],J:[41,126],K:[69,82],L:[127,66],M:[61,145],N:[162,116],O:[119,165],S:[140.5,140.5]};
+const pairs=['AB','BC','CD','DE','EF','FG','GH','HI','IJ','JA','AK','KL','LC','KM','MI','LN','NE','NS','SO','OM','OG'];
+const edges=pairs.map(([a,b])=>{const [ax,ay]=vertices[a],[bx,by]=vertices[b];return {a,b,ax,ay,bx,by,length:Math.hypot(bx-ax,by-ay)}});
+const dist=Object.fromEntries(Object.keys(vertices).map(k=>[k,Infinity]));dist.S=0;
+const visited=new Set();
+while(visited.size<Object.keys(vertices).length){
+ const u=Object.keys(vertices).filter(k=>!visited.has(k)).sort((a,b)=>dist[a]-dist[b])[0];
+ if(!u || !Number.isFinite(dist[u]))break;visited.add(u);
+ for(const e of edges){const v=e.a===u?e.b:e.b===u?e.a:null;if(v&&dist[v]>dist[u]+e.length)dist[v]=dist[u]+e.length;}
+}
+const radiusMax=Math.max(...edges.map(e=>(dist[e.a]+dist[e.b]+e.length)/2));
+const g=document.getElementById('edges'),ns='http://www.w3.org/2000/svg';
+for(const e of edges){
+ for(const forward of [true,false]){
+  const el=document.createElementNS(ns,'line');const xa=forward?e.ax:e.bx, ya=forward?e.ay:e.by, xb=forward?e.bx:e.ax,yb=forward?e.by:e.ay;
+  el.setAttribute('x1',xa);el.setAttribute('y1',ya);el.setAttribute('x2',xb);el.setAttribute('y2',yb);
+  el.style.display='none';g.append(el);if(forward)e.forward=el;else e.backward=el;
+ }
+}
+const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+function edgePart(line,n,length){if(n<0.15){line.style.display='none';return;}line.style.display='';line.setAttribute('stroke-dasharray',`${Math.min(n,length)} ${length*2}`)}
+function topology(p){const radius=radiusMax*(1-Math.pow(1-p,1.65))+(p===1?1:0);for(const e of edges){const fa=clamp(radius-dist[e.a],0,e.length),fb=clamp(radius-dist[e.b],0,e.length);if(fa+fb>=e.length-0.01){edgePart(e.forward,e.length,e.length);e.backward.style.display='none'}else{edgePart(e.forward,fa,e.length);edgePart(e.backward,fb,e.length)}}}
+const rotation=document.getElementById('rotationMark');
+function spin(p){let scale;if(p<=0.52){scale=.018+.982*.52*Math.pow(p/.52,2.1)}else{const q=(p-.52)/.48;scale=.018+.982*(.52+.48*(1-Math.pow(1-q,2.3)))}
+const angle=-300*Math.pow(1-p,1.32);rotation.style.transform=`rotate(${angle.toFixed(4)}deg) scale(${scale.toFixed(6)})`;rotation.style.opacity=Math.min(1,.75+p*1.8)}
+let raf=0;
+function replay(){cancelAnimationFrame(raf);if(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches){topology(1);spin(1);return;}topology(0);spin(0);let start=null;function tick(now){if(start===null)start=now;const elapsed=now-start;topology(clamp(elapsed/740,0,1));spin(clamp(elapsed/780,0,1));if(elapsed<780)raf=requestAnimationFrame(tick)}raf=requestAnimationFrame(tick)}
+document.getElementById('theme').addEventListener('change',e=>document.documentElement.dataset.theme=e.target.value);
+document.getElementById('replay').addEventListener('click',replay);
+window.addEventListener('keydown',e=>{if(e.code==='Space' && !['SELECT','BUTTON'].includes(document.activeElement?.tagName)){e.preventDefault();replay()}});
+replay();
+})();
+</script>
+</body>
+</html>
