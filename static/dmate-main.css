@@ -4399,6 +4399,7 @@ body[data-appearance-theme="light"] .kg-node-badge,
 /* 左侧底部入口统一留出 8px 间距，避免按钮彼此贴合。 */
 .download-entry,
 .account-entry,
+.data-transfer-entry,
 .offline-entry,
 .appearance-entry {
     flex:0 0 auto;
@@ -4406,6 +4407,7 @@ body[data-appearance-theme="light"] .kg-node-badge,
     margin-bottom:0 !important;
 }
 .download-entry,
+.data-transfer-entry,
 .offline-entry {
     margin-top:8px !important;
 }

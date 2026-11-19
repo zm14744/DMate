@@ -49,9 +49,6 @@ async function onlineStyles(page,theme) {
   assert.equal(await notebook.locator('.dcn-original').getAttribute('aria-label'),'概念内容');
   assert.equal((await notebook.locator('.dcn-editor label').last().innerText()).trim(),'概念内容');
   result.remove=await circle(notebook.locator('.dcn-note-delete'));
-  result.unchecked=await circle(notebook.locator('.dcn-note-select input'));
-  await notebook.locator('.dcn-note-select input').check();await settle(page);
-  result.checked=await circle(notebook.locator('.dcn-note-select input'));
   await notebook.locator('.dcn-close').first().click();
   return result;
 }
@@ -143,9 +140,8 @@ async function exercise(page,reference,width) {
   const firstNote=(await records(page,'notes'))[0];
   await page.mouse.move(0,0);await settle(page);assert.deepEqual(await style(page.locator('#addNote')),reference.create,'The original notebook create action has the online filled style');
   assert.deepEqual(await circle(page.locator('.dcn-note-delete')),reference.remove,'The notebook delete dot matches the online red circle');
-  const check=page.locator('.dcn-note-select input');assert.deepEqual(await circle(check),reference.unchecked);
-  await check.check();await settle(page);assert.deepEqual(await circle(check),reference.checked,'Selected notebook controls match online geometry');
-  assert.match(await page.locator('.dcn-selection').innerText(),/1/);
+  assert.equal(await page.locator('#notesPanel .dcn-note-select,#notesPanel input[type="checkbox"]').count(),0,'Offline note rows have no selection circles');
+  assert.equal(await page.locator('#notesPanel .dcn-selection').count(),0,'Offline notes have no selected-count hint');
   await page.locator('#addNote').click();await page.locator('.dcn-title').fill('图论笔记');await page.locator('.dcn-original').fill('路径、回路和连通性');
   await page.waitForFunction(()=>Object.keys(DMateGuestSession.read('offline-notes')||{}).length===2);
   const search=page.locator('.dcn-search');await search.fill('不会匹配的内容');

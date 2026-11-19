@@ -32,7 +32,7 @@
   } catch (_) {}
 })();
 </script>
-<link rel="stylesheet" href="/static/dmate-main.css?v=66">
+<link rel="stylesheet" href="/static/dmate-main.css?v=67">
 
 <link rel="stylesheet" href="/static/graph-editor.css?v=26">
 <link rel="stylesheet" href="/static/drawing-workspace.css?v=51">
@@ -45,9 +45,9 @@
 <link rel="stylesheet" href="/static/dmate-shared-overrides.css?v=23">
 <link rel="stylesheet" href="/static/search-controls.css?v=27">
 <link rel="stylesheet" href="/static/textarea-autosize.css?v=1">
-<link rel="stylesheet" href="/static/button-themes.css?v=64">
+<link rel="stylesheet" href="/static/button-themes.css?v=65">
 <link rel="stylesheet" href="/static/offline-knowledge-graph.css?v=54">
-<link rel="stylesheet" href="/static/offline.css?v=54">
+<link rel="stylesheet" href="/static/offline.css?v=56">
 <link rel="stylesheet" href="/static/select-controls.css?v=43">
 <link rel="stylesheet" href="/static/scrollbars.css?v=25">
 <script defer src="/static/mobile-select.js?v=26"></script>
@@ -71,7 +71,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/vendor/dompurify-3.2.6/purify.min.js"></script>
 <script defer src="/static/ui-tooltip.js?v=49"></script>
 <script defer src="/static/guest-session.js?v=53"></script>
-<script defer src="/static/language-catalog.js?v=63"></script>
+<script defer src="/static/language-catalog.js?v=64"></script>
 <script defer src="/static/language-knowledge.js"></script>
 <script defer src="/static/language.js?v=59"></script>
 <script defer src="/static/modal-text.js?v=53"></script>
@@ -82,7 +82,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/offline-entry.js?v=46"></script>
 <!-- Backend API only; existing UI storage is migrated separately. -->
 <script defer src="/static/offline-vault.js?v=1"></script>
-<script defer src="/static/offline.js?v=57"></script>
+<script defer src="/static/offline.js?v=58"></script>
 </head>
 <body class="offline-workspace">
 <script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"light";</script>
@@ -134,6 +134,14 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
     </nav>
 
     <div class="offline-sidebar-bottom">
+      <button type="button" id="offlineImportDataBtn" class="offline-nav-item" data-transfer-action="import" aria-label="导入数据">
+        <svg class="dmate-lucide-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" data-icon="file-input"><path d="M4 11V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M2 15h10"/><path d="m9 18 3-3-3-3"/></svg>
+        <span class="dmate-ui-label">导入数据</span>
+      </button>
+      <button type="button" id="offlineExportDataBtn" class="offline-nav-item" data-transfer-action="export" aria-label="导出数据">
+        <svg class="dmate-lucide-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" data-icon="file-output"><path d="M4.226 20.925A2 2 0 0 0 6 22h12a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v3.127"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="m5 11-3 3"/><path d="m5 17-3-3h10"/></svg>
+        <span class="dmate-ui-label">导出数据</span>
+      </button>
       <button type="button" id="returnOnline" class="btn offline-return" aria-label="在线版">
         <svg class="dmate-lucide-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
         <span>在线版</span>

@@ -14,7 +14,7 @@
     questionDifficulty: "", questionType: "", questionSelection: "", questionQuery: "", conceptCategory: "", conceptSelection: "", conceptQuery: "", graphQuery: "", graphController: null,
     librarySelections: {concepts:new Set(), questions:new Set()}, selectionQueue: Promise.resolve(),
     selectedNoteId:null, noteQuery:"", noteRows:[], noteSaveQueue:Promise.resolve(),
-    noteSelectedIds:new Set(), noteDrafts:new Map(), noteSaveStatus:new Map(), noteDeletePending:null,
+    noteDrafts:new Map(), noteSaveStatus:new Map(), noteDeletePending:null,
     appearanceQueue: Promise.resolve()
   };
   const panelMeta = {
@@ -95,7 +95,7 @@
   function invalidateWorkspace(resetGuest = false) {
     if (!workspaceActive) return;
     workspaceActive = false;
-    state.noteRows = []; state.noteDrafts.clear(); state.noteSelectedIds.clear();
+    state.noteRows = []; state.noteDrafts.clear();
     state.drawingController?.destroy?.();
     for (const dialog of document.querySelectorAll("dialog[open]")) dialog.close();
     for (const id of ["mistakeList", "noteList", "offlineDrawingHost"]) $(id)?.replaceChildren();
@@ -576,7 +576,6 @@
     await deleteOfflineRecord("notes", row, "notebook-deletions");
     state.noteDrafts.delete(row.id);
     state.noteSaveStatus.delete(row.id);
-    state.noteSelectedIds.delete(row.id);
   }
 
   async function renderNotes() {
@@ -592,7 +591,6 @@
     const rows = [...byId.values()].sort((a,b) => noteTime(b.updatedAt) - noteTime(a.updatedAt));
     state.noteRows = rows;
     if (!rows.some(row => row.id === state.selectedNoteId)) state.selectedNoteId = rows[0]?.id || null;
-    state.noteSelectedIds = new Set([...state.noteSelectedIds].filter(id => byId.has(id)));
     const host = $("noteList");
     host.replaceChildren();
     const sidebar = el("aside", "dcn-sidebar"), main = el("section", "dcn-main");
@@ -607,8 +605,7 @@
     });
     searchClear.title = tr("清空搜索", "Clear search"); searchClear.setAttribute("aria-label", searchClear.title);
     searchWrap.append(search, searchClear);
-    const list = el("div", "dcn-list"), selection = el("div", "dcn-selection"), count = el("span");
-    selection.append(count);
+    const list = el("div", "dcn-list");
     const editor = el("section", "dcn-editor");
     const nameLabel = el("label", "", tr("概念名称", "Concept name")), name = el("input", "dcn-title");
     name.maxLength = 160; name.setAttribute("aria-label", tr("概念名称", "Concept name")); nameLabel.append(name);
@@ -620,9 +617,8 @@
     function renderActions() {
       const empty = state.noteRows.length === 0;
       $("notesPanel").classList.toggle("is-empty", empty);
-      selection.hidden = empty; main.hidden = empty;
+      main.hidden = empty;
       name.disabled = body.disabled = state.noteDeletePending === state.selectedNoteId;
-      count.textContent = tr("已选 " + state.noteSelectedIds.size + " 条", state.noteSelectedIds.size + " selected");
       for (const deletion of host.querySelectorAll(".dcn-note-delete")) deletion.disabled = Boolean(state.noteDeletePending);
     }
     function renderList() {
@@ -640,13 +636,6 @@
         const title = row.title.trim() || tr("未命名概念", "Untitled concept");
         const item = el("div", "dcn-note" + (row.id === state.selectedNoteId ? " is-current" : ""));
         item.dataset.noteId = row.id;
-        const hit = el("label", "dcn-note-select"), check = el("input");
-        check.type = "checkbox"; check.checked = state.noteSelectedIds.has(row.id);
-        check.setAttribute("aria-label", tr("选择概念：" + title, "Select concept: " + title)); hit.append(check);
-        check.addEventListener("change", () => {
-          if (check.checked) state.noteSelectedIds.add(row.id); else state.noteSelectedIds.delete(row.id);
-          renderActions();
-        });
         const open = button(title, "dcn-note-open", () => {
           state.selectedNoteId = row.id; renderList(); renderEditor(); renderActions();
         });
@@ -666,7 +655,7 @@
         });
         deletion.title = tr("删除", "Delete") + title;
         deletion.setAttribute("aria-label", tr("删除概念：" + title, "Delete concept: " + title) + (names.get(title) > 1 ? "（" + row.id + "）" : ""));
-        item.append(hit, open, deletion); list.append(item);
+        item.append(open, deletion); list.append(item);
       }
     }
     function renderEditor() {
@@ -686,7 +675,7 @@
     };
     name.addEventListener("input", edit); body.addEventListener("input", edit);
     search.addEventListener("input", () => { state.noteQuery = search.value; renderList(); });
-    sidebar.append(create, searchWrap, selection, list); host.append(sidebar, main);
+    sidebar.append(create, searchWrap, list); host.append(sidebar, main);
     renderList(); renderEditor(); renderActions();
     window.DMateTextareaAutosize?.refresh?.(host);
   }
@@ -1165,7 +1154,6 @@
       for (const key of ["panel", "revealed", "analysisRevealed", "graphCategory", "graphSelectedNodeId", "questionCategory", "questionDifficulty", "questionType", "questionSelection", "questionQuery", "conceptCategory", "conceptSelection", "conceptQuery", "graphQuery", "selectedNoteId", "noteQuery"]) snapshot[key] = state[key];
       snapshot.selectedQuestion = state.selectedQuestion?.id || "";
       snapshot.selectedConcept = state.selectedConcept?.id || "";
-      snapshot.noteSelectedIds = [...state.noteSelectedIds];
       if (!window.DMateGuestSession.write("offline-view", snapshot)) toast("当前标签页未能保存最新浏览位置");
     };
     for (const type of ["input", "change", "click"]) document.addEventListener(type, () => queueMicrotask(checkpoint));
@@ -1259,7 +1247,6 @@
         state.analysisRevealed = view.analysisRevealed === true;
         state.selectedQuestion = state.questions.find(item => item.id === view.selectedQuestion) || null;
         state.selectedConcept = state.concepts.find(item => item.id === view.selectedConcept) || null;
-        state.noteSelectedIds = new Set(Array.isArray(view.noteSelectedIds) ? view.noteSelectedIds : []);
         $("questionSearch").value = state.questionQuery;
         $("conceptSearch").value = state.conceptQuery;
       }
