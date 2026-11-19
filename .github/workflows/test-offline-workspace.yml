@@ -53,6 +53,8 @@ on:
       - 'scripts/test_offline_storage_browser.cjs'
       - 'scripts/test_offline_handoff_browser.cjs'
       - 'scripts/test_offline_vault_workspace_browser.cjs'
+      - 'scripts/test_offline_interface_lifecycle_browser.cjs'
+      - 'scripts/test_textarea_autogrow_browser.cjs'
       - 'scripts/offline-vault-browser-fixtures.cjs'
       - 'scripts/test_drawing_async_persistence_browser.cjs'
       - 'scripts/test_mobile_drawers_browser.cjs'
@@ -146,6 +148,8 @@ on:
       - 'scripts/test_offline_storage_browser.cjs'
       - 'scripts/test_offline_handoff_browser.cjs'
       - 'scripts/test_offline_vault_workspace_browser.cjs'
+      - 'scripts/test_offline_interface_lifecycle_browser.cjs'
+      - 'scripts/test_textarea_autogrow_browser.cjs'
       - 'scripts/offline-vault-browser-fixtures.cjs'
       - 'scripts/test_drawing_async_persistence_browser.cjs'
       - 'scripts/test_mobile_drawers_browser.cjs'
@@ -223,6 +227,7 @@ jobs:
           node --check static/mobile-select.js
           node --check static/search-controls.js
           node --check static/offline-shell.js
+          node --check static/offline-interface-state.js
           node --check static/offline-appearance.js
           node --check static/offline-knowledge-graph.js
           node --check static/knowledge-graph-labels.js
@@ -254,6 +259,8 @@ jobs:
           node --check scripts/test_offline_storage_browser.cjs
           node --check scripts/test_offline_handoff_browser.cjs
           node --check scripts/test_offline_vault_workspace_browser.cjs
+          node --check scripts/test_offline_interface_lifecycle_browser.cjs
+          node --check scripts/test_textarea_autogrow_browser.cjs
           node --check scripts/offline-vault-browser-fixtures.cjs
           node --check scripts/test_drawing_async_persistence_browser.cjs
           node --check scripts/test_mobile_drawers_browser.cjs
@@ -384,6 +391,8 @@ jobs:
           node scripts/test_offline_storage_browser.cjs
           node scripts/test_offline_handoff_browser.cjs
           node scripts/test_offline_vault_workspace_browser.cjs
+          node scripts/test_offline_interface_lifecycle_browser.cjs
+          node scripts/test_textarea_autogrow_browser.cjs
           node scripts/test_drawing_async_persistence_browser.cjs
           node scripts/test_service_worker_cache_browser.cjs
           node scripts/test_image_export_browser.cjs

@@ -6,14 +6,17 @@ const {mkdtemp, rm} = require('node:fs/promises');
 const {tmpdir} = require('node:os');
 const {join} = require('node:path');
 const {chromium} = require('playwright');
-const {installStorageProbe, records, row} = require('./offline-vault-browser-fixtures.cjs');
+const {installStorageProbe, records, row, revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const executablePath = process.env.CHROMIUM_EXECUTABLE_PATH;
 const launch = {headless:true,...(executablePath ? {executablePath} : {})};
 const owner = 'vault-ui-account';
 const secret = {title:'VAULT-UI-PRIVATE-NOTE-71',content:'VAULT-UI-PRIVATE-CONTENT-73',
   drawing:'VAULT-UI-PRIVATE-DRAWING-79',filename:'VAULT-UI-PRIVATE-BACKGROUND-83.png'};
-const ready = page => page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+const ready = async page => {
+  await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+  await revealInterface(page);
+};
 
 async function prepare(context) {
   await installStorageProbe(context);

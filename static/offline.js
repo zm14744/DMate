@@ -103,9 +103,10 @@
   }
   const escapeHtml = value => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const workspaceOwner = window.DMateGuestSession?.getOwner() || "";
+  // Account tabs keep independent workspaces; guest vaults are already tab scoped.
+  const viewRecordId = workspaceOwner ? "view:" + window.name : "view";
   let workspaceActive = true;
   const workspaceCurrent = () => workspaceActive && (window.DMateGuestSession?.getOwner() || "") === workspaceOwner;
-  const guest = () => Boolean(window.DMateGuestSession && !workspaceOwner);
   function invalidateWorkspace(resetGuest = false) {
     if (!workspaceActive) return;
     workspaceActive = false;
@@ -585,10 +586,10 @@
     searchWrap.append(search, searchClear);
     const list = el("div", "dcn-list");
     const editor = el("section", "dcn-editor");
-    const nameLabel = el("label", "", tr("概念名称", "Concept name")), name = el("input", "dcn-title");
-    name.maxLength = 160; name.setAttribute("aria-label", tr("概念名称", "Concept name")); nameLabel.append(name);
+    const nameLabel = el("label", "", tr("概念名称", "Concept name")), name = el("textarea", "dcn-title");
+    name.maxLength = 160; name.rows = 1; name.setAttribute("aria-label", tr("概念名称", "Concept name")); nameLabel.append(name);
     const bodyLabel = el("label", "", tr("概念内容", "Concept content")), body = el("textarea", "dcn-original");
-    body.rows = 9; body.setAttribute("aria-label", tr("概念内容", "Concept content")); bodyLabel.append(body);
+    body.rows = 1; body.setAttribute("aria-label", tr("概念内容", "Concept content")); bodyLabel.append(body);
     const saved = el("span", "dcn-saved"); saved.setAttribute("role", "status");
     editor.append(nameLabel, bodyLabel, saved);
     main.append(editor);
@@ -1109,7 +1110,7 @@
 
   function bind() {
     const checkpoint = () => {
-      if (!guest() || !workspaceCurrent() || !state.storage) return;
+      if (!workspaceCurrent() || !state.storage) return;
       const snapshot = {};
       for (const key of ["panel", "revealed", "analysisRevealed", "graphCategory", "graphSelectedNodeId", "questionCategory", "questionDifficulty", "questionType", "questionSelection", "questionQuery", "conceptCategory", "conceptSelection", "conceptQuery", "graphQuery", "selectedNoteId", "noteQuery"]) snapshot[key] = state[key];
       snapshot.selectedQuestion = state.selectedQuestion?.id || "";
@@ -1117,7 +1118,7 @@
       const encoded = JSON.stringify(snapshot);
       if (encoded === state.viewSnapshot) return;
       state.viewSnapshot = encoded;
-      state.viewSaveQueue = state.viewSaveQueue.then(() => put("settings",{id:"view",...snapshot}))
+      state.viewSaveQueue = state.viewSaveQueue.then(() => put("settings",{id:viewRecordId,...snapshot}))
         .catch(error => { state.viewSnapshot = ""; if (workspaceCurrent()) toast(storageError(error)); });
     };
     for (const type of ["input", "change", "click"]) document.addEventListener(type, () => queueMicrotask(checkpoint));
@@ -1207,7 +1208,7 @@
       await loadLibrarySelections();
       bind();
       window.DMateI18n?.translate?.(document.body);
-      const view = guest() && await transaction("settings","readonly",os => os.get("view"));
+      const view = await transaction("settings","readonly",os => os.get(viewRecordId));
       if (view) {
         for (const key of ["graphCategory", "graphSelectedNodeId", "questionCategory", "questionDifficulty", "questionType", "questionSelection", "questionQuery", "conceptCategory", "conceptSelection", "conceptQuery", "graphQuery", "selectedNoteId", "noteQuery"])
           if (typeof view[key] === "string") state[key] = view[key];

@@ -5,13 +5,14 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
-const {installStorageProbe} = require('./offline-vault-browser-fixtures.cjs');
+const {installStorageProbe, revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const profile = { mode:'dark', accent:'purple', fontSize:'large', backgroundFit:'contain',
   mask:17, blur:3, panelOpacity:80, bubbleOpacity:70 };
 
 async function ready(page) {
   await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+  await revealInterface(page);
 }
 async function openAppearance(page) {
   if (await page.locator('#offlineAppearanceBtn').count()) {

@@ -3,6 +3,7 @@
  */
 'use strict';
 const assert = require('node:assert/strict');
+const { revealInterface } = require('./offline-vault-browser-fixtures.cjs');
 const { chromium } = require('playwright');
 const concepts = require('../static/offline-content/concepts.zh-CN.json').concepts;
 const questions = require('../static/offline-content/questions.zh-CN.json').questions;
@@ -243,6 +244,7 @@ async function runCase(browser, width, height, full) {
   try {
     await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await revealInterface(page);
     await fullDetails(page, 'concepts', longConcept);
     await fullDetails(page, 'questions', longQuestion);
     if (full) { await titleSearch(page, 'concepts'); await titleSearch(page, 'questions'); await links(page); }
@@ -258,11 +260,13 @@ async function disconnectedCase(browser) {
   try {
     await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await revealInterface(page);
     await titleSearch(page, 'questions');
     await page.evaluate(async () => { await navigator.serviceWorker.register('/offline-service-worker.js', { scope: '/' }); await navigator.serviceWorker.ready; });
     await page.waitForFunction(() => navigator.serviceWorker.controller?.state === 'activated');
     await context.setOffline(true); await page.reload({ waitUntil: 'load' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await revealInterface(page);
     assert.equal(await page.evaluate(() => navigator.onLine), false);
     await clearFilters(page, 'questions'); await choose(page, 'questionSelection', 'selected');
     await page.locator('#questionSearch').fill(translations.questions[linkedQuestion.id].title);

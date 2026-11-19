@@ -4,6 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const {revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const concepts = require('../static/offline-content/concepts.zh-CN.json').concepts;
 const questions = require('../static/offline-content/questions.zh-CN.json').questions;
 const translations = require('../static/offline-content/translations.en.json');
@@ -317,6 +318,7 @@ async function runCase(browser, width, theme) {
   try {
     await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await revealInterface(page);
     assert.equal(await page.locator('html').getAttribute('data-appearance-theme'), theme, 'Guest appearance migrates into the encrypted workspace');
     await shapeAndIndependentSelection(page, 'concepts', selectedConcepts);
     await conceptCombinedFilters(page);
@@ -335,6 +337,7 @@ async function runCase(browser, width, theme) {
     await context.setOffline(true);
     await page.reload({ waitUntil: 'load' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await revealInterface(page);
     assert.equal(await page.locator('html').getAttribute('data-appearance-theme'), theme, 'Encrypted guest appearance survives disconnected reload');
     assert.equal(await page.evaluate(() => navigator.onLine), false);
     await language(page, 'en');

@@ -4,20 +4,22 @@
 'use strict';
 const assert = require('node:assert/strict');
 const {chromium} = require('playwright');
+const {revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const longText = Array.from({length:30}, (_,i) => `第${i+1}行：自动增高的输入内容`).join('\n');
+const longTitle = Array.from({length:24}, (_,i) => `标题${i+1}`).join('\n');
 const settle = page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 const metrics = input => input.evaluate(node => {
   const css = getComputedStyle(node);
   return {height:node.getBoundingClientRect().height,client:node.clientHeight,scroll:node.scrollHeight,
     resize:css.resize,overflow:css.overflowY,max:parseFloat(css.maxHeight),value:node.value};
 });
-async function grows(page, input, label) {
+async function grows(page, input, label, content = longText) {
   await input.waitFor({state:'visible'});
   await input.fill('短内容'); await settle(page);
   const short = await metrics(input);
   assert.equal(short.resize,'none',label+': manual resize is removed');
-  await input.fill(longText); await settle(page);
+  await input.fill(content); await settle(page);
   const long = await metrics(input);
   assert.ok(long.height>short.height+8,label+': more lines increase the visible height '+JSON.stringify({short,long}));
   assert.ok(long.height<=long.max+2,label+': height stays within its limit');
@@ -26,7 +28,7 @@ async function grows(page, input, label) {
   await input.evaluate(node => node.setSelectionRange(3,12));
   await page.evaluate(() => dispatchEvent(new Event('resize'))); await settle(page);
   assert.deepEqual(await input.evaluate(node => [node.selectionStart,node.selectionEnd]),[3,12],label+': measuring preserves the selection');
-  assert.equal(await input.inputValue(),longText,label+': resizing preserves the complete text');
+  assert.equal(await input.inputValue(),content,label+': resizing preserves the complete text');
   await input.fill('短内容'); await settle(page);
   assert.ok(Math.abs((await metrics(input)).height-short.height)<=2,label+': deleting text shrinks the field again');
 }
@@ -85,6 +87,7 @@ async function online(page,width) {
     learningState.conceptNotebook={notes:[{id:'auto-note',title:'自动增高',content:'已有内容',updatedAt:1}],deleted:{}};
     initializeConceptNotebook();dmateConceptNotebook.open();
   });
+  await grows(page,page.locator('.dcn-title'),'notebook concept name',longTitle);
   await grows(page,page.locator('.dcn-original'),'notebook original content');
   await grows(page,page.locator('.dcn-question'),'notebook supplementary request');
   const original=page.locator('.dcn-original');
@@ -150,6 +153,12 @@ async function runCase(browser,width) {
     await online(page,width);
     await page.goto(new URL('/offline',baseURL).href,{waitUntil:'networkidle'});
     await page.waitForFunction(()=>document.documentElement.dataset.offlineReady==='true'&&Boolean(window.DMateTextareaAutosize));
+    await revealInterface(page);
+    if(width<=1100)await page.locator('#offlineNavToggle').click();
+    await page.locator('.offline-nav-item[data-panel="notes"]').click();
+    await page.locator('#addNote').click();
+    await grows(page,page.locator('.dcn-title'),'offline notebook concept name',longTitle);
+    await grows(page,page.locator('.dcn-original'),'offline notebook concept content');
     await graphTextFields(page,true);
     assert.deepEqual(requests,[],'Resizing and editing fields never generates model output');assert.deepEqual(errors,[]);
     console.log('PASS '+width+': real online/offline fields grow, cap, shrink, refill and retain values/selection/keyboard behavior');

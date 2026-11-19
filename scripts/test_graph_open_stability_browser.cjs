@@ -3,6 +3,7 @@
  */
 'use strict';
 const assert = require('node:assert/strict');
+const { revealInterface } = require('./offline-vault-browser-fixtures.cjs');
 const { writeFileSync } = require('node:fs');
 const { chromium } = require('playwright');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
@@ -132,7 +133,10 @@ async function fixture(browser, width, offline = false) {
   await page.route('**/analyze-questions', route => { indexing.push(route.request().url()); return new Promise(() => {}); });
   await page.route('**/chat', route => { modelCalls.push(route.request().url()); return route.abort(); });
   await page.goto(baseURL + (offline ? '/offline' : ''), { waitUntil: 'networkidle' });
-  if (offline) await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+  if (offline) {
+    await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await revealInterface(page);
+  }
   else await page.evaluate(() => {
     newChat();
     const question = '判断命题 p 与 q 的合取在什么情况下为真。';

@@ -3,6 +3,7 @@
  */
 'use strict';
 const assert = require('node:assert/strict');
+const { revealInterface } = require('./offline-vault-browser-fixtures.cjs');
 const { chromium } = require('playwright');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const mobile = page => page.viewportSize().width <= 1100;
@@ -212,6 +213,7 @@ async function runCase(browser, width, theme, offline) {
     await page.goto(baseURL + (offline ? '/offline' : ''), { waitUntil: 'networkidle' });
     if (offline) {
       await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+      await revealInterface(page);
       await page.evaluate(mode => window.DMateOfflineAppearance.apply({ mode }, null), theme);
       await filterMetrics(page);
     } else await page.evaluate(mode => { appearanceSettings.mode = mode; applyAppearanceSettings({ save: false }); }, theme);
@@ -250,6 +252,7 @@ async function runCase(browser, width, theme, offline) {
     try {
       const page = await context.newPage(); await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
       await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+      await revealInterface(page);
       await page.evaluate(() => window.DMateOfflineAppearance.apply({ mode: 'navy' }, null));
       await filterMetrics(page);
       console.log('PASS offline 820/navy: matching library filter dimensions and independent scrolling');

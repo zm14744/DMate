@@ -3,6 +3,7 @@
  */
 'use strict';
 const assert = require('node:assert/strict');
+const { revealInterface } = require('./offline-vault-browser-fixtures.cjs');
 const { chromium } = require('playwright');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const settle = page => page.evaluate(async () => {
@@ -290,6 +291,7 @@ async function runCase(browser, width, offline) {
     assert.equal(all.length, 68);
     if (offline) {
       await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+      await revealInterface(page);
       assert.equal(await page.locator('.offline-nav-item.active').getAttribute('data-panel'), 'graph', 'The inline graph is the default tool');
       assert.equal(await page.locator('#knowledgeGraphModal').evaluate(node => node.parentElement.id), 'graphPanel');
       assert.equal(await page.locator('#knowledgeGraphModal.modal,#knowledgeGraphClose').count(), 0,

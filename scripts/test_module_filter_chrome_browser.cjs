@@ -3,6 +3,7 @@
  */
 'use strict';
 const assert = require('node:assert/strict');
+const { revealInterface } = require('./offline-vault-browser-fixtures.cjs');
 const { chromium } = require('playwright');
 const nodes = require('../static/offline-content/knowledge_graph.json').nodes;
 const questions = require('../static/offline-content/questions.zh-CN.json').questions;
@@ -294,6 +295,7 @@ async function runCase(browser, width, theme, offline) {
     await page.goto(baseURL + (offline ? '/offline' : ''), { waitUntil: 'networkidle' });
     if (offline) {
       await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+      await revealInterface(page);
       await page.evaluate(mode => window.DMateOfflineAppearance.apply({ mode }, null), theme);
       await settle(page);
       await offlineHeader(page);
@@ -336,6 +338,7 @@ async function disconnectedCase(browser) {
   try {
     await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await revealInterface(page);
     await page.evaluate(async () => {
       await navigator.serviceWorker.register('/offline-service-worker.js', { scope: '/' });
       await navigator.serviceWorker.ready;
@@ -344,6 +347,7 @@ async function disconnectedCase(browser) {
     await context.setOffline(true);
     await page.reload({ waitUntil: 'load' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await revealInterface(page);
     assert.equal(await page.evaluate(() => navigator.onLine), false);
     await offlineHeader(page);
     await moduleControls(page);

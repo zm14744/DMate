@@ -2,7 +2,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
-const {installStorageProbe, records: vaultRecords, row: vaultRow} = require('./offline-vault-browser-fixtures.cjs');
+const {installStorageProbe, records: vaultRecords, row: vaultRow, revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.BASE_URL || process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const executablePath = process.env.CHROMIUM || process.env.CHROMIUM_EXECUTABLE_PATH;
 const dbName = 'dmate-offline-workspace', migrationKey = 'dmate_offline_migration_v1';
@@ -16,7 +16,10 @@ const documentFor = label => ({body_text:'Body ' + label, graphs:[{id:'G1',name:
   directed:false,weighted:false,vertices:[{id:'v1',label,x:.3,y:.4}],edges:[]}]});
 const drawing = (id, name, label, updatedAt) => ({id,name,document:documentFor(label),
   createdAt:1,updatedAt,requirement:'Retained request',custom:{marker:id}});
-const ready = page => page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+const ready = async page => {
+  await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+  await revealInterface(page);
+};
 async function bootstrap(context, owner = ownerA) {
   await context.route('**/__offline-data-test', route => route.fulfill({contentType:'text/html',body:
     '<!doctype html><title>Migration fixture</title><script src="/static/guest-session.js"></script>'}));

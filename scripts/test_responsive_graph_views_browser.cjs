@@ -4,7 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
-const {installStorageProbe} = require('./offline-vault-browser-fixtures.cjs');
+const {installStorageProbe,revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const dimensions = { desktop: { width: 1440, height: 900 }, mobile: { width: 390, height: 844 } };
 const username = 'responsive-view-local-fixture';
@@ -53,6 +53,7 @@ async function pageFixture(browser, kind, offline, startingMode) {
   await page.goto(baseURL + (offline ? '/offline' : ''), { waitUntil: 'networkidle' });
   if (offline) {
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await revealInterface(page);
     await page.evaluate(async gallery => {
       await __offlineTestStore.put('drawings', {id:'gallery',gallery:JSON.stringify(gallery),updatedAt:Date.now()});
       await __offlineTestStore.put('settings', {id:'appearance',settings:{mode:'dark',accent:'blue',panelOpacity:100},updatedAt:Date.now()});
@@ -61,6 +62,7 @@ async function pageFixture(browser, kind, offline, startingMode) {
     // so both fixtures enter through the actual encrypted storage adapter.
     await page.reload({waitUntil:'networkidle'});
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await revealInterface(page);
     assert.equal(await page.locator('#conceptsPanel .toolbar-muted,#questionsPanel .toolbar-muted').count(), 0,
       'Removed library heading hints stay absent');
     await offlinePanel(page, kind === 'drawing' ? 'drawing' : 'graph');

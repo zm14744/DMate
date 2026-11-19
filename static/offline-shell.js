@@ -30,6 +30,8 @@
   };
   const $ = id => document.getElementById(id);
   const mobile = window.matchMedia('(max-width:1100px)');
+  const interfaceState = window.DMateOfflineInterfaceState;
+  const initialInterface = interfaceState?.read() || {hidden:true};
   const privacyButtons = [...document.querySelectorAll('[data-offline-privacy]')];
   const privacyCover = $('offlinePrivacyCover'), privacyRestore = $('offlinePrivacyRestore');
   const layout = document.querySelector('.offline-layout');
@@ -60,6 +62,7 @@
     layoutWasInert = layout.inert;
     layout.inert = true;
     document.body.classList.add('offline-content-hidden');
+    interfaceState?.update({hidden:true});
     syncPrivacyControls();
     privacyRestore.focus({preventScroll:true});
   }
@@ -67,6 +70,7 @@
     if (!interfaceHidden) return;
     interfaceHidden = false;
     document.body.classList.remove('offline-content-hidden');
+    interfaceState?.update({hidden:false});
     layout.inert = layoutWasInert;
     if (privacyCover.open) privacyCover.close();
     updateDrawer();
@@ -107,10 +111,14 @@
     const open = mobile.matches ? document.body.classList.contains('offline-nav-open')
       : document.documentElement.dataset.offlineSidebar !== 'collapsed';
     $('offlineSidebar').inert = !open;
-    $('offlineNavBackdrop').hidden = !mobile.matches || !open;
+    // Keep the mobile backdrop mounted so a closing transition can finish.
+    $('offlineNavBackdrop').hidden = !mobile.matches;
+    $('offlineNavBackdrop').setAttribute('aria-hidden',String(!mobile.matches || !open));
     for (const id of ['offlineNavToggle','offlineDesktopSidebarToggle','offlineDesktopSidebarOpen']) {
       $(id).setAttribute('aria-expanded',String(open));
     }
+    interfaceState?.update({desktopCollapsed:document.documentElement.dataset.offlineSidebar === 'collapsed',
+      mobileOpen:document.body.classList.contains('offline-nav-open')});
   }
   function closeDrawer(restore = true) {
     document.body.classList.remove('offline-nav-open');
@@ -145,6 +153,7 @@
       const controls = [...$('offlineSidebar').querySelectorAll('button:not(:disabled),a[href]')]
         .filter(node => node.getClientRects().length && !node.closest('[inert]') && getComputedStyle(node).visibility !== 'hidden');
       const first = controls[0], last = controls.at(-1);
+      if (!first) return;
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     }
@@ -155,7 +164,13 @@
     if (interfaceHidden) privacyRestore.focus({preventScroll:true});
     else if (restorePrivacyFocus) $(mobile.matches ? 'offlineMobilePrivacyToggle' : 'offlineDesktopPrivacyToggle').focus({preventScroll:true});
   });
+  if (initialInterface.desktopCollapsed) document.documentElement.dataset.offlineSidebar = 'collapsed';
+  if (initialInterface.mobileOpen && mobile.matches) document.body.classList.add('offline-nav-open');
   updateDrawer();
+  if (initialInterface.hidden) hideInterface();
+  else document.body.classList.remove('offline-content-hidden');
+  delete document.documentElement.dataset.offlineInterfacePending;
+  requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.add('offline-shell-ready')));
   function syncPanelNavigation() {
     document.querySelectorAll('.offline-nav-item[data-panel]').forEach(button => {
       button.setAttribute('aria-current',button.classList.contains('active') ? 'page' : 'false');

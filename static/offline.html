@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN" data-offline-workspace="true">
+<html lang="zh-CN" data-offline-workspace="true" data-offline-interface-pending>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -37,7 +37,7 @@
 <link rel="stylesheet" href="/static/graph-editor.css?v=26">
 <link rel="stylesheet" href="/static/drawing-workspace.css?v=51">
 <link rel="stylesheet" href="/static/modal-chrome.css">
-<link rel="stylesheet" href="/static/concept-notebook.css?v=1">
+<link rel="stylesheet" href="/static/concept-notebook.css?v=2">
 <link rel="stylesheet" href="/static/ai-answer-renderer.css?v=22">
 <link rel="stylesheet" href="/static/red-circle-controls.css">
 <link rel="stylesheet" href="/static/ui-tooltip.css">
@@ -47,7 +47,7 @@
 <link rel="stylesheet" href="/static/textarea-autosize.css?v=1">
 <link rel="stylesheet" href="/static/button-themes.css?v=65">
 <link rel="stylesheet" href="/static/offline-knowledge-graph.css?v=54">
-<link rel="stylesheet" href="/static/offline.css?v=58">
+<link rel="stylesheet" href="/static/offline.css?v=59">
 <link rel="stylesheet" href="/static/select-controls.css?v=43">
 <link rel="stylesheet" href="/static/scrollbars.css?v=25">
 <script defer src="/static/mobile-select.js?v=26"></script>
@@ -71,21 +71,22 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/vendor/dompurify-3.2.6/purify.min.js"></script>
 <script defer src="/static/ui-tooltip.js?v=49"></script>
 <script defer src="/static/guest-session.js?v=53"></script>
+<script defer src="/static/offline-interface-state.js?v=1"></script>
 <script defer src="/static/language-catalog.js?v=64"></script>
 <script defer src="/static/language-knowledge.js"></script>
 <script defer src="/static/language.js?v=59"></script>
 <script defer src="/static/modal-text.js?v=53"></script>
 <script defer src="/static/offline-appearance.js?v=8"></script>
-<script defer src="/static/offline-shell.js?v=35"></script>
+<script defer src="/static/offline-shell.js?v=36"></script>
 <script defer src="/static/knowledge-graph-labels.js?v=17"></script>
 <script defer src="/static/offline-knowledge-graph.js?v=60"></script>
 <script defer src="/static/offline-vault.js?v=2"></script>
 <script defer src="/static/offline-handoff.js?v=1"></script>
 <script defer src="/static/offline-storage.js?v=1"></script>
 <script defer src="/static/offline-entry.js?v=47"></script>
-<script defer src="/static/offline.js?v=59"></script>
+<script defer src="/static/offline.js?v=60"></script>
 </head>
-<body class="offline-workspace">
+<body class="offline-workspace offline-content-hidden">
 <script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"light";</script>
 <div id="appearanceBackgroundLayer" class="appearance-background-layer" aria-hidden="true"></div>
 <div class="appearance-mask-layer" aria-hidden="true"></div>

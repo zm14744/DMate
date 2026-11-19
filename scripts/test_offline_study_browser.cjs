@@ -3,7 +3,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
-const { installStorageProbe } = require('./offline-vault-browser-fixtures.cjs');
+const { installStorageProbe, revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const migrationReview = require('../offline-content/example-practice-migration.json');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const conceptsURL = '/static/offline-content/concepts.zh-CN.json';
@@ -356,6 +356,7 @@ async function run(browser, width) {
   try {
     await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await revealInterface(page);
     const cache = await page.evaluate(async () => {
       await navigator.serviceWorker.register('/offline-service-worker.js', { scope: '/' }); await navigator.serviceWorker.ready;
       const worker = await fetch('/offline-service-worker.js').then(response => response.text());
@@ -369,6 +370,7 @@ async function run(browser, width) {
     workerProtocol = await disconnectWorkerNetwork(browser, page, await page.evaluate(() => navigator.serviceWorker.controller.scriptURL));
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await revealInterface(page);
     assert.equal(await page.evaluate(() => navigator.onLine), false, 'The reload really runs with browser networking disabled');
     await hookRenderer(page); const data = await packs(page);
     for (const url of [conceptsURL, questionsURL, translationsURL]) assert.ok(cachedResponses.has(url), 'Actual deployed pack is served by the offline worker: ' + url);
@@ -459,6 +461,7 @@ async function run(browser, width) {
     await page.waitForFunction(async () => (await __offlineTestStore.get('settings', 'language'))?.value === 'en');
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await revealInterface(page);
     assert.equal(await page.locator('html').getAttribute('data-ui-language'), 'en', 'The English preference survives a true offline reload');
     if (width === 1440) { await packs(page); await corpusPreflight(page); }
     assert.equal(page.modelCalls, 0); assert.deepEqual(page.studyErrors, []);

@@ -48,4 +48,14 @@ async function row(page, collection, id) {
   return page.evaluate(({collection,id}) => __offlineTestStore.get(collection,id), {collection,id});
 }
 
-module.exports = {installStorageProbe, records, row};
+// UI tests reveal the workspace through the same eye button a person uses.
+// Keep this explicit: lifecycle tests must observe the untouched cold start.
+async function revealInterface(page) {
+  await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+  if (await page.locator('#offlinePrivacyCover').evaluate(node => node.open)) {
+    await page.locator('#offlinePrivacyRestore').click();
+    await page.waitForFunction(() => !document.getElementById('offlinePrivacyCover').open);
+  }
+}
+
+module.exports = {installStorageProbe, records, row, revealInterface};

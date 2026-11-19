@@ -1,6 +1,7 @@
 /* Start Flask first. Exercise native scrollbars, including a held thumb drag. */
 'use strict';
 const assert = require('node:assert/strict');
+const { revealInterface } = require('./offline-vault-browser-fixtures.cjs');
 const { chromium } = require('playwright');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const attribute = 'data-dmate-scroll-active';
@@ -186,6 +187,7 @@ async function assertPaint(page, selector, axis) {
     const offline = await browser.newPage({viewport:{width:1440,height:950}});
     await offline.goto(baseURL + '/offline', {waitUntil:'networkidle'});
     await offline.waitForFunction(() => window.__dmateScrollbarsInstalled === true);
+    await revealInterface(offline);
     await offline.evaluate(() => {
       const node = document.createElement('div'); node.id = 'offline-scroll-probe';
       node.style.cssText = 'position:fixed;z-index:100000;left:20px;top:100px;width:250px;height:160px;overflow:scroll;border:0;padding:0;background:#000;border-radius:0';

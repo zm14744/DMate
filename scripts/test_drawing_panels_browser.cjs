@@ -4,7 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
-const {installStorageProbe} = require('./offline-vault-browser-fixtures.cjs');
+const {installStorageProbe,revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const storageKey = 'dmate:drawing-panels-browser-regression';
 const names = ['测试 A', '测试 B', '测试 C'];
@@ -729,6 +729,7 @@ async function runOfflineViewport(browser, width) {
   try {
     await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await revealInterface(page);
     await page.evaluate(value => __offlineTestStore.put('drawings', {id:'gallery',gallery:JSON.stringify(value),updatedAt:Date.now()}), gallery);
     if (width === 390) await page.locator('#offlineNavToggle').click();
     await page.locator('#graphDrawingBtn').click();

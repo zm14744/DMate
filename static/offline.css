@@ -1,6 +1,7 @@
 /* Offline panels use DMate's shared theme and component styles. Only their
    navigation and page-sized containers need an offline layout adapter. */
-body.offline-workspace { min-width:0; overflow:hidden; }
+body.offline-workspace { --offline-shell-duration:220ms; --offline-shell-easing:cubic-bezier(.2,.8,.2,1); min-width:0; overflow:hidden; }
+html[data-offline-interface-pending] .offline-layout { visibility:hidden; opacity:0; pointer-events:none; }
 body.offline-workspace [hidden] { display:none !important; }
 body.offline-workspace .offline-layout {
   position:relative; z-index:1; display:grid !important;
@@ -13,6 +14,7 @@ body.offline-workspace .offline-sidebar.left {
   width:100%; min-width:0; height:100%; max-height:100%; min-height:0;
   padding:12px !important; overflow:hidden;
   background:var(--surface-1); border-right:1px solid var(--border-strong);
+  transition:none !important;
 }
 .offline-sidebar .dmate-brand { flex:none; min-height:50px; margin:0 0 22px; padding-right:34px; }
 .offline-sidebar .dmate-brand-subtitle { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -210,8 +212,25 @@ body.offline-workspace :is(.question-parent-concepts,.question-graph-modules,.of
 .offline-sidebar-toggle { position:absolute; top:15px; right:10px; }
 #offlineDesktopSidebarOpen { position:absolute; z-index:10; top:12px; left:12px; display:none; }
 #offlineDesktopPrivacyToggle { position:absolute; z-index:10; top:12px; left:12px; }
-html[data-offline-sidebar="collapsed"] body.offline-workspace .offline-layout { grid-template-columns:0 minmax(0,1fr); }
-html[data-offline-sidebar="collapsed"] body.offline-workspace .offline-sidebar { visibility:hidden; padding-inline:0 !important; }
+@media(min-width:1101px) {
+  html[data-offline-sidebar="collapsed"] body.offline-workspace .offline-layout { grid-template-columns:0px minmax(0,1fr); }
+  html[data-offline-sidebar="collapsed"] body.offline-workspace .offline-sidebar { visibility:hidden; opacity:0; transform:translateX(-12px); padding-inline:0 !important; }
+  /* Clip a stable-width menu as its grid track closes, rather than wrapping
+     its labels on every intermediate frame. The main track follows it. */
+  body.offline-workspace .offline-sidebar > :is(.dmate-brand,.offline-nav,.offline-sidebar-bottom) { min-width:256px; }
+  body.offline-workspace .offline-sidebar-heading { white-space:nowrap; }
+  body.offline-workspace.offline-shell-ready .offline-layout { transition:grid-template-columns var(--offline-shell-duration) var(--offline-shell-easing); }
+  body.offline-workspace.offline-shell-ready .offline-sidebar.left {
+    transition:transform var(--offline-shell-duration) var(--offline-shell-easing),
+      opacity var(--offline-shell-duration) var(--offline-shell-easing),
+      padding-left var(--offline-shell-duration) var(--offline-shell-easing),
+      padding-right var(--offline-shell-duration) var(--offline-shell-easing),
+      visibility 0s linear 0s !important;
+  }
+  html[data-offline-sidebar="collapsed"] body.offline-workspace.offline-shell-ready .offline-sidebar.left { transition-delay:0s,0s,0s,0s,var(--offline-shell-duration) !important; }
+  body.offline-workspace.offline-shell-ready .offline-main.center { transition:padding-left var(--offline-shell-duration) var(--offline-shell-easing); }
+  body.offline-workspace.offline-shell-ready #offlineDesktopPrivacyToggle { transition:left var(--offline-shell-duration) var(--offline-shell-easing); }
+}
 html[data-offline-sidebar="collapsed"] #offlineDesktopSidebarOpen { display:inline-flex; }
 html[data-offline-sidebar="collapsed"] #offlineDesktopPrivacyToggle { left:58px; }
 body.offline-workspace.offline-content-hidden > :not(#offlinePrivacyCover) { visibility:hidden !important; opacity:0 !important; pointer-events:none !important; }
@@ -279,9 +298,17 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
   body.offline-workspace .offline-topbar { position:absolute; display:flex !important; align-items:center; gap:8px; top:0; left:0; right:0; z-index:70; height:calc(56px + env(safe-area-inset-top)); padding:env(safe-area-inset-top) 10px 0; }
   :is(.offline-topbar,.offline-drawer-head) .mobile-topbar-button { display:flex; align-items:center; justify-content:center; flex:none; width:42px; min-width:42px; height:42px; min-height:42px; padding:8px; margin:0; border:0; background:transparent; }
   :is(.offline-topbar,.offline-drawer-head) .mobile-topbar-button svg { width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
-  body.offline-workspace .offline-sidebar.left { position:fixed !important; z-index:200; top:0; bottom:0; left:0; display:flex !important; width:min(320px,88vw) !important; height:100dvh !important; max-height:100dvh !important; padding:12px !important; visibility:hidden; transform:translateX(-100%) !important; transition:transform .2s ease,visibility .2s ease; }
+  body.offline-workspace .offline-sidebar.left { position:fixed !important; z-index:200; top:0; bottom:0; left:0; display:flex !important; width:min(320px,88vw) !important; height:100dvh !important; max-height:100dvh !important; padding:12px !important; visibility:hidden; transform:translateX(-100%) !important; }
   body.offline-workspace.offline-nav-open .offline-sidebar.left { visibility:visible; transform:translateX(0) !important; }
-  body.offline-workspace .offline-nav-backdrop { position:fixed; z-index:190; inset:0; display:block; background:rgba(0,0,0,.46); }
+  body.offline-workspace.offline-shell-ready .offline-sidebar.left {
+    transition:transform var(--offline-shell-duration) var(--offline-shell-easing),
+      visibility 0s linear var(--offline-shell-duration) !important;
+  }
+  body.offline-workspace.offline-shell-ready.offline-nav-open .offline-sidebar.left { transition-delay:0s,0s !important; }
+  body.offline-workspace .offline-nav-backdrop { position:fixed; z-index:190; inset:0; display:block; background:rgba(0,0,0,.46); opacity:0; visibility:hidden; pointer-events:none; }
+  body.offline-workspace.offline-nav-open .offline-nav-backdrop { opacity:1; visibility:visible; pointer-events:auto; }
+  body.offline-workspace.offline-shell-ready .offline-nav-backdrop { transition:opacity var(--offline-shell-duration) var(--offline-shell-easing),visibility 0s linear var(--offline-shell-duration); }
+  body.offline-workspace.offline-shell-ready.offline-nav-open .offline-nav-backdrop { transition-delay:0s,0s; }
   .offline-drawer-head { display:flex; align-items:center; justify-content:space-between; min-height:42px; margin-bottom:14px; color:var(--text-primary); font-size:16px; font-weight:600; }
   .offline-drawer-actions { display:flex; align-items:center; flex:none; gap:8px; }
   .offline-sidebar-heading,.offline-drawer-head>span { font-size:14px; font-weight:650; }
@@ -313,7 +340,9 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
   .offline-search { width:100%; min-width:0; }
   .offline-card-grid { grid-template-columns:1fr; }
 }
-@media(prefers-reduced-motion:reduce) { body.offline-workspace .offline-sidebar.left { transition:none; } }
+@media(prefers-reduced-motion:reduce) {
+  body.offline-workspace.offline-shell-ready :is(.offline-layout,.offline-sidebar.left,.offline-main.center,#offlineDesktopPrivacyToggle,.offline-nav-backdrop) { transition:none !important; }
+}
 /* The online mobile shell positions its chat absolutely. Offline panels remain
    in normal flow so their scrollable area ends above the device safe area. */
 @media(max-width:1100px) {

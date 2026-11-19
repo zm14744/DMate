@@ -2,14 +2,17 @@
 'use strict';
 const assert = require('node:assert/strict');
 const {chromium} = require('playwright');
-const {installStorageProbe,records} = require('./offline-vault-browser-fixtures.cjs');
+const {installStorageProbe,records, revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const styleKeys = ['fontFamily','fontSize','fontWeight','lineHeight','color','backgroundColor',
   'borderTopWidth','borderTopStyle','borderTopColor','borderRadius','boxShadow','paddingTop','paddingRight'];
 const style = locator => locator.evaluate((node, keys) => Object.fromEntries(keys.map(key => [key,getComputedStyle(node)[key]])),styleKeys);
 const circle = locator => locator.evaluate(node => Object.fromEntries(['width','height','borderRadius','backgroundColor',
   'borderTopWidth','borderTopStyle','borderTopColor','appearance'].map(key => [key,getComputedStyle(node)[key]])));
-const ready = page => page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+const ready = async page => {
+  await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+  await revealInterface(page);
+};
 const settle = page => page.evaluate(async()=>{
   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   await Promise.all(document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity)

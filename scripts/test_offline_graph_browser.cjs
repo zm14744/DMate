@@ -3,6 +3,7 @@
  */
 'use strict';
 const assert = require('node:assert/strict');
+const { revealInterface } = require('./offline-vault-browser-fixtures.cjs');
 const { chromium } = require('playwright');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const mobile = page => page.viewportSize().width <= 760;
@@ -261,6 +262,7 @@ async function disconnectWorkerNetwork(browser, page) {
 
 async function openOfflineGraph(page) {
   await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+  await revealInterface(page);
   const toggle = page.locator(page.viewportSize().width <= 1100 ? '#offlineNavToggle' : '#offlineDesktopSidebarOpen');
   if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
   await page.locator('.offline-nav-item[data-panel="graph"]').click();
@@ -588,6 +590,7 @@ async function runCase(browser, width, theme) {
     });
     await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => navigator.serviceWorker.controller && document.documentElement.dataset.offlineReady === 'true');
+    await revealInterface(page);
     await openOfflineGraph(page);
     await inlineLayout(page);
     const available = await frame(page).locator('.graph-modal-card').evaluate(card => {

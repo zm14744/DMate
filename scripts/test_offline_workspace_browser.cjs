@@ -4,7 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
-const {installStorageProbe, records} = require('./offline-vault-browser-fixtures.cjs');
+const {installStorageProbe, records, revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const panels = ['graph', 'concepts', 'questions', 'mistakes', 'notes', 'drawing'];
 const iconReferences = { drawing: '#graphDrawingBtn svg', graph: '#knowledgeGraphBtn svg' };
@@ -44,6 +44,7 @@ async function navigate(page, panel) {
 
 async function ready(page, expectedPanel = 'graph') {
   await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+  await revealInterface(page);
   assert.equal(await page.locator('.offline-header,#networkStatus,#saveState').count(), 0,
     'The removed header, save-state label, and network status are absent from the DOM');
   assert.equal(await page.locator('#exportLocalData').count(), 0, 'The local-data export entry is removed');

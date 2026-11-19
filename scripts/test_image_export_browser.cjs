@@ -3,6 +3,7 @@
  */
 'use strict';
 const assert = require('node:assert/strict');
+const { revealInterface } = require('./offline-vault-browser-fixtures.cjs');
 const { chromium } = require('playwright');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const android = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36';
@@ -52,7 +53,10 @@ async function fixture(browser, { offline = false, width = 1440, ua, nativeBridg
   await page.route('**/auth/me', route => route.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify({ configured: true, authenticated: false }) }));
   await page.goto(baseURL + (offline ? '/offline' : ''), { waitUntil: 'networkidle' });
-  if (offline) await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+  if (offline) {
+    await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await revealInterface(page);
+  }
   else {
     await page.waitForFunction(() => typeof openKnowledgeGraph === 'function');
     await page.evaluate(() => openKnowledgeGraph());
@@ -213,6 +217,7 @@ async function disconnectedExport(browser) {
     await context.setOffline(true);
     await page.reload({ waitUntil: 'load' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await revealInterface(page);
     assert.equal(await page.evaluate(() => navigator.onLine), false);
     await smallModule(page);
     const downloading = page.waitForEvent('download');

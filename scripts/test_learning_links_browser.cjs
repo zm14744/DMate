@@ -4,6 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const {revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const concepts = require('../static/offline-content/concepts.zh-CN.json').concepts;
 const questions = require('../static/offline-content/questions.zh-CN.json').questions;
 const nodes = require('../static/offline-content/knowledge_graph.json').nodes;
@@ -290,6 +291,7 @@ async function richFooter(page, lang) {
 
 async function ready(page) {
   await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+  await revealInterface(page);
 }
 
 async function runCase(browser, width, height, theme) {
