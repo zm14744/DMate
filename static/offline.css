@@ -38,6 +38,9 @@ body.offline-workspace .offline-main.center { position:relative; display:flex !i
 .record-actions button { display:inline-flex; align-items:center; justify-content:center; gap:6px; }
 /* The notebook keeps the shared component's controls inside a page panel. */
 #notesPanel.offline-notebook { display:flex; flex-direction:column; height:auto; max-height:none; min-height:0; }
+@media(max-width:680px) {
+  #notesPanel.offline-notebook .dcn-sidebar { grid-template-rows:auto minmax(0,1fr); }
+}
 .offline-card,.question-detail,.concept-detail { min-width:0; border:1px solid var(--border-strong); border-radius:12px; background:var(--surface-1); color:var(--text-primary); }
 .offline-card h3 { margin:0 0 8px; color:var(--text-primary); font-size:15px; font-weight:600; }
 .offline-card p { margin:0; color:var(--text-secondary); font-size:14px; line-height:1.75; white-space:pre-wrap; overflow-wrap:anywhere; }
