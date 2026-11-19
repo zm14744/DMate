@@ -55,6 +55,7 @@ public final class MainActivity extends Activity {
     private static final int FILE_CHOOSER_REQUEST = 1001;
     private static final int LEGACY_SAVE_PERMISSION_REQUEST = 1002;
     private static final int MICROPHONE_PERMISSION_REQUEST = 1003;
+    private static final int BACKUP_SAVE_REQUEST = 1004;
     private static final int MAX_PNG_BYTES = 20 * 1024 * 1024;
     private static final byte[] PNG_MAGIC = {(byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
     private static final String HOME_URL = BuildConfig.DMATE_URL;
@@ -73,9 +74,11 @@ public final class MainActivity extends Activity {
     private ValueCallback<Uri[]> pendingFileCallback;
     private boolean filePickerTriedDocuments;
     private boolean filePickerMultiple;
+    private String[] filePickerMimeTypes = new String[] {"image/*"};
     private long filePickerLaunchedAt;
     private final ExecutorService imageSaver = Executors.newSingleThreadExecutor();
     private PendingSave pendingLegacySave;
+    private PendingBackupSave pendingBackupSave;
     private PermissionRequest pendingMicrophoneRequest;
     // Do not attach a new WebView request to an older Android permission dialog.
     private boolean microphonePermissionInFlight;
@@ -89,6 +92,19 @@ public final class MainActivity extends Activity {
             this.id = id;
             this.filename = filename;
             this.png = png;
+            this.reply = reply;
+        }
+    }
+
+    private static final class PendingBackupSave {
+        final String id;
+        final String filename;
+        final JavaScriptReplyProxy reply;
+        volatile boolean cancelled;
+        byte[] bytes;
+        PendingBackupSave(String id, String filename, JavaScriptReplyProxy reply) {
+            this.id = id;
+            this.filename = filename;
             this.reply = reply;
         }
     }
@@ -219,6 +235,7 @@ public final class MainActivity extends Activity {
         cookies.setAcceptThirdPartyCookies(webView, false);
 
         installGallerySaveBridge();
+        installBackupSaveBridge();
         installLanguageBridge();
         offlineVaultBridge = OfflineVaultBridge.install(this, webView);
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
@@ -331,6 +348,134 @@ public final class MainActivity extends Activity {
         Uri page = Uri.parse(webView.getUrl());
         return "https".equalsIgnoreCase(page.getScheme()) &&
             HOME_HOST.equalsIgnoreCase(page.getHost());
+    }
+
+    /** ZIP bytes remain in memory until the user chooses their destination. */
+    private void installBackupSaveBridge() {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) return;
+        WebViewCompat.addWebMessageListener(webView, "DMateFileSave",
+            Collections.singleton("https://" + HOME_HOST),
+            (view, message, sourceOrigin, isMainFrame, reply) -> {
+                if (!isMainFrame || view != webView || !isTrustedMicrophoneOrigin(sourceOrigin)
+                    || !isTrustedPage() || !isTrustedMicrophoneOrigin(Uri.parse(webView.getUrl()))
+                    || !canSaveToGallery() || message.getType() != WebMessageCompat.TYPE_STRING) return;
+                String id = "";
+                try {
+                    String raw = message.getData();
+                    if (raw == null || raw.length() > BackupFiles.MAX_ZIP_BYTES * 4 / 3 + 4096)
+                        throw new IOException("ZIP request exceeds the size limit");
+                    JSONObject request = new JSONObject(raw);
+                    id = request.optString("id", "");
+                    String encoded = request.optString("data", "");
+                    if (id.isEmpty() || id.length() > 128 || !"application/zip".equals(request.optString("mime"))
+                        || encoded.isEmpty() || encoded.length() > BackupFiles.MAX_ZIP_BYTES * 4 / 3 + 1024)
+                        throw new IOException("Invalid ZIP save request");
+                    if (pendingBackupSave != null) {
+                        sendBackupReply(reply, id, false, false,
+                            nativeText("请先完成当前文件保存", "Finish the current file save first."));
+                        return;
+                    }
+                    PendingBackupSave save = new PendingBackupSave(id,
+                        BackupFiles.zipFilename(request.optString("name", "DMate.zip")), reply);
+                    pendingBackupSave = save;
+                    try {
+                        imageSaver.execute(() -> {
+                            if (save.cancelled) return;
+                            try {
+                                byte[] bytes = Base64.decode(encoded, Base64.DEFAULT);
+                                if (!BackupFiles.isZip(bytes)) throw new IOException("Invalid ZIP bytes");
+                                runOnUiThread(() -> beginBackupSave(save, bytes));
+                            } catch (Exception error) {
+                                runOnUiThread(() -> finishBackupSave(save, false, false,
+                                    nativeText("备份包数据无效或文件过大", "The ZIP data is invalid or too large.")));
+                            }
+                        });
+                    } catch (RejectedExecutionException error) {
+                        finishBackupSave(save, false, false,
+                            nativeText("文件保存暂不可用，请重试", "File saving is unavailable. Try again."));
+                    }
+                } catch (Exception error) {
+                    sendBackupReply(reply, id, false, false,
+                        nativeText("无法读取 ZIP 保存请求", "The ZIP save request could not be read."));
+                }
+            });
+    }
+
+    private void beginBackupSave(PendingBackupSave save, byte[] bytes) {
+        if (pendingBackupSave != save || save.cancelled || !canSaveToGallery()) return;
+        save.bytes = bytes;
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/zip");
+        intent.putExtra(Intent.EXTRA_TITLE, save.filename);
+        intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        try { startActivityForResult(intent, BACKUP_SAVE_REQUEST); }
+        catch (ActivityNotFoundException | SecurityException error) {
+            finishBackupSave(save, false, false,
+                nativeText("无法打开系统文件保存窗口", "The system file save dialog could not be opened."));
+        }
+    }
+
+    private void sendBackupReply(JavaScriptReplyProxy reply, String id, boolean ok, boolean cancelled, String message) {
+        try {
+            JSONObject response = new JSONObject();
+            response.put("type", "dmate:file-save");
+            response.put("id", id);
+            response.put("ok", ok);
+            response.put("cancelled", cancelled);
+            response.put("message", message);
+            reply.postMessage(response.toString());
+        } catch (Exception ignored) { /* A navigated document cannot receive the old result. */ }
+    }
+
+    private void finishBackupSave(PendingBackupSave save, boolean ok, boolean cancelled, String message) {
+        if (pendingBackupSave != save) return;
+        pendingBackupSave = null;
+        save.cancelled = true;
+        save.bytes = null;
+        sendBackupReply(save.reply, save.id, ok, cancelled, message);
+    }
+
+    private void cancelBackupSave() {
+        PendingBackupSave save = pendingBackupSave;
+        if (save != null) finishBackupSave(save, false, true,
+            nativeText("已取消文件保存", "File save cancelled."));
+    }
+
+    private void writeBackupResult(int resultCode, Intent data) {
+        PendingBackupSave save = pendingBackupSave;
+        if (save == null) return;
+        Uri uri = data == null ? null : data.getData();
+        if (resultCode != RESULT_OK || uri == null) {
+            finishBackupSave(save, false, true, nativeText("已取消文件保存", "File save cancelled."));
+            return;
+        }
+        if (!"content".equalsIgnoreCase(uri.getScheme()) || save.bytes == null) {
+            finishBackupSave(save, false, false,
+                nativeText("无法写入所选文件", "The selected file cannot be written."));
+            return;
+        }
+        byte[] bytes = save.bytes;
+        try {
+            imageSaver.execute(() -> {
+                if (save.cancelled) return;
+                try {
+                    try (OutputStream out = getContentResolver().openOutputStream(uri, "w")) {
+                        if (out == null) throw new IOException("No output stream");
+                        out.write(bytes);
+                        out.flush();
+                    }
+                    runOnUiThread(() -> finishBackupSave(save, true, false,
+                        nativeText("ZIP 备份已保存", "ZIP backup saved.")));
+                } catch (Exception error) {
+                    runOnUiThread(() -> finishBackupSave(save, false, false,
+                        nativeText("文件保存失败，请检查可用空间后重试", "File save failed. Check the available space and retry.")));
+                }
+            });
+        } catch (RejectedExecutionException error) {
+            finishBackupSave(save, false, false,
+                nativeText("文件保存暂不可用，请重试", "File saving is unavailable. Try again."));
+        }
     }
 
     private boolean isTrustedMicrophoneOrigin(Uri origin) {
@@ -526,6 +671,7 @@ public final class MainActivity extends Activity {
         @Override
         public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
             if (offlineVaultBridge != null) offlineVaultBridge.navigated();
+            cancelBackupSave();
             cancelPendingMicrophoneRequest();
             super.onPageStarted(view, url, favicon);
         }
@@ -581,10 +727,12 @@ public final class MainActivity extends Activity {
     private Intent createImagePickerIntent(boolean documents, boolean multiple) {
         Intent intent = new Intent(documents ? Intent.ACTION_OPEN_DOCUMENT : Intent.ACTION_GET_CONTENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("image/*");
+        intent.setType(filePickerMimeTypes.length == 1 ? filePickerMimeTypes[0] : "*/*");
+        if (filePickerMimeTypes.length > 1) intent.putExtra(Intent.EXTRA_MIME_TYPES, filePickerMimeTypes);
         intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, multiple);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        return Intent.createChooser(intent, nativeText("选择图片", "Choose images"));
+        return Intent.createChooser(intent, BackupFiles.imagesOnly(filePickerMimeTypes)
+            ? nativeText("选择图片", "Choose images") : nativeText("选择文件", "Choose a file"));
     }
 
     private boolean launchImagePicker(boolean documents) {
@@ -614,11 +762,12 @@ public final class MainActivity extends Activity {
             // ACTION_OPEN_DOCUMENT UI. Prefer the content chooser, and allow one
             // document-picker retry when an OEM picker exits almost instantly.
             filePickerMultiple = fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE;
+            filePickerMimeTypes = BackupFiles.acceptMimeTypes(fileChooserParams.getAcceptTypes());
             filePickerTriedDocuments = false;
             if (!launchImagePicker(false) && !launchImagePicker(true)) {
                 pendingFileCallback = null;
                 filePathCallback.onReceiveValue(null);
-                Toast.makeText(MainActivity.this, nativeText("无法打开系统图片选择器", "Could not open the system image picker."), Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, nativeText("无法打开系统文件选择器", "Could not open the system file picker."), Toast.LENGTH_SHORT).show();
             }
             return true;
         }
@@ -699,6 +848,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == BACKUP_SAVE_REQUEST) { writeBackupResult(resultCode, data); return; }
         if (requestCode != FILE_CHOOSER_REQUEST || pendingFileCallback == null) return;
 
         // An immediate empty result often means the OEM chooser failed to
@@ -761,6 +911,7 @@ public final class MainActivity extends Activity {
     protected void onDestroy() {
         if (isFinishing()) GuestSession.end(guestSessionToken);
         cancelPendingMicrophoneRequest();
+        cancelBackupSave();
         if (pendingFileCallback != null) {
             pendingFileCallback.onReceiveValue(null);
             pendingFileCallback = null;

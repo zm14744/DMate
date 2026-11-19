@@ -5,6 +5,9 @@ on:
     paths:
       - 'android/app/src/main/java/app/dmate/client/GuestSession.java'
       - 'android/app/src/main/java/app/dmate/client/MainActivity.java'
+      - 'android/app/src/main/java/app/dmate/client/BackupFiles.java'
+      - 'scripts/native/BackupFilesTest.java'
+      - 'scripts/test_native_backup_files.py'
       - 'desktop/src-tauri/src/guest-session.js'
       - 'desktop/src-tauri/src/guest_session.rs'
       - 'desktop/src-tauri/src/main.rs'
@@ -15,6 +18,9 @@ on:
     paths:
       - 'android/app/src/main/java/app/dmate/client/GuestSession.java'
       - 'android/app/src/main/java/app/dmate/client/MainActivity.java'
+      - 'android/app/src/main/java/app/dmate/client/BackupFiles.java'
+      - 'scripts/native/BackupFilesTest.java'
+      - 'scripts/test_native_backup_files.py'
       - 'desktop/src-tauri/src/guest-session.js'
       - 'desktop/src-tauri/src/guest_session.rs'
       - 'desktop/src-tauri/src/main.rs'
@@ -43,3 +49,5 @@ jobs:
           java-version: '21'
       - name: Verify native launch, refresh, origin and frame boundaries
         run: python scripts/test_native_guest_session.py -v
+      - name: Verify ZIP save metadata and file picker types
+        run: python scripts/test_native_backup_files.py -v

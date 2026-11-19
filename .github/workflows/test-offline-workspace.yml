@@ -55,6 +55,8 @@ on:
       - 'scripts/test_offline_vault_workspace_browser.cjs'
       - 'scripts/test_offline_interface_lifecycle_browser.cjs'
       - 'scripts/test_offline_privacy_motion_browser.cjs'
+      - 'scripts/test_offline_backup_browser.cjs'
+      - 'scripts/test_online_backup_browser.cjs'
       - 'scripts/test_textarea_autogrow_browser.cjs'
       - 'scripts/offline-vault-browser-fixtures.cjs'
       - 'scripts/test_drawing_async_persistence_browser.cjs'
@@ -151,6 +153,8 @@ on:
       - 'scripts/test_offline_vault_workspace_browser.cjs'
       - 'scripts/test_offline_interface_lifecycle_browser.cjs'
       - 'scripts/test_offline_privacy_motion_browser.cjs'
+      - 'scripts/test_offline_backup_browser.cjs'
+      - 'scripts/test_online_backup_browser.cjs'
       - 'scripts/test_textarea_autogrow_browser.cjs'
       - 'scripts/offline-vault-browser-fixtures.cjs'
       - 'scripts/test_drawing_async_persistence_browser.cjs'
@@ -231,6 +235,9 @@ jobs:
           node --check static/offline-shell.js
           node --check static/offline-interface-state.js
           node --check static/offline-privacy-motion.js
+          node --check static/offline-backup.js
+          node --check static/backup-download.js
+          node --check static/online-backup.js
           node --check static/offline-appearance.js
           node --check static/offline-knowledge-graph.js
           node --check static/knowledge-graph-labels.js
@@ -264,6 +271,8 @@ jobs:
           node --check scripts/test_offline_vault_workspace_browser.cjs
           node --check scripts/test_offline_interface_lifecycle_browser.cjs
           node --check scripts/test_offline_privacy_motion_browser.cjs
+          node --check scripts/test_offline_backup_browser.cjs
+          node --check scripts/test_online_backup_browser.cjs
           node --check scripts/test_textarea_autogrow_browser.cjs
           node --check scripts/offline-vault-browser-fixtures.cjs
           node --check scripts/test_drawing_async_persistence_browser.cjs
@@ -397,6 +406,8 @@ jobs:
           node scripts/test_offline_vault_workspace_browser.cjs
           node scripts/test_offline_interface_lifecycle_browser.cjs
           node scripts/test_offline_privacy_motion_browser.cjs
+          node scripts/test_offline_backup_browser.cjs
+          node scripts/test_online_backup_browser.cjs
           node scripts/test_textarea_autogrow_browser.cjs
           node scripts/test_drawing_async_persistence_browser.cjs
           node scripts/test_service_worker_cache_browser.cjs

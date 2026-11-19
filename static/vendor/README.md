@@ -9,6 +9,7 @@
 | DOMPurify | 3.2.6 | `dompurify-3.2.6/purify.min.js` |
 | html2canvas | 1.4.1 | `html2canvas-1.4.1/html2canvas.min.js` |
 | jsPDF | 2.5.2 | `jspdf-2.5.2/jspdf.umd.min.js` |
+| fflate | 0.8.2 | `fflate-0.8.2/fflate.min.js` |
 | Viz.js / Graphviz | 3.31.0 / 16.1.0 | `viz-js-3.31.0/viz-global.js` |
 | Viz.js / Graphviz | 3.31.0 / 16.1.0 | `viz-js-3.31.0/viz-global.js` |
 

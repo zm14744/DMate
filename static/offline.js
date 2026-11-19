@@ -13,7 +13,7 @@
     librarySelections: {concepts:new Set(), questions:new Set()}, selectionQueue: Promise.resolve(),
     selectedNoteId:null, noteQuery:"", noteRows:[], noteSaveQueue:Promise.resolve(),
     noteDrafts:new Map(), noteDeletePending:null,
-    appearanceQueue: Promise.resolve(), viewSaveQueue:Promise.resolve(), viewSnapshot:""
+    appearanceQueue: Promise.resolve(), viewSaveQueue:Promise.resolve(), viewSnapshot:"", transferBusy:false
   };
   const panelMeta = {
     mistakes: ["错题本", "在本机查看、整理和复习已保存的错题。"],
@@ -67,7 +67,10 @@
       LEGACY_BLOCKED:["请关闭旧版离线页面后重试", "Close older offline pages and try again"],
       QUOTA_EXCEEDED:["设备存储空间不足，当前编辑仍保留，请释放空间后重试", "Storage is full; your draft is retained. Free some space and retry"],
       TOO_LARGE:["内容超过加密存储上限，当前内容与原数据仍保留", "This content exceeds the encrypted storage limit; current and original data are retained"],
-      CLOSED:["账号状态已变化，请重新打开离线页面", "The account changed; reopen the offline workspace"]
+      CLOSED:["账号状态已变化，请重新打开离线页面", "The account changed; reopen the offline workspace"],
+      BACKUP_INVALID:["备份包损坏或格式不正确，原数据未改动", "The backup is damaged or invalid; existing data is unchanged"],
+      BACKUP_UNSUPPORTED:["无法读取此版本的备份包，请更新应用后重试", "Update the app to read this backup version"],
+      BACKUP_TOO_LARGE:["备份内容超过大小或绘图库数量上限，原数据未改动", "The backup exceeds the size or drawing limit; existing data is unchanged"]
     };
     const text = messages[error?.code];
     return text ? tr(...text) : error?.message || tr("离线工作区初始化失败", "The offline workspace could not be initialized");
@@ -1081,6 +1084,156 @@
     window.location.assign("/");
   }
 
+  async function flushTransferDrafts() {
+    if (!await flushNoteDrafts()) throw new Error(tr("笔记尚未保存，请重试后再导入或导出", "Save the note before importing or exporting"));
+    if (state.drawingController && !await state.drawingController.flush())
+      throw new Error(tr("绘图尚未保存，请重试后再导入或导出", "Save the drawing before importing or exporting"));
+    requireWorkspace();
+  }
+
+  async function liveBackupRows(store, metadataId) {
+    const [rows, metadata] = await Promise.all([all(store),transaction("settings","readonly",os => os.get(metadataId))]);
+    return rows.filter(row => !metadata?.deleted?.[row.id] || noteTime(metadata.deleted[row.id]) < noteTime(row.updatedAt));
+  }
+
+  async function exportBackup() {
+    await flushTransferDrafts();
+    const [notes,mistakes,saved] = await Promise.all([
+      liveBackupRows("notes","notebook-deletions"),liveBackupRows("mistakes","mistake-deletions"),
+      transaction("drawings","readonly",os => os.get("gallery"))
+    ]);
+    const drawings = saved?.gallery ? JSON.parse(saved.gallery) : null;
+    const blob = await window.DMateOfflineBackup.create({notes,mistakes,drawings});
+    requireWorkspace();
+    const filename = "DMate-" + new Date().toISOString().replace(/[:.]/g,"-") + ".zip";
+    if (!await window.DMateBackupDownload.save(blob,filename)) return;
+    toast(tr("已导出 ZIP 备份", "ZIP backup exported"));
+  }
+
+  async function planBackupImport(payload) {
+    const operations = [];
+    const counts = {notes:0,mistakes:0,drawings:0};
+    for (const [store,metadataId] of [["notes","notebook-deletions"],["mistakes","mistake-deletions"]]) {
+      const [rows,metadata] = await Promise.all([all(store),transaction("settings","readonly",os => os.get(metadataId))]);
+      const existing = new Map(rows.map(row => [row.id,row]));
+      for (const incoming of payload[store]) {
+        let id = incoming.id;
+        if (existing.has(id) && await sameBackupValue(existing.get(id),incoming)
+          && (!metadata?.deleted?.[id] || noteTime(metadata.deleted[id]) < noteTime(incoming.updatedAt))) continue;
+        // Conflicting edits and previously deleted records get stable copy IDs.
+        // A repeated restore finds the same copy instead of creating duplicates.
+        if (existing.has(id) || metadata?.deleted?.[id]) id = "restored-" + await window.DMateOfflineBackup.fingerprint(incoming);
+        while (metadata?.deleted?.[id] || existing.has(id) && !await sameBackupValue(existing.get(id),{...incoming,id})) {
+          id = "restored-" + await window.DMateOfflineBackup.fingerprint({record:incoming,previous:id,
+            deletedAt:metadata?.deleted?.[id] || null,local:existing.get(id) || null});
+        }
+        const value = {...incoming,id};
+        if (existing.has(id)) continue;
+        existing.set(id,value);
+        operations.push({type:"put",store,value}); counts[store]++;
+      }
+    }
+    if (payload.drawings) {
+      const saved = await transaction("drawings","readonly",os => os.get("gallery"));
+      const local = saved?.gallery ? JSON.parse(saved.gallery) : null;
+      const pages = local?.pages?.slice() || [], existing = new Map(pages.map(page => [page.id,page]));
+      for (const page of payload.drawings.pages) {
+        let id = page.id;
+        if (existing.has(id) && await sameBackupValue(existing.get(id),page)) continue;
+        if (existing.has(id)) id = "restored-" + await window.DMateOfflineBackup.fingerprint(page);
+        while (existing.has(id) && !await sameBackupValue(existing.get(id),{...page,id})) {
+          id = "restored-" + await window.DMateOfflineBackup.fingerprint({page,previous:id,local:existing.get(id)});
+        }
+        if (existing.has(id)) continue;
+        const value = {...page,id};
+        existing.set(id,value); pages.push(value); counts.drawings += value.document.graphs.length;
+      }
+      if (pages.reduce((count,page) => count+page.document.graphs.length,0) > 50)
+        throw Object.assign(new Error(),{code:"BACKUP_TOO_LARGE"});
+      if (counts.drawings) operations.push({type:"put",store:"drawings",value:{...saved,id:"gallery",updatedAt:stamp(),
+        gallery:JSON.stringify({...payload.drawings,...local,pages})}});
+    }
+    return {operations,counts};
+  }
+
+  async function sameBackupValue(left,right) {
+    return await window.DMateOfflineBackup.fingerprint(left) === await window.DMateOfflineBackup.fingerprint(right);
+  }
+
+  function transferBytes(value) {
+    let binary = 0;
+    const json = JSON.stringify(value,(_key,item) => {
+      if (item instanceof Blob) binary += item.size;
+      else if (item instanceof ArrayBuffer || ArrayBuffer.isView(item)) binary += item.byteLength;
+      return item;
+    });
+    return new TextEncoder().encode(json).length+binary+4096;
+  }
+
+  async function importBackup(file) {
+    // Decode and validate the complete package before writing any record.
+    const payload = await window.DMateOfflineBackup.read(file);
+    requireWorkspace();
+    await flushTransferDrafts();
+    const {operations,counts} = await planBackupImport(payload);
+    if (!operations.length) return toast(tr("备份内容已存在，无需重复导入", "This backup is already present"));
+    const limits = window.DMateOfflineVault.limits;
+    const chunks = []; let chunk = [], bytes = 0;
+    for (const operation of operations) {
+      const size = transferBytes(operation.value);
+      if (size > limits.recordBytes) throw Object.assign(new Error(),{code:"BACKUP_TOO_LARGE"});
+      if (chunk.length && (chunk.length >= limits.batchRecords || bytes+size > limits.batchBytes/2)) {
+        chunks.push(chunk); chunk = []; bytes = 0;
+      }
+      chunk.push(operation); bytes += size;
+    }
+    if (chunk.length) chunks.push(chunk);
+    const mounted = Boolean(state.drawingController);
+    state.drawingController?.destroy(); state.drawingController = null;
+    let committed = 0;
+    try {
+      for (const batch of chunks) {
+        requireWorkspace();
+        await state.storage.batch(batch);
+        committed += batch.length;
+      }
+      requireWorkspace();
+      toast(tr("导入完成："+counts.notes+" 个概念、"+counts.mistakes+" 道错题、"+counts.drawings+" 幅绘图",
+        "Imported "+counts.notes+" concepts, "+counts.mistakes+" mistakes and "+counts.drawings+" drawings"));
+    } catch (error) {
+      if (!committed) throw error;
+      throw new Error(tr("导入未完成，已恢复 "+committed+" 条记录，可重试；本机原有内容已保留。", "Import incomplete; "+committed+" records were restored. Retry to finish; existing content is retained.")+" "+storageError(error));
+    } finally {
+      if (workspaceCurrent()) {
+        if (state.panel === "notes") await renderNotes();
+        if (state.panel === "mistakes") await renderMistakes();
+        if (mounted && state.panel === "drawing") await mountDrawing();
+      }
+    }
+  }
+
+  async function runDataTransfer(action) {
+    if (state.transferBusy || !state.ready) return;
+    state.transferBusy = true;
+    const layout = document.querySelector(".offline-layout"), wasInert = layout.inert, focus = document.activeElement;
+    const controls = [$("offlineImportDataBtn"),$("offlineExportDataBtn")];
+    for (const control of controls) { control.disabled = true; control.setAttribute("aria-busy","true"); }
+    layout.inert = true;
+    try {
+      requireWorkspace();
+      if (!window.DMateOfflineBackup) throw new Error(tr("备份组件尚未加载，请刷新后重试", "Reload to load the backup component"));
+      await action();
+    } catch (error) { if (workspaceCurrent()) toast(storageError(error)); }
+    finally {
+      state.transferBusy = false;
+      if (workspaceCurrent()) {
+        layout.inert = wasInert;
+        for (const control of controls) { control.disabled = !state.ready; control.removeAttribute("aria-busy"); }
+        if (focus?.isConnected && focus.getClientRects().length) focus.focus({preventScroll:true});
+      }
+    }
+  }
+
   async function saveAppearance(changes) {
     const saved = await transaction("settings", "readonly", os => os.get("appearance"));
     const patch = changes?.settings || changes || {};
@@ -1135,7 +1288,17 @@
       "待订正":"Pending correction", "已完成订正":"Corrected", "加入错题本":"Add to mistake book",
       "查看答案":"View answer", "查看解析":"View explanation", "整题涉及":"Related content"
     });
-    document.querySelectorAll(".offline-nav-item").forEach(item => item.addEventListener("click", () => {
+    $("offlineExportDataBtn").addEventListener("click", () => { void runDataTransfer(exportBackup); });
+    $("offlineImportDataBtn").addEventListener("click", () => {
+      if (state.transferBusy || !state.ready) return;
+      $("offlineImportDataFile").value = "";
+      $("offlineImportDataFile").click();
+    });
+    $("offlineImportDataFile").addEventListener("change", event => {
+      const file = event.target.files?.[0];
+      if (file) void runDataTransfer(() => importBackup(file));
+    });
+    document.querySelectorAll(".offline-nav-item[data-panel]").forEach(item => item.addEventListener("click", () => {
       void Promise.resolve(switchPanel(item.dataset.panel)).catch(error => toast(storageError(error)));
     }));
     $("questionCategory").addEventListener("change", event => { state.questionCategory=event.target.value; renderQuestions(); });

@@ -68,7 +68,9 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       '/static/modal-chrome.css', '/static/modal-text.js?v=53', '/static/delete-confirm.js', '/static/guest-session.js?v=53', '/static/offline-interface-state.js?v=1', '/static/language.js?v=59',
       '/static/graph-editor-format.js?v=32', '/static/language-catalog.js?v=64', '/static/offline-privacy-motion.js?v=2', '/static/offline-shell.js?v=39',
       '/static/offline-vault.js?v=2', '/static/offline-handoff.js?v=1', '/static/offline-storage.js?v=1',
-      '/static/offline.js?v=63', '/static/offline-knowledge-graph.js?v=60',
+      '/static/vendor/fflate-0.8.2/fflate.min.js', '/static/offline-backup.js?v=1',
+      '/static/backup-download.js?v=1',
+      '/static/offline.js?v=64', '/static/offline-knowledge-graph.js?v=60',
       '/static/ui-tooltip.js?v=49',
       '/static/offline-knowledge-graph.css?v=54', '/static/offline-entry.js?v=47',
       '/static/search-controls.css?v=27', '/static/search-controls.js?v=27',
@@ -84,7 +86,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     // Simulate the pinned stylesheet left by the previous offline shell.
     await page.goto(new URL('/health', baseURL).href);
     await page.evaluate(async () => {
-      const cache = await caches.open('dmate-offline-shell-v90');
+      const cache = await caches.open('dmate-offline-shell-v91');
       await cache.put('/static/button-themes.css?v=54', new Response('/* obsolete graph navigation button styles */'));
     });
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });
@@ -102,7 +104,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       if (canonical.length !== 1) throw new Error('Expected exactly one precached shared stylesheet');
       return { name: names[0], canonical: canonical[0].url };
     }, assetPath);
-    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 91, 'The automatic intro needs the refreshed offline cache');
+    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 92, 'ZIP backup needs the refreshed offline cache');
     assert.equal((await fetchAsset(page, current.canonical)).text, networkCSS,
       'The refreshed shell loads current frameless controls instead of the obsolete stylesheet');
     for (const asset of sharedAssets) {
@@ -183,6 +185,13 @@ async function disconnectWorkerNetwork(browser, workerURL) {
         && visible.every(line => Number.parseFloat(line.getAttribute('stroke-dasharray')) >= line.getTotalLength()-0.05);
     });
     console.log('PASS a fully offline reload completes the precached intro and automatically enters the workspace');
+    const downloadPending = page.waitForEvent('download');
+    await page.locator('#offlineExportDataBtn').click();
+    const download = await downloadPending;
+    assert.match(download.suggestedFilename(),/^DMate-.*\.zip$/);
+    const archive = await require('node:fs/promises').readFile(await download.path());
+    assert.equal(archive.subarray(0,4).toString('hex'),'504b0304','The offline export is a real ZIP archive');
+    console.log('PASS fully disconnected offline mode exports a ZIP using only precached backup resources');
   } catch (error) {
     console.error('Worker cache context:', await page.evaluate(async () => ({
       controller: navigator.serviceWorker.controller?.scriptURL,

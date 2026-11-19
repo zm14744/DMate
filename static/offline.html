@@ -84,8 +84,11 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/offline-vault.js?v=2"></script>
 <script defer src="/static/offline-handoff.js?v=1"></script>
 <script defer src="/static/offline-storage.js?v=1"></script>
+<script defer src="/static/vendor/fflate-0.8.2/fflate.min.js"></script>
+<script defer src="/static/offline-backup.js?v=1"></script>
+<script defer src="/static/backup-download.js?v=1"></script>
 <script defer src="/static/offline-entry.js?v=47"></script>
-<script defer src="/static/offline.js?v=63"></script>
+<script defer src="/static/offline.js?v=64"></script>
 </head>
 <body class="offline-workspace offline-content-hidden">
 <script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"light";</script>
@@ -268,6 +271,8 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
     </section>
   </main>
 </div>
+
+<input id="offlineImportDataFile" type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden>
 
 <dialog id="offlinePrivacyCover" aria-label="DMate 防窥界面" tabindex="-1">
   <button id="offlinePrivacyRestore" class="offline-icon-button offline-privacy-toggle" type="button" aria-label="显示界面" autofocus></button>
