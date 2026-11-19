@@ -61,7 +61,7 @@
       return {...edge,forward,backward};
     });
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    let raf = 0;
+    let raf = 0, resolvePlayback = null;
     function showPart(line,visible,length) {
       if (visible < 0.15) { line.style.display = 'none'; return; }
       line.style.display = '';
@@ -84,10 +84,14 @@
       cancelAnimationFrame(raf);
       raf = 0;
       render(maxDistance+1);
+      const resolve = resolvePlayback;
+      resolvePlayback = null;
+      resolve?.();
     }
     function play() {
       finish();
-      if (!cover.open || document.hidden || reducedMotion.matches) return;
+      const completed = new Promise(resolve => { resolvePlayback = resolve; });
+      if (!cover.open || document.hidden || reducedMotion.matches) { finish(); return completed; }
       render(0);
       let start = null;
       function tick(now) {
@@ -95,10 +99,12 @@
         if (!cover.open || document.hidden || reducedMotion.matches) { finish(); return; }
         if (start === null) start = now;
         const progress = clamp((now-start)/740,0,1);
-        render(maxDistance*(1-Math.pow(1-progress,1.65))+(progress === 1 ? 1 : 0));
-        if (progress < 1) raf = requestAnimationFrame(tick);
+        if (progress === 1) { finish(); return; }
+        render(maxDistance*(1-Math.pow(1-progress,1.65)));
+        raf = requestAnimationFrame(tick);
       }
       raf = requestAnimationFrame(tick);
+      return completed;
     }
     finish();
     mark.append(svg);

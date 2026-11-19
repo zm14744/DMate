@@ -66,7 +66,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       '/static/concept-notebook.css?v=3', '/static/textarea-autosize.css?v=1', '/static/textarea-autosize.js?v=1',
       '/static/drawing-workspace.css?v=52', '/static/graph-editor.js?v=53', '/static/graph-editor-overlay.js?v=39', '/static/drawing-workspace.js?v=56', '/static/drawing-export.js?v=39',
       '/static/modal-chrome.css', '/static/modal-text.js?v=53', '/static/delete-confirm.js', '/static/guest-session.js?v=53', '/static/offline-interface-state.js?v=1', '/static/language.js?v=59',
-      '/static/graph-editor-format.js?v=32', '/static/language-catalog.js?v=64', '/static/offline-privacy-motion.js?v=1', '/static/offline-shell.js?v=38',
+      '/static/graph-editor-format.js?v=32', '/static/language-catalog.js?v=64', '/static/offline-privacy-motion.js?v=2', '/static/offline-shell.js?v=39',
       '/static/offline-vault.js?v=2', '/static/offline-handoff.js?v=1', '/static/offline-storage.js?v=1',
       '/static/offline.js?v=63', '/static/offline-knowledge-graph.js?v=60',
       '/static/ui-tooltip.js?v=49',
@@ -84,7 +84,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     // Simulate the pinned stylesheet left by the previous offline shell.
     await page.goto(new URL('/health', baseURL).href);
     await page.evaluate(async () => {
-      const cache = await caches.open('dmate-offline-shell-v89');
+      const cache = await caches.open('dmate-offline-shell-v90');
       await cache.put('/static/button-themes.css?v=54', new Response('/* obsolete graph navigation button styles */'));
     });
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });
@@ -102,7 +102,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       if (canonical.length !== 1) throw new Error('Expected exactly one precached shared stylesheet');
       return { name: names[0], canonical: canonical[0].url };
     }, assetPath);
-    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 90, 'The topology animation needs the refreshed offline cache');
+    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 91, 'The automatic intro needs the refreshed offline cache');
     assert.equal((await fetchAsset(page, current.canonical)).text, networkCSS,
       'The refreshed shell loads current frameless controls instead of the obsolete stylesheet');
     for (const asset of sharedAssets) {
@@ -179,10 +179,10 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       const cover = document.getElementById('offlinePrivacyCover');
       const lines = [...cover.querySelectorAll('.offline-privacy-mark-growth line')];
       const visible = lines.filter(line => getComputedStyle(line).display !== 'none');
-      return cover.open && lines.length === 42 && visible.length === 21
+      return !cover.open && lines.length === 42 && visible.length === 21
         && visible.every(line => Number.parseFloat(line.getAttribute('stroke-dasharray')) >= line.getTotalLength()-0.05);
     });
-    console.log('PASS a fully offline reload runs the precached topology animation and completes the logo');
+    console.log('PASS a fully offline reload completes the precached intro and automatically enters the workspace');
   } catch (error) {
     console.error('Worker cache context:', await page.evaluate(async () => ({
       controller: navigator.serviceWorker.controller?.scriptURL,

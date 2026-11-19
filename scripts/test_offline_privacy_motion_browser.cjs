@@ -5,7 +5,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const {chromium} = require('playwright');
-const {revealInterface} = require('./offline-vault-browser-fixtures.cjs');
+const {installStorageProbe,revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const launch = {headless:true, ...(process.env.CHROMIUM_EXECUTABLE_PATH
   ? {executablePath:process.env.CHROMIUM_EXECUTABLE_PATH} : {})};
@@ -24,7 +24,14 @@ async function installSamples(context) {
         return Math.min(Number.isFinite(dash) ? dash : line.getTotalLength(), line.getTotalLength());
       });
       const style = getComputedStyle(svg);
+      const shown = node => node && node.getClientRects().length && getComputedStyle(node).visibility === 'visible'
+        && getComputedStyle(node).display !== 'none' && Number(getComputedStyle(node).opacity) > 0;
+      const eye = document.getElementById('offlinePrivacyRestore');
       return {time:performance.now(), open:cover.open, lines:lines.length, visible:visible.length,
+        eyeVisible:Boolean(shown(eye)), ready:document.documentElement.dataset.offlineReady === 'true',
+        pending:document.documentElement.hasAttribute('data-offline-interface-pending'),
+        workspaceVisible:!cover.open && Boolean(shown(document.querySelector('.offline-layout'))),
+        panels:[...document.querySelectorAll('.offline-panel')].filter(shown).map(node => node.id),
         partial:visible.filter((line,i) => drawn[i] < line.getTotalLength() - 0.05).length,
         length:drawn.reduce((sum,n) => sum+n,0),
         painted:cover.open && style.visibility === 'visible' && style.display !== 'none'
@@ -32,21 +39,23 @@ async function installSamples(context) {
         signature:svg.innerHTML};
     };
     const frames = window.__privacyColdFrames = [];
-    let first;
+    let first, firstClosed;
     function sample() {
       const row = window.__privacyMotionSnapshot();
-      if (row?.open) {
+      if (row) {
         first ??= row.time;
         frames.push(row);
+        if (!row.open) firstClosed ??= row.time;
       }
-      if (first === undefined || performance.now()-first < 1200) requestAnimationFrame(sample);
+      if (first === undefined || ((firstClosed === undefined || performance.now()-firstClosed < 250)
+        && performance.now()-first < 6000)) requestAnimationFrame(sample);
       else window.__privacyColdSampleComplete = true;
     }
     requestAnimationFrame(sample);
   });
 }
 
-function assertGrowth(frames,label) {
+function assertGrowth(frames,label,settles=true) {
   const painted = frames.filter(frame => frame.painted);
   const partial = painted.filter(frame => frame.partial > 0 && frame.visible > 0);
   assert.ok(partial.length >= 3,label+': several painted frames contain growing edges');
@@ -54,13 +63,66 @@ function assertGrowth(frames,label) {
     label+': the visible drawing grows over time');
   for (let i=1;i<painted.length;i++) assert.ok(painted[i].length+0.1 >= painted[i-1].length,
     label+': growth does not jump back to an earlier drawing');
-  const end = painted.at(-1);
+  const end = frames.at(-1);
   assert.equal(end.lines,42,label+': the original 21 edges retain both propagation directions');
   assert.equal(end.visible,21,label+': the final logo closes every original edge once');
   assert.equal(end.partial,0,label+': the final logo has no incomplete edges');
-  const settled = painted.filter(frame => frame.time-end.time > -200);
-  assert.ok(settled.length >= 2,label+': the completed logo actually paints');
-  assert.equal(new Set(settled.map(frame => frame.signature)).size,1,label+': completed logo stays still');
+  if (settles) {
+    const settled = painted.filter(frame => frame.time-end.time > -200);
+    assert.ok(settled.length >= 2,label+': the completed logo actually paints');
+    assert.equal(new Set(settled.map(frame => frame.signature)).size,1,label+': completed logo stays still');
+  }
+}
+
+function assertIntro(frames,label,requiresGrowth=true) {
+  const painted = frames.filter(frame => frame.painted);
+  if (requiresGrowth) assert.ok(painted.length >= 3,label+': the automatic introduction paints before entering');
+  assert.ok(painted.every(frame => !frame.eyeVisible),label+': autoplay has no eye button');
+  assert.equal(frames.at(-1).open,false,label+': playback enters automatically');
+  const revealed = frames.filter(frame => frame.workspaceVisible);
+  assert.ok(revealed.length > 1,label+': the workspace is actually painted after playback');
+  assert.ok(revealed.every(frame => frame.ready && !frame.pending),label+': reveal waits for restored content');
+}
+
+async function assertStartupGate(browser,reducedMotion) {
+  const context = await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion});
+  let release;
+  let hold = false;
+  const held = new Promise(resolve => {release = resolve;});
+  try {
+    await installSamples(context);
+    await installStorageProbe(context);
+    await context.route('**/static/offline-content/concepts.zh-CN.json*',async route => {
+      if (hold) await held;
+      await route.continue();
+    });
+    const {page,errors} = await enter(context);
+    await page.locator('#offlineNavToggle').click();
+    await page.locator('.offline-nav-item[data-panel="notes"]').click();
+    await page.waitForFunction(async () => (await __offlineTestStore.get('settings','view'))?.panel === 'notes');
+    hold = true;
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(() => {
+      const snapshot = window.__privacyMotionSnapshot?.();
+      return snapshot?.open && snapshot.visible === 21 && snapshot.partial === 0;
+    });
+    await page.waitForTimeout(150);
+    await page.keyboard.press('Escape');
+    const waiting = await page.evaluate(() => __privacyMotionSnapshot());
+    assert.equal(waiting.open,true,reducedMotion+': completed intro waits while restoring data');
+    assert.equal(waiting.eyeVisible,false,reducedMotion+': no eye appears while waiting for data');
+    assert.equal(waiting.ready,false,reducedMotion+': delayed resource really holds startup');
+    assert.equal(waiting.workspaceVisible,false,reducedMotion+': incomplete content is not exposed');
+    release();
+    await page.waitForFunction(() => window.__privacyColdSampleComplete);
+    const frames = await page.evaluate(() => __privacyColdFrames);
+    assertIntro(frames,reducedMotion+' delayed startup',reducedMotion !== 'reduce');
+    const revealed = frames.filter(frame => frame.workspaceVisible);
+    assert.ok(revealed.every(frame => frame.panels.length === 1 && frame.panels[0] === 'notesPanel'),
+      reducedMotion+': the first revealed frame goes directly to the saved notes page');
+    assert.deepEqual(errors,[],reducedMotion+': delayed startup raises no errors');
+    console.log('PASS '+reducedMotion+' autoplay waits for saved page restoration without exposing an eye or graph flash');
+  } finally {release();await context.close();}
 }
 
 async function enter(context) {
@@ -71,7 +133,7 @@ async function enter(context) {
   page.on('pageerror',error => errors.push(error.message));
   await page.goto(baseURL+'/offline',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
-  await page.waitForFunction(() => document.getElementById('offlinePrivacyCover')?.open);
+  await page.waitForFunction(() => !document.getElementById('offlinePrivacyCover')?.open);
   return {page,errors};
 }
 
@@ -184,15 +246,23 @@ async function assertLayout(page) {
       await installSamples(context);
       const {page,errors} = await enter(context);
       await page.waitForFunction(() => window.__privacyColdSampleComplete);
-      assertGrowth(await page.evaluate(() => __privacyColdFrames),'cold entry');
+      const coldFrames = await page.evaluate(() => __privacyColdFrames);
+      assertGrowth(coldFrames,'cold entry',false);
+      assertIntro(coldFrames,'cold entry');
+      await assertNoLateUpdates(page,'automatically revealed cover');
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForFunction(() => window.__privacyColdSampleComplete);
+      const reloadFrames = await page.evaluate(() => __privacyColdFrames);
+      assertGrowth(reloadFrames,'reload entry',false);
+      assertIntro(reloadFrames,'reload entry');
+      console.log('PASS cold entry and reload automatically play without an eye, then enter the workspace');
+      assertGrowth(await replayFrames(page),'manual hide action');
+      assert.equal(await page.locator('#offlinePrivacyRestore').isVisible(),true,'Manual privacy hiding retains the eye');
       await page.keyboard.press('Escape');
-      assert.equal(await page.locator('#offlinePrivacyCover').evaluate(node => node.open),true,'Escape cannot reveal the workspace');
-      await revealInterface(page);
-      await assertNoLateUpdates(page,'revealed cover');
-      assertGrowth(await replayFrames(page),'hide action');
-      await assertNoLateUpdates(page,'completed animation');
+      assert.equal(await page.locator('#offlinePrivacyCover').evaluate(node => node.open),true,'Escape cannot reveal a manually hidden workspace');
+      await assertNoLateUpdates(page,'completed manual animation');
       await assertAsyncModalStaysBehind(page);
-      console.log('PASS cold entry and hide action paint progressive growth, then stop');
+      console.log('PASS manual privacy still paints growth and stays closed until the eye is used');
       console.log('PASS asynchronous dialogs stay behind the cover without replaying completed growth');
 
       await page.evaluate(async () => {
@@ -227,15 +297,17 @@ async function assertLayout(page) {
       await installSamples(reduced);
       const {page,errors} = await enter(reduced);
       await page.waitForFunction(() => window.__privacyColdSampleComplete);
-      const painted = (await page.evaluate(() => __privacyColdFrames)).filter(frame => frame.painted);
-      assert.ok(painted.length > 2,'Reduced-motion cold entry actually paints');
-      assert.ok(painted.every(frame => frame.visible === 21 && frame.partial === 0),'Reduced-motion cold entry always shows the complete logo');
-      await revealInterface(page);
+      const coldFrames = await page.evaluate(() => __privacyColdFrames);
+      assert.ok(coldFrames.length > 2,'Reduced-motion cold entry is observed');
+      assert.ok(coldFrames.every(frame => frame.visible === 21 && frame.partial === 0),'Reduced-motion cold entry always retains the complete logo');
+      assertIntro(coldFrames,'reduced-motion entry',false);
       const frames = await replayFrames(page);
       assert.ok(frames.every(frame => frame.visible === 21 && frame.partial === 0),'Reduced-motion hide action never starts growth');
       await assertNoLateUpdates(page,'reduced-motion static cover');
       assert.deepEqual(errors,[],'Reduced-motion page raises no errors');
       console.log('PASS reduced motion preserves a complete static logo on entry and hide');
     } finally {await reduced.close();}
+    await assertStartupGate(browser,'no-preference');
+    await assertStartupGate(browser,'reduce');
   } finally {await browser.close();}
 })().catch(error => {console.error(error);process.exitCode=1;});

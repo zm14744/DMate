@@ -48,10 +48,15 @@ async function row(page, collection, id) {
   return page.evaluate(({collection,id}) => __offlineTestStore.get(collection,id), {collection,id});
 }
 
-// UI tests reveal the workspace through the same eye button a person uses.
-// Keep this explicit: lifecycle tests must observe the untouched cold start.
+// Automatic entry has no eye button. Wait for it, then use the real eye button
+// only when a test has explicitly hidden the workspace.
 async function revealInterface(page) {
   await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+  await page.waitForFunction(() => {
+    const cover = document.getElementById('offlinePrivacyCover');
+    const eye = document.getElementById('offlinePrivacyRestore');
+    return !cover.open || (eye.getClientRects().length && getComputedStyle(eye).visibility === 'visible');
+  });
   if (await page.locator('#offlinePrivacyCover').evaluate(node => node.open)) {
     await page.locator('#offlinePrivacyRestore').click();
     await page.waitForFunction(() => !document.getElementById('offlinePrivacyCover').open);

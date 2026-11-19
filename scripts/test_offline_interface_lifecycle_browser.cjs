@@ -1,5 +1,5 @@
-/* The privacy cover belongs to a tab/app use session, independently of the
- * encrypted records. Exercise real reloads, navigation and browser restoration.
+/* Every offline entry plays a buttonless introduction, then reveals the
+ * restored workspace. Exercise reloads, navigation and browser restoration.
  * Start Flask first; account/sync responses are local fixtures and models are
  * forbidden. The native case changes only the existing app-launch marker.
  */
@@ -75,6 +75,38 @@ async function assertRestorationFrames(page,panel,label,loading=true) {
 
 async function prepare(context, username='', nativeLaunch) {
   await installStorageProbe(context);
+  await context.addInitScript(() => {
+    // A window.open document may still report about:blank when init scripts
+    // run. Arm the final document at DOMContentLoaded, after deferred scripts
+    // start the introduction and before its first painted animation frames.
+    let raf = 0;
+    function start() {
+      cancelAnimationFrame(raf);
+      const frames = window.__offlineEntryFrames = [];
+      window.__offlineEntryStartedHidden = document.hidden;
+      let visibleFrames = 0;
+      const started = performance.now();
+      const shown = node => node && node.getClientRects().length
+        && getComputedStyle(node).visibility === 'visible' && getComputedStyle(node).display !== 'none';
+      function sample(time) {
+        const cover = document.getElementById('offlinePrivacyCover');
+        const layout = document.querySelector('.offline-layout');
+        if (cover && layout) {
+          const visible = !cover.open && shown(layout) && !document.body.classList.contains('offline-content-hidden');
+          frames.push({time,open:cover.open,eye:shown(document.getElementById('offlinePrivacyRestore')),
+            modal:cover.open && cover.matches(':modal'),inert:layout.inert,visible,
+            ready:document.documentElement.dataset.offlineReady === 'true'});
+          visibleFrames = visible ? visibleFrames+1 : 0;
+        }
+        if (visibleFrames < 3 && performance.now()-started < 15000) raf = requestAnimationFrame(sample);
+      }
+      raf = requestAnimationFrame(sample);
+    }
+    addEventListener('pageshow',event => {if (event.persisted) start();});
+    // Bind on window: Chromium reuses the popup window across about:blank but
+    // replaces its initial document before loading the actual offline page.
+    addEventListener('DOMContentLoaded',() => {if (location.pathname === '/offline') start();},{once:true});
+  });
   const modelCalls = [];
   await context.route(/\/(?:chat|ocr|drawing\/[^?]+|notebook\/analyze|analyze-questions|conversation\/title)(?:\?|$)/,
     route => {modelCalls.push(route.request().url());return route.abort();});
@@ -114,6 +146,21 @@ async function assertHidden(page, label) {
   assert.equal(await page.locator('.offline-layout').evaluate(node => node.inert),true,label+': private controls remain inert');
   assert.equal(await page.locator('#offlinePrivacyRestore').isVisible(),true,label+': the eye remains usable');
   assert.equal(await page.locator('#offlineMain').isVisible(),false,label+': private content is not shown');
+}
+
+async function assertAutoEntry(page,label,{sampled=true}={}) {
+  await ready(page);
+  await page.waitForFunction(() => !document.getElementById('offlinePrivacyCover').open);
+  const frames = await page.evaluate(async () => {
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    return window.__offlineEntryFrames || [];
+  });
+  const intro = frames.filter(frame => frame.open);
+  if (sampled) assert.ok(intro.length >= 2,label+': the automatic opening actually paints');
+  assert.ok(intro.every(frame => !frame.eye),label+': automatic playback has no eye button');
+  assert.ok(intro.every(frame => frame.modal && frame.inert),label+': startup stays above inert private content');
+  assert.ok(frames.every(frame => !frame.visible || frame.ready),label+': unfinished restoration is never exposed');
+  assert.equal(await page.locator('.offline-layout').evaluate(node => node.inert),false,label+': completion enters the usable workspace automatically');
 }
 
 async function assertVisible(page, label) {
@@ -158,38 +205,44 @@ async function hide(page) {
 }
 
 async function navigationSession(browser, width, username) {
-  const context = await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'});
+  const context = await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:'no-preference'});
   const models = await prepare(context,username), errors=[];
   try {
     const page = await enter(context,username);page.on('pageerror',error => errors.push(error.message));
-    await assertHidden(page,'cold '+(username ? 'account' : 'guest'));
+    await assertAutoEntry(page,'cold '+(username ? 'account' : 'guest'));
+    await hide(page);
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('#offlinePrivacyCover').evaluate(node => node.open),true,'Escape does not expose a hidden workspace');
     await revealInterface(page);await createNote(page);
     const delayedLoads = await observeRestoredPanel(page);
     let beforeLoad = delayedLoads();
     await page.reload({waitUntil:'networkidle'});await ready(page);
+    await assertAutoEntry(page,'visible refresh');
     await assertVisible(page,'visible refresh');
     assert.ok(delayedLoads()>beforeLoad,'Visible refresh exercised delayed startup I/O');
     await assertRestorationFrames(page,'notes','visible refresh');
     beforeLoad = delayedLoads();
     await page.goto(baseURL+'/offline',{waitUntil:'networkidle'});await ready(page);
+    await assertAutoEntry(page,'same live tab direct navigation');
     await assertVisible(page,'same live tab direct navigation');
     assert.ok(delayedLoads()>beforeLoad,'Direct navigation exercised delayed startup I/O');
     await assertRestorationFrames(page,'notes','same live tab direct navigation');
     await hide(page);await page.reload({waitUntil:'networkidle'});await ready(page);
-    await assertHidden(page,'hidden refresh');
-    assert.equal(await page.locator('#notesPanel').evaluate(node => node.hidden),false,'Hidden refresh retains the current module behind its cover');
+    await assertAutoEntry(page,'previously hidden refresh');
+    await assertVisible(page,'previously hidden refresh');
+    assert.equal(await page.locator('#notesPanel').evaluate(node => node.hidden),false,'Refresh retains the current module after automatic entry');
     assert.equal(await page.locator('.dcn-original').inputValue(),content);
     await revealInterface(page);
     if (width>1100) {
       await page.locator('#offlineDesktopSidebarToggle').click();
       await page.reload({waitUntil:'networkidle'});await ready(page);
+      await assertAutoEntry(page,'collapsed desktop refresh');
       await assertVisible(page,'collapsed desktop refresh');
       assert.equal(await page.locator('html').getAttribute('data-offline-sidebar'),'collapsed');
     } else {
       await page.locator('#offlineNavToggle').click();
       await page.reload({waitUntil:'networkidle'});await ready(page);
+      await assertAutoEntry(page,'open mobile drawer refresh');
       await assertVisible(page,'open mobile drawer refresh');
       assert.equal(await page.locator('body').evaluate(node => node.classList.contains('offline-nav-open')),true);
       await page.locator('#offlineNavClose').click();
@@ -210,6 +263,7 @@ async function navigationSession(browser, width, username) {
     beforeLoad = delayedLoads();
     await page.locator('#offlineWorkspaceBtn').click();
     await page.waitForURL('**/offline');await ready(page);
+    await assertAutoEntry(page,'same-tab online round trip');
     await assertVisible(page,'same-tab online round trip');
     assert.ok(delayedLoads()>beforeLoad,'Online round trip exercised delayed startup I/O');
     await assertRestorationFrames(page,'notes','same-tab online round trip');
@@ -218,41 +272,42 @@ async function navigationSession(browser, width, username) {
       && !accountVerificationOperation && !cloudInitialSyncInFlight);
     beforeLoad = delayedLoads();
     await page.goForward({waitUntil:'domcontentloaded'});await ready(page);
+    await assertAutoEntry(page,'same-session history back and forward');
     await assertVisible(page,'same-session history back and forward');
     await assertRestorationFrames(page,'notes','same-session history back and forward',delayedLoads()>beforeLoad);
     // A real window.open receives an opener copy of sessionStorage in Chromium;
-    // it must still start hidden and must not mutate the source tab's state.
+    // it must still play its own introduction without mutating the source tab.
     const copied = page.waitForEvent('popup');
     await page.evaluate(() => window.open('/offline','_blank'));
-    const other = await copied;await ready(other);await assertHidden(other,'opener-copied new tab');
+    const other = await copied;await ready(other);await assertAutoEntry(other,'opener-copied new tab');
     if(username) {
       await other.goto(baseURL+'/__offline-interface-fixture');
       await other.evaluate(username=>DMateGuestSession.setAccountOwner(username),username);
       await other.locator('a[href="/offline"]').click();await ready(other);await revealInterface(other);
       await navigate(other,'questions');
       await other.waitForFunction(async () => (await __offlineTestStore.get('settings','view:'+window.name))?.panel==='questions');
-      await page.reload({waitUntil:'networkidle'});await ready(page);await assertVisible(page,'independent account tab navigation');
+      await page.reload({waitUntil:'networkidle'});await ready(page);await assertAutoEntry(page,'independent account tab navigation');await assertVisible(page,'independent account tab navigation');
       assert.doesNotMatch(await page.locator('#offlineToast').textContent(),/CONFLICT|另一页面|another page/i);
     }
     await other.close();await assertVisible(page,'source tab after opening another tab');
     await page.close();
-    const reopened = await enter(context,username);await assertHidden(reopened,'closed tab opened again');
+    const reopened = await enter(context,username);await assertAutoEntry(reopened,'closed tab opened again');
     const restored = await records(reopened,'notes');
-    if(username)assert.ok(restored.some(note=>note.content===content),'Account data remains available behind a new-session cover');
+    if(username)assert.ok(restored.some(note=>note.content===content),'Account data remains available after a new-session introduction');
     else assert.deepEqual(restored,[],'A new guest tab does not adopt the old guest note');
     assert.deepEqual(models,[]);assert.deepEqual(errors,[]);
-    console.log('PASS interface session '+width+'/'+(username?'account':'guest')+': default cover, frame-by-frame restored panel, refresh, drawer state, real online hop and copied/new tabs');
+    console.log('PASS interface session '+width+'/'+(username?'account':'guest')+': buttonless automatic entry, manual cover, frame-by-frame restored panel, refresh, drawer state, real online hop and copied/new tabs');
   } finally {await context.close();}
 }
 
 async function restoredBrowserProcess() {
   const profile = await mkdtemp(join(tmpdir(),'dmate-interface-restored-'));
-  const options = {...launch,args:['--restore-last-session'],serviceWorkers:'block',viewport:{width:1440,height:900}};
+  const options = {...launch,args:['--restore-last-session'],serviceWorkers:'block',viewport:{width:1440,height:900},reducedMotion:'no-preference'};
   let context;
   try {
     context = await chromium.launchPersistentContext(profile,options);await prepare(context,account);
     for(const blank of context.pages())if(blank.url()==='about:blank')await blank.close();
-    const page = await enter(context,account);await assertHidden(page,'first browser process');
+    const page = await enter(context,account);await assertAutoEntry(page,'first browser process');
     await revealInterface(page);await createNote(page);
     await page.evaluate(() => sessionStorage.setItem('__interface_restore_probe','restored-session-storage'));
     await context.close();context=null;
@@ -272,30 +327,32 @@ async function restoredBrowserProcess() {
       referrer:document.referrer
     }));
     assert.equal(originState.copied,'restored-session-storage','The test exercises a genuine browser-restored tab with retained sessionStorage');
-    await assertHidden(restored,'restarted browser restored tab');
+    // Session restoration starts while launchPersistentContext is resolving,
+    // before prepare() can install frame observers on the existing document.
+    await assertAutoEntry(restored,'restarted browser restored tab',{sampled:false});
     // Restored browser tabs may no longer be verified as the old account.
     // Reverify through the local fixture, then confirm the persistent records.
     await restored.goto(baseURL+'/__offline-interface-fixture');
     await restored.evaluate(username=>DMateGuestSession.setAccountOwner(username),account);
     await restored.locator('a[href="/offline"]').click();await ready(restored);
     assert.ok((await records(restored,'notes')).some(note=>note.content===content),'Encrypted account notes survive a real process restart');
-    console.log('PASS real process restore: retained sessionStorage starts covered; account records survive ('+originState.type+')');
+    console.log('PASS real process restore: retained sessionStorage plays automatic entry; account records survive ('+originState.type+')');
   } finally {await context?.close();await rm(profile,{recursive:true,force:true});}
 }
 
 async function nativeLaunchReset(browser) {
   let nativeLaunch = 'interface-native-launch-one';
-  const context = await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block'});
+  const context = await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'no-preference'});
   const models = await prepare(context,'',()=>nativeLaunch);
   try {
-    const page = await enter(context);await assertHidden(page,'native first launch');
+    const page = await enter(context);await assertAutoEntry(page,'native first launch');
     await revealInterface(page);await createNote(page);
-    await page.reload({waitUntil:'networkidle'});await ready(page);await assertVisible(page,'same native launch refresh');
+    await page.reload({waitUntil:'networkidle'});await ready(page);await assertAutoEntry(page,'same native launch refresh');await assertVisible(page,'same native launch refresh');
     nativeLaunch = 'interface-native-launch-two';
-    await page.reload({waitUntil:'networkidle'});await ready(page);await assertHidden(page,'new native launch');
+    await page.reload({waitUntil:'networkidle'});await ready(page);await assertAutoEntry(page,'new native launch');
     assert.deepEqual(await records(page,'notes'),[],'A new native guest launch rejects the previous guest workspace');
     assert.deepEqual(models,[]);
-    console.log('PASS native launch marker: same-launch state is retained; a new launch resets cover and guest workspace');
+    console.log('PASS native launch marker: every launch enters automatically; same-launch state remains and a new launch resets the guest workspace');
   } finally {await context.close();}
 }
 

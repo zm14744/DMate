@@ -38,6 +38,7 @@
   const layout = document.querySelector('.offline-layout');
   let privacyReturnFocus = null, layoutWasInert = false;
   let interfaceHidden = false;
+  let introPlaying = false, introMotionComplete = false, introRun = 0;
   window.DMateI18n?.register({'隐藏界面':'Hide interface','显示界面':'Show interface','DMate 防窥界面':'DMate privacy screen'});
   function syncPrivacyControls() {
     for (const control of [...privacyButtons,privacyRestore]) {
@@ -55,27 +56,52 @@
       control.replaceChildren(icon);
     }
   }
-  function hideInterface(trigger) {
-    if (interfaceHidden) return;
+  function focusPrivacyCover() {
+    (introPlaying ? privacyCover : privacyRestore).focus({preventScroll:true});
+  }
+  function completeIntro() {
+    if (introPlaying && introMotionComplete
+      && !document.documentElement.hasAttribute('data-offline-interface-pending')) showInterface();
+  }
+  function hideInterface(trigger,autoplay = false) {
+    if (interfaceHidden && !autoplay) return;
+    const wasHidden = interfaceHidden;
+    const run = ++introRun;
+    introPlaying = autoplay;
+    introMotionComplete = false;
+    privacyRestore.hidden = autoplay;
+    privacyCover.toggleAttribute('data-offline-intro',autoplay);
     privacyReturnFocus = trigger;
-    privacyCover.showModal();
-    privacyMotion?.play();
+    if (!privacyCover.open) privacyCover.showModal();
     interfaceHidden = true;
-    layoutWasInert = layout.inert;
+    if (!wasHidden) layoutWasInert = layout.inert;
     layout.inert = true;
     document.body.classList.add('offline-content-hidden');
     interfaceState?.update({hidden:true});
     syncPrivacyControls();
-    privacyRestore.focus({preventScroll:true});
+    focusPrivacyCover();
+    const playback = privacyMotion?.play();
+    if (autoplay) Promise.resolve(playback).then(() => {
+      // Paint the completed logo before entering the fully restored workspace.
+      requestAnimationFrame(() => {
+        if (!introPlaying || run !== introRun) return;
+        introMotionComplete = true;
+        completeIntro();
+      });
+    });
   }
   function showInterface() {
     if (!interfaceHidden) return;
     interfaceHidden = false;
+    introPlaying = false;
+    introRun++;
     privacyMotion?.finish();
     document.body.classList.remove('offline-content-hidden');
     interfaceState?.update({hidden:false});
     layout.inert = layoutWasInert;
     if (privacyCover.open) privacyCover.close();
+    privacyRestore.hidden = false;
+    privacyCover.removeAttribute('data-offline-intro');
     updateDrawer();
     syncPrivacyControls();
     // An existing modal remains open behind the cover and retains its own focus.
@@ -104,9 +130,14 @@
       && target instanceof HTMLDialogElement && target.open && target.matches(':modal'));
     if (newerModal) {
       privacyCover.close(); privacyCover.showModal();
-      privacyRestore.focus({preventScroll:true});
+      focusPrivacyCover();
     }
   }).observe(document.body,{subtree:true,attributes:true,attributeFilter:['open']});
+  // Initialization restores the selected panel and drafts before removing this
+  // flag, including the failure path that leaves return-online reachable.
+  new MutationObserver(completeIntro).observe(document.documentElement,
+    {attributes:true,attributeFilter:['data-offline-interface-pending']});
+  window.addEventListener('pageshow',event => { if (event.persisted) hideInterface(undefined,true); });
   window.addEventListener('dmate:languagechange',syncPrivacyControls);
   syncPrivacyControls();
   let lastDrawerTrigger = null;
@@ -164,14 +195,13 @@
   mobile.addEventListener('change',() => {
     const restorePrivacyFocus = document.activeElement?.matches('[data-offline-privacy]');
     closeDrawer(false);
-    if (interfaceHidden) privacyRestore.focus({preventScroll:true});
+    if (interfaceHidden) focusPrivacyCover();
     else if (restorePrivacyFocus) $(mobile.matches ? 'offlineMobilePrivacyToggle' : 'offlineDesktopPrivacyToggle').focus({preventScroll:true});
   });
   if (initialInterface.desktopCollapsed) document.documentElement.dataset.offlineSidebar = 'collapsed';
   if (initialInterface.mobileOpen && mobile.matches) document.body.classList.add('offline-nav-open');
   updateDrawer();
-  if (initialInterface.hidden) hideInterface();
-  else document.body.classList.remove('offline-content-hidden');
+  hideInterface(undefined,true);
   requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.add('offline-shell-ready')));
   function syncPanelNavigation() {
     document.querySelectorAll('.offline-nav-item[data-panel]').forEach(button => {
