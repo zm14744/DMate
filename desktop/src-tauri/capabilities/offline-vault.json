@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "offline-vault",
+  "description": "Only the DMate offline page may use the native encrypted vault.",
+  "windows": ["main"],
+  "local": false,
+  "remote": {
+    "urls": [
+      "https://dmate.zeabur.app/offline",
+      "https://dmate.zeabur.app/static/offline.html"
+    ]
+  },
+  "platforms": ["linux", "macOS", "windows"],
+  "permissions": ["allow-dmate-offline-vault"]
+}

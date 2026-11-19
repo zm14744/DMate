@@ -10,6 +10,11 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+dmate-offline-vault = { path = "offline-vault" }
+serde_json = "1"
+getrandom = "0.2.16"
+zeroize = "1.8"
 
 [features]
 default = ["custom-protocol"]
