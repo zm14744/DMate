@@ -34,6 +34,7 @@
   const initialInterface = interfaceState?.read() || {hidden:true};
   const privacyButtons = [...document.querySelectorAll('[data-offline-privacy]')];
   const privacyCover = $('offlinePrivacyCover'), privacyRestore = $('offlinePrivacyRestore');
+  const privacyMotion = window.DMateOfflinePrivacyMotion?.create(privacyCover);
   const layout = document.querySelector('.offline-layout');
   let privacyReturnFocus = null, layoutWasInert = false;
   let interfaceHidden = false;
@@ -58,6 +59,7 @@
     if (interfaceHidden) return;
     privacyReturnFocus = trigger;
     privacyCover.showModal();
+    privacyMotion?.play();
     interfaceHidden = true;
     layoutWasInert = layout.inert;
     layout.inert = true;
@@ -69,6 +71,7 @@
   function showInterface() {
     if (!interfaceHidden) return;
     interfaceHidden = false;
+    privacyMotion?.finish();
     document.body.classList.remove('offline-content-hidden');
     interfaceState?.update({hidden:false});
     layout.inert = layoutWasInert;

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-appearance-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" id="themeColor" content="#0d0d0d">
+<title>DMate · 拓扑生长动画预览</title>
+<!--
+独立的响应式视觉设计稿，不包含 DMate 应用接入逻辑。
+切换预览主题：?theme=light / ?theme=dark / ?theme=navy
+也支持 #light / #dark / #navy。未指定时跟随操作系统浅色/深色。
+背景精确取自 DMate GitHub 的主题最终覆盖值。
+图标几何和 stroke 参数逐项取自原版 tab-black-v52.svg / tab-white-v52.svg。
+-->
+<script>
+(function () {
+  'use strict';
+  const valid = ['light', 'dark', 'navy'];
+  const params = new URLSearchParams(location.search);
+  const selected = params.get('theme') || location.hash.slice(1);
+  const theme = valid.includes(selected)
+    ? selected
+    : ((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-appearance-theme', theme);
+  document.documentElement.setAttribute('data-privacy-motion', 'topology');
+  document.addEventListener('DOMContentLoaded', function () {
+    const color = {'light':'#f8fafc','dark':'#0d0d0d','navy':'#0f172a'}[theme];
+    document.getElementById('themeColor').setAttribute('content',color);
+  }, {once:true});
+})();
+</script>
+<style>
+/* DMate 真实主题背景：浅色/深黑/深蓝。 */
+:root[data-appearance-theme="light"] { --privacy-background:#f8fafc; color-scheme:light; }
+:root[data-appearance-theme="dark"]  { --privacy-background:#0d0d0d; color-scheme:dark; }
+:root[data-appearance-theme="navy"]  { --privacy-background:#0f172a; color-scheme:dark; }
+
+*,*::before,*::after { box-sizing:border-box; }
+html,body { width:100%; height:100%; margin:0; padding:0; }
+html { background:var(--privacy-background); }
+body {
+  background:var(--privacy-background);
+  overflow:hidden;
+  overscroll-behavior:none;
+  -webkit-text-size-adjust:100%;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+/* 背景始终铺满视口，包含安全区域；图标按实际可用空间居中。 */
+.dmate-privacy-cover {
+  position:fixed;
+  inset:0;
+  z-index:0;
+  display:grid;
+  place-items:center;
+  width:100%;
+  height:100vh;            /* 老版浏览器回退 */
+  height:100dvh;           /* 移动端地址栏变化时跟随可视区域 */
+  background:var(--privacy-background);
+  overflow:hidden;
+  isolation:isolate;
+  padding:
+    max(12px,env(safe-area-inset-top))
+    max(12px,env(safe-area-inset-right))
+    max(12px,env(safe-area-inset-bottom))
+    max(12px,env(safe-area-inset-left));
+}
+
+/* 不使用图片裁剪、transform 拉伸或固定像素背景。 */
+.dmate-mark {
+  position:relative;
+  width:min(68vmin, 420px);
+  max-width:100%;
+  max-height:100%;
+  aspect-ratio:1 / 1;
+  flex:none;
+}
+.dmate-mark svg {
+  display:block;
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  overflow:visible;
+}
+.dmate-mark--black { display:none !important; }
+.dmate-mark--white { display:block !important; }
+:root[data-appearance-theme="light"] .dmate-mark--black { display:block !important; }
+:root[data-appearance-theme="light"] .dmate-mark--white { display:none !important; }
+
+/* 超矮横屏与小窗口也保持完整几何和留白。 */
+@media (max-height:420px) and (orientation:landscape) {
+  .dmate-mark { width:min(55vmin, 300px); }
+}
+/* 极窄设备进一步缩小，不因安全区引起溢出。 */
+@media (max-width:280px) {
+  .dmate-mark { width:min(60vmin, 200px); }
+}
+
+/* 纯视觉演示：原版静态图标保留用于禁用动画；动态版只改变描画进度。 */
+:root[data-appearance-theme="light"] { --privacy-ink:#000; }
+:root[data-appearance-theme="dark"], :root[data-appearance-theme="navy"] { --privacy-ink:#fff; }
+:root[data-privacy-motion="topology"] .dmate-mark--black,
+:root[data-privacy-motion="topology"] .dmate-mark--white { display:none !important; }
+.dmate-mark--growth { display:block; }
+.dmate-mark--growth line { vector-effect:none; }
+</style>
+</head>
+<body>
+<main class="dmate-privacy-cover" aria-label="DMate 防窥界面">
+  <div class="dmate-mark" role="img" aria-label="DMate">
+    <!-- 透明背景黑色线条：原版 dmate-tab-black-v52.svg -->
+    <svg class="dmate-mark--black" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="#000" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M59 73 L103 48 L154 39 L205 84 L215 129 L201 188 L139 215 L94 217 L51 170 L41 126 L59 73"/>
+        <path d="M59 73 L69 82 L127 66 L154 39"/>
+        <path d="M69 82 L61 145 L51 170"/>
+        <path d="M127 66 L162 116 L215 129"/>
+        <path d="M162 116 L119 165 L61 145"/>
+        <path d="M119 165 L139 215"/>
+      </g>
+    </svg>
+    <!-- 透明背景白色线条：原版 dmate-tab-white-v52.svg -->
+    <svg class="dmate-mark--white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M59 73 L103 48 L154 39 L205 84 L215 129 L201 188 L139 215 L94 217 L51 170 L41 126 L59 73"/>
+        <path d="M59 73 L69 82 L127 66 L154 39"/>
+        <path d="M69 82 L61 145 L51 170"/>
+        <path d="M127 66 L162 116 L215 129"/>
+        <path d="M162 116 L119 165 L61 145"/>
+        <path d="M119 165 L139 215"/>
+      </g>
+    </svg>
+
+    <!-- 原版 6 条路径拆成 21 条精确直线（中心线在中点分割），便于按图的拓扑连接关系生长。 -->
+    <svg class="dmate-mark--growth" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" aria-hidden="true" focusable="false">
+      <g id="topologyEdges" fill="none" stroke="var(--privacy-ink)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"></g>
+    </svg>
+  </div>
+</main>
+
+<script>
+(() => {
+  'use strict';
+  /* 每个顶点的坐标和每条边，均直接来自 DMate 的 v52 原版 SVG。
+     S 为原有 N--O 斜线中点，不添加新结构，最终图案与原 SVG 完全一致。 */
+  const vertices = {
+    A:[59,73], B:[103,48], C:[154,39], D:[205,84], E:[215,129],
+    F:[201,188], G:[139,215], H:[94,217], I:[51,170], J:[41,126],
+    K:[69,82], L:[127,66], M:[61,145], N:[162,116], O:[119,165],
+    S:[140.5,140.5]
+  };
+  const pairs = [
+    ['A','B'],['B','C'],['C','D'],['D','E'],['E','F'],
+    ['F','G'],['G','H'],['H','I'],['I','J'],['J','A'],
+    ['A','K'],['K','L'],['L','C'],['K','M'],['M','I'],
+    ['L','N'],['N','E'],['N','S'],['S','O'],['O','M'],['O','G']
+  ];
+  const edges = pairs.map(([a,b]) => {
+    const [ax,ay] = vertices[a], [bx,by] = vertices[b];
+    return {a,b, ax,ay,bx,by, length:Math.hypot(bx-ax,by-ay)};
+  });
+  const distances = Object.fromEntries(Object.keys(vertices).map(k=>[k,Infinity]));
+  distances.S=0;
+  const visited=new Set();
+  while (visited.size < Object.keys(vertices).length) {
+    const u=Object.keys(vertices).filter(k=>!visited.has(k)).sort((a,b)=>distances[a]-distances[b])[0];
+    if (!u || !isFinite(distances[u])) break;
+    visited.add(u);
+    for (const e of edges) {
+      const v=e.a===u ? e.b : e.b===u ? e.a : null;
+      if (v && distances[v] > distances[u] + e.length) distances[v] = distances[u] + e.length;
+    }
+  }
+  // 传播到所有边上最远点，而不只是最远顶点，外围也能完整闭合。
+  const maxDistance=Math.max(...edges.map(e=>(distances[e.a]+distances[e.b]+e.length)/2));
+  const group=document.getElementById('topologyEdges');
+  const ns='http://www.w3.org/2000/svg';
+  for (const e of edges) {
+    e.forward=document.createElementNS(ns,'line');
+    e.backward=document.createElementNS(ns,'line');
+    for (const line of [e.forward,e.backward]) line.style.display='none';
+    e.forward.setAttribute('x1',e.ax); e.forward.setAttribute('y1',e.ay);
+    e.forward.setAttribute('x2',e.bx); e.forward.setAttribute('y2',e.by);
+    e.backward.setAttribute('x1',e.bx); e.backward.setAttribute('y1',e.by);
+    e.backward.setAttribute('x2',e.ax); e.backward.setAttribute('y2',e.ay);
+    group.append(e.forward,e.backward);
+  }
+  const DURATION=740;
+  const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
+  let raf=0;
+  function showPart(line, visible, length) {
+    if (visible < 0.15) { line.style.display='none'; return; }
+    line.style.display='';
+    line.setAttribute('stroke-dasharray',`${Math.min(visible,length)} ${length*2}`);
+  }
+  function render(radius) {
+    for (const e of edges) {
+      const fromA=clamp(radius-distances[e.a],0,e.length);
+      const fromB=clamp(radius-distances[e.b],0,e.length);
+      if (fromA+fromB >= e.length-0.01) {
+        // 闭合后用单条完整边，避免重叠描边。
+        showPart(e.forward,e.length,e.length);
+        e.backward.style.display='none';
+      } else {
+        showPart(e.forward,fromA,e.length);
+        showPart(e.backward,fromB,e.length);
+      }
+    }
+  }
+  function replay() {
+    cancelAnimationFrame(raf);
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      render(maxDistance+1);
+      return;
+    }
+    render(0);
+    let start=null;
+    const tick=(now)=>{
+      if (start===null) start=now;
+      const p=clamp((now-start)/DURATION,0,1);
+      // 稍快起步、自然减速，不反弹，不扭曲原图标。
+      const reach=1-Math.pow(1-p,1.65);
+      render(maxDistance*reach+((p===1)?1:0));
+      if (p<1) raf=requestAnimationFrame(tick);
+    };
+    raf=requestAnimationFrame(tick);
+  }
+  // 仅此独立预览稿允许点按/空格重播；不涉及真正的隐藏/解锁行为。
+  document.querySelector('.dmate-privacy-cover').addEventListener('click',replay);
+  window.addEventListener('keydown',e=>{
+    if(e.code==='Space' || e.code==='KeyR') {e.preventDefault();replay();}
+  });
+  replay();
+})();
+</script>
+</body>
+</html>

@@ -243,6 +243,7 @@ body.offline-workspace.offline-content-hidden > :not(#offlinePrivacyCover) { vis
    surface so navigation, floating graph views and dialogs stay underneath. */
 #offlinePrivacyCover {
   --privacy-background:#0d0d0d;
+  --privacy-ink:#fff;
   position:fixed; inset:0; box-sizing:border-box; width:100%; max-width:none;
   height:100vh; height:100dvh; max-height:none; margin:0; border:0; border-radius:0;
   padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
@@ -253,11 +254,13 @@ body.offline-workspace.offline-content-hidden > :not(#offlinePrivacyCover) { vis
 #offlinePrivacyCover:not([open]) { display:none; }
 #offlinePrivacyCover[open] { display:grid; place-items:center; }
 #offlinePrivacyCover::backdrop { background:var(--privacy-background); }
-body[data-appearance-theme="light"] #offlinePrivacyCover { --privacy-background:#f8fafc; }
+body[data-appearance-theme="light"] #offlinePrivacyCover { --privacy-background:#f8fafc; --privacy-ink:#000; }
 body[data-appearance-theme="navy"] #offlinePrivacyCover { --privacy-background:#0f172a; }
 #offlinePrivacyRestore { position:absolute; top:max(12px,env(safe-area-inset-top)); left:max(12px,env(safe-area-inset-left)); z-index:1; }
 #offlinePrivacyCover .offline-privacy-mark { position:relative; width:min(68vmin,420px); max-width:100%; max-height:100%; aspect-ratio:1 / 1; flex:none; }
 #offlinePrivacyCover .offline-privacy-mark img { display:block; position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+#offlinePrivacyCover .offline-privacy-mark-growth { display:block; position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+#offlinePrivacyCover .offline-privacy-mark.offline-privacy-topology-ready > img { display:none !important; }
 #offlinePrivacyCover .offline-privacy-mark .offline-privacy-mark-black { display:none; }
 body[data-appearance-theme="light"] #offlinePrivacyCover .offline-privacy-mark .offline-privacy-mark-black { display:block; }
 body[data-appearance-theme="light"] #offlinePrivacyCover .offline-privacy-mark .offline-privacy-mark-white { display:none; }
