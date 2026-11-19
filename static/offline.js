@@ -12,7 +12,7 @@
     questionDifficulty: "", questionType: "", questionSelection: "", questionQuery: "", conceptCategory: "", conceptSelection: "", conceptQuery: "", graphQuery: "", graphController: null,
     librarySelections: {concepts:new Set(), questions:new Set()}, selectionQueue: Promise.resolve(),
     selectedNoteId:null, noteQuery:"", noteRows:[], noteSaveQueue:Promise.resolve(),
-    noteDrafts:new Map(), noteSaveStatus:new Map(), noteDeletePending:null,
+    noteDrafts:new Map(), noteDeletePending:null,
     appearanceQueue: Promise.resolve(), viewSaveQueue:Promise.resolve(), viewSnapshot:""
   };
   const panelMeta = {
@@ -156,10 +156,19 @@
   function answerDetails(title, value, className = "wrong-answer-details") {
     const details = el("details", className);
     const analysis = className === "wrong-analysis-details";
-    details.append(el("summary", analysis ? "wrong-analysis-summary" : "wrong-answer-summary", tr(title)),
-      rich(analysis ? "wrong-analysis-body" : "wrong-answer-inner", value));
+    const content = el("div", analysis ? "wrong-analysis-body" : "wrong-answer-inner");
+    content.setAttribute("data-i18n-content", "");
+    const render = () => {
+      if (window.DMateAIAnswer?.render) return window.DMateAIAnswer.render(content, value, {
+        typography:"answer",
+        markdownToHtml:source => window.DMateMathMarkdown.markdownToHtml(source)
+      });
+      content.textContent = String(value ?? "");
+    };
+    details.append(el("summary", analysis ? "wrong-analysis-summary" : "wrong-answer-summary", tr(title)), content);
+    void render();
     details.addEventListener("toggle", () => {
-      if (details.open) void window.DMateAIAnswer?.render(details.lastElementChild, studySource(value), {typography:"chat"});
+      if (details.open) void render();
     });
     return details;
   }
@@ -261,13 +270,20 @@
       if (!item || typeof item.question !== "string" || !item.question.trim()) continue;
       const id = String(item.id || uid()), existing = mistakes.get(id), incomingAt = noteTime(item.updatedAt || item.createdAt);
       if (noteTime(mistakeMetadata?.deleted?.[id]) >= incomingAt && mistakeMetadata?.deleted?.[id]) continue;
-      if (existing && incomingAt <= noteTime(existing.updatedAt)) continue;
+      if (existing && incomingAt <= noteTime(existing.updatedAt)) {
+        if (incomingAt === noteTime(existing.updatedAt) && !Array.isArray(existing.focusPoints)
+            && Array.isArray(item.focusPoints) && item.focusPoints.length) {
+          await save("mistakes", {...existing,focusPoints:item.focusPoints});
+        }
+        continue;
+      }
       const reference = item.referenceAnswer;
       const answer = item.answer || (typeof reference === "string" ? reference
         : reference && typeof reference === "object" ? reference.text || reference.answer || JSON.stringify(reference) : "");
       const row = {...existing,id,title:String(item.category || item.question).slice(0,160),statement:item.question,
         answer:String(answer || ""),explanation:String(item.analysis || item.solution || ""),
-        knowledgePoints:Array.isArray(item.knowledgePoints) ? item.knowledgePoints : [],status:item.corrected ? "resolved" : "pending",
+        knowledgePoints:Array.isArray(item.knowledgePoints) ? item.knowledgePoints : [],
+        focusPoints:Array.isArray(item.focusPoints) ? item.focusPoints : existing?.focusPoints || [],status:item.corrected ? "resolved" : "pending",
         createdAt:existing?.createdAt || existing?.updatedAt || new Date(noteTime(item.createdAt) || incomingAt || Date.now()).toISOString(),
         updatedAt:new Date(incomingAt || Date.now()).toISOString()};
       await save("mistakes",row); mistakes.set(id,row);
@@ -471,14 +487,16 @@
       const top = el("div", "wrong-card-top");
       top.append(el("span", "wrong-date", new Date(noteTime(row.createdAt || row.updatedAt)).toLocaleString()));
       card.append(top, rich("wrong-question", row.statement || row.content || ""));
-      const knowledgeLabels = [...new Set((row.knowledgePoints || []).map(point =>
-        state.graph?.nodes?.find(node => node.id === point)?.name
+      const focusPoints = row.focusPoints?.length ? row.focusPoints : row.knowledgePoints || [];
+      const focusLabels = [...new Set(focusPoints.map(point => {
+        const label = state.graph?.nodes?.find(node => node.id === point)?.name
         || state.concepts.find(concept => concept.id === point)?.title
-        || (typeof point === "string" && /[\u3400-\u9fff]/.test(point) ? point : "")
-      ).filter(Boolean))];
-      if (knowledgeLabels.length) {
-        const meta = el("div", "wrong-meta"), line = el("div", "wrong-meta-row");
-        line.append(el("span", "wrong-meta-label", tr("整题涉及")), el("span", "wrong-meta-value", knowledgeLabels.join("、")));
+        || (typeof point === "string" ? point.trim() : "");
+        return window.DMateKnowledgeLanguage?.label(label) || label;
+      }).filter(Boolean))];
+      if (focusLabels.length) {
+        const meta = el("div", "wrong-meta"), line = el("div", "wrong-meta-row focus");
+        line.append(el("span", "wrong-meta-label", tr("难点", "Focus")), el("span", "wrong-meta-value", focusLabels.join(english() ? ", " : "、")));
         meta.append(line); card.append(meta);
       }
       card.append(answerDetails("查看答案", row.answer || tr("这条记录没有保存参考答案。", "No reference answer was saved for this record.")));
@@ -510,17 +528,9 @@
     requireWorkspace();
   }
 
-  function setNoteSaveStatus(id, message) {
-    if (!workspaceCurrent()) return;
-    state.noteSaveStatus.set(id, message);
-    const saved = $("noteList")?.querySelector(".dcn-saved");
-    if (saved?.dataset.noteId === id) saved.textContent = message;
-  }
-
   function queueNoteSave(row) {
     const snapshot = {...row};
     state.noteDrafts.set(row.id, snapshot);
-    setNoteSaveStatus(row.id, tr("正在保存…", "Saving…"));
     state.noteSaveQueue = state.noteSaveQueue.then(async () => {
       if (!workspaceCurrent()) { invalidateWorkspace(); return false; }
       try {
@@ -528,13 +538,11 @@
         if (!workspaceCurrent()) return false;
         if (state.noteDrafts.get(row.id) === snapshot) {
           state.noteDrafts.delete(row.id);
-          setNoteSaveStatus(row.id, "");
         }
         return true;
       } catch (error) {
         if (!workspaceCurrent()) return false;
         if (state.noteDrafts.get(row.id) === snapshot) {
-          setNoteSaveStatus(row.id, tr("保存失败，请保留当前页面后重试。", "Save failed; keep this page open and try again."));
           toast(storageError(error));
         }
         return false;
@@ -554,7 +562,6 @@
   async function deleteNote(row) {
     await deleteOfflineRecord("notes", row, "notebook-deletions");
     state.noteDrafts.delete(row.id);
-    state.noteSaveStatus.delete(row.id);
   }
 
   async function renderNotes() {
@@ -590,8 +597,7 @@
     name.maxLength = 160; name.rows = 1; name.setAttribute("aria-label", tr("概念名称", "Concept name")); nameLabel.append(name);
     const bodyLabel = el("label", "", tr("概念内容", "Concept content")), body = el("textarea", "dcn-original");
     body.rows = 1; body.setAttribute("aria-label", tr("概念内容", "Concept content")); bodyLabel.append(body);
-    const saved = el("span", "dcn-saved"); saved.setAttribute("role", "status");
-    editor.append(nameLabel, bodyLabel, saved);
+    editor.append(nameLabel, bodyLabel);
     main.append(editor);
     function renderActions() {
       const empty = state.noteRows.length === 0;
@@ -642,8 +648,6 @@
       editor.hidden = !row;
       name.value = row?.title || ""; body.value = row?.content || "";
       body.maxLength = Math.max(12000, row?.content.length || 0);
-      saved.dataset.noteId = row?.id || "";
-      saved.textContent = row ? state.noteSaveStatus.get(row.id) || "" : "";
     }
     const edit = () => {
       const row = state.noteRows.find(note => note.id === state.selectedNoteId);

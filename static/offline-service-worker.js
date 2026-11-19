@@ -1,5 +1,5 @@
 "use strict";
-const CACHE_NAME = "dmate-offline-shell-v84";
+const CACHE_NAME = "dmate-offline-shell-v85";
 const PRECACHE = [
   "/offline",
   "/static/icons/dmate-app-v52.ico",
@@ -12,7 +12,7 @@ const PRECACHE = [
   "/static/graph-editor.css?v=26",
   "/static/drawing-workspace.css?v=51",
   "/static/modal-chrome.css",
-  "/static/concept-notebook.css?v=2",
+  "/static/concept-notebook.css?v=3",
   "/static/ai-answer-renderer.css?v=22",
   "/static/red-circle-controls.css",
   "/static/ui-tooltip.css",
@@ -20,7 +20,7 @@ const PRECACHE = [
   "/static/dmate-shared-overrides.css?v=23",
   "/static/button-themes.css?v=65",
   "/static/offline-knowledge-graph.css?v=54",
-  "/static/offline.css?v=59",
+  "/static/offline.css?v=60",
   "/static/search-controls.css?v=27",
   "/static/search-controls.js?v=27",
   "/static/select-controls.css?v=43",
@@ -56,7 +56,7 @@ const PRECACHE = [
   "/static/offline-handoff.js?v=1",
   "/static/offline-storage.js?v=1",
   "/static/offline-entry.js?v=47",
-  "/static/offline.js?v=60",
+  "/static/offline.js?v=61",
   "/static/icons/dmate-brand-v52.svg",
   "/static/offline-content/concepts.zh-CN.json?v=34",
   "/static/offline-content/questions.zh-CN.json?v=34",

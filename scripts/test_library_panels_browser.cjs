@@ -239,8 +239,12 @@ async function openRelatedExercise(page, concept, language = 'zh-CN') {
   await page.locator('#conceptDetail [data-question-id="' + question.id + '"]').click();
   await page.locator('#questionsPanel').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#questionList .question-item.active').getAttribute('data-question-id'), question.id);
-  await page.locator('#questionDetail .question-actions .offline-primary').click();
-  await page.locator('#questionDetail .answer-panel').waitFor({ state: 'visible' });
+  if (!await page.locator('#questionDetail .wrong-answer-details').evaluate(node => node.open))
+    await page.locator('#questionDetail .wrong-answer-summary').click();
+  await page.locator('#questionDetail .wrong-answer-details[open] .wrong-answer-inner').waitFor({ state: 'visible' });
+  if (!await page.locator('#questionDetail .wrong-analysis-details').evaluate(node => node.open))
+    await page.locator('#questionDetail .wrong-analysis-summary').click();
+  await page.locator('#questionDetail .wrong-analysis-details[open] .wrong-analysis-body').waitFor({ state: 'visible' });
   await page.waitForFunction(() => !document.querySelector('#questionDetail [data-dmate-render-state="pending"]'));
   assert.ok(await page.locator('#questionDetail .wrong-answer-inner').evaluate(element =>
     Boolean(element.textContent.trim() || element.querySelector('mjx-container'))), 'Migrated exercise reference answer is rendered');
@@ -284,7 +288,8 @@ async function runCase(browser, width, height) {
     await page.locator('#questionList .question-item[data-question-id="' + longQuestion.id + '"]').click();
     await page.locator('#questionSearch').fill('');
     await openLibraryDetail(page, 'questions');
-    await page.locator('#questionDetail .question-actions .offline-primary').click();
+    if (!await page.locator('#questionDetail .wrong-answer-details').evaluate(node => node.open))
+      await page.locator('#questionDetail .wrong-answer-summary').click();
     await page.waitForFunction(() => !document.querySelector('#questionDetail [data-dmate-render-state="pending"]'));
     await settle(page);
     await independentScroll(page, 'questions', 'detail');

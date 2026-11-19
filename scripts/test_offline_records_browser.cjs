@@ -147,8 +147,18 @@ async function exercise(page,reference,width) {
   assert.deepEqual(await circle(page.locator('.dcn-note-delete')),reference.remove,'The notebook delete dot matches the online red circle');
   assert.equal(await page.locator('#notesPanel .dcn-note-select,#notesPanel input[type="checkbox"]').count(),0,'Offline note rows have no selection circles');
   assert.equal(await page.locator('#notesPanel .dcn-selection').count(),0,'Offline notes have no selected-count hint');
-  await page.locator('#addNote').click();await page.locator('.dcn-title').fill('图论笔记');await page.locator('.dcn-original').fill('路径、回路和连通性');
-  await page.waitForFunction(async()=>(await __offlineTestStore.all('notes')).length===2);
+  await page.locator('#addNote').click();
+  await page.waitForFunction(previous=>{
+    const current=document.querySelector('#noteList .dcn-note.is-current');
+    return current && current.dataset.noteId!==previous;
+  },firstNote.id);
+  await page.locator('.dcn-title').fill('图论笔记');await page.locator('.dcn-original').fill('路径、回路和连通性');
+  await page.waitForFunction(async()=>{
+    const notes=await __offlineTestStore.all('notes');
+    return notes.length===2&&notes.some(row=>row.content==='路径、回路和连通性');
+  });
+  assert.equal((await records(page,'notes')).find(row=>row.id===firstNote.id)?.content,'保留我的原始推导：幂集含有所有子集',
+    'Creating and editing another note retains the original note content');
   const search=page.locator('.dcn-search');await search.fill('不会匹配的内容');
   assert.equal((await page.locator('.dcn-list-empty').innerText()).trim(),'无');
   await search.fill('原始推导');assert.equal(await page.locator('.dcn-note').count(),1,'Original note search includes its content');

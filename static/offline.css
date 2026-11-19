@@ -57,7 +57,7 @@ body.offline-workspace .offline-main.center { position:relative; display:flex !i
    its outer positioning and available size adapt to the offline module. */
 #drawingPanel.graph-editor-dialog { position:relative; inset:auto; display:flex; flex-direction:column; width:calc(100% - 48px); max-width:1280px; height:auto; max-height:none; padding:18px; border-radius:16px; overflow:hidden; }
 #drawingPanel > #offlineDrawingHost { flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain; }
-.question-toolbar { align-items:flex-start; }
+.offline-library-toolbar { align-items:flex-start; }
 /* Shared control widths keep both libraries identical without letting headings
    or the concept library's missing difficulty control stretch their fields. */
 .offline-filters { --offline-filter-select-width:153px; --offline-filter-search-width:218px; --offline-filter-control-height:41px; display:flex; align-items:stretch; flex-wrap:wrap; gap:8px; flex:none; min-width:0; max-width:100%; }
@@ -321,7 +321,7 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
   .offline-toolbar { align-items:flex-start; gap:10px; flex-wrap:wrap; }
   .toolbar-muted { display:block; margin:4px 0 0; }
   .offline-toolbar .offline-primary { font-size:13px; }
-  .question-toolbar { flex-direction:column; }
+  .offline-library-toolbar { flex-direction:column; }
   .offline-filters { display:grid; width:100%; grid-template-columns:repeat(2,minmax(0,1fr)); }
   .offline-filters select,.offline-filters > :is(.offline-search,.dmate-search-wrap) { width:100%; }
   .offline-filters > :is(.offline-search,.dmate-search-wrap) { grid-column:1 / -1; }
