@@ -517,6 +517,27 @@
         });
       });
     }
+    async function destroy() {
+      ensureOpen();
+      const identity = initial;
+      await run(["vaults", "records"], "readwrite", (tx, result, guard) => {
+        tx.objectStore("vaults").get(identity.name).onsuccess = guard(event => {
+          matchMeta(event.target.result, identity, provider);
+          const cursor = tx.objectStore("records").index("byVault").openCursor(identity.name);
+          cursor.onsuccess = guard(event => {
+            const row = event.target.result;
+            if (row) { row.delete(); row.continue(); }
+          });
+          tx.objectStore("vaults").delete(identity.name);
+          result(true);
+        });
+      });
+      close();
+      if (provider.call) {
+        try { await provider.call({op:"delete", keyId:identity.keyId}); }
+        catch (_) { /* An unused OS key contains no surviving vault records. */ }
+      }
+    }
     return Object.freeze({
       name: initial.name,
       capabilities: Object.freeze({version: FORMAT, provider: provider.name, keyProtection: provider.protection,
@@ -538,7 +559,7 @@
         await batch([{type: "delete", collection, id, expectedRevision: options.expectedRevision}]);
         ensureOpen();
       },
-      batch, close
+      batch, close, destroy
     });
   }
 

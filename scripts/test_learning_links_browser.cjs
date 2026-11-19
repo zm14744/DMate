@@ -251,8 +251,10 @@ async function graphPracticeRoundTrip(page, lang) {
   assert.equal(await page.locator('#questionDifficulty').inputValue(), '');
   assert.equal(await page.locator('#questionSearch').inputValue(), '', 'Conflicting search is cleared when opening the linked exercise');
   assert.equal(await page.locator('#questionList .question-item.active').getAttribute('data-question-id'), target.id);
-  await page.locator('#questionDetail .question-actions .offline-primary').click();
-  await page.locator('#questionDetail .answer-panel').waitFor({ state: 'visible' });
+  await page.locator('#questionDetail .wrong-answer-summary').click();
+  await page.locator('#questionDetail .wrong-answer-details[open]').waitFor({ state: 'visible' });
+  await page.locator('#questionDetail .wrong-analysis-summary').click();
+  await page.locator('#questionDetail .wrong-analysis-details[open]').waitFor({ state: 'visible' });
   await page.waitForFunction(() => !document.querySelector('#questionDetail [data-dmate-render-state="pending"]'));
   assert.ok(await page.locator('#questionDetail .wrong-answer-inner').evaluate(element =>
     Boolean(element.textContent.trim() || element.querySelector('mjx-container'))), 'Linked exercise has its reference answer');
@@ -293,12 +295,20 @@ async function ready(page) {
 async function runCase(browser, width, height, theme) {
   const context = await browser.newContext({ viewport: { width, height }, serviceWorkers: 'block',
     ...(width <= 1100 ? { isMobile: true, hasTouch: true } : {}) });
-  await context.addInitScript(theme => localStorage.setItem('dmate:offline:appearance:v1',
-    JSON.stringify({ mode: theme, accent: 'blue', panelOpacity: 100 })), theme);
+  await context.addInitScript(theme => {
+    let session;
+    Object.defineProperty(window, 'DMateGuestSession', {configurable:true, get:()=>session, set(api) {
+      session = api;
+      if (!api.getOwner() && !api.read('offline-vault-ref')) api.write('offline-settings', {
+        appearance:{id:'appearance', settings:{mode:theme, accent:'blue', panelOpacity:100}, updatedAt:1}
+      });
+    }});
+  }, theme);
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
   try {
     await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' }); await ready(page);
+    assert.equal(await page.locator('html').getAttribute('data-appearance-theme'), theme, 'Guest appearance migrates into the encrypted workspace');
     if (width === 1440) await allOverviewSections(page);
     await openQuestion(page, sameParent);
     await checkQuestionLinks(page, sameParent, 'zh-CN');

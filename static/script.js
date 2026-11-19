@@ -24267,6 +24267,12 @@ document.addEventListener(
 // 离线工作区只导出当前页面已验证账号、或当前游客会话的学习记录和绘图库。
 // 不从 localStorage 的旧账号标记推断身份，也不上传这份快照。
 window.DMateOfflineBridge = Object.freeze({
+    context() {
+        return {version:cloudSyncContextVersion, owner:drawingStorageOwner()};
+    },
+    isCurrent(context) {
+        return context?.version === cloudSyncContextVersion && context.owner === drawingStorageOwner();
+    },
     async snapshot() {
         const context = cloudSyncContextVersion, owner = drawingStorageOwner();
         const username = shouldPersistClientState() ? accountState.username : "";
@@ -24274,75 +24280,47 @@ window.DMateOfflineBridge = Object.freeze({
             if (context !== cloudSyncContextVersion || drawingStorageOwner() !== owner)
                 throw new Error("账号状态已变化，请重新打开离线版");
         };
-        let drawings = [];
-        try {
-            drawings = typeof collectLearningReviewDrawings === "function"
-                ? collectLearningReviewDrawings() : [];
-        } catch (_error) {}
-
-        // 离线工作区复用 DMate 当前设备的主题、字体、透明度和用户背景。
+        const sameOwner = standaloneDrawingOwner === owner;
+        const controller = sameOwner && ocrEditorTaskId === "standalone-drawing"
+            && typeof ocrEditorController?.getPages === "function" ? ocrEditorController : null;
+        // flush collects the current document, active page and viewport into
+        // page memory even when the online storage write fails. The encrypted
+        // handoff can still preserve that complete newer in-memory gallery.
+        if (controller?.flush) await controller.flush();
+        verifyOwner();
+        let raw = sameOwner ? standaloneDrawingSessionState.gallery : null;
+        if (!raw && username) raw = localStorage.getItem("dmate:graph-gallery:v1::" + encodeURIComponent(owner));
+        let gallery = null;
+        if (raw) {
+            gallery = JSON.parse(raw);
+            if (![1,2].includes(gallery?.version) || !Array.isArray(gallery.pages))
+                throw new Error("绘图库格式无法读取，当前绘图仍保留");
+        }
+        if (controller) {
+            const pages = controller.getPages();
+            if (!Array.isArray(pages)) throw new Error("绘图库暂时无法读取，当前绘图仍保留");
+            gallery = {...(gallery || {}),version:2,pages,
+                activeId:pages.some(page => page?.id === gallery?.activeId) ? gallery.activeId : pages[0]?.id || ""};
+        }
+        if (!gallery) {
+            let legacy = sameOwner ? standaloneDrawing : null;
+            if (!legacy && username && localStorage.getItem(DRAWING_STORAGE_KEY + ":owner") === owner)
+                legacy = JSON.parse(localStorage.getItem(DRAWING_STORAGE_KEY));
+            gallery = {version:2,activeId:legacy ? "legacy-local" : "",pages:legacy
+                ? [{id:"legacy-local",name:legacy.graphs?.[0]?.name || "我的绘图",document:legacy}] : []};
+        }
         const settings = JSON.parse(JSON.stringify(appearanceSettings || {}));
-        let backgroundBlob = null;
-        try {
-            backgroundBlob = await readAppearanceBackgroundBlob();
-        } catch (_error) {}
-        verifyOwner();
-        try {
-            if (!shouldPersistClientState()) {
-                if (!window.DMateGuestSession?.write("appearance", settings)
-                    || backgroundBlob && !await window.DMateGuestSession.writeBlob("background", backgroundBlob))
-                    throw new Error("本标签页的离线外观暂时无法保存");
-            } else {
-            const offlineOwnerSuffix = "::" + encodeURIComponent("account:" + accountState.username);
-            localStorage.setItem("dmate:offline:appearance:v1" + offlineOwnerSuffix, JSON.stringify(settings));
-            await new Promise((resolve, reject) => {
-                const request = indexedDB.open("dmate-offline-workspace", 3);
-                let blocked = false;
-                request.onblocked = () => {
-                    blocked = true;
-                    reject(new Error("旧版离线页面仍在使用本机数据，请关闭该页面后重试"));
-                };
-                request.onupgradeneeded = () => {
-                    const db = request.result;
-                    for (const store of ["mistakes", "notes", "practice", "settings"]) {
-                        if (!db.objectStoreNames.contains(store)) db.createObjectStore(store, {keyPath:"id"});
-                    }
-                };
-                request.onerror = () => reject(request.error || new Error("离线外观数据准备失败"));
-                request.onsuccess = () => {
-                    const db = request.result;
-                    if (blocked) { db.close(); return; }
-                    const tx = db.transaction("settings", "readwrite");
-                    tx.objectStore("settings").put({
-                        id:"appearance" + offlineOwnerSuffix, settings, backgroundBlob,
-                        updatedAt:Date.now()
-                    });
-                    tx.oncomplete = () => { db.close(); resolve(); };
-                    tx.onerror = () => { const error=tx.error; db.close(); reject(error || new Error("离线外观数据保存失败")); };
-                    tx.onabort = () => { const error=tx.error; db.close(); reject(error || new Error("离线外观数据保存中断")); };
-                };
-            });
-            }
-        } catch (error) {
-            console.warn("DMate 原有外观未能复制到离线工作区：", error);
-        }
+        const backgroundBlob = await readAppearanceBackgroundBlob();
         verifyOwner();
 
-        const copiedDrawings = Array.isArray(drawings) ? JSON.parse(JSON.stringify(drawings)) : [];
-        const legacyPage = copiedDrawings.length === 1 ? copiedDrawings[0] : null;
-        const legacyDocument = legacyPage?.document;
-        if (legacyPage && !legacyPage.id
-            && Array.isArray(legacyDocument?.graphs) && legacyDocument.graphs.length > 0
-            && legacyDocument.graphs.every(graph => graph && Array.isArray(graph.vertices) && Array.isArray(graph.edges))) {
-            legacyPage.id = "legacy-local";
-        }
         return {
             username,
+            appearance: {settings, backgroundBlob:backgroundBlob instanceof Blob ? backgroundBlob : null},
             wrongQuestions: JSON.parse(JSON.stringify((learningState.wrongQuestions || []).filter(item =>
                 item && !learningState.deletedWrongQuestionIds?.[String(item.id)]))),
             notes: JSON.parse(JSON.stringify((learningState.conceptNotebook?.notes || []).filter(note =>
                 note && !(Number(learningState.conceptNotebook?.deleted?.[String(note.id)]) >= Number(note.updatedAt || 0))))),
-            drawings: copiedDrawings
+            drawings: JSON.stringify(gallery)
         };
     }
 });

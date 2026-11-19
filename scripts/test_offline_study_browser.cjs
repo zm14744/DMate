@@ -3,6 +3,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const { installStorageProbe } = require('./offline-vault-browser-fixtures.cjs');
 const migrationReview = require('../offline-content/example-practice-migration.json');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const conceptsURL = '/static/offline-content/concepts.zh-CN.json';
@@ -348,6 +349,7 @@ async function run(browser, width) {
   const references = await onlineReference(browser, width);
   const context = await browser.newContext({ viewport: { width, height: width === 390 ? 820 : 1000 }, locale: 'zh-CN',
     isMobile: width === 390, hasTouch: width === 390, serviceWorkers: 'allow' });
+  await installStorageProbe(context);
   const page = await context.newPage(); await protectAPIs(page);
   let workerProtocol;
   const cachedResponses = new Set(); page.on('response', response => { if (response.fromServiceWorker()) cachedResponses.add(new URL(response.url()).pathname); });
@@ -454,15 +456,7 @@ async function run(browser, width) {
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/study-' + width + '-cn.png' });
     await languageChoice(page, 'en');
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/study-' + width + '-en.png' });
-    await page.waitForFunction(() => new Promise(resolve => {
-      const request = indexedDB.open('dmate-offline-workspace');
-      request.onerror = () => resolve(false);
-      request.onsuccess = () => {
-        const db = request.result, get = db.transaction('settings', 'readonly').objectStore('settings').get('language');
-        get.onsuccess = () => { const saved = get.result?.value === 'en'; db.close(); resolve(saved); };
-        get.onerror = () => { db.close(); resolve(false); };
-      };
-    }));
+    await page.waitForFunction(async () => (await __offlineTestStore.get('settings', 'language'))?.value === 'en');
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
     assert.equal(await page.locator('html').getAttribute('data-ui-language'), 'en', 'The English preference survives a true offline reload');

@@ -385,6 +385,28 @@ async function scenario(title, operation) {
     });
   });
 
+  await scenario('Destroy removes only its vault and prevents stale writers', async () => {
+    await page.evaluate(async () => {
+      const removed = await DMateOfflineVault.open({name:'test-destroy'});
+      const stale = await DMateOfflineVault.open({name:'test-destroy'});
+      const retained = await DMateOfflineVault.open({name:'test-retained'});
+      await removed.write('notes', 'one', 'remove this guest record', {expectedRevision:null});
+      await retained.write('notes', 'one', 'retain another vault', {expectedRevision:null});
+      const original = await test.get('vaults', 'test-destroy');
+      const changed = structuredClone(original); changed.check.revision = 'f'.repeat(original.check.revision.length);
+      await test.put('vaults', changed);
+      await test.expectRejected(() => removed.destroy());
+      test.check((await test.records('test-destroy')).length === 1, 'Changed vault metadata prevents destructive cleanup');
+      await test.put('vaults', original);
+      await removed.destroy();
+      await test.expectCode(() => removed.list('notes'), 'CLOSED');
+      await test.expectRejected(() => stale.write('notes', 'two', 'cannot resurrect', {expectedRevision:null}));
+      test.check((await retained.read('notes', 'one')).value === 'retain another vault', 'Destroy leaves other vaults intact');
+      test.check(await test.get('vaults', 'test-destroy') === undefined, 'Guest key metadata is removed after commit');
+      stale.close(); retained.close();
+    });
+  });
+
   await scenario('A strict OS-keystore requirement cannot fall back to browser keys', async () => {
     await page.evaluate(async () => {
       await test.expectCode(() => DMateOfflineVault.open({name: 'test-strict', requireProtection: 'os-keystore'}), 'PROTECTION_UNAVAILABLE');
@@ -446,6 +468,12 @@ async function scenario(title, operation) {
         await test.expectCode(() => DMateOfflineVault.open({name: 'test-native'}), 'KEY_MISSING');
         test.check(__nativeCounts.create === 1, 'A missing native key is not silently replaced');
         test.check((await test.records('test-native')).length === 2, 'Native key loss preserves ciphertext');
+        const cleanup = await DMateOfflineVault.open({name:'test-native-delete', requireProtection:'os-keystore'});
+        await cleanup.write('notes', 'temporary', 'remove native guest data', {expectedRevision:null});
+        const cleanupMeta = await test.get('vaults', 'test-native-delete');
+        await cleanup.destroy();
+        test.check(__nativeCounts.delete === 1 && !__nativeKeys.has(cleanupMeta.keyId), 'Native guest cleanup releases its key after deleting ciphertext');
+        test.check((await test.records('test-native-delete')).length === 0 && !await test.get('vaults','test-native-delete'), 'Native cleanup commits metadata and records together');
         test.check(test.blocked.length === 0, 'Native storage performs no network or Web Storage side effects');
       });
     } finally { await nativeContext.close(); }

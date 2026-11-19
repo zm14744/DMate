@@ -185,7 +185,7 @@ async function questionCombinedFilters(page) {
 async function answers(page, english = false) {
   for (const question of [letterQuestion, multipleQuestion]) {
     await openQuestion(page, question);
-    await page.locator('#questionDetail .question-actions .offline-primary').click();
+    await page.locator('#questionDetail .wrong-answer-summary').click();
     const answer = page.locator('#questionDetail .wrong-answer-inner');
     await answer.waitFor({ state: 'visible' });
     assert.equal((await answer.innerText()).trim(), question.answer.join('、'), 'Choice reference answers are plain option letters');
@@ -199,13 +199,14 @@ async function answers(page, english = false) {
       await control.check(); await settle(page);
       assert.equal(await page.locator('#questionList .question-item.active').getAttribute('data-question-id'), letterQuestion.id);
       await openLibraryDetail(page, 'questions');
-      assert.equal(await page.locator('#questionDetail .answer-panel').isVisible(), true, 'Closing the detail and checking another row retains the revealed answer');
+      assert.equal(await page.locator('#questionDetail .wrong-answer-details[open]').isVisible(), true, 'Closing the detail and checking another row retains the revealed answer');
       await closeLibraryDetail(page);
       await control.uncheck();
     }
   }
   await openQuestion(page, writtenQuestion);
-  await page.locator('#questionDetail .question-actions .offline-primary').click();
+  await page.locator('#questionDetail .wrong-answer-summary').click();
+  await page.locator('#questionDetail .wrong-answer-inner').waitFor({state:'visible'});
   await page.waitForFunction(() => !document.querySelector('#questionDetail [data-dmate-render-state="pending"]'));
   assert.ok(await page.locator('#questionDetail .wrong-answer-inner mjx-container').count() > 0,
     'Written reference answers retain mathematical typesetting in ' + (english ? 'English' : 'Chinese'));
@@ -300,13 +301,23 @@ async function assertSelectedRecords(page) {
 async function runCase(browser, width, theme) {
   const context = await browser.newContext({ viewport: { width, height: 900 },
     ...(width <= 1100 ? { isMobile: true, hasTouch: true } : {}) });
-  await context.addInitScript(theme => localStorage.setItem('dmate:offline:appearance:v1',
-    JSON.stringify({ mode: theme, accent: 'blue', panelOpacity: 100 })), theme);
+  await context.addInitScript(theme => {
+    let session;
+    Object.defineProperty(window, 'DMateGuestSession', {configurable:true, get:()=>session, set(api) {
+      session = api;
+      // Seed this guest's legacy settings before encrypted workspace opening.
+      // Reloads retain the migrated vault rather than recreating a raw copy.
+      if (!api.getOwner() && !api.read('offline-vault-ref')) api.write('offline-settings', {
+        appearance:{id:'appearance', settings:{mode:theme, accent:'blue', panelOpacity:100}, updatedAt:1}
+      });
+    }});
+  }, theme);
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
   try {
     await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    assert.equal(await page.locator('html').getAttribute('data-appearance-theme'), theme, 'Guest appearance migrates into the encrypted workspace');
     await shapeAndIndependentSelection(page, 'concepts', selectedConcepts);
     await conceptCombinedFilters(page);
     await shapeAndIndependentSelection(page, 'questions', selectedQuestions);
@@ -324,6 +335,7 @@ async function runCase(browser, width, theme) {
     await context.setOffline(true);
     await page.reload({ waitUntil: 'load' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    assert.equal(await page.locator('html').getAttribute('data-appearance-theme'), theme, 'Encrypted guest appearance survives disconnected reload');
     assert.equal(await page.evaluate(() => navigator.onLine), false);
     await language(page, 'en');
     await assertSelectedRecords(page);

@@ -4,6 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const {installStorageProbe} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const storageKey = 'dmate:drawing-panels-browser-regression';
 const names = ['测试 A', '测试 B', '测试 C'];
@@ -721,13 +722,14 @@ async function runOCRDirectionContract(browser) {
 async function runOfflineViewport(browser, width) {
   const page = await browser.newPage({ viewport: { width, height: width === 390 ? 740 : 900 },
     isMobile: width === 390, hasTouch: width === 390, serviceWorkers: 'block' });
+  await installStorageProbe(page);
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   let modelCalls = 0;
   await page.route(/\/(?:chat|ocr|drawing\/[^?]+)(?:\?|$)/, route => { modelCalls++; return route.abort(); });
   try {
     await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
-    await page.evaluate(value => DMateGuestSession.write('drawings', {gallery:JSON.stringify(value)}), gallery);
+    await page.evaluate(value => __offlineTestStore.put('drawings', {id:'gallery',gallery:JSON.stringify(value),updatedAt:Date.now()}), gallery);
     if (width === 390) await page.locator('#offlineNavToggle').click();
     await page.locator('#graphDrawingBtn').click();
     await page.locator('#offlineDrawingHost .dge-overlay-viewport').waitFor();

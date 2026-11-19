@@ -5,6 +5,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const {installStorageProbe} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const profile = { mode:'dark', accent:'purple', fontSize:'large', backgroundFit:'contain',
   mask:17, blur:3, panelOpacity:80, bubbleOpacity:70 };
@@ -100,6 +101,7 @@ async function filledAppearanceActions(page) {
   const browser = await chromium.launch({ headless:true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath:process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   const context = await browser.newContext({ viewport:{ width:1440, height:900 } });
+  await installStorageProbe(context);
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -113,7 +115,9 @@ async function filledAppearanceActions(page) {
       const blob = await new Promise(resolve => canvas.toBlob(resolve,'image/png'));
       await writeAppearanceBackgroundBlob(blob);
       setAppearanceBackgroundVisual(blob);
-      await window.DMateOfflineBridge.snapshot();
+      const snapshot = await window.DMateOfflineBridge.snapshot();
+      if (Array.isArray(snapshot.drawings)) snapshot.drawings = JSON.stringify({version:2,activeId:snapshot.drawings[0]?.id || '',pages:snapshot.drawings});
+      await DMateOfflineHandoff.stage(snapshot);
     }, profile);
     await settledWallpaper(page);
     const online = await appearance(page);
@@ -164,15 +168,7 @@ async function filledAppearanceActions(page) {
     // the real controls. The failed draft must remain editable and uncommitted.
     await openAppearance(page);
     await page.locator('[data-appearance-accent="teal"]').click();
-    await page.evaluate(() => {
-      window.restoreAppearanceTransaction = Storage.prototype.setItem;
-      Storage.prototype.setItem = function(key, value) {
-        if (this === sessionStorage && key === 'dmate:guest-tab:v1') {
-          throw new DOMException('Appearance write blocked for regression test','QuotaExceededError');
-        }
-        return window.restoreAppearanceTransaction.call(this,key,value);
-      };
-    });
+    await page.evaluate(() => { window.__failOfflineAppearanceSave = true; });
     await page.locator('#appearanceDone').click();
     await page.locator('.dmate-delete-confirm[open]').waitFor({ state:'visible' });
     assert.equal(await page.locator('#appearanceDone').isDisabled(), false, 'Saving failure must permit retry');
@@ -180,10 +176,7 @@ async function filledAppearanceActions(page) {
     await page.keyboard.press('Escape');
     await page.locator('.dmate-delete-confirm[open]').waitFor({ state:'detached' });
     assert.equal(await page.locator('#appearanceModal').isVisible(), true, 'Notice dismissal must preserve the draft');
-    await page.evaluate(() => {
-      Storage.prototype.setItem = window.restoreAppearanceTransaction;
-      delete window.restoreAppearanceTransaction;
-    });
+    await page.evaluate(() => { window.__failOfflineAppearanceSave = false; });
     await page.locator('#appearanceDone').click();
     await page.locator('#appearanceModal').waitFor({ state:'hidden' });
     await page.reload({ waitUntil:'networkidle' }); await ready(page);

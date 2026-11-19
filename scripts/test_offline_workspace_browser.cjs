@@ -4,6 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const {installStorageProbe, records} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const panels = ['graph', 'concepts', 'questions', 'drawing', 'mistakes', 'notes'];
 const iconReferences = { drawing: '#graphDrawingBtn svg', graph: '#knowledgeGraphBtn svg' };
@@ -66,26 +67,16 @@ async function ready(page, expectedPanel = 'graph') {
     'The mobile header has no centered application logo or panel title');
   assert.equal(await page.locator('.offline-nav-item[aria-current="page"]').getAttribute('data-panel'), expectedPanel);
   const schema = await page.evaluate(() => new Promise((resolve, reject) => {
-    const request = indexedDB.open('dmate-offline-workspace', 3);
+    const request = indexedDB.open('dmate-offline-workspace');
     request.onerror = () => reject(request.error);
     request.onsuccess = () => { const db = request.result; resolve({ version: db.version, stores: [...db.objectStoreNames] }); db.close(); };
   }));
-  assert.deepEqual(schema, { version: 3, stores: ['mistakes', 'notes', 'practice', 'settings'] },
-    'The restored stores coexist with existing practice and settings');
+  assert.deepEqual(schema, { version: 4, stores: ['mistakes', 'notes', 'practice', 'settings'] },
+    'The legacy migration schema retains its original stores');
 }
 
 async function readStore(page, name) {
-  return page.evaluate(store => new Promise((resolve, reject) => {
-    const request = indexedDB.open('dmate-offline-workspace');
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      const db = request.result;
-      const tx = db.transaction(store, 'readonly');
-      const get = tx.objectStore(store).getAll();
-      tx.oncomplete = () => { db.close(); resolve(get.result); };
-      tx.onerror = () => { db.close(); reject(tx.error); };
-    };
-  }), name);
+  return (await records(page, name)).sort((a,b) => a.id.localeCompare(b.id));
 }
 
 async function geometry(locator) {
@@ -503,16 +494,9 @@ async function practice(page) {
     { id: 'legacy-written', questionId: 'archived-question', selected: [], response: '原有证明：α²≤Γ₁',
       createdAt: '2025-03-02T00:00:00Z', custom: { futureField: true } }
   ];
-  await page.evaluate(rows => new Promise((resolve, reject) => {
-    const request = indexedDB.open('dmate-offline-workspace');
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      const db = request.result, tx = db.transaction('practice', 'readwrite');
-      for (const row of rows) tx.objectStore('practice').put(row);
-      tx.oncomplete = () => { db.close(); resolve(); };
-      tx.onerror = () => { db.close(); reject(tx.error); };
-    };
-  }), legacy);
+  await page.evaluate(async rows => {
+    for (const row of rows) await __offlineTestStore.put('practice', row);
+  }, legacy);
   await select(representatives.at(-1));
   await detail.locator('summary.wrong-answer-summary').click();
   assert.deepEqual(await readStore(page, 'practice'), legacy, 'Existing practice content and metadata are untouched');
@@ -664,7 +648,10 @@ async function drawing(page, reference) {
   await navigate(page, 'drawing');
   const workspace = page.locator('#offlineDrawingHost .dmate-drawing-workspace');
   await workspace.waitFor();
-  const previousNames = await page.evaluate(() => JSON.parse(DMateGuestSession.read('drawings')?.gallery || '{"pages":[]}').pages.map(page => page.name));
+  const previousNames = await page.evaluate(async () => {
+    const gallery = (await __offlineTestStore.get('drawings', 'gallery'))?.gallery;
+    return (typeof gallery === 'string' ? JSON.parse(gallery) : gallery || {pages:[]}).pages.map(page => page.name);
+  });
   assert.ok(previousNames.length >= 2, 'The same guest tab retains drawings made in the online reference');
   assert.equal(await page.locator('#offlineDrawingTitle').innerText(), '绘图');
   assert.deepEqual(await drawingShellStyle(page, '#drawingPanel'), reference.outer,
@@ -759,7 +746,7 @@ async function drawing(page, reference) {
   await page.waitForFunction(count => document.querySelectorAll('.ddw-history-open').length === count, previousNames.length + 1);
   assert.deepEqual(await historyNames(), [...previousNames, '离线保存画板']);
   await history.click();
-  await page.waitForFunction(() => (DMateGuestSession.read('drawings')?.gallery || '').includes('离线保存画板'));
+  await page.waitForFunction(async () => JSON.stringify(await __offlineTestStore.get('drawings','gallery')).includes('离线保存画板'));
   assert.equal(await workspace.locator('.ddw-name').inputValue(), '离线保存画板');
 }
 
@@ -806,10 +793,17 @@ async function runCase(browser, width, theme) {
   const context = await browser.newContext({ viewport: { width, height: 900 }, isMobile: width < 1101,
     hasTouch: width < 1101, serviceWorkers: 'allow',
     ...(width < 760 ? { userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36' } : {}) });
+  await installStorageProbe(context);
   const page = await context.newPage(), errors = [], failures = [], nativeDialogs = [], apiRequests = [];
   let workerProtocol;
   try {
     const reference = await onlineReference(page, theme);
+    await page.evaluate(async () => {
+      const snapshot = await DMateOfflineBridge.snapshot();
+      const pages = snapshot.drawings;
+      if (Array.isArray(pages)) snapshot.drawings = JSON.stringify({version:2,activeId:pages[0]?.id || '',pages});
+      await DMateOfflineHandoff.stage(snapshot);
+    });
     await page.evaluate(async () => {
       await navigator.serviceWorker.register('/offline-service-worker.js', { scope: '/' });
       const registration = await navigator.serviceWorker.ready;

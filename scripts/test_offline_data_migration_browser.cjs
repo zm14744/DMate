@@ -2,6 +2,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const {installStorageProbe, records: vaultRecords, row: vaultRow} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.BASE_URL || process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const executablePath = process.env.CHROMIUM || process.env.CHROMIUM_EXECUTABLE_PATH;
 const dbName = 'dmate-offline-workspace', migrationKey = 'dmate_offline_migration_v1';
@@ -47,7 +48,7 @@ async function seed(page, fixture) {
   },{fixture,dbName,migrationKey,journalKey});
 }
 async function readState(page) {
-  return page.evaluate(({dbName,journalKey}) => new Promise((resolve,reject) => {
+  const state = await page.evaluate(({dbName,journalKey}) => new Promise((resolve,reject) => {
     const request = indexedDB.open(dbName);
     request.onerror = () => reject(request.error);
     request.onsuccess = async () => {
@@ -61,9 +62,12 @@ async function readState(page) {
       } catch(error) { reject(error); } finally { db.close(); }
     };
   }),{dbName,journalKey});
+  state.vault = {notes:await vaultRecords(page,'notes'),mistakes:await vaultRecords(page,'mistakes')};
+  return state;
 }
 async function migration(browser, legacy) {
   const context = await browser.newContext({viewport:{width:1440,height:950},serviceWorkers:'block'});
+  await installStorageProbe(context);
   const page = await bootstrap(context), errors = [], forbidden = [];
   page.on('pageerror',error=>errors.push(error.message));
   await page.route(/\/(?:chat|ocr(?:\/[^?]*)?|notebook\/analyze|auth\/[^?]*|sync)(?:\?|$)/,route=>{
@@ -100,10 +104,10 @@ async function migration(browser, legacy) {
     assert.equal(await page.locator('.offline-nav-item.active').getAttribute('data-panel'),'graph');
     assert.equal(await page.locator('#mistakesPanel,#notesPanel').count(),2);
     let state = await readState(page);
-    assert.equal(state.version,3); assert.deepEqual(state.stores,['mistakes','notes','practice','settings']);
+    assert.equal(state.version,4); assert.deepEqual(state.stores,['mistakes','notes','practice','settings']);
     assert.equal(state.journal,journal,'Unknown-owner legacy journal is preserved without replay');
-    const note = id => state.records.notes.find(row=>row.id===id+suffix(ownerA));
-    const mistake = id => state.records.mistakes.find(row=>row.id===id+suffix(ownerA));
+    const note = id => state.vault.notes.find(row=>row.id===id);
+    const mistake = id => state.vault.mistakes.find(row=>row.id===id);
     assert.equal(note('local-note').content,legacy?'Newest local note':'Older incoming text');
     assert.equal(note('updated-note').content,'New online content');
     assert.equal(mistake('local-mistake').statement,legacy?'Newest local question':'Older incoming question');
@@ -112,6 +116,9 @@ async function migration(browser, legacy) {
     assert.equal(mistake('updated-mistake').explanation,'Saved explanation');
     assert.equal(mistake('updated-mistake').status,'resolved');
     assert.equal(time(mistake('updated-mistake').createdAt),legacy?1000:5000,'Import keeps the original capture date');
+    assert.equal(state.records.notes.some(row=>row.id.endsWith(suffix(ownerA))),false,
+      'Verified encrypted migration removes only this owner’s old note sources');
+    assert.equal(state.records.mistakes.some(row=>row.id.endsWith(suffix(ownerA))),false);
     if (legacy) {
       assert.equal(note('deleted-note'),undefined);assert.equal(mistake('deleted-mistake'),undefined);
       assert.equal(note('updated-note').custom,oldNote.custom);assert.equal(mistake('updated-mistake').custom,oldMistake.custom);
@@ -134,13 +141,16 @@ async function migration(browser, legacy) {
       'Stored correction and explanation data do not recreate removed offline controls');
     assert.equal(await page.locator('#mistakeList [data-action="delete-mistake"] svg').count(),0);
     assert.ok((await page.locator('#mistakeList .wrong-date').count())>0,'Original capture dates remain visible');
-    const gallery = await page.evaluate(key=>JSON.parse(localStorage.getItem(key)), 'dmate:offline:drawing-gallery:v1'+suffix(ownerA));
+    const savedGallery = (await vaultRow(page,'drawings','gallery')).gallery;
+    const gallery = typeof savedGallery === 'string' ? JSON.parse(savedGallery) : savedGallery;
     assert.deepEqual(gallery.pages.map(row=>row.id),['shared','incoming-only']);
     if (legacy) { assert.equal(gallery.pages[0].name,'Existing drawing');assert.equal(gallery.activeId,'shared');assert.deepEqual(gallery.custom,localGallery.custom); }
+    assert.equal(await page.evaluate(key=>localStorage.getItem(key),'dmate:offline:drawing-gallery:v1'+suffix(ownerA)),null,
+      'The migrated gallery no longer has a plaintext offline localStorage copy');
     await page.evaluate(({incoming,migrationKey})=>sessionStorage.setItem(migrationKey,JSON.stringify(incoming)),{incoming,migrationKey});
     await page.reload();await ready(page);state=await readState(page);
-    assert.equal(state.records.notes.filter(row=>row.id==='local-note'+suffix(ownerA)).length,1,'Re-entry does not duplicate notes');
-    assert.equal(state.records.mistakes.filter(row=>row.id==='local-mistake'+suffix(ownerA)).length,1,'Re-entry does not duplicate mistakes');
+    assert.equal(state.vault.notes.filter(row=>row.id==='local-note').length,1,'Re-entry does not duplicate notes');
+    assert.equal(state.vault.mistakes.filter(row=>row.id==='local-mistake').length,1,'Re-entry does not duplicate mistakes');
     if (legacy) {
       await page.evaluate(owner=>DMateGuestSession.setAccountOwner(owner),ownerB);await page.reload();await ready(page);
       await page.locator('.offline-nav-item[data-panel="notes"]').click();
@@ -153,21 +163,25 @@ async function migration(browser, legacy) {
   } finally { await context.close(); }
 }
 async function guestMigration(browser) {
-  const context=await browser.newContext({serviceWorkers:'block'}),page=await bootstrap(context,'');
+  const context=await browser.newContext({serviceWorkers:'block'});
+  await installStorageProbe(context);
+  const page=await bootstrap(context,'');
   try {
     await page.evaluate(key=>sessionStorage.setItem(key,JSON.stringify({username:'',drawings:'',
       notes:[{id:'guest-note',title:'Guest note',content:'Temporary text',updatedAt:1000}],
       wrongQuestions:[{id:'guest-wrong',question:'Temporary question',updatedAt:1000}]})),migrationKey);
     await page.goto(baseURL+'/offline');await ready(page);
-    assert.equal(await page.evaluate(()=>Object.values(DMateGuestSession.read('offline-notes')||{}).length),1);
-    assert.equal(await page.evaluate(()=>Object.values(DMateGuestSession.read('offline-mistakes')||{}).length),1);
+    assert.equal((await vaultRecords(page,'notes')).length,1);
+    assert.equal((await vaultRecords(page,'mistakes')).length,1);
+    assert.equal(await page.evaluate(()=>DMateGuestSession.read('offline-notes')),null);
+    assert.equal(await page.evaluate(()=>DMateGuestSession.read('offline-mistakes')),null);
     const state=await readState(page);assert.deepEqual(state.records.notes,[]);assert.deepEqual(state.records.mistakes,[]);
     await page.reload();await ready(page);
-    assert.equal(await page.evaluate(()=>Object.values(DMateGuestSession.read('offline-notes')||{}).length),1);
+    assert.equal((await vaultRecords(page,'notes')).length,1);
     const fresh=await context.newPage();await fresh.goto(baseURL+'/offline');await ready(fresh);
-    assert.deepEqual(await fresh.evaluate(()=>DMateGuestSession.read('offline-notes')||{}),{});
-    assert.deepEqual(await fresh.evaluate(()=>DMateGuestSession.read('offline-mistakes')||{}),{});
-    assert.equal(await page.evaluate(()=>Object.values(localStorage).some(value=>value.includes('Temporary text')||value.includes('Temporary question'))),false);
+    assert.deepEqual(await vaultRecords(fresh,'notes'),[]);
+    assert.deepEqual(await vaultRecords(fresh,'mistakes'),[]);
+    assert.equal(await page.evaluate(()=>[...Object.values(localStorage),...Object.values(sessionStorage)].some(value=>value.includes('Temporary text')||value.includes('Temporary question'))),false);
     console.log('PASS guest records: current-tab import and refresh, empty new tab, no permanent personal records');
   } finally { await context.close(); }
 }
@@ -189,10 +203,11 @@ async function bridge(browser) {
       let rejected=false;try{await pending;}catch(_){rejected=true;}finally{readAppearanceBackgroundBlob=read;}
       return {snapshot,rejected};
     },documentFor('Legacy original'));
-    assert.deepEqual(Object.keys(result.snapshot).sort(),['drawings','notes','username','wrongQuestions']);
+    assert.deepEqual(Object.keys(result.snapshot).sort(),['appearance','drawings','notes','username','wrongQuestions']);
     assert.equal(result.snapshot.username,'');assert.deepEqual(result.snapshot.notes.map(row=>row.id),['active-note']);
     assert.deepEqual(result.snapshot.wrongQuestions.map(row=>row.id),['active-wrong']);
-    assert.equal(result.snapshot.drawings[0].id,'legacy-local');assert.equal(result.rejected,true,'A late snapshot cannot cross an account context change');
+    const drawings=typeof result.snapshot.drawings==='string'?JSON.parse(result.snapshot.drawings).pages:result.snapshot.drawings;
+    assert.equal(drawings[0].id,'legacy-local');assert.equal(result.rejected,true,'A late snapshot cannot cross an account context change');
     console.log('PASS real online bridge: only current in-memory personal records, deleted filtering and stale-owner rejection');
   } finally { await context.close(); }
 }
@@ -201,8 +216,8 @@ async function entry(browser,kind) {
   const gallery={version:2,pages:[drawing('entry-page','Entry','entry',1)]};
   const notes=[{id:'entry-note',title:'Own note',content:'Own text',updatedAt:1000}],wrongQuestions=[{id:'entry-wrong',question:'Own question',updatedAt:1000}];
   await context.route('**/__offline-entry-test',route=>route.fulfill({contentType:'text/html',body:
-    '<!doctype html><html data-account-authenticated="'+(kind==='guest'?'0':'1')+'" data-account-username="'+username+'"><body><button id="offlineWorkspaceBtn">离线版</button><script src="/static/offline-entry.js"></script>'}));
-  await context.route('**/offline',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Captured handoff</title>'}));
+    '<!doctype html><html data-account-authenticated="'+(kind==='guest'?'0':'1')+'" data-account-username="'+username+'"><body><button id="offlineWorkspaceBtn">离线版</button><script src="/static/guest-session.js"></script><script>DMateGuestSession.setAccountOwner('+JSON.stringify(kind==='guest'?'':username)+')</script><script src="/static/offline-handoff.js"></script><script src="/static/offline-entry.js"></script>'}));
+  await context.route('**/offline',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Captured handoff</title><script src="/static/guest-session.js"></script><script src="/static/offline-handoff.js"></script>'}));
   await context.addInitScript(({kind,username,gallery,notes,wrongQuestions})=>{
     if(location.pathname!=='/__offline-entry-test')return;
     localStorage.setItem('dmate:graph-gallery:v1::'+encodeURIComponent('account:'+username),JSON.stringify(gallery));
@@ -214,13 +229,20 @@ async function entry(browser,kind) {
   },{kind,username,gallery,notes,wrongQuestions});
   const page=await context.newPage();
   try {
-    await page.goto(baseURL+'/__offline-entry-test');await page.locator('#offlineWorkspaceBtn').click();await page.waitForURL(baseURL+'/offline');
-    const payload=await page.evaluate(key=>JSON.parse(sessionStorage.getItem(key)),migrationKey);
-    assert.deepEqual(Object.keys(payload).sort(),['drawings','notes','username','wrongQuestions']);
-    assert.equal(payload.username,kind==='guest'?'':username);
-    assert.deepEqual(payload.notes,kind==='bridge'?notes:[]);assert.deepEqual(payload.wrongQuestions,kind==='bridge'?wrongQuestions:[]);
-    if(kind==='guest')assert.equal(payload.drawings,'');else assert.deepEqual(JSON.parse(payload.drawings).pages,gallery.pages);
-    console.log('PASS entry '+kind+': current snapshot handoff, safe fallback and guest stale-account exclusion');
+    await page.goto(baseURL+'/__offline-entry-test');await page.locator('#offlineWorkspaceBtn').click();
+    if(kind==='bridge') {
+      await page.waitForURL(baseURL+'/offline');
+      const payload=await page.evaluate(()=>DMateOfflineHandoff.read(DMateOfflineHandoff.pendingToken()));
+      assert.deepEqual(Object.keys(payload).sort(),['appearance','drawings','notes','username','wrongQuestions']);
+      assert.equal(payload.username,username);assert.deepEqual(payload.notes,notes);assert.deepEqual(payload.wrongQuestions,wrongQuestions);
+      assert.deepEqual(JSON.parse(payload.drawings).pages,gallery.pages);
+      assert.equal(await page.evaluate(key=>sessionStorage.getItem(key),migrationKey),null,'New navigation never writes the old plaintext payload');
+    } else {
+      await page.waitForFunction(()=>!document.getElementById('offlineWorkspaceBtn').disabled);
+      assert.equal(new URL(page.url()).pathname,'/__offline-entry-test','A missing bridge preserves this page instead of reading old plaintext caches');
+      assert.equal(await page.evaluate(()=>DMateOfflineHandoff.pendingToken()),null);
+    }
+    console.log('PASS entry '+kind+': encrypted current-memory handoff or recoverable missing bridge');
   } finally { await context.close(); }
 }
 async function blockedUpgrade(browser) {

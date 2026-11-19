@@ -13,7 +13,9 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   const doc=host.ownerDocument,win=doc.defaultView;
   if(!root.DMateGraphEditor?.mount)throw new Error(uiText('绘图模块未加载，请刷新后重试。'));
   const key=String(options.storageKey||'dmate:graph-gallery:v1:guest');
-  const persistent=options.persistent===true,sessionState=options.sessionState||{};
+  const persistence=options.persistence;
+  if(persistence&&typeof persistence.save!=='function')throw new Error('Drawing persistence requires a save function');
+  const persistent=!persistence&&options.persistent===true,sessionState=persistence?{}:options.sessionState||{};
   // Online callers retain every feature. Embedded offline owners can omit
   // remote actions entirely, including their controls and event handlers.
   const features={ai:options.features?.ai!==false,upload:options.features?.upload!==false};
@@ -21,6 +23,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   let savedRaw='',restoredGallery=false,exportPreview=null,exportPreviewUrl='',chromeFrame=0,observedView=null,observedViewport=null,observedPalette=null,toolsExpanded=false,deletePending=null;
   let noticeFrame=0,noticeCurrent='',noticeQueue=[],persistNoticeShown='';
   let galleryMetadata={};
+  let saveQueue=Promise.resolve(true),pendingSaves=0,queuedRaw='';
   const el=(tag,className,text)=>{const n=doc.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;};
   const button=(text,fn,className)=>{const b=el('button',className,text);b.type='button';b.addEventListener('click',event=>{event.stopPropagation();if(!destroyed)void fn();});return b;};
   const sendIcon=()=>{const svg=doc.createElementNS('http://www.w3.org/2000/svg','svg'),path=doc.createElementNS(svg.namespaceURI,'path');
@@ -195,18 +198,62 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   doc.addEventListener('pointerdown',outsidePointer,true);doc.addEventListener('keydown',escapeKey,true);
   win.addEventListener('resize',queueChrome);doc.addEventListener('scroll',documentScrolled,true);win.visualViewport?.addEventListener('resize',queueChrome);win.visualViewport?.addEventListener('scroll',queueChrome);
   function currentDocument(){return editor?.getDocument?.()||active()?.document||emptyDocument();}
-  function collect(){const p=active();if(!p)return;p.document=clone(currentDocument());p.name=caption(name.value);p.updatedAt=Date.now();}
+  function collect(){const p=active();if(!p)return;const value=clone(currentDocument()),title=caption(name.value);
+   const changed=!persistence||fingerprint(p.document)!==fingerprint(value)||p.name!==title;
+   p.document=value;p.name=title;if(changed)p.updatedAt=Date.now();}
+  function saveFailure(error){
+   if(error?.code==='CONFLICT')return uiText('此绘图库已在另一个页面修改，当前绘图仍保留，请重新打开后重试。','This gallery changed in another page. Your current drawing is retained; reopen it and retry.');
+   const reason={
+    QUOTA_EXCEEDED:uiText('此设备存储空间不足。','This device has insufficient storage space.'),
+    TOO_LARGE:uiText('绘图库超过保存大小限制。','The gallery exceeds the storage size limit.'),
+    CLOSED:uiText('账号状态已变化，请重新打开离线页面。','The account state changed; reopen the offline page.'),
+    STORAGE_BLOCKED:uiText('请关闭旧版离线页面后重试。','Close older offline pages and retry.'),
+    KEYSTORE_UNAVAILABLE:uiText('系统密钥库暂时无法使用或已锁定。','The system key store is unavailable or locked.')
+   }[error?.code];
+   return reason?uiText('绘图未能保存：','The drawing could not be saved: ')+reason+' '+uiText('当前内容仍在本页保留，请重试后再关闭页面。','It remains on this page; retry before closing.')
+    :uiText('绘图未能保存，当前内容仍在本页保留，请重试后再关闭页面。','The drawing could not be saved. It remains on this page; retry before closing.');
+  }
   function persist(notify=true){
    clearTimeout(timer);timer=null;if(destroyed)return false;
    const payload=JSON.stringify({...galleryMetadata,version:2,activeId,pages});
    // Keep the complete gallery in this owner's page memory even when storage
    // is full. Closing the drawing dialog must not discard that newer draft.
    sessionState.gallery=payload;
+   if(persistence){
+    if(!pendingSaves&&payload===savedRaw&&!sessionState.galleryDirty)return true;
+    if(pendingSaves&&payload===queuedRaw)return false;
+    sessionState.galleryDirty=true;queuedRaw=payload;pendingSaves++;
+    const snapshot=JSON.parse(payload);
+    saveQueue=saveQueue.then(async()=>{
+     try{
+      if(destroyed)return false;
+      const result=await persistence.save(snapshot);
+      if(result===false)throw new Error('Drawing save did not commit');
+      savedRaw=payload;
+      // An older completed write must not acknowledge a newer drawing draft.
+      if(sessionState.gallery===payload&&!timer){sessionState.galleryDirty=false;persistError='';persistNoticeShown='';}
+      return true;
+     }catch(error){
+      sessionState.galleryDirty=true;
+      persistError=saveFailure(error);
+      if(notify&&!destroyed)setStatus();
+      return false;
+     }finally{pendingSaves--;if(!pendingSaves)queuedRaw='';}
+    });
+    return false;
+   }
    if(payload===savedRaw&&!sessionState.galleryDirty)return true;
    try{if(sessionState.gallerySaveFailed)throw new Error('Guest gallery checkpoint failed');if(persistent)win.localStorage.setItem(key,payload);sessionState.galleryDirty=false;savedRaw=payload;persistError='';persistNoticeShown='';return true;}
    catch(_){sessionState.galleryDirty=true;persistError='此设备存储不足，当前绘图仍在本页保留；请导出图片后再关闭页面。';if(notify)setStatus();return false;}
   }
-  function schedule(){clearTimeout(timer);timer=win.setTimeout(()=>persist(),350);}
+  async function flush(){
+   if(destroyed)return false;
+   collect();persist();
+   let observed,result;
+   do{observed=saveQueue;result=await observed;}while(!destroyed&&observed!==saveQueue);
+   return persistence?Boolean(result&&!sessionState.galleryDirty):!sessionState.galleryDirty;
+  }
+  function schedule(){if(persistence)sessionState.galleryDirty=true;clearTimeout(timer);timer=win.setTimeout(()=>persist(),350);}
   function mountPage(){
    editor?.destroy();editor=null;const p=active(),documentValue=p?.document||emptyDocument();
    name.value=p?.name||'';nameFollowsGraph=false;requirement=p?.requirement||'';answer='';answerDocument='';answerRequirement='';
@@ -217,7 +264,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
     onChange:value=>{if(destroyed)return;const selected=active();if(!selected)return;selected.document=clone(value);selected.updatedAt=Date.now();
      if(nameFollowsGraph&&doc.activeElement!==name&&value.graphs[0]){selected.name=caption(value.graphs[0].name);name.value=selected.name;}
      options.onChange?.(clone(value));invalidateAnswer();schedule();},
-    onConfirm:async value=>{const selected=active();if(!selected)return;selected.document=clone(value);selected.name=caption(name.value);selected.updatedAt=Date.now();if(!persist())throw new Error(persistError);if(panelMode==='history')renderPanel();}
+    onConfirm:async value=>{const selected=active();if(!selected)return;selected.document=clone(value);selected.name=caption(name.value);selected.updatedAt=Date.now();const saved=persistence?await flush():persist();if(!saved)throw new Error(persistError);if(panelMode==='history')renderPanel();}
    });
    const mountedDocument=currentDocument();if(p)p.document=clone(mountedDocument);
    options.onChange?.(clone(mountedDocument));renderPanel();syncChrome();
@@ -370,7 +417,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   async function exportImage(){if(exportBusy)return;busy(true);try{collect();persist();const metadata={name:caption(name.value)},{blob}=await makeImage();if(destroyed)return;if(typeof options.onExport==='function')await options.onExport(blob,metadata);else await root.DMateDrawingExport.save(blob,metadata.name,{document:doc,mobilePreview:showExportPreview});if(!destroyed)setStatus('');}catch(error){if(!destroyed)setStatus(error?.message||'图片导出失败。');}finally{if(!destroyed)busy(false);}}
   async function uploadImage(){
    if(!features.upload||exportBusy)return;busy(true);uploadBusy=true;
-   try{if(typeof options.onUpload!=='function')throw new Error(uiText('上传功能未就绪，请刷新后重试。'));collect();persist();const pageName=caption(name.value),requirements=requirement,{blob,document}=await makeImage();if(destroyed)return;await options.onUpload(blob,{name:pageName,document,requirements});if(!destroyed){setStatus('');options.onClose?.();}}
+   try{if(typeof options.onUpload!=='function')throw new Error(uiText('上传功能未就绪，请刷新后重试。'));collect();if(persistence){if(!await flush())throw new Error(persistError);}else persist();const pageName=caption(name.value),requirements=requirement,{blob,document}=await makeImage();if(destroyed)return;await options.onUpload(blob,{name:pageName,document,requirements});if(!destroyed){setStatus('');options.onClose?.();}}
    catch(error){if(!destroyed)setStatus(error?.message||'绘图上传失败，请重试。');}
    finally{uploadBusy=false;if(!destroyed)busy(false);}
   }
@@ -380,7 +427,9 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    schedule();}});
   try{
    const draft=persistent&&sessionState.galleryDirty?sessionState.gallery:null;
-   const raw=draft||(persistent?win.localStorage.getItem(key):sessionState.gallery),value=raw?JSON.parse(raw):null;
+   const initial=persistence?.initialGallery;
+   const raw=persistence?(typeof initial==='string'?initial:initial?JSON.stringify(initial):sessionState.gallery)
+    :draft||(persistent?win.localStorage.getItem(key):sessionState.gallery),value=raw?JSON.parse(raw):null;
    if((value?.version===1||value?.version===2)&&Array.isArray(value.pages)){
     restoredGallery=true;
     galleryMetadata={...value};
@@ -405,7 +454,8 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   // failed mount cannot leave a drawing action in the shared image dialog.
   exportHeader.classList.add('has-drawing-header-export');exportHeader.insertBefore(exportButton,exportHeader.querySelector(':scope > .graph-editor-close-dot'));
   const pageHide=()=>{collect();persist(false);};win.addEventListener('pagehide',pageHide);
-  return{getDocument:()=>clone(currentDocument()),getPages:()=>clone(pages),isBusy:()=>uploadBusy,createPageFromDocument,
+  return{getDocument:()=>clone(currentDocument()),getPages:()=>clone(pages),isBusy:()=>uploadBusy,createPageFromDocument,flush,
+   hasUnsavedChanges:()=>Boolean(sessionState.galleryDirty||pendingSaves),
    fitView:()=>editor?.fitView?.(),
    destroy(){if(destroyed)return;collect();persist(false);destroyed=true;noticeQueue=[];if(noticeFrame)win.cancelAnimationFrame(noticeFrame);root.DMateDeleteConfirm?.cancel(noticeOwner);cancelDelete();closeExportPreview();clearTimeout(timer);if(chromeFrame)win.cancelAnimationFrame(chromeFrame);chromeObserver.disconnect();resizeObserver?.disconnect();abortAnswer();doc.removeEventListener('pointerdown',outsidePointer,true);doc.removeEventListener('keydown',escapeKey,true);doc.removeEventListener('scroll',documentScrolled,true);win.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('scroll',queueChrome);win.removeEventListener('pagehide',pageHide);editor?.destroy();exportButton.remove();if(!exportHeader.querySelector(':scope > .ddw-header-export'))exportHeader.classList.remove('has-drawing-header-export');host.replaceChildren();host.classList.remove('has-drawing-workspace');}};
  }

@@ -2,6 +2,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const {chromium} = require('playwright');
+const {installStorageProbe,records} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const styleKeys = ['fontFamily','fontSize','fontWeight','lineHeight','color','backgroundColor',
   'borderTopWidth','borderTopStyle','borderTopColor','borderRadius','boxShadow','paddingTop','paddingRight'];
@@ -9,7 +10,6 @@ const style = locator => locator.evaluate((node, keys) => Object.fromEntries(key
 const circle = locator => locator.evaluate(node => Object.fromEntries(['width','height','borderRadius','backgroundColor',
   'borderTopWidth','borderTopStyle','borderTopColor','appearance'].map(key => [key,getComputedStyle(node)[key]])));
 const ready = page => page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
-const records = (page, name) => page.evaluate(name => Object.values(DMateGuestSession.read('offline-'+name) || {}),name);
 const settle = page => page.evaluate(async()=>{
   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   await Promise.all(document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity)
@@ -88,6 +88,7 @@ async function noOverflow(page,panel) {
 }
 async function exercise(page,reference,width) {
   await navigate(page,'mistakes');
+  await page.waitForFunction(()=>document.getElementById('mistakeList').textContent.trim().length>0);
   assert.equal((await page.locator('#mistakeList').innerText()).trim(),'无');
   assert.equal(await page.locator('#addMistake,#recordDialog,#recordForm,#recordTitle,#recordContent').count(),0,
     'The removed manual mistake controls are absent, not merely hidden');
@@ -95,7 +96,7 @@ async function exercise(page,reference,width) {
   await navigate(page,'questions');
   if(width<=1100)await page.locator('#questionFullView').click();
   const add=page.locator('#questionDetail [data-action="add-to-mistakes"]');await add.waitFor({state:'visible'});await add.click();
-  await page.waitForFunction(()=>Object.keys(DMateGuestSession.read('offline-mistakes')||{}).length===1);
+  await page.waitForFunction(async()=>(await __offlineTestStore.all('mistakes')).length===1);
   const first=(await records(page,'mistakes'))[0];
   assert.ok(first.questionId&&first.statement&&first.answer&&first.createdAt,'Practice capture retains the question, reference answer and capture time');
   await add.click();
@@ -119,12 +120,13 @@ async function exercise(page,reference,width) {
   await remove.click();await page.locator('.dmate-delete-confirm-close').click();
   assert.equal((await records(page,'mistakes')).length,1,'Cancel removal retains the original record');
   await remove.click();await confirmDeletion(page);
-  await page.waitForFunction(()=>Object.keys(DMateGuestSession.read('offline-mistakes')||{}).length===0);
+  await page.waitForFunction(async()=>(await __offlineTestStore.all('mistakes')).length===0);
+  await page.waitForFunction(()=>document.getElementById('mistakeList').textContent.trim()==='无');
   assert.equal((await page.locator('#mistakeList').innerText()).trim(),'无');
   await navigate(page,'questions');
   if(width<=1100)await page.locator('#questionFullView').click();
   await page.locator('#questionDetail [data-action="add-to-mistakes"]').click();
-  await page.waitForFunction(()=>Object.keys(DMateGuestSession.read('offline-mistakes')||{}).length===1);
+  await page.waitForFunction(async()=>(await __offlineTestStore.all('mistakes')).length===1);
   await navigate(page,'mistakes');
   await noOverflow(page,'mistakes');
   if(width===390&&process.env.OFFLINE_RECORDS_SCREENSHOTS==='1')await page.screenshot({path:'/tmp/dmate-offline-records-390-mistakes.png'});
@@ -136,14 +138,14 @@ async function exercise(page,reference,width) {
   assert.equal(await page.locator('.dcn-original').getAttribute('aria-label'),'概念内容');
   assert.equal((await page.locator('.dcn-editor label').last().innerText()).trim(),'概念内容');
   await page.locator('.dcn-title').fill('集合笔记');await page.locator('.dcn-original').fill('保留我的原始推导：幂集含有所有子集');
-  await page.waitForFunction(()=>Object.values(DMateGuestSession.read('offline-notes')||{}).some(row=>row.content.includes('原始推导')));
+  await page.waitForFunction(async()=>(await __offlineTestStore.all('notes')).some(row=>row.content.includes('原始推导')));
   const firstNote=(await records(page,'notes'))[0];
   await page.mouse.move(0,0);await settle(page);assert.deepEqual(await style(page.locator('#addNote')),reference.create,'The original notebook create action has the online filled style');
   assert.deepEqual(await circle(page.locator('.dcn-note-delete')),reference.remove,'The notebook delete dot matches the online red circle');
   assert.equal(await page.locator('#notesPanel .dcn-note-select,#notesPanel input[type="checkbox"]').count(),0,'Offline note rows have no selection circles');
   assert.equal(await page.locator('#notesPanel .dcn-selection').count(),0,'Offline notes have no selected-count hint');
   await page.locator('#addNote').click();await page.locator('.dcn-title').fill('图论笔记');await page.locator('.dcn-original').fill('路径、回路和连通性');
-  await page.waitForFunction(()=>Object.keys(DMateGuestSession.read('offline-notes')||{}).length===2);
+  await page.waitForFunction(async()=>(await __offlineTestStore.all('notes')).length===2);
   const search=page.locator('.dcn-search');await search.fill('不会匹配的内容');
   assert.equal((await page.locator('.dcn-list-empty').innerText()).trim(),'无');
   await search.fill('原始推导');assert.equal(await page.locator('.dcn-note').count(),1,'Original note search includes its content');
@@ -158,11 +160,13 @@ async function exercise(page,reference,width) {
   await page.locator('.dcn-note[data-note-id="'+firstNote.id+'"] .dcn-note-open').click();
   assert.equal(await page.locator('.dcn-original').inputValue(),'保留我的原始推导：幂集含有所有子集');
   await page.locator('.dcn-note[data-note-id="'+firstNote.id+'"] .dcn-note-delete').click();await confirmDeletion(page);
-  await page.waitForFunction(()=>Object.keys(DMateGuestSession.read('offline-notes')||{}).length===1);
-  await navigate(page,'mistakes');assert.equal(await page.locator('.wrong-card').count(),1,'Practice capture survives the same offline refresh');
+  await page.waitForFunction(async()=>(await __offlineTestStore.all('notes')).length===1);
+  await navigate(page,'mistakes');await page.locator('#mistakeList .wrong-card').waitFor({state:'visible'});
+  assert.equal(await page.locator('.wrong-card').count(),1,'Practice capture survives the same offline refresh');
 }
 async function run(browser,width,theme) {
   const context=await browser.newContext({viewport:{width,height:900},isMobile:width<=1100,hasTouch:width<=1100,serviceWorkers:'allow'});
+  await installStorageProbe(context);
   const page=await context.newPage(),errors=[],apiRequests=[],failures=[];let workerProtocol;
   await context.route('**/auth/me',route=>route.fulfill({contentType:'application/json',body:'{"configured":true,"authenticated":false}'}));
   await context.route(/\/(?:chat|ocr(?:\/[^?]*)?|graph\/[^?]*|notebook\/analyze|analyze-questions|classify|conversation\/title)(?:\?|$)/,
@@ -185,48 +189,41 @@ async function run(browser,width,theme) {
   }finally{await context.close();if(workerProtocol)await workerProtocol.detach().catch(()=>{});}
 }
 async function recordRaces(browser){
-  const context=await browser.newContext({viewport:{width:1440,height:1000},serviceWorkers:'block'}),page=await context.newPage();
-  const errors=[],calls=[];page.on('pageerror',error=>errors.push(error.message));
+  const context=await browser.newContext({viewport:{width:1440,height:1000},serviceWorkers:'block'});
+  await installStorageProbe(context);
+  const page=await context.newPage(),errors=[],calls=[];
+  page.on('pageerror',error=>errors.push(error.message));
   await context.route(/\/(?:auth|chat|ocr|graph\/|notebook\/analyze|analyze-questions|classify|sync)(?:\/|\?|$)/,
     route=>{calls.push(new URL(route.request().url()).pathname);return route.abort();});
-  const rows=store=>page.evaluate(store=>new Promise((resolve,reject)=>{
-    const opening=indexedDB.open('dmate-offline-workspace');opening.onerror=()=>reject(opening.error);
-    opening.onsuccess=()=>{const db=opening.result,request=db.transaction(store).objectStore(store).getAll();
-      request.onsuccess=()=>{db.close();resolve(request.result);};request.onerror=()=>reject(request.error);};
-  }),store);
   try{
     await page.goto(baseURL+'/offline',{waitUntil:'networkidle'});await ready(page);
-    await page.evaluate(()=>DMateGuestSession.setAccountOwner('race-owner-a'));
-    await page.reload({waitUntil:'networkidle'});await ready(page);await navigate(page,'notes');
+    await Promise.all([page.waitForNavigation({waitUntil:'networkidle'}),page.evaluate(()=>{
+      window.dispatchEvent(new CustomEvent('dmate:account-state',{detail:{authenticated:true,username:'race-owner-a'}}));
+    })]);
+    await ready(page);await navigate(page,'notes');
     await page.locator('#addNote').click();await page.locator('.dcn-title').fill('Private A concept');
     await page.locator('.dcn-original').fill('A initial note');
-    await page.waitForFunction(()=>new Promise(resolve=>{
-      const opening=indexedDB.open('dmate-offline-workspace');opening.onsuccess=()=>{const db=opening.result,
-        request=db.transaction('notes').objectStore('notes').getAll();request.onsuccess=()=>{db.close();resolve(request.result.some(row=>row.content==='A initial note'));};};
-    }));
-    await page.evaluate(()=>{
-      const original=IDBDatabase.prototype.transaction;
-      IDBDatabase.prototype.transaction=function(stores,mode,...args){const tx=original.call(this,stores,mode,...args);
-        if(mode==='readwrite'&&(stores==='notes'||Array.isArray(stores)&&stores.includes('notes'))){
-          IDBDatabase.prototype.transaction=original;
-          Object.defineProperty(tx,'oncomplete',{configurable:true,set(handler){window.releaseNoteRace=()=>handler();}});
-        }return tx;
-      };
-    });
+    await page.waitForFunction(async()=>(await __offlineTestStore.all('notes')).some(row=>row.content==='A initial note'));
+    await page.evaluate(()=>{window.__holdNextOfflineNoteSave=true;});
     await page.locator('.dcn-original').fill('A first held save');
-    await page.waitForFunction(()=>typeof releaseNoteRace==='function');
+    await page.waitForFunction(()=>typeof __releaseOfflineNoteSave==='function');
     await page.locator('.dcn-original').fill('A PRIVATE QUEUED SAVE');
     await Promise.all([page.waitForNavigation({waitUntil:'networkidle'}),page.evaluate(()=>{
-      DMateGuestSession.setAccountOwner('race-owner-b');releaseNoteRace();
+      DMateGuestSession.setAccountOwner('race-owner-b');__releaseOfflineNoteSave();
+      window.dispatchEvent(new CustomEvent('dmate:account-state',{detail:{authenticated:true,username:'race-owner-b'}}));
     })]);await ready(page);
     assert.equal(await page.evaluate(()=>DMateGuestSession.getOwner()),'race-owner-b');
-    const saved=await rows('notes');
-    assert.ok(saved.some(row=>row.id.endsWith('::account%3Arace-owner-a')),'The authorized first save remains with account A');
-    assert.ok(!saved.some(row=>row.id.endsWith('::account%3Arace-owner-b')&&/A PRIVATE|A first/.test(row.content)),
-      'A queued save never follows a later account owner into B');
+    assert.deepEqual(await records(page,'notes'),[],'A delayed notebook save cannot write into a new owner');
     await navigate(page,'notes');assert.equal(await page.locator('.dcn-note').count(),0,'The new account sees no previous private concepts');
+    await Promise.all([page.waitForNavigation({waitUntil:'networkidle'}),page.evaluate(()=>{
+      window.dispatchEvent(new CustomEvent('dmate:account-state',{detail:{authenticated:true,username:'race-owner-a'}}));
+    })]);
+    await ready(page);
+    const saved=await records(page,'notes');
+    assert.ok(saved.some(row=>row.content==='A first held save'),'The authorized first save remains with account A');
+    assert.ok(!saved.some(row=>row.content==='A PRIVATE QUEUED SAVE'),'The cancelled queued edit is never persisted into either workspace');
     assert.deepEqual(errors,[]);assert.deepEqual(calls,[]);
-    console.log('PASS delayed notebook saves retain their original owner after account changes');
+    console.log('PASS delayed encrypted notebook saves retain their original owner after account changes');
   }finally{await context.close();}
 }
 (async()=>{

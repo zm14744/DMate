@@ -4,6 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const {installStorageProbe} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const dimensions = { desktop: { width: 1440, height: 900 }, mobile: { width: 390, height: 844 } };
 const username = 'responsive-view-local-fixture';
@@ -44,12 +45,21 @@ async function pageFixture(browser, kind, offline, startingMode) {
   await page.route('**/auth/me', route => route.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify({ configured: true, authenticated: false }) }));
   await page.route(/\/(?:chat|ocr|drawing\/[^?]+)(?:\?|$)/, route => { modelCalls++; return route.abort(); });
-  await page.addInitScript(({ offline, key, gallery }) => {
+  if (offline) await installStorageProbe(context);
+  else await page.addInitScript(({ key, gallery }) => {
     localStorage.setItem('dmate:offline:appearance:v1', JSON.stringify({ mode: 'dark', accent: 'blue', panelOpacity: 100 }));
-    localStorage.setItem(offline ? 'dmate:offline:drawing-gallery:v1' : key, JSON.stringify(gallery));
-  }, { offline, key: 'dmate:graph-gallery:v1::' + encodeURIComponent('account:' + username), gallery });
+    localStorage.setItem(key, JSON.stringify(gallery));
+  }, { key: 'dmate:graph-gallery:v1::' + encodeURIComponent('account:' + username), gallery });
   await page.goto(baseURL + (offline ? '/offline' : ''), { waitUntil: 'networkidle' });
   if (offline) {
+    await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    await page.evaluate(async gallery => {
+      await __offlineTestStore.put('drawings', {id:'gallery',gallery:JSON.stringify(gallery),updatedAt:Date.now()});
+      await __offlineTestStore.put('settings', {id:'appearance',settings:{mode:'dark',accent:'blue',panelOpacity:100},updatedAt:Date.now()});
+    }, gallery);
+    // Appearance is read when the workspace starts; reload the same guest tab
+    // so both fixtures enter through the actual encrypted storage adapter.
+    await page.reload({waitUntil:'networkidle'});
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
     assert.equal(await page.locator('#conceptsPanel .toolbar-muted,#questionsPanel .toolbar-muted').count(), 0,
       'Removed library heading hints stay absent');
@@ -59,7 +69,13 @@ async function pageFixture(browser, kind, offline, startingMode) {
     await page.evaluate(username => {
       stopCloudLivePolling(); accountState.authenticated = true; accountState.username = username;
     }, username);
-    await page.evaluate(kind => kind === 'drawing' ? openGraphDrawing() : openKnowledgeGraph(), kind);
+    await page.evaluate(kind => {
+      if (kind === 'drawing') return openGraphDrawing();
+      // Camera restoration belongs to a current conversation. Closing a graph
+      // over the landing page intentionally restores its default view.
+      newChat();
+      return openKnowledgeGraph();
+    }, kind);
     if (kind === 'graph') {
       await page.waitForFunction(() => knowledgeGraphInitialized);
       await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
@@ -182,7 +198,7 @@ async function reopen(page, kind, offline) {
     await page.waitForFunction(() => !document.getElementById('graphEditorDialog').open && ocrEditorController === null);
     await page.evaluate(() => openGraphDrawing());
   } else {
-    await page.evaluate(() => { closeKnowledgeGraph(); openKnowledgeGraph(); });
+    await page.evaluate(() => { closeKnowledgeGraph(); return openKnowledgeGraph(); });
   }
   await ready(page, kind);
 }

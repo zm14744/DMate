@@ -3,40 +3,29 @@
   const button = document.getElementById("offlineWorkspaceBtn");
   let opening = false;
   async function prepareCurrentAccountData() {
-    try {
-      let snapshot = window.DMateOfflineBridge?.snapshot ? await window.DMateOfflineBridge.snapshot() : null;
-      if (!snapshot) {
-        const root = document.documentElement;
-        const username = root.dataset.accountAuthenticated === "1" ? root.dataset.accountUsername : "";
-        let drawings = "";
-        if (username) {
-          const galleryKey = "dmate:graph-gallery:v1::" + encodeURIComponent("account:" + username);
-          const drawingKey = "dmate:graph-drawing:v1";
-          drawings = localStorage.getItem(galleryKey) || "";
-          if (!drawings && localStorage.getItem(drawingKey + ":owner") === "account:" + username) {
-            const legacy = localStorage.getItem(drawingKey);
-            if (legacy) {
-              try {
-                const document = JSON.parse(legacy);
-                drawings = JSON.stringify({version:1,pages:[{id:"legacy-local",name:document.graphs?.[0]?.name || "我的绘图",document,updatedAt:Date.now()}]});
-              } catch (_) {}
-            }
-          }
-        }
-        snapshot = { username, drawings };
-      }
-      const pages = Array.isArray(snapshot.drawings) ? snapshot.drawings : [];
-      const drawings = typeof snapshot.drawings === "string" ? snapshot.drawings
-        : JSON.stringify({version:2,activeId:pages[0]?.id || "",pages});
-      sessionStorage.setItem("dmate_offline_migration_v1", JSON.stringify({
-        username: snapshot.username || "",
-        wrongQuestions: Array.isArray(snapshot.wrongQuestions) ? snapshot.wrongQuestions : [],
-        notes: Array.isArray(snapshot.notes) ? snapshot.notes : [],
-        drawings
-      }));
-    } catch (error) {
-      console.warn("DMate 离线数据准备未完成：", error);
+    const bridge = window.DMateOfflineBridge, handoff = window.DMateOfflineHandoff;
+    if (!bridge?.snapshot || !handoff?.stage) throw new Error("离线数据接口尚未加载，请刷新后重试");
+    const context = bridge.context?.();
+    const owner = window.DMateGuestSession?.getOwner?.() || "";
+    const isCurrent = () => (window.DMateGuestSession?.getOwner?.() || "") === owner
+      && (!context || bridge.isCurrent?.(context) === true);
+    const snapshot = await bridge.snapshot();
+    if (!isCurrent()) throw new Error("账号状态已变化，请重新打开离线版");
+    const pages = Array.isArray(snapshot.drawings) ? snapshot.drawings : [];
+    const drawings = typeof snapshot.drawings === "string" ? snapshot.drawings
+      : JSON.stringify({version:2,activeId:pages[0]?.id || "",pages});
+    const token = await handoff.stage({
+      username:snapshot.username || "",
+      wrongQuestions:Array.isArray(snapshot.wrongQuestions) ? snapshot.wrongQuestions : [],
+      notes:Array.isArray(snapshot.notes) ? snapshot.notes : [],
+      appearance:snapshot.appearance || null,
+      drawings
+    }, {isCurrent});
+    if (!isCurrent()) {
+      await handoff.ack(token).catch(() => {});
+      throw new Error("账号状态已变化，请重新打开离线版");
     }
+    return token;
   }
   async function openOfflineWorkspace() {
     if (opening) return;
@@ -45,7 +34,16 @@
       button.disabled = true;
       button.setAttribute("aria-busy", "true");
     }
-    await prepareCurrentAccountData();
+    try { await prepareCurrentAccountData(); }
+    catch (_error) {
+      opening = false;
+      if (button) {
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+      }
+      window.showCopyToast?.("离线内容未能安全保存，请稍后重试；当前页面内容仍保留");
+      return;
+    }
     if ("serviceWorker" in navigator && window.isSecureContext) {
       try {
         // Cache installation continues across the navigation. Enter the real

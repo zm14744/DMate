@@ -32,6 +32,7 @@ on:
       - 'scripts/test_offline_content*.py'
       - 'scripts/test_favicon_consistency.py'
       - 'scripts/test_offline_workspace_browser.cjs'
+      - 'scripts/test_offline_records_browser.cjs'
       - 'scripts/test_knowledge_graph_browser.cjs'
       - 'scripts/test_graph_empty_recent_browser.cjs'
       - 'scripts/test_graph_relation_navigation_browser.cjs'
@@ -49,6 +50,11 @@ on:
       - 'scripts/test_math_markdown.cjs'
       - 'scripts/test_offline_appearance_browser.cjs'
       - 'scripts/test_offline_data_migration_browser.cjs'
+      - 'scripts/test_offline_storage_browser.cjs'
+      - 'scripts/test_offline_handoff_browser.cjs'
+      - 'scripts/test_offline_vault_workspace_browser.cjs'
+      - 'scripts/offline-vault-browser-fixtures.cjs'
+      - 'scripts/test_drawing_async_persistence_browser.cjs'
       - 'scripts/test_mobile_drawers_browser.cjs'
       - 'scripts/test_service_worker_cache_browser.cjs'
       - 'scripts/test_image_export_browser.cjs'
@@ -119,6 +125,7 @@ on:
       - 'scripts/test_offline_content*.py'
       - 'scripts/test_favicon_consistency.py'
       - 'scripts/test_offline_workspace_browser.cjs'
+      - 'scripts/test_offline_records_browser.cjs'
       - 'scripts/test_knowledge_graph_browser.cjs'
       - 'scripts/test_graph_empty_recent_browser.cjs'
       - 'scripts/test_graph_relation_navigation_browser.cjs'
@@ -136,6 +143,11 @@ on:
       - 'scripts/test_math_markdown.cjs'
       - 'scripts/test_offline_appearance_browser.cjs'
       - 'scripts/test_offline_data_migration_browser.cjs'
+      - 'scripts/test_offline_storage_browser.cjs'
+      - 'scripts/test_offline_handoff_browser.cjs'
+      - 'scripts/test_offline_vault_workspace_browser.cjs'
+      - 'scripts/offline-vault-browser-fixtures.cjs'
+      - 'scripts/test_drawing_async_persistence_browser.cjs'
       - 'scripts/test_mobile_drawers_browser.cjs'
       - 'scripts/test_service_worker_cache_browser.cjs'
       - 'scripts/test_image_export_browser.cjs'
@@ -182,7 +194,8 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1's pinned Linux browser dependencies support this image.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -202,6 +215,9 @@ jobs:
         run: |
           node --check static/offline.js
           node --check static/offline-entry.js
+          node --check static/offline-vault.js
+          node --check static/offline-storage.js
+          node --check static/offline-handoff.js
           node --check static/offline-service-worker.js
           node --check static/scrollbars.js
           node --check static/mobile-select.js
@@ -216,6 +232,7 @@ jobs:
           node --check static/ai-answer-renderer.js
           node --check scripts/test_offline_study_browser.cjs
           node --check scripts/test_offline_workspace_browser.cjs
+          node --check scripts/test_offline_records_browser.cjs
           node --check scripts/test_knowledge_graph_browser.cjs
           node --check scripts/test_graph_empty_recent_browser.cjs
           node --check scripts/test_graph_relation_navigation_browser.cjs
@@ -234,6 +251,11 @@ jobs:
           node --check scripts/test_math_markdown.cjs
           node --check scripts/test_offline_appearance_browser.cjs
           node --check scripts/test_offline_data_migration_browser.cjs
+          node --check scripts/test_offline_storage_browser.cjs
+          node --check scripts/test_offline_handoff_browser.cjs
+          node --check scripts/test_offline_vault_workspace_browser.cjs
+          node --check scripts/offline-vault-browser-fixtures.cjs
+          node --check scripts/test_drawing_async_persistence_browser.cjs
           node --check scripts/test_mobile_drawers_browser.cjs
           node --check scripts/test_service_worker_cache_browser.cjs
           node --check scripts/test_image_export_browser.cjs
@@ -355,9 +377,14 @@ jobs:
         run: |
           mkdir -p artifacts/offline-workspace
           node scripts/test_offline_workspace_browser.cjs
+          node scripts/test_offline_records_browser.cjs
           node scripts/test_offline_study_browser.cjs
           node scripts/test_offline_appearance_browser.cjs
           node scripts/test_offline_data_migration_browser.cjs
+          node scripts/test_offline_storage_browser.cjs
+          node scripts/test_offline_handoff_browser.cjs
+          node scripts/test_offline_vault_workspace_browser.cjs
+          node scripts/test_drawing_async_persistence_browser.cjs
           node scripts/test_service_worker_cache_browser.cjs
           node scripts/test_image_export_browser.cjs
           node scripts/test_mistake_action_chrome_browser.cjs

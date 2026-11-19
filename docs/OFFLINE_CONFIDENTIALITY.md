@@ -1,10 +1,12 @@
-# 离线保密底层与前端接入约定
+# 离线保密存储与平台边界
 
 ## 交付状态
 
-本次实现可直接调用的加密存储、自动密钥管理和原生密钥桥。没有新增锁屏、密码设置、导入导出按钮或备份流程。
+离线工作区已接入加密存储、自动密钥管理和原生密钥桥。错题、概念笔记、历史练习、设置、外观背景及绘图库通过 `static/offline-storage.js` 读写 `DMateOfflineVault`，绘图库使用异步保存接口。没有新增锁屏、密码设置、导入导出按钮或备份流程。
 
-`static/offline.html` 已加载 `offline-vault.js`，Service Worker 已预缓存它。**现有 `offline.js` 的业务读写尚未切换到新接口，旧数据也没有自动迁移。因此，仅合入本次改动不能宣称现有离线页面已经全部加密。** 后续前端工作须完成本文的存储替换和迁移验收。
+`static/offline.html` 已加载 vault、业务适配器和加密交接模块，Service Worker 将它们纳入离线应用外壳缓存。已知归属的旧离线数据先写入密文并读回核对，再清理对应旧副本；无法归属的旧资料、其他账号资料和在线原副本不会因此删除。这里的保护范围是离线业务存储，不能据此声称整个浏览器配置或在线版数据都已加密。
+
+当前交付是 `main` 中的源码接入，未发布新安装包。已安装的旧 Android/Desktop 1.0.2 客户端没有新桥，必须基于当前源码重建并安装客户端；仅更新远程网页不能补上原生桥。旧原生客户端会明确报 `NATIVE_UNAVAILABLE`，不退回浏览器密钥。
 
 底层本身不访问网络、不调用云端接口、不写 localStorage/sessionStorage、不要求用户记住或另存一个 DMate 密码。系统钥匙串如果已锁定，操作可能需要用户解锁现有系统账户；这与新增应用密码不同。
 
@@ -32,6 +34,7 @@
 - 每次写入必须提供 `expectedRevision`。事务内比较全部旧 revision，再原子写入整批；冲突返回 `CONFLICT`，不自动覆盖。
 - Web Crypto/Blob/系统密钥操作都在 IndexedDB 事务外执行。只有事务完成事件才代表本次保存成功。
 - `close()` 中止活跃事务，并使仍在进行的解密在交还结果前检查关闭状态。已交给调用者的对象、DOM、字符串或截图不会被本模块自动擦除。
+- `destroy()` 在核对 vault 身份后，用事务删除该 vault 的记录和元数据，再尽力删除对应原生密钥；业务适配器用它清理已结束的游客资料。它不提供恢复功能，也不代表物理安全擦除。
 
 数据库名为 `dmate-offline-vault-v1`，版本 1：
 
@@ -40,7 +43,7 @@
 | `vaults` | keyPath `name`；格式、随机 vaultId/keyId、提供者、能力声明、加密校验记录；仅浏览器提供者包含 `CryptoKey` |
 | `records` | keyPath `[vault, collection, id]`；revision、IV、认证密文；按 vault、集合建立结构性索引 |
 
-**公开元数据**包括 vault 名称、集合名、记录 ID、记录数量、revision、密文长度和密钥提供者。应使用 `personal-v1`、`notes`、随机 UUID 等结构性标识；不能把笔记标题、邮箱、姓名或搜索词放进这些键。标题、正文、Blob MIME 类型、文件名和业务时间戳应放在加密的 `value` 内。
+**公开元数据**包括 vault 名称、集合名、记录 ID、记录数量、revision、密文长度和密钥提供者。应使用 `personal-v1`、`notes`、随机 UUID 等结构性标识；不能把笔记标题、邮箱、姓名或搜索词放进这些键。当前业务适配器在加密目录中保存账号到随机 vault 名称的映射，记录地址使用 SHA-256 映射；原始业务 ID、账号、标题、正文、Blob MIME 类型、文件名和业务时间戳放在加密的 `value` 内。
 
 本版本不隐藏访问模式或数据长度，不防完整有效数据库的历史回滚，不保证防删除。IndexedDB、系统钥匙串和旧明文缓存的删除都不等于物理磁盘安全擦除。随机 IV 的碰撞概率不是数学上的零；该接口面向个人离线资料库，不应把单一密钥用于接近 `2^32` 次的大规模加密服务。
 
@@ -137,41 +140,73 @@ Android 文件位于 `android/app/src/main/java/app/dmate/client/OfflineVault*.j
 
 Android 使用来源 origin、顶层 frame、当前 URL 与导航 generation 校验；回复通过原始 `JavaScriptReplyProxy`。桌面同时使用最小远程 ACL、原生 URL/窗口校验和初始化脚本闭包内的临时 token；跨源文档不加载进这个有解密回调的 WebView，外部 HTTP(S) 链接交系统浏览器打开。浏览器里的同源恶意代码仍与业务代码有同等访问能力。
 
-原生操作协议是 `capabilities / create / encrypt / decrypt / delete`。`delete` 用于清理未入库候选密钥；普通前端应通过存储 API 管理记录，不能直接删已提交 vault 的 key。桌面锁文件只保存跨进程互斥状态，不含密钥或用户数据。
+原生操作协议是 `capabilities / create / encrypt / decrypt / delete`。`delete` 用于清理未入库候选密钥，以及在 `destroy()` 已提交删除 vault 后清理不再使用的密钥；普通前端应通过存储 API 管理记录，不能直接删已提交 vault 的 key。桌面锁文件只保存跨进程互斥状态，不含密钥或用户数据。
 
 原生密钥丢失、清理应用数据、浏览器清理站点数据、系统钥匙串重置等可能使资料不可恢复。本次没有密码恢复、云端托管或导出副本；不要加入开发者万能密钥。若日后设计跨设备迁移，须单独设计密钥交付，不能直接把数据库复制成功当成迁移成功。
 
-## 5. 后续 Codex 必须完成的持久化接入
+## 5. 已接入的业务、迁移与交接
 
-此次没有删除、重写或隐式迁移用户的旧数据。以下是实际代码中的接入点，不是额外 UI 需求：
+### 业务保存与上下文
 
-| 现有路径 | 后续替换要求 |
-| --- | --- |
-| `offline.js` 的 `openDb / transaction / put / all / remove` | 笔记、错题、练习、设置全部走 vault，保存 revision；删除与 tombstone 用 batch |
-| `offline.js` 与 drawing-workspace 的绘图库 localStorage | 用加密记录保存图库；若图形组件要求同步缓存，只能用当前页面的内存适配器，异步保存成功后再确认 |
-| `offline.js` 的 appearance localStorage 备份 | 外观及背景 Blob 统一走 vault，不能同时留一份明文 JSON/图片 |
-| `DMateGuestSession` 中的离线 JSON 与 Blob key | 不把现有 Base64 secret 当作新密钥；明确游客资料生命周期，再使用对应的加密存储策略 |
-| `offline-entry.js` 的 `dmate_offline_migration_v1` | 新交接不写明文 sessionStorage；既有交接槽迁移成功后清理 |
-| 搜索索引、临时图片、草稿、错误日志 | 不把解密结果重新持久化到 localStorage、sessionStorage、Cache Storage 或遥测 |
-| 账号/上下文切换 | 先关闭旧 vault，清空业务内存和 DOM，再打开新上下文；名称只是数据分组，不是访问认证 |
+`DMateOfflineStorage.open({owner, isCurrent})` 提供 `get / all / put / remove / batch / close / destroyGuest`。适配器为每个句柄保存读取到的 revision，并串行处理写入；删除笔记或错题及其删除墓碑使用同一批事务。并发页面修改返回冲突，不无条件覆盖。初始化或解密失败时工作区保持不可编辑，不展示假空库，也不写回旧明文存储。
 
-迁移必须先加密写入、成功提交并读回校验，再删除该范围旧明文；失败保留源数据。跨旧/新数据库不可能凭本接口获得一个全局事务，需可重复、可恢复的迁移标记。迁移期间应通过旧 IndexedDB 的版本升级/关闭协议阻止旧页面继续写明文，并处理旧 localStorage 路径。不能把复制一次后旧页面仍继续写入的状态视为迁移完成。
+`offline.js` 的外观及背景 Blob 保存到加密设置记录，不再维护明文离线外观备份。绘图组件通过 `persistence.initialGallery / save` 接收初始快照与异步保存函数，防抖更新、显式保存和确认操作等待保存结果；失败保留当前页面编辑并允许重试，不把尚未提交的内容显示为保存成功。返回在线版前等待笔记及绘图库保存。强制终止页面仍可能丢失尚未提交的编辑，不能将异步保存描述为关机事务。
 
-在线版原有数据与云同步属于另一条业务路径；这里不保证擦除在线副本。离线入口接入时也不得重新调用在线同步方法为 vault 自动备份。
+账号切换、退出或游客会话结束时，工作区使旧句柄失效，销毁绘图组件并清除业务内存和 DOM；异步结果返回前仍核对当前账号。名称及账号分组不是额外的访问认证，也不能隔离同源恶意脚本。
+
+### 游客生命周期
+
+游客仍沿用当前标签页/原生启动会话：刷新可恢复，关闭标签页或应用后新会话不恢复旧游客资料，普通新标签页也不会复制。随机游客 vault 引用保存在现有会话容器中，不使用旧会话 Base64 secret 作为 vault 密钥；业务内容保存到加密 vault。原生启动会话由原有 guest-session 机制界定。
+
+显式会话结束时调用 `destroyGuest()`。页面突然关闭时不能保证异步删除完成；支持 Web Locks 的环境还使用活跃租约及不含正文的最近活跃时间，后续打开时清理至少一小时无活跃租约的旧游客 vault。不支持租约查询或清理失败时不强行删除，也不阻断当前工作区。失去会话引用、停止恢复与底层密文已被物理删除是不同的状态。
+
+### 旧数据迁移
+
+- 旧 `dmate-offline-workspace` 升级到版本 4，用版本升级/连接关闭协议阻止旧版 IndexedDB 写入；若被旧页面阻塞则提示关闭旧页面后重试。
+- 版本屏障不能停用已经加载的旧页面中的 localStorage 写入逻辑，应关闭旧版页面。适配器每次打开仍重扫旧来源，不凭迁移标记跳过；图库按页的修改时间合并，无法判定的冲突保留源资料。
+- 只迁移当前已验证账号后缀对应的错题、笔记、历史练习和设置，以及该账号旧离线外观、绘图库。无账号后缀的记录、其他账号资料和无法归属的旧草稿保留原样，不猜测归属。
+- 当前游客会话中的旧离线记录、视图、图库、外观及背景按同样规则转入密文；从在线版进入时保留在线游客源资料，避免清理共享源。
+- 每项先提交加密写入并读回核对，再清理对应旧源；旧数据库事务中再次比较源记录，localStorage 清理前也核对原值。重试不覆盖时间较新的加密记录；旧库写入迁移标记。失败保留未成功清理的源，可重试，不承诺跨两个数据库的全局事务。
+- 既有明文 `dmate_offline_migration_v1` 交接槽仅作兼容读取；所属账号匹配且加密导入、核对成功后才删除。新入口不再写入该槽。
+
+### 在线到离线的短期交接
+
+在线 `DMateOfflineBridge` 只取得当前页面已验证账号或当前游客会话的快照，不读取旧账号标记来猜测身份，不额外调用云同步。`offline-entry.js` 等待 `DMateOfflineHandoff.stage()` 提交成功后才导航；账号或来源上下文变化、容量不足或保存失败时不导航。
+
+原生桥仅授权离线路径，在线 `/` 页面不能使用原生 vault。因此 `static/offline-handoff.js` 是单独的短期运输层：**即使在原生客户端中，也使用浏览器管理的不可导出 AES-GCM 密钥，不具有目标 native vault 的 OS 密钥保护。** 它不是 native vault 失败时的业务存储回退，也没有扩大原生 ACL。
+
+交接数据库为 `dmate-offline-handoff-v1`：元数据、JSON、Blob/File 内容按 4 MiB 分块认证加密，结构化克隆的 `CryptoKey` 与密文保存在 IndexedDB；sessionStorage 只保存随机 token。元数据绑定账号、`window.name` 标签页标识和 30 分钟有效期；总编码上限 128 MiB，最多 32 个待完成交接。过期交接不可读取，并在后续操作中尽力清理，不保证页面关闭时立即擦除。
+
+离线目标通过 `read()` 读取但不删除交接，导入实际 vault、读回核对后才 `ack()` 清除密文、密钥与 token；失败保留交接供有效期内重试。新版原生目标 vault 仍必须使用 OS 密钥，缺桥、缺钥或服务不可用时停止，不能将运输层当作已完成的业务保存。
+
+**在线原副本、在线图库、原有账号同步和其他在线持久化不在本次离线保密范围内，不因进入离线版而删除，也不自动替换为 vault。** 离线修改不会自动回传或云备份；Cache Storage 只缓存应用与学习资源，不保存解密后的个人资料。
 
 ## 6. 验证方法
 
 ```sh
 node scripts/test_offline_vault_browser.cjs
+node scripts/test_offline_storage_browser.cjs
+node scripts/test_offline_handoff_browser.cjs
 python3 scripts/test_android_offline_vault.py
 node scripts/test_desktop_offline_vault.cjs
 cargo test --locked --manifest-path desktop/src-tauri/offline-vault/Cargo.toml
 cargo check --locked --manifest-path desktop/src-tauri/Cargo.toml
 ```
 
-浏览器脚本启动独立本地 HTTP 测试服务，使用真实 IndexedDB 和 Web Crypto；`DMATE_TEST_BROWSER` 可选 `chromium`、`firefox`、`webkit`，也可指定 `DMATE_BROWSER_EXECUTABLE`。测试包括并发建库、持久化重开、CAS 和整批失败、密文/IV/AAD 调换、丢钥不重建、关闭在途读取、嵌套 Blob、没有网络或 Web Storage 旁路、原生不可用不降级及大记录的原生桥格式。
+上述 vault/storage/handoff 浏览器脚本各自启动本地 HTTP 测试服务，使用真实 IndexedDB 和 Web Crypto。vault 底层脚本的 `DMATE_TEST_BROWSER` 可选 `chromium`、`firefox`、`webkit`，也可指定 `DMATE_BROWSER_EXECUTABLE`；新增业务脚本默认使用 Chromium。测试包括并发建库、持久化重开、CAS 和整批失败、密文/IV/AAD 调换、丢钥不重建、关闭在途读取、嵌套 Blob、没有网络或 Web Storage 明文旁路、原生不可用不降级、旧数据迁移和游客隔离、交接账号/标签页/有效期及失败保留。
+
+实际 UI 与绘图异步保存回归需要先启动本地 Flask 应用，再运行：
+
+```sh
+DMATE_TEST_BASE_URL=http://127.0.0.1:5000 node scripts/test_offline_vault_workspace_browser.cjs
+DMATE_TEST_BASE_URL=http://127.0.0.1:5000 node scripts/test_drawing_async_persistence_browser.cjs
+```
+
+UI 回归检查真实离线编辑、重开恢复、旧资料迁移、二进制背景和持久化内容中没有私密正文旁路。绘图回归在桌面及移动视口模拟延迟提交、容量错误、确认等待、失败重试和图库重新挂载。接口采用本地 fixtures；这些测试不调用真实模型、OCR、登录或云同步 API。工作区 CI 固定 Ubuntu 24.04 以匹配当前 Playwright 版本，原生底层另有独立工作流。
 
 Android JDK 测试执行生产协议/密码学实现，密钥提供者为内存模拟；桌面 Rust 单测也使用测试密钥提供者，JS 桥测试使用受控环境。它们不冒充真机硬件验证。真实 OS 凭据库往返测试明确标记 ignored，需在目标机器解锁密钥库后手动运行；Android 还需要真机/模拟器验证 KeyStore 与 WebView 生命周期。Playwright WebKit 也不等于已经在用户的 iPhone/iPad 上验收。
+
+本次接入环境已运行 Android 协议/密码学测试与 Desktop JS 桥测试，但没有安装 Cargo，未在该环境执行 Rust/Tauri 编译；不能用 JS 通过替代目标平台构建、真实密钥库验证或新安装包验收。
 
 ## 7. 一手依据
 

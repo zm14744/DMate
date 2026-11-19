@@ -1,13 +1,11 @@
 (() => {
   "use strict";
   const $ = id => document.getElementById(id);
-  const DB_NAME = "dmate-offline-workspace";
-  const DB_VERSION = 3;
   const libraryMobile = window.matchMedia("(max-width:1100px)");
   const libraryScroll = {concepts:0, questions:0};
   let libraryDetail = null;
   const state = {
-    db: null, concepts: [], questions: [], graph: null, translations: {concepts:{},questions:{}},
+    storage: null, concepts: [], questions: [], graph: null, translations: {concepts:{},questions:{}},
     panel: "graph", selectedQuestion: null, selectedConcept: null,
     revealed: false, analysisRevealed: false,
     drawingController: null, backgroundUrl: "", graphCategory: "", graphSelectedNodeId: "", questionCategory: "",
@@ -15,7 +13,7 @@
     librarySelections: {concepts:new Set(), questions:new Set()}, selectionQueue: Promise.resolve(),
     selectedNoteId:null, noteQuery:"", noteRows:[], noteSaveQueue:Promise.resolve(),
     noteDrafts:new Map(), noteSaveStatus:new Map(), noteDeletePending:null,
-    appearanceQueue: Promise.resolve()
+    appearanceQueue: Promise.resolve(), viewSaveQueue:Promise.resolve(), viewSnapshot:""
   };
   const panelMeta = {
     mistakes: ["错题本", "在本机查看、整理和复习已保存的错题。"],
@@ -57,6 +55,23 @@
     clearTimeout(toast.timer);
     toast.timer = setTimeout(() => { node.hidden = true; }, 3600);
   }
+  function storageError(error) {
+    const messages = {
+      CONFLICT:["记录已在另一页面修改，当前编辑仍保留，请重新打开后重试", "This record changed in another page; your draft is retained. Reopen it and retry"],
+      KEY_MISSING:["加密密钥不可用，原数据已保留，请检查当前设备后重试", "The encryption key is unavailable; existing data is retained"],
+      AUTHENTICATION_FAILED:["加密资料无法验证，原数据已保留，请勿清除网站数据", "Encrypted data could not be verified; existing data is retained"],
+      KEYSTORE_UNAVAILABLE:["系统密钥服务尚未解锁或不可用，请解锁后刷新重试", "Unlock the system key store and reload to retry"],
+      NATIVE_UNAVAILABLE:["请更新客户端后再使用离线加密存储，原数据已保留", "Update the client to use encrypted offline storage; existing data is retained"],
+      NATIVE_TIMEOUT:["系统密钥服务暂时没有响应，请稍后刷新重试", "The system key service did not respond; reload to retry"],
+      STORAGE_BLOCKED:["请关闭旧版离线页面后重试", "Close older offline pages and try again"],
+      LEGACY_BLOCKED:["请关闭旧版离线页面后重试", "Close older offline pages and try again"],
+      QUOTA_EXCEEDED:["设备存储空间不足，当前编辑仍保留，请释放空间后重试", "Storage is full; your draft is retained. Free some space and retry"],
+      TOO_LARGE:["内容超过加密存储上限，当前内容与原数据仍保留", "This content exceeds the encrypted storage limit; current and original data are retained"],
+      CLOSED:["账号状态已变化，请重新打开离线页面", "The account changed; reopen the offline workspace"]
+    };
+    const text = messages[error?.code];
+    return text ? tr(...text) : error?.message || tr("离线工作区初始化失败", "The offline workspace could not be initialized");
+  }
   function el(tag, className, text) {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -67,8 +82,8 @@
     const node = el("button", className || "", text);
     node.type = "button";
     node.addEventListener("click", event => {
-      try { Promise.resolve(handler(event)).catch(error => toast(error?.message || "操作未完成")); }
-      catch (error) { toast(error?.message || "操作未完成"); }
+      try { Promise.resolve(handler(event)).catch(error => toast(storageError(error))); }
+      catch (error) { toast(storageError(error)); }
     });
     return node;
   }
@@ -91,12 +106,14 @@
   let workspaceActive = true;
   const workspaceCurrent = () => workspaceActive && (window.DMateGuestSession?.getOwner() || "") === workspaceOwner;
   const guest = () => Boolean(window.DMateGuestSession && !workspaceOwner);
-  const ownerSuffix = () => "::" + encodeURIComponent("account:" + workspaceOwner);
   function invalidateWorkspace(resetGuest = false) {
     if (!workspaceActive) return;
     workspaceActive = false;
     state.noteRows = []; state.noteDrafts.clear();
     state.drawingController?.destroy?.();
+    const storage = state.storage; state.storage = null;
+    if (resetGuest && !workspaceOwner) void storage?.destroyGuest?.().catch(() => {});
+    else storage?.close();
     for (const dialog of document.querySelectorAll("dialog[open]")) dialog.close();
     for (const id of ["mistakeList", "noteList", "offlineDrawingHost"]) $(id)?.replaceChildren();
     window.DMateOfflineAppearance?.apply?.({}, null);
@@ -115,8 +132,6 @@
   window.addEventListener("storage", event => {
     if (event.key === "dmate_account_logout_signal_v1" && event.newValue) invalidateWorkspace(true);
   });
-  const galleryKey = () => "dmate:offline:drawing-gallery:v1" + ownerSuffix();
-  const appearanceKey = () => "dmate:offline:appearance:v1" + ownerSuffix();
   function configureRenderer() {
     window.DMateAIAnswer?.configure({
       markdownToHtml(value) {
@@ -151,89 +166,23 @@
     if (!window.DMateDeleteConfirm?.request) { toast(tr("删除确认组件尚未加载，请刷新后重试")); return false; }
     return window.DMateDeleteConfirm.request(owner, {title, body:"删除后无法恢复", content, confirmText:"删除"});
   }
-  function openDb() {
-    return new Promise((resolve, reject) => {
-      let blocked = false;
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        for (const store of ["mistakes", "notes", "practice", "settings"]) {
-          if (!db.objectStoreNames.contains(store)) {
-            const objectStore = db.createObjectStore(store, { keyPath: "id" });
-            objectStore.createIndex("updatedAt", "updatedAt");
-          }
-        }
-      };
-      request.onsuccess = () => {
-        if (blocked) { request.result.close(); return; }
-        request.result.onversionchange = () => request.result.close();
-        resolve(request.result);
-      };
-      request.onblocked = () => {
-        blocked = true;
-        reject(new Error(tr("请关闭旧版离线页面后重试", "Close older offline pages and try again")));
-      };
-      request.onerror = () => reject(request.error || new Error("无法打开本地学习数据库"));
-    });
-  }
-  function transaction(store, mode, action) {
+  async function transaction(store, _mode, action) {
     requireWorkspace();
-    if (guest()) {
-      return Promise.resolve().then(() => {
-        requireWorkspace();
-        const records = window.DMateGuestSession.read("offline-" + store) || {};
-        const request = action({
-          get: id => ({result:records[id]}),
-          put: value => { records[value.id] = value; return {result:value.id}; },
-          delete: id => { delete records[id]; return {}; },
-          getAll: () => ({result:Object.values(records)})
-        });
-        if (mode === "readwrite" && !window.DMateGuestSession.write("offline-" + store, records))
-          throw new Error(tr("本标签页的临时存储空间不足，请释放浏览器空间后重试", "This tab could not save its changes; free browser storage and try again"));
-        return request?.result;
-      });
-    }
-    return new Promise((resolve, reject) => {
-      const tx = state.db.transaction(store, mode);
-      const original = tx.objectStore(store), suffix = ownerSuffix();
-      const objectStore = {
-        get:id => {
-          const request = original.get(id + suffix);
-          return request;
-        },
-        put:value => original.put({...value, id:value.id + suffix}),
-        delete:id => original.delete(id + suffix)
-      };
-      let request, readingAll = false;
-      objectStore.getAll = () => { readingAll = true; return original.getAll(); };
-      try { request = action(objectStore); }
-      catch (error) { reject(error); return; }
-      tx.oncomplete = () => {
-        if (!workspaceCurrent()) { invalidateWorkspace(); reject(new Error(tr("账号状态已变化，请重新打开离线页面"))); return; }
-        const result = request?.result;
-        resolve(readingAll ? result.filter(row => typeof row.id === "string" && row.id.endsWith(suffix))
-          .map(row => ({...row, id:row.id.slice(0, -suffix.length)})) : result);
-      };
-      tx.onerror = () => reject(tx.error || request?.error || new Error("本地保存失败"));
-      tx.onabort = () => reject(tx.error || new Error("本地保存已取消"));
+    if (!state.storage) throw new Error(tr("离线存储尚未就绪", "Offline storage is not ready"));
+    const storage = state.storage;
+    const result = await action({
+      get:id => storage.get(store, id), put:value => storage.put(store, value),
+      delete:id => storage.remove(store, id), getAll:() => storage.all(store)
     });
+    requireWorkspace();
+    return result;
   }
   const put = (store, value) => transaction(store, "readwrite", os => os.put(value));
   const all = store => transaction(store, "readonly", os => os.getAll());
   const remove = (store, id) => transaction(store, "readwrite", os => os.delete(id));
   async function applyOriginalAppearance() {
-    if (guest()) {
-      window.DMateOfflineAppearance?.apply(window.DMateGuestSession.read("appearance") || {},
-        await window.DMateGuestSession.readBlob("background"));
-      return;
-    }
-    let saved = null;
-    try { saved = await transaction("settings", "readonly", os => os.get("appearance")); } catch (_) {}
-    let settings = saved?.settings || null;
-    if (!settings) {
-      try { settings = JSON.parse(localStorage.getItem(appearanceKey()) || "null"); } catch (_) {}
-    }
-    window.DMateOfflineAppearance?.apply(settings || {}, saved?.backgroundBlob || null);
+    const saved = await transaction("settings", "readonly", os => os.get("appearance"));
+    window.DMateOfflineAppearance?.apply(saved?.settings || {}, saved?.backgroundBlob || null);
   }
 
   async function loadLibrarySelections() {
@@ -286,16 +235,27 @@
   const stamp = () => new Date().toISOString();
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : "local-" + Date.now() + "-" + Math.random().toString(36).slice(2));
 
-  async function migrateCurrentAccountData() {
-    let payload;
-    try { payload = JSON.parse(sessionStorage.getItem("dmate_offline_migration_v1") || "null"); }
-    catch (_) { payload = null; }
-    if (!payload || typeof payload !== "object") return;
-    if (String(payload.username || "") !== (window.DMateGuestSession?.getOwner() || "")) {
-      sessionStorage.removeItem("dmate_offline_migration_v1"); return;
+  async function sameStoredValue(left, right) {
+    if (Object.is(left,right)) return true;
+    if (left instanceof Blob || right instanceof Blob) {
+      if (!(left instanceof Blob) || !(right instanceof Blob) || left.type !== right.type || left.size !== right.size) return false;
+      const a = new Uint8Array(await left.arrayBuffer()), b = new Uint8Array(await right.arrayBuffer());
+      return a.every((byte,index) => byte === b[index]);
     }
-    const mistakes = new Map((await all("mistakes")).map(row => [row.id, row]));
-    const mistakeMetadata = await transaction("settings", "readonly", os => os.get("mistake-deletions"));
+    if (!left || !right || typeof left !== "object" || typeof right !== "object" || Array.isArray(left) !== Array.isArray(right)) return false;
+    const keys = Object.keys(left);
+    if (keys.length !== Object.keys(right).length) return false;
+    for (const key of keys) if (!Object.hasOwn(right,key) || !await sameStoredValue(left[key],right[key])) return false;
+    return true;
+  }
+
+  async function importOfflineSnapshot(payload) {
+    if (!payload || typeof payload !== "object" || String(payload.username || "") !== workspaceOwner)
+      throw new Error(tr("资料所属账号已变化，请从在线版重新进入", "The snapshot account changed; reopen offline mode from the online page"));
+    const written = [];
+    const save = async (store,value) => { await put(store,value); written.push([store,value]); };
+    const mistakes = new Map((await all("mistakes")).map(row => [row.id,row]));
+    const mistakeMetadata = await transaction("settings","readonly",os => os.get("mistake-deletions"));
     for (const item of Array.isArray(payload.wrongQuestions) ? payload.wrongQuestions : []) {
       if (!item || typeof item.question !== "string" || !item.question.trim()) continue;
       const id = String(item.id || uid()), existing = mistakes.get(id), incomingAt = noteTime(item.updatedAt || item.createdAt);
@@ -304,49 +264,80 @@
       const reference = item.referenceAnswer;
       const answer = item.answer || (typeof reference === "string" ? reference
         : reference && typeof reference === "object" ? reference.text || reference.answer || JSON.stringify(reference) : "");
-      const row = {...existing, id, title:String(item.category || item.question).slice(0, 160),
-        statement:item.question, answer:String(answer || ""), explanation:String(item.analysis || item.solution || ""),
-        knowledgePoints:Array.isArray(item.knowledgePoints) ? item.knowledgePoints : [],
-        status:item.corrected ? "resolved" : "pending",
+      const row = {...existing,id,title:String(item.category || item.question).slice(0,160),statement:item.question,
+        answer:String(answer || ""),explanation:String(item.analysis || item.solution || ""),
+        knowledgePoints:Array.isArray(item.knowledgePoints) ? item.knowledgePoints : [],status:item.corrected ? "resolved" : "pending",
         createdAt:existing?.createdAt || existing?.updatedAt || new Date(noteTime(item.createdAt) || incomingAt || Date.now()).toISOString(),
         updatedAt:new Date(incomingAt || Date.now()).toISOString()};
-      await put("mistakes", row); mistakes.set(id, row);
+      await save("mistakes",row); mistakes.set(id,row);
     }
-    const notes = new Map((await all("notes")).map(row => [row.id, row]));
-    const noteMetadata = await transaction("settings", "readonly", os => os.get("notebook-deletions"));
+    const notes = new Map((await all("notes")).map(row => [row.id,row]));
+    const noteMetadata = await transaction("settings","readonly",os => os.get("notebook-deletions"));
     for (const note of Array.isArray(payload.notes) ? payload.notes : []) {
       if (!note || typeof note.title !== "string" || typeof note.content !== "string") continue;
       const id = String(note.id || uid()), existing = notes.get(id), incomingAt = noteTime(note.updatedAt);
       if (noteTime(noteMetadata?.deleted?.[id]) >= incomingAt && noteMetadata?.deleted?.[id]) continue;
       if (existing && incomingAt <= noteTime(existing.updatedAt)) continue;
-      const row = {...existing, id, title:note.title, content:note.content,
-        updatedAt:new Date(incomingAt || Date.now()).toISOString()};
-      await put("notes", row); notes.set(id, row);
+      const row = {...existing,id,title:note.title,content:note.content,updatedAt:new Date(incomingAt || Date.now()).toISOString()};
+      await save("notes",row); notes.set(id,row);
     }
     if (typeof payload.drawings === "string" && payload.drawings) {
-      try {
-        const key = galleryKey(), current = guest()
-          ? window.DMateGuestSession.read("drawings")?.gallery : localStorage.getItem(key);
-        const save = value => {
-          if (guest()) { if (!window.DMateGuestSession.write("drawings", {gallery:value})) throw Error("临时绘图库保存失败"); }
-          else localStorage.setItem(key, value);
-        };
-        if (!current) save(payload.drawings);
-        else {
-          const local = JSON.parse(current), incoming = JSON.parse(payload.drawings);
-          if (Array.isArray(local?.pages) && Array.isArray(incoming?.pages)) {
-            const pages = local.pages.slice(), ids = new Set(pages.map(page => page.id));
-            for (const page of incoming.pages) if (page && typeof page.id === "string" && !ids.has(page.id) && pages.length < 50) {
-              pages.push(page); ids.add(page.id);
-            }
-            // Local page positions, documents and the active page stay intact.
-            save(JSON.stringify({...local, pages}));
+      const saved = await transaction("drawings","readonly",os => os.get("gallery"));
+      let gallery = payload.drawings;
+      const incoming = JSON.parse(gallery);
+      if (![1,2].includes(incoming?.version) || !Array.isArray(incoming.pages)
+          || new Set(incoming.pages.map(page => page?.id)).size !== incoming.pages.length
+          || incoming.pages.some(page => !page || typeof page.id !== "string" || !page.id
+            || !Array.isArray(page.document?.graphs) || !page.document.graphs.length
+            || page.document.graphs.some(graph => !graph || !Array.isArray(graph.vertices) || !Array.isArray(graph.edges)))) {
+        throw new Error(tr("绘图库格式无法读取，原数据已保留", "The gallery format could not be read; original data is retained"));
+      }
+      const pageCount = pages => pages.reduce((count,page) => count + page.document.graphs.length,0);
+      if (pageCount(incoming.pages) > 50) throw Object.assign(new Error(),{code:"TOO_LARGE"});
+      if (saved?.gallery) {
+        const local = JSON.parse(saved.gallery);
+        if (Array.isArray(local?.pages) && Array.isArray(incoming?.pages)) {
+          const pages = local.pages.slice(), ids = new Set(pages.map(page => page.id));
+          for (const page of incoming.pages) if (!ids.has(page.id)) {
+            if (pages.length >= 50) throw Object.assign(new Error(),{code:"TOO_LARGE"});
+            pages.push(page); ids.add(page.id);
           }
-        }
-      } catch (error) { toast("本机绘图库已保留，部分在线绘图未能导入：" + (error?.message || "")); }
+          if (pageCount(pages) > 50) throw Object.assign(new Error(),{code:"TOO_LARGE"});
+          gallery = JSON.stringify({...local,pages});
+        } else throw new Error(tr("绘图库格式无法读取，原数据已保留", "The gallery format could not be read; original data is retained"));
+      }
+      await save("drawings",{id:"gallery",gallery,updatedAt:stamp()});
     }
-    sessionStorage.removeItem("dmate_offline_migration_v1");
-    toast(guest() ? "已导入当前标签页的错题、笔记和绘图到离线区" : "已导入当前账号的错题、笔记和绘图到本机离线区");
+    if (payload.appearance && typeof payload.appearance.settings === "object") {
+      const value = {id:"appearance",settings:payload.appearance.settings,updatedAt:stamp()};
+      if (payload.appearance.backgroundBlob instanceof Blob) value.backgroundBlob = payload.appearance.backgroundBlob;
+      await save("settings",value);
+    }
+    for (const [store,value] of written) {
+      const saved = await transaction(store,"readonly",os => os.get(value.id));
+      if (!await sameStoredValue(saved,value)) throw new Error(tr("加密保存校验未通过，原数据已保留", "Encrypted save verification failed; original data is retained"));
+    }
+    requireWorkspace();
+  }
+
+  async function migrateCurrentAccountData() {
+    const legacy = sessionStorage.getItem("dmate_offline_migration_v1");
+    if (legacy) {
+      let payload;
+      try { payload = JSON.parse(legacy); }
+      catch (_) { throw new Error(tr("旧交接资料无法读取，原数据已保留", "The legacy snapshot could not be read; original data is retained")); }
+      if (payload && String(payload.username || "") === workspaceOwner) {
+        await importOfflineSnapshot(payload);
+        if (sessionStorage.getItem("dmate_offline_migration_v1") === legacy) sessionStorage.removeItem("dmate_offline_migration_v1");
+      }
+    }
+    const token = window.DMateOfflineHandoff?.pendingToken?.();
+    if (token) {
+      const payload = await window.DMateOfflineHandoff.read(token,{isCurrent:workspaceCurrent});
+      requireWorkspace();
+      await importOfflineSnapshot(payload);
+      await window.DMateOfflineHandoff.ack(token);
+    }
   }
 
   async function loadResources() {
@@ -452,7 +443,7 @@
     let rendering;
     if (name === "mistakes") rendering = renderMistakes();
     if (name === "notes") rendering = renderNotes();
-    if (name === "drawing") mountDrawing();
+    if (name === "drawing") rendering = mountDrawing();
     if (name === "graph") renderGraph();
     if (name === "questions") renderQuestions();
     if (name === "concepts") renderConcepts();
@@ -508,27 +499,14 @@
 
   async function deleteOfflineRecord(store, row, metadataId) {
     requireWorkspace();
-    const deletedAt = previous => Math.max(Date.now(), noteTime(row.updatedAt) + 1, noteTime(previous));
-    if (guest()) {
-      const previous = await transaction("settings", "readonly", os => os.get(metadataId));
-      const deleted = {...previous?.deleted, [row.id]:deletedAt(previous?.deleted?.[row.id])};
-      await put("settings", {...previous, id:metadataId, deleted, updatedAt:stamp()});
-      await remove(store, row.id);
-      return;
-    }
-    await new Promise((resolve, reject) => {
-      const suffix = ownerSuffix(), tx = state.db.transaction([store, "settings"], "readwrite");
-      const settings = tx.objectStore("settings"), request = settings.get(metadataId + suffix);
-      request.onsuccess = () => {
-        if (!workspaceCurrent()) { tx.abort(); return; }
-        const previous = request.result || {};
-        const deleted = {...previous.deleted, [row.id]:deletedAt(previous.deleted?.[row.id])};
-        settings.put({...previous, id:metadataId + suffix, deleted, updatedAt:stamp()});
-      };
-      tx.objectStore(store).delete(row.id + suffix);
-      tx.oncomplete = () => { if (workspaceCurrent()) resolve(); else { invalidateWorkspace(); reject(new Error(tr("账号状态已变化，请重新打开离线页面"))); } };
-      tx.onerror = tx.onabort = () => reject(tx.error || new Error(tr("记录尚未删除，请重试", "The record could not be deleted; try again")));
-    });
+    const previous = await transaction("settings", "readonly", os => os.get(metadataId));
+    const deletedAt = Math.max(Date.now(), noteTime(row.updatedAt) + 1, noteTime(previous?.deleted?.[row.id]));
+    await state.storage.batch([
+      {type:"put",store:"settings",value:{...previous,id:metadataId,
+        deleted:{...previous?.deleted,[row.id]:deletedAt},updatedAt:stamp()}},
+      {type:"delete",store,id:row.id}
+    ]);
+    requireWorkspace();
   }
 
   function setNoteSaveStatus(id, message) {
@@ -556,7 +534,7 @@
         if (!workspaceCurrent()) return false;
         if (state.noteDrafts.get(row.id) === snapshot) {
           setNoteSaveStatus(row.id, tr("保存失败，请保留当前页面后重试。", "Save failed; keep this page open and try again."));
-          toast(error?.message || "笔记保存失败");
+          toast(storageError(error));
         }
         return false;
       }
@@ -1085,76 +1063,62 @@
     });
   }
 
-  function mountDrawing() {
-    if (state.drawingController) {
-      return;
-    }
+  async function mountDrawing() {
+    if (state.drawingController) return;
     const host = $("offlineDrawingHost");
-    if (!window.DMateDrawingWorkspace?.mount) {
-      toast("绘图组件尚未加载，请刷新页面后重试");
-      return;
-    }
-    try {
-      state.drawingController = window.DMateDrawingWorkspace.mount(host, {
-        storageKey: galleryKey(),
-        persistent: !guest(),
-        sessionState: guest() ? window.DMateGuestSession.drawingState("drawings") : {},
-        features: {ai:false, upload:false},
-        legacyDocument: {body_text:"",graphs:[{id:"G1",name:"我的图形",directed:false,weighted:false,vertices:[],edges:[]}]},
-        onChange: () => {}
-      });
-    } catch (error) {
-      toast(error?.message || "绘图工作区无法启动");
-    }
+    if (!window.DMateDrawingWorkspace?.mount) throw new Error(tr("绘图组件尚未加载，请刷新页面后重试"));
+    const storage = state.storage;
+    const saved = await transaction("drawings", "readonly", os => os.get("gallery"));
+    requireWorkspace();
+    if (state.drawingController) return;
+    state.drawingController = window.DMateDrawingWorkspace.mount(host, {
+      persistent:false,sessionState:{},
+      persistence:{initialGallery:saved?.gallery || null,
+        save:async snapshot => {
+          requireWorkspace();
+          await storage.put("drawings", {id:"gallery",gallery:JSON.stringify(snapshot),updatedAt:stamp()});
+          requireWorkspace();
+        }},
+      features:{ai:false,upload:false},
+      legacyDocument:{body_text:"",graphs:[{id:"G1",name:"我的图形",directed:false,weighted:false,vertices:[],edges:[]}]},
+      onChange:() => {}
+    });
   }
 
   async function returnOnline() {
-    if (!navigator.onLine) return toast("当前没有网络，在线版暂时无法打开");
+    if (!navigator.onLine) return toast(tr("当前没有网络，在线版暂时无法打开"));
+    if (!await flushNoteDrafts()) return toast(tr("笔记尚未保存，请重试后再离开", "The note is not saved; retry before leaving"));
+    if (state.drawingController && !await state.drawingController.flush()) return;
+    await Promise.all([state.viewSaveQueue,state.appearanceQueue,state.selectionQueue]);
     window.location.assign("/");
   }
 
   async function saveAppearance(changes) {
-    if (guest()) {
-      const previous = window.DMateGuestSession.read("appearance") || {};
-      const next = {...previous, ...(changes?.settings || changes || {})};
-      delete next.backgroundBlob; delete next.removeBackground;
-      let blob = await window.DMateGuestSession.readBlob("background");
-      if (changes?.removeBackground) { window.DMateGuestSession.remove("background"); blob = null; }
-      else if (changes?.backgroundBlob instanceof Blob) {
-        blob = changes.backgroundBlob;
-        if (!await window.DMateGuestSession.writeBlob("background", blob)) throw Error("背景图片暂时无法保存，请释放浏览器存储空间后重试");
-      }
-      if (!window.DMateGuestSession.write("appearance", next)) throw Error("外观设置暂时无法保存，请释放浏览器存储空间后重试");
-      window.DMateOfflineAppearance?.apply(next, blob);
-      window.dispatchEvent(new CustomEvent("offline:appearance-applied", {detail:{settings:next}}));
-      return;
-    }
     const saved = await transaction("settings", "readonly", os => os.get("appearance"));
-    let previous = saved?.settings;
-    if (!previous) {
-      try { previous = JSON.parse(localStorage.getItem(appearanceKey()) || "null"); } catch (_) {}
-    }
     const patch = changes?.settings || changes || {};
-    const fields = ["mode", "accent", "fontSize", "panelOpacity", "bubbleOpacity", "backgroundFit", "blur", "mask"];
-    const next = {...(previous || {})};
-    for (const key of fields) if (Object.hasOwn(patch, key)) next[key] = patch[key];
-    const value = {...(saved || {}), id:"appearance", settings:next, updatedAt:stamp()};
+    const next = {...(saved?.settings || {})};
+    for (const key of ["mode","accent","fontSize","panelOpacity","bubbleOpacity","backgroundFit","blur","mask"])
+      if (Object.hasOwn(patch,key)) next[key] = patch[key];
+    const value = {...saved,id:"appearance",settings:next,updatedAt:stamp()};
     if (changes?.removeBackground) delete value.backgroundBlob;
     else if (changes?.backgroundBlob instanceof Blob) value.backgroundBlob = changes.backgroundBlob;
     await put("settings", value);
-    try { localStorage.setItem(appearanceKey(), JSON.stringify(next)); } catch (_) {}
-    window.DMateOfflineAppearance?.apply(next, value.backgroundBlob || null);
-    window.dispatchEvent(new CustomEvent("offline:appearance-applied", {detail:{settings:next}}));
+    window.DMateOfflineAppearance?.apply(next,value.backgroundBlob || null);
+    window.dispatchEvent(new CustomEvent("offline:appearance-applied",{detail:{settings:next}}));
   }
 
   function bind() {
     const checkpoint = () => {
-      if (!guest()) return;
+      if (!guest() || !workspaceCurrent() || !state.storage) return;
       const snapshot = {};
       for (const key of ["panel", "revealed", "analysisRevealed", "graphCategory", "graphSelectedNodeId", "questionCategory", "questionDifficulty", "questionType", "questionSelection", "questionQuery", "conceptCategory", "conceptSelection", "conceptQuery", "graphQuery", "selectedNoteId", "noteQuery"]) snapshot[key] = state[key];
       snapshot.selectedQuestion = state.selectedQuestion?.id || "";
       snapshot.selectedConcept = state.selectedConcept?.id || "";
-      if (!window.DMateGuestSession.write("offline-view", snapshot)) toast("当前标签页未能保存最新浏览位置");
+      const encoded = JSON.stringify(snapshot);
+      if (encoded === state.viewSnapshot) return;
+      state.viewSnapshot = encoded;
+      state.viewSaveQueue = state.viewSaveQueue.then(() => put("settings",{id:"view",...snapshot}))
+        .catch(error => { state.viewSnapshot = ""; if (workspaceCurrent()) toast(storageError(error)); });
     };
     for (const type of ["input", "change", "click"]) document.addEventListener(type, () => queueMicrotask(checkpoint));
     document.addEventListener("toggle", () => requestAnimationFrame(checkpoint), true);
@@ -1183,7 +1147,9 @@
       "待订正":"Pending correction", "已完成订正":"Corrected", "加入错题本":"Add to mistake book",
       "查看答案":"View answer", "查看解析":"View explanation", "整题涉及":"Related content"
     });
-    document.querySelectorAll(".offline-nav-item").forEach(item => item.addEventListener("click", () => switchPanel(item.dataset.panel)));
+    document.querySelectorAll(".offline-nav-item").forEach(item => item.addEventListener("click", () => {
+      void Promise.resolve(switchPanel(item.dataset.panel)).catch(error => toast(storageError(error)));
+    }));
     $("questionCategory").addEventListener("change", event => { state.questionCategory=event.target.value; renderQuestions(); });
     $("questionDifficulty").addEventListener("change", event => { state.questionDifficulty=event.target.value; renderQuestions(); });
     $("questionType").addEventListener("change", event => { state.questionType=event.target.value; renderQuestions(); });
@@ -1207,7 +1173,6 @@
       closeLibraryDetail(false);
       article.focus({preventScroll:true});
     });
-    $("returnOnline").addEventListener("click", returnOnline);
     window.addEventListener("online", setNetworkStatus);
     window.addEventListener("offline", setNetworkStatus);
     window.addEventListener("dmate:languagechange", event => {
@@ -1222,24 +1187,27 @@
     });
     window.addEventListener("offline:appearance-change", event => {
       state.appearanceQueue = state.appearanceQueue.then(() => saveAppearance(event.detail))
-        .catch(error => { window.DMateOfflineAppearance?.fail(error); toast(error?.message || "外观保存失败"); });
+        .catch(error => { window.DMateOfflineAppearance?.fail(new Error(storageError(error))); toast(storageError(error)); });
     });
   }
 
   async function init() {
     try {
       setNetworkStatus();
-      state.db = await openDb();
+      const token = window.DMateOfflineHandoff?.pendingToken?.();
+      state.storage = await window.DMateOfflineStorage.open({owner:workspaceOwner,isCurrent:workspaceCurrent,
+        preserveSharedGuestSource:Boolean(token)});
+      requireWorkspace();
+      await migrateCurrentAccountData();
       await applyOriginalAppearance();
       const language = await transaction("settings", "readonly", os => os.get("language"));
       if (language?.value === "en" || language?.value === "zh-CN") window.DMateI18n?.setLanguage?.(language.value, false);
       configureRenderer();
-      await migrateCurrentAccountData();
       await loadResources();
       await loadLibrarySelections();
       bind();
       window.DMateI18n?.translate?.(document.body);
-      const view = guest() && window.DMateGuestSession.read("offline-view");
+      const view = guest() && await transaction("settings","readonly",os => os.get("view"));
       if (view) {
         for (const key of ["graphCategory", "graphSelectedNodeId", "questionCategory", "questionDifficulty", "questionType", "questionSelection", "questionQuery", "conceptCategory", "conceptSelection", "conceptQuery", "graphQuery", "selectedNoteId", "noteQuery"])
           if (typeof view[key] === "string") state[key] = view[key];
@@ -1252,9 +1220,15 @@
       }
       await switchPanel(view?.panel || "graph");
       document.documentElement.dataset.offlineReady = "true";
+      $("offlineMain").inert = false;
+      for (const button of startupControls) button.disabled = false;
     } catch (error) {
-      toast(error?.message || "离线工作区初始化失败");
+      toast(storageError(error));
     }
   }
+  const startupControls = [...document.querySelectorAll(".offline-nav-item")];
+  for (const button of startupControls) button.disabled = true;
+  $("offlineMain").inert = true;
+  $("returnOnline").addEventListener("click",() => { void returnOnline().catch(error => toast(storageError(error))); });
   init();
 })();
