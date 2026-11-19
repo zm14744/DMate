@@ -6,6 +6,8 @@
     'use strict';
     const exact = {
         "选项": "Options",
+        "导入数据": "Import data",
+        "导出数据": "Export data",
         // Mathematical symbol picker UI; the inserted glyphs remain content.
         "数学符号": "Math symbols",
         "数学符号键盘": "Math symbol keyboard",
