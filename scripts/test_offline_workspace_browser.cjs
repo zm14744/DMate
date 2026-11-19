@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const {installStorageProbe, records} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
-const panels = ['graph', 'concepts', 'questions', 'drawing', 'mistakes', 'notes'];
+const panels = ['graph', 'concepts', 'questions', 'mistakes', 'notes', 'drawing'];
 const iconReferences = { drawing: '#graphDrawingBtn svg', graph: '#knowledgeGraphBtn svg' };
 
 async function closeLibraryDetail(page) {
