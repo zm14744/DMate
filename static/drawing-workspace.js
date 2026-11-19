@@ -93,15 +93,40 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   function positionPopover(content,trigger,alignLeft=false){
    if(!content||!trigger)return;
    content.style.visibility='hidden';
-   const viewport=win.visualViewport,margin=8,gap=8,leftEdge=(viewport?.offsetLeft||0)+margin,topEdge=(viewport?.offsetTop||0)+margin;
-   const rightEdge=leftEdge+(viewport?.width||win.innerWidth)-2*margin,bottomEdge=topEdge+(viewport?.height||win.innerHeight)-2*margin;
+   const viewport=win.visualViewport,margin=8,gap=8,viewportLeft=viewport?.offsetLeft||0,viewportTop=viewport?.offsetTop||0;
+   let leftEdge=viewportLeft+margin,topEdge=viewportTop+margin;
+   let rightEdge=viewportLeft+(viewport?.width||win.innerWidth)-margin,bottomEdge=viewportTop+(viewport?.height||win.innerHeight)-margin;
+   // Embedded editors have their own border inside the viewport. Keep every
+   // popover inset from that frame instead of letting their edges coincide.
+   const hostBox=host.closest('.graph-editor-dialog')?.getBoundingClientRect();
+   if(hostBox?.width&&hostBox.height){
+    leftEdge=Math.max(leftEdge,hostBox.left+margin);topEdge=Math.max(topEdge,hostBox.top+margin);
+    rightEdge=Math.min(rightEdge,hostBox.right-margin);bottomEdge=Math.min(bottomEdge,hostBox.bottom-margin);
+   }
    // Translated rail labels can wrap. Keep every row reachable when a
    // popover opens from a button in the first row.
    const triggerBox=trigger.getBoundingClientRect(),railBox=trigger.closest('.ddw-side-actions')?.getBoundingClientRect();
    const anchor=railBox?{left:triggerBox.left,right:triggerBox.right,top:railBox.top,bottom:railBox.bottom}:triggerBox;
+   const canvasBox=content.matches('.dge-float-content,.dge-overlay-tools')
+    ?editorHost.querySelector('.ddw-canvas-frame')?.getBoundingClientRect():null;
+   if(canvasBox?.width&&canvasBox.height){
+    const canvasLeft=Math.max(leftEdge,canvasBox.left+margin),canvasRight=Math.min(rightEdge,canvasBox.right-margin);
+    if(canvasRight>canvasLeft){leftEdge=canvasLeft;rightEdge=canvasRight;}
+    const canvasTop=Math.max(topEdge,canvasBox.top+margin),canvasBottom=Math.min(bottomEdge,canvasBox.bottom-margin);
+    const aboveBottom=Math.min(bottomEdge,canvasBox.top-margin),belowTop=Math.max(topEdge,canvasBox.bottom+margin);
+    const aboveSpace=Math.max(0,aboveBottom-topEdge),belowSpace=Math.max(0,bottomEdge-belowTop);
+    const insideSpace=Math.max(0,Math.min(canvasBottom,anchor.top-gap)-canvasTop,
+     canvasBottom-Math.max(canvasTop,anchor.bottom+gap));
+    // Prefer the white canvas interior. Short screens can instead use a
+    // separate area above/below it, with a gap rather than a crossing border.
+    if(insideSpace<120&&aboveSpace>insideSpace&&aboveSpace>=belowSpace)bottomEdge=aboveBottom;
+    else if(insideSpace<120&&belowSpace>insideSpace)topEdge=belowTop;
+    else if(canvasBottom>canvasTop){topEdge=canvasTop;bottomEdge=canvasBottom;}
+   }
+   const availableWidth=Math.max(1,rightEdge-leftEdge),availableHeight=Math.max(1,bottomEdge-topEdge);
    const below=bottomEdge-anchor.bottom-gap,above=anchor.top-gap-topEdge;
-   const upwards=below<120&&above>below,space=Math.max(40,upwards?above:below);
-   content.style.maxHeight=space+'px';content.style.maxWidth=Math.max(40,rightEdge-leftEdge)+'px';
+   const upwards=below<120&&above>below,space=Math.min(availableHeight,Math.max(40,upwards?above:below));
+   content.style.maxHeight=space+'px';content.style.maxWidth=availableWidth+'px';
    // A host can create a fixed containing block (for example will-change:
    // transform on the offline main). Measure its origin instead of assuming
    // that fixed left/top are viewport coordinates.

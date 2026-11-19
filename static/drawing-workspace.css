@@ -58,7 +58,7 @@
 .ddw-side-panel,.ddw-editor .dge-float-content,.ddw-editor .dge-tool-palette>.dge-overlay-tools{max-height:var(--ddw-panel-space,50dvh);overflow:auto;overscroll-behavior:contain;padding:12px;box-sizing:border-box;border:1px solid var(--border-strong,#cbd5e1);border-radius:12px;background:var(--surface-1,#fff);box-shadow:0 6px 22px #0002}
 .ddw-editor .dge-tool-palette{left:var(--ddw-tools-left,18px)!important;top:var(--ddw-tools-top,76px)!important;width:max-content;max-width:calc(100% - 20px);margin:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;z-index:15}
 .ddw-editor .dge-tool-palette>summary,.ddw-editor .dge-tool-palette[open]>summary{padding:8px 10px;margin:0;border:1px solid var(--border-strong,#cbd5e1);border-radius:9px;background:var(--surface-1,#fff);color:inherit;font-size:13px;font-weight:400;line-height:1.4;box-shadow:0 3px 12px #0000000f}
-.ddw-editor .dge-tool-palette>.dge-overlay-tools{position:fixed;visibility:hidden;width:160px;gap:8px;z-index:20}
+.ddw-editor .dge-tool-palette>.dge-overlay-tools{position:fixed;visibility:hidden;width:160px;gap:8px;flex-wrap:nowrap;z-index:20}
 .ddw-editor .dge-tool-palette>summary[aria-disabled=true]{opacity:1;color:color-mix(in srgb,var(--text-primary,#172033) 55%,transparent);cursor:default}
 .ddw-side-actions>button:disabled{cursor:default}
 .ddw-editor .dge-tool-palette .dge-overlay-status:empty{display:none}

@@ -152,13 +152,29 @@ async function reachablePanelEnd(page, selector) {
 async function compactPanel(page, selector, mobile) {
   const metrics = await page.locator(selector).evaluate(node => {
     const rect = node.getBoundingClientRect(), style = getComputedStyle(node);
+    const host = node.closest('.graph-editor-dialog').getBoundingClientRect();
+    const canvas = node.matches('.dge-float-content,.dge-overlay-tools')
+      ? node.closest('.dmate-drawing-workspace').querySelector('.ddw-canvas-frame').getBoundingClientRect() : null;
     return { x: rect.x, y: rect.y, width: rect.width, height: rect.height,
       right: rect.right, bottom: rect.bottom, screenWidth: innerWidth, screenHeight: innerHeight,
+      hostGaps: {left:rect.left-host.left, right:host.right-rect.right,
+        top:rect.top-host.top, bottom:host.bottom-rect.bottom},
+      canvasPlacement:canvas ? {left:rect.left-canvas.left,right:canvas.right-rect.right,
+        top:rect.top-canvas.top,bottom:canvas.bottom-rect.bottom,
+        above:canvas.top-rect.bottom,below:rect.top-canvas.bottom} : null,
       padding: parseFloat(style.paddingTop), horizontalOverflow: node.scrollWidth - node.clientWidth };
   });
   assert.ok(metrics.x >= 7 && metrics.right <= metrics.screenWidth - 7, 'Popover fits the horizontal viewport: ' + JSON.stringify(metrics));
   assert.ok(metrics.y >= 7 && metrics.bottom <= metrics.screenHeight - 7, 'Popover fits the vertical viewport: ' + JSON.stringify(metrics));
-  assert.ok(metrics.horizontalOverflow <= 1, 'Panel does not require horizontal scrolling');
+  assert.ok(Object.values(metrics.hostGaps).every(gap => gap > 1),
+    'Popover stays inside the drawing frame with clear space around every edge: ' + JSON.stringify(metrics));
+  if (metrics.canvasPlacement) {
+    const gaps=metrics.canvasPlacement;
+    const inside=[gaps.left,gaps.right,gaps.top,gaps.bottom].every(gap=>gap>1);
+    assert.ok(inside || gaps.above>1 || gaps.below>1,
+      'Drawing popover stays inside the white canvas or fully outside it without crossing a canvas edge: ' + JSON.stringify(metrics));
+  }
+  assert.ok(metrics.horizontalOverflow <= 1, 'Panel does not require horizontal scrolling: ' + selector + ' ' + JSON.stringify(metrics));
   if (mobile) {
     assert.ok(metrics.width <= 320, 'Mobile panel stays compact instead of filling the screen: ' + JSON.stringify(metrics));
     assert.ok(metrics.padding <= 10, 'Mobile panel has compact padding');
@@ -387,7 +403,10 @@ async function viewportAndPopoverChecks(page, mobile, label, online = true) {
     if(name==='settings'&&mobile){
       const position=await page.locator(panel).evaluate(node=>{
         const rect=node.getBoundingClientRect(),trigger=document.querySelector('.ddw-side-actions>button:first-child').getBoundingClientRect();
-        return {left:rect.left,expected:Math.max(8,Math.min(trigger.left,innerWidth-8-rect.width))};
+        const host=node.closest('.graph-editor-dialog').getBoundingClientRect();
+        const canvas=node.closest('.dmate-drawing-workspace').querySelector('.ddw-canvas-frame').getBoundingClientRect();
+        const left=Math.max(8,host.left+8,canvas.left+8),right=Math.min(innerWidth-8,host.right-8,canvas.right-8);
+        return {left:rect.left,expected:Math.max(left,Math.min(trigger.left,right-rect.width))};
       });
       assert.ok(Math.abs(position.left-position.expected)<=2,
         label+': compact drawing settings opens toward its trigger instead of the left viewport edge');
@@ -767,7 +786,7 @@ async function runOfflineViewport(browser, width) {
 }
 
 async function runOfflinePopoverLayer(browser) {
-  for (const [width, height] of [[820, 390], [390, 500]]) {
+  for (const [width, height] of [[820, 390], [390, 500], [390, 740], [390, 844]]) {
     const page = await browser.newPage({ viewport:{width,height}, isMobile:true, hasTouch:true, serviceWorkers:'block' });
     await installStorageProbe(page);
     const errors = []; let modelCalls = 0;
@@ -791,17 +810,21 @@ async function runOfflinePopoverLayer(browser) {
         await page.locator(panel).waitFor({state:'visible'});
         await settle(page);
         const paint = await page.locator(panel).evaluate(node => {
-          const rect = node.getBoundingClientRect();
+          const rect = node.getBoundingClientRect(),host=node.closest('.graph-editor-dialog').getBoundingClientRect();
           const points = [[rect.left + rect.width / 2, rect.top + 2],
             [rect.left + 24, rect.top + Math.min(48, rect.height / 2)],
             [rect.left + rect.width / 2, rect.bottom - 8]];
-          return points.map(([x,y]) => {
+          return {gaps:{left:rect.left-host.left,right:host.right-rect.right,
+            top:rect.top-host.top,bottom:host.bottom-rect.bottom},points:points.map(([x,y]) => {
             const hit = document.elementFromPoint(x,y);
             return {x,y,inside:hit === node || node.contains(hit),hit:hit?.id || hit?.className};
-          });
+          })};
         });
-        assert.ok(paint.every(point => point.inside),
-          'Offline ' + width + 'x' + height + ' ' + name + ' stays above the topbar and surrounding page: ' + JSON.stringify(paint));
+        assert.ok(Object.values(paint.gaps).every(gap=>gap>1),
+          'Offline ' + width + 'x' + height + ' ' + name + ' does not touch or cross the drawing frame: ' + JSON.stringify(paint));
+        assert.ok(paint.points.every(point => point.inside),
+          'Offline ' + width + 'x' + height + ' ' + name + ' remains visible and clickable: ' + JSON.stringify(paint));
+        await compactPanel(page,panel,true);
         await page.locator(trigger).click();
         await page.locator(panel).waitFor({state:'hidden'});
         await settle(page);
@@ -809,7 +832,7 @@ async function runOfflinePopoverLayer(browser) {
           'Closing the drawing popover restores its ordinary workspace state');
       }
       assert.equal(modelCalls,0); assert.deepEqual(errors,[]);
-      console.log('PASS offline popover layer ' + width + 'x' + height + ': all three panels remain clickable and close normally');
+      console.log('PASS offline popover frame ' + width + 'x' + height + ': clear outer gaps, reachable content and normal open/close');
     } finally { await page.close(); }
   }
 }
