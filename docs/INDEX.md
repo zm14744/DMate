@@ -11,6 +11,7 @@
 | [识别流程](RECOGNITION.md) | 当前网页识图路径、其他后端路径、确认与计算 |
 | [部署说明](DEPLOYMENT.md) | 依赖、环境变量、容器、数据库与客户端构建 |
 | [数据与隐私](SECURITY_PRIVACY.md) | 本机和云端数据、第三方服务、认证和删除边界 |
+| [离线保密底层](OFFLINE_CONFIDENTIALITY.md) | 加密存储、系统密钥、浏览器保护边界和后续前端接入约定 |
 | [macOS 分发](MACOS_DISTRIBUTION.md) | Developer ID 签名、公证与构建产物 |
 | [参考资料](REFERENCES.md) | 课程知识与第三方技术来源 |
 | [第三方许可](../THIRD_PARTY_LICENSES.md) | 依赖、远程模型服务与客户端组件的来源和许可 |

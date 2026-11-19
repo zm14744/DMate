@@ -1,0 +1,107 @@
+name: Test offline confidentiality backend
+
+on:
+  push:
+    paths:
+      - 'static/offline-vault.js'
+      - 'scripts/test_offline_vault_browser.cjs'
+      - 'android/app/src/main/java/app/dmate/client/OfflineVault*.java'
+      - 'android/app/src/main/java/app/dmate/client/MainActivity.java'
+      - 'android/app/src/main/AndroidManifest.xml'
+      - 'android/app/build.gradle'
+      - 'desktop/**'
+      - 'scripts/test_android_offline_vault.py'
+      - 'scripts/test_desktop_offline_vault.cjs'
+      - '.github/workflows/test-offline-vault.yml'
+  pull_request:
+    paths:
+      - 'static/offline-vault.js'
+      - 'scripts/test_offline_vault_browser.cjs'
+      - 'android/app/src/main/java/app/dmate/client/OfflineVault*.java'
+      - 'android/app/src/main/java/app/dmate/client/MainActivity.java'
+      - 'android/app/src/main/AndroidManifest.xml'
+      - 'android/app/build.gradle'
+      - 'desktop/**'
+      - 'scripts/test_android_offline_vault.py'
+      - 'scripts/test_desktop_offline_vault.cjs'
+      - '.github/workflows/test-offline-vault.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    # Same-repository branches are already checked on push; PR events provide
+    # coverage for forks without running each same-repository change twice.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install the pinned browser test runner
+        run: npm install --no-save --ignore-scripts playwright@1.62.1
+      - name: Install the selected browser
+        run: npx playwright install --with-deps "${{ matrix.browser }}"
+      - name: Test real encrypted storage, conflicts, corruption, and provider failures
+        run: node scripts/test_offline_vault_browser.cjs
+        env:
+          DMATE_TEST_BROWSER: ${{ matrix.browser }}
+
+  android-core:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Test the Android vault protocol and AES-GCM core
+        run: python scripts/test_android_offline_vault.py
+
+  desktop:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux WebView build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev pkg-config
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            desktop/src-tauri -> target
+            desktop/src-tauri/offline-vault -> target
+      - name: Test the native encryption core without interactive keyring tests
+        run: cargo test --locked --manifest-path desktop/src-tauri/offline-vault/Cargo.toml
+      - name: Test bridge origin restrictions and least-privilege configuration
+        run: node scripts/test_desktop_offline_vault.cjs
+      - name: Compile the complete Tauri host and native vault integration
+        run: cargo check --locked --manifest-path desktop/src-tauri/Cargo.toml

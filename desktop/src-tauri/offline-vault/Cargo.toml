@@ -1,0 +1,24 @@
+[package]
+name = "dmate-offline-vault"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[features]
+default = ["system-keyring"]
+system-keyring = ["dep:keyring", "dep:fs2"]
+
+[dependencies]
+aes-gcm = { version = "0.10.3", features = ["zeroize"] }
+# Enable best-effort key-schedule cleanup in AES-GCM's transitive primitives.
+aes = { version = "0.8.4", features = ["zeroize"] }
+ghash = { version = "0.5.1", features = ["zeroize"] }
+polyval = { version = "0.6.2", features = ["zeroize"] }
+base64 = "0.22.1"
+getrandom = "0.2.16"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+zeroize = "1.8"
+url = "2"
+fs2 = { version = "0.4.3", optional = true }
+keyring = { version = "3.6.3", default-features = false, features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust", "vendored"], optional = true }
