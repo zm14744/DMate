@@ -1,0 +1,26 @@
+/* The tools keep their place in normal flow while conversation details resize. */
+#conversationInfoSection { box-sizing:border-box; margin:0; padding:0; overflow:hidden; }
+#conversationInfoSection[hidden] { display:none !important; }
+#conversationInfoContent { display:flow-root; }
+body[data-appearance-theme] #learningToolsPanel #conversationInfoHeading { margin-top:0 !important; }
+body[data-appearance-theme] #learningToolsPanel > .learning-panel {
+    transition:margin-top .22s cubic-bezier(.2,.8,.2,1),
+        padding-top .22s cubic-bezier(.2,.8,.2,1),
+        border-top-width .22s cubic-bezier(.2,.8,.2,1),border-top-color .22s ease;
+}
+body[data-appearance-theme] #learningToolsPanel[data-has-conversation-info="false"] > .learning-panel {
+    margin-top:0 !important; padding-top:0 !important; border-top-width:0 !important;
+    border-top-color:transparent !important;
+}
+body[data-appearance-theme] #learningToolsPanel[data-has-conversation-info="false"] .learning-title { margin-top:0 !important; }
+body[data-appearance-theme] #learningToolsPanel .learning-title {
+    transition:margin-top .22s cubic-bezier(.2,.8,.2,1);
+}
+@media(max-width:1100px) {
+    body[data-appearance-theme] #learningToolsPanel #conversationInfoHeading,
+    body[data-appearance-theme] #learningToolsPanel[data-has-conversation-info="false"] .learning-title { margin-top:2px !important; }
+}
+@media(prefers-reduced-motion:reduce) {
+    body[data-appearance-theme] #learningToolsPanel > .learning-panel,
+    body[data-appearance-theme] #learningToolsPanel .learning-title { transition:none; }
+}

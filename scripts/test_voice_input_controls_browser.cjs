@@ -108,6 +108,11 @@ async function runCase(browser, width, theme, reducedMotion = 'no-preference') {
     await page.evaluate(() => setSessionBusy(currentId, false));
     await page.locator('#text').fill('保留原有草稿');
     await idle(page);
+    // Initial font/layout restoration may still be moving the composer. Start
+    // the strict replacement check only after that independent motion settles.
+    await page.evaluate(async () => { await document.fonts?.ready; });
+    await page.waitForFunction(() => !document.querySelector('.center')?.hasAttribute('data-composer-motion'));
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const frame = () => page.locator('.input').evaluate(node => {
       const rect = node.getBoundingClientRect(); return [rect.x, rect.y, rect.width, rect.height];
     });

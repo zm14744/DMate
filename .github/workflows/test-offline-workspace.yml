@@ -62,6 +62,7 @@ on:
       - 'scripts/offline-vault-browser-fixtures.cjs'
       - 'scripts/test_drawing_async_persistence_browser.cjs'
       - 'scripts/test_mobile_drawers_browser.cjs'
+      - 'scripts/test_learning_panel_motion_browser.cjs'
       - 'scripts/test_service_worker_cache_browser.cjs'
       - 'scripts/test_image_export_browser.cjs'
       - 'scripts/test_mistake_action_chrome_browser.cjs'
@@ -161,6 +162,7 @@ on:
       - 'scripts/offline-vault-browser-fixtures.cjs'
       - 'scripts/test_drawing_async_persistence_browser.cjs'
       - 'scripts/test_mobile_drawers_browser.cjs'
+      - 'scripts/test_learning_panel_motion_browser.cjs'
       - 'scripts/test_service_worker_cache_browser.cjs'
       - 'scripts/test_image_export_browser.cjs'
       - 'scripts/test_mistake_action_chrome_browser.cjs'
@@ -244,6 +246,7 @@ jobs:
           node --check static/offline-knowledge-graph.js
           node --check static/knowledge-graph-labels.js
           node --check static/script.js
+          node --check static/learning-panel.js
           node --check static/conversation-titles.js
           node --check static/math-markdown.js
           node --check static/ai-answer-renderer.js
@@ -280,6 +283,7 @@ jobs:
           node --check scripts/offline-vault-browser-fixtures.cjs
           node --check scripts/test_drawing_async_persistence_browser.cjs
           node --check scripts/test_mobile_drawers_browser.cjs
+          node --check scripts/test_learning_panel_motion_browser.cjs
           node --check scripts/test_service_worker_cache_browser.cjs
           node --check scripts/test_image_export_browser.cjs
           node --check scripts/test_mistake_action_chrome_browser.cjs
@@ -445,6 +449,7 @@ jobs:
           node scripts/test_library_selection_browser.cjs
           node scripts/test_library_detail_view_browser.cjs
           node scripts/test_mobile_drawers_browser.cjs
+          node scripts/test_learning_panel_motion_browser.cjs
           node scripts/test_knowledge_graph_browser.cjs
           node scripts/test_graph_empty_recent_browser.cjs
           node scripts/test_graph_relation_navigation_browser.cjs

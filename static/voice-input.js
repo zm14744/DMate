@@ -7,7 +7,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
     const TRAILING_PAD_SAMPLES = Math.round(SAMPLE_RATE * .25);
     const TAIL_CAPTURE_MS = 350;
     const LITTLE_ENDIAN = new Uint8Array(Uint16Array.of(1).buffer)[0] === 1;
-    const ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>';
+    const ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></svg>';
 
     function wavBlob(chunks, count) {
         const buffer = new ArrayBuffer(44 + count * 2), view = new DataView(buffer);

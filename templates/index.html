@@ -8976,6 +8976,7 @@ body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
 <link rel="stylesheet" href="/static/learning-report.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/red-circle-controls.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/desktop-shell.css?v={{ dmate_web_revision }}">
+<link rel="stylesheet" href="/static/learning-panel.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/ui-tooltip.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/select-controls.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/search-controls.css?v={{ dmate_web_revision }}">
@@ -9125,7 +9126,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
             <div class="manual-question-composer">
                 <textarea id="text" rows="1" placeholder="询问DMate" autocomplete="off" enterkeyhint="send" aria-label="消息输入"></textarea>
                 <button id="voiceInputBtn" class="voice-input-button" type="button" aria-label="语音输入" title="语音输入" aria-pressed="false">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></svg>
                 </button>
             </div>
             <span class="image-picker-wrap" id="imagePickerWrap">
@@ -9142,14 +9143,18 @@ window.DMATE_CLIENT_CONFIG = {{ {
     </div>
 </div>
 
-<div id="learningToolsPanel" class="right" role="region" aria-label="学习工具">
+<div id="learningToolsPanel" class="right" role="region" aria-label="学习工具" data-has-conversation-info="false">
     <div class="mobile-drawer-head mobile-drawer-close-row">
         <button id="mobileToolsClose" class="mobile-drawer-close" type="button" aria-label="关闭学习工具">×</button>
     </div>
-    <div class="panel-heading-row">
-        <div>对话信息</div>
-    </div>
-    <div id="info" class="small rich-copy-surface"></div>
+    <section id="conversationInfoSection" aria-labelledby="conversationInfoHeading" aria-hidden="true" hidden>
+        <div id="conversationInfoContent">
+            <div id="conversationInfoHeading" class="panel-heading-row">
+                <div>对话信息</div>
+            </div>
+            <div id="info" class="small rich-copy-surface"></div>
+        </div>
+    </section>
 
     <div class="learning-panel">
         <div class="panel-heading-row learning-title">
@@ -9815,6 +9820,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script defer src="/static/chat-message-edit.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/conversation-image-drafts.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/ocr-task-client.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/learning-panel.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/script.js?v={{ dmate_web_revision }}"></script>
 <link rel="stylesheet" href="/static/conversation-tabs.css?v={{ dmate_web_revision }}">
 <script defer src="/static/conversation-tabs.js?v={{ dmate_web_revision }}"></script>

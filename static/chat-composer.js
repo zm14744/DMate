@@ -77,7 +77,8 @@
         toggle.setAttribute('title', uiText('数学符号'));
         toggle.setAttribute('aria-expanded', 'false');
         toggle.setAttribute('aria-controls', 'dmate-symbol-panel');
-        toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.8" y="5.2" width="18.4" height="13.6" rx="2.2"/><path d="M6.5 9h.01M10 9h.01M13.5 9h.01M17 9h.01M6.5 12.3h.01M10 12.3h.01M13.5 12.3h.01M17 12.3h.01M8.5 15.5h7"/></svg>';
+        // Lucide keyboard artwork; keep the composer's original SVG parameters.
+        toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/></svg>';
 
         const panel = doc.createElement('div');
         panel.id = 'dmate-symbol-panel';

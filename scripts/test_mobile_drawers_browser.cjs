@@ -44,11 +44,14 @@ async function checkHeader(page, sidebar) {
 }
 
 async function checkTools(page, empty) {
+  await page.waitForFunction(() => !document.getElementById('conversationInfoSection').hasAttribute('data-info-animating'));
   const state = await page.evaluate(() => {
+    const section = document.getElementById('conversationInfoSection');
     const info = document.getElementById('info'), box = info.getBoundingClientRect(), css = getComputedStyle(info);
     const range = document.createRange(); range.selectNodeContents(info);
     const text = range.getBoundingClientRect();
-    const first = document.querySelector('#learningToolsPanel > .panel-heading-row').firstElementChild;
+    const heading = document.getElementById('conversationInfoHeading');
+    const first = heading.firstElementChild || heading;
     const second = document.querySelector('#learningToolsPanel .learning-title').firstElementChild;
     const firstBox = first.getBoundingClientRect(), secondBox = second.getBoundingClientRect();
     const style = node => Object.fromEntries(['fontSize', 'fontWeight', 'fontFamily', 'color', 'lineHeight']
@@ -59,7 +62,8 @@ async function checkTools(page, empty) {
       const bounds = lineRange.getBoundingClientRect();
       return bounds.left + bounds.width / 2;
     });
-    return { text: info.textContent.trim(), center: box.x + box.width / 2, textCenter: text.x + text.width / 2,
+    return { sectionHidden:section.hidden, ariaHidden:section.getAttribute('aria-hidden'),
+      infoVisible:Boolean(box.width && box.height), text: info.textContent.trim(), center: box.x + box.width / 2, textCenter: text.x + text.width / 2,
       centerY: box.y + box.height / 2, textCenterY: text.y + text.height / 2,
       contentLeft: box.left + info.clientLeft + parseFloat(css.paddingLeft), lines,
       infoBottom: box.bottom, separatorTop: panelBox.top, border: parseFloat(getComputedStyle(panel).borderTopWidth),
@@ -70,17 +74,24 @@ async function checkTools(page, empty) {
   assert.equal(state.firstText, '对话信息');
   assert.equal(state.secondText, '学习工具');
   assert.ok(state.secondVisible, 'Learning tools section heading remains visible');
-  assert.ok(state.border > 0 && state.separatorTop >= state.infoBottom, 'Section separator follows conversation information');
-  assert.ok(state.headingTop > state.separatorTop + state.border, 'Learning tools heading sits below the separator');
-  near(state.firstLeft, state.secondLeft, 'Section headings share the same left alignment');
   assert.deepEqual(state.secondStyle, state.firstStyle, 'Section headings use matching typography');
   if (empty) {
-    assert.equal(state.text, '无');
-    near(state.textCenter, state.center, 'Empty conversation information is horizontally centered');
-    near(state.textCenterY, state.centerY, 'Empty conversation information is vertically centered', 3);
+    assert.equal(state.sectionHidden,true,'Empty conversation information, including its heading, is removed');
+    assert.equal(state.ariaHidden,'true','Empty information stays out of the accessibility tree');
+    assert.equal(state.infoVisible,false,'No empty information placeholder remains visible');
+    assert.equal(state.border,0,'There is no orphaned separator above learning tools');
+    assert.notEqual(state.text,'无','Empty information does not render the old None placeholder');
   } else {
+    assert.equal(state.sectionHidden,false,'A real message makes conversation information available');
+    assert.ok(state.border > 0 && state.separatorTop >= state.infoBottom, 'Section separator follows conversation information');
+    assert.ok(state.headingTop > state.separatorTop + state.border, 'Learning tools heading sits below the separator');
+    near(state.firstLeft, state.secondLeft, 'Section headings share the same left alignment');
     assert.ok(state.lines.length >= 2, 'New conversation produces real information lines');
     for (const center of state.lines) near(center, state.center, 'Conversation information lines are centered');
+  }
+  for (const id of ['wrongBookBtn','conceptNotebookBtn','knowledgeGraphBtn','graphDrawingBtn','learningReviewBtn']) {
+    assert.equal(await page.locator('#'+id).isVisible(),true,id+': learning action remains visible');
+    assert.equal(await page.locator('#'+id).isEnabled(),true,id+': learning action remains usable');
   }
 }
 
@@ -149,8 +160,12 @@ async function checkDesktopInfo(browser,theme) {
   const page=await browser.newPage({viewport:{width:1440,height:900}});
   try {
     await page.goto(baseURL,{waitUntil:'networkidle'});
-    await page.evaluate(theme => {appearanceSettings.mode=theme;applyAppearanceSettings({save:false});newChat();},theme);
+    await page.evaluate(theme => {
+      appearanceSettings.mode=theme;applyAppearanceSettings({save:false});newChat();
+      getCurrent().messages.push({role:'user',text:'核对有实际消息时的对话信息。'});renderInfo();
+    },theme);
     await page.locator('#desktopToolsBtn').click();
+    await page.waitForFunction(() => !document.getElementById('conversationInfoSection').hasAttribute('data-info-animating'));
     const lines=await page.locator('#info').evaluate(info => {
       const box=info.getBoundingClientRect();
       return [...info.querySelectorAll('.conversation-info-line')].map(line=>{
@@ -174,7 +189,7 @@ async function runCase(browser, width, theme) {
       appearanceSettings.mode = value;
       applyAppearanceSettings({save:false});
     }, theme);
-    await page.waitForFunction(() => document.getElementById('info').textContent.trim() === '无');
+    await page.waitForFunction(() => document.getElementById('conversationInfoSection')?.hidden);
     await openDrawer(page, 'tools');
     await checkHeader(page, '#learningToolsPanel');
     await checkTools(page, true);
@@ -194,6 +209,10 @@ async function runCase(browser, width, theme) {
     await page.waitForFunction(count => document.querySelectorAll('#sessions .session').length === count + 1, oldCount);
     await page.waitForFunction(() => !document.body.classList.contains('mobile-left-open'));
     await openDrawer(page, 'tools');
+    await checkTools(page, true);
+    await page.evaluate(() => {
+      getCurrent().messages.push({role:'user',text:'这条消息让当前对话的信息可供显示。'});renderInfo();
+    });
     await checkTools(page, false);
     if (process.env.MOBILE_DRAWER_SCREENSHOT_DIR) {
       await page.screenshot({ path: process.env.MOBILE_DRAWER_SCREENSHOT_DIR + '/' + width + '-' + theme + '-tools.png' });

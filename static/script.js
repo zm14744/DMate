@@ -22685,41 +22685,46 @@ function renderInfo() {
     info.setAttribute("data-i18n-content", "");
 
     const session = getCurrent();
-    info.classList.toggle("is-empty", !session);
+    const hasInfo = Boolean(session && Array.isArray(session.messages) && session.messages.length);
+    const render = () => {
+        info.classList.toggle("is-empty", !hasInfo);
+        if (!hasInfo) { info.replaceChildren(); return; }
 
-    if (!session) {
-        info.innerText = dmateUiText("无");
-        return;
-    }
+        const lines = [
+            dmateUiText("当前对话：", "Conversation: ") + sessionDisplayName(session),
+            dmateUiText("消息数：", "Messages: ") + session.messages.length
+        ];
 
-    const lines = [
-        dmateUiText("当前对话：", "Conversation: ") + sessionDisplayName(session),
-        dmateUiText("消息数：", "Messages: ") + session.messages.length
-    ];
+        const teaching = getEffectiveSessionTeaching(session);
 
-    const teaching = getEffectiveSessionTeaching(session);
-
-    if (teaching) {
-        // 后台仍使用 teaching.category；右侧概览只展示具体学习要点。
-        if (teaching.focus_points.length) {
-            lines.push(
-                dmateUiText("本题难点：", "Focus: ") + teaching.focus_points.map(dmateKnowledgeLabel).join(dmateUiLanguage() === "en" ? ", " : "、")
-            );
+        if (teaching) {
+            // 后台仍使用 teaching.category；右侧概览只展示具体学习要点。
+            if (teaching.focus_points.length) {
+                lines.push(
+                    dmateUiText("本题难点：", "Focus: ") + teaching.focus_points.map(dmateKnowledgeLabel).join(dmateUiLanguage() === "en" ? ", " : "、")
+                );
+            }
+            if (teaching.knowledge_path.length >= 2) {
+                lines.push(
+                    dmateUiText("知识脉络：", "Learning path: ") + teaching.knowledge_path.map(dmateKnowledgeLabel).join(" → ")
+                );
+            }
         }
 
-        if (teaching.knowledge_path.length >= 2) {
-            lines.push(
-                dmateUiText("知识脉络：", "Learning path: ") + teaching.knowledge_path.map(dmateKnowledgeLabel).join(" → ")
-            );
-        }
+        info.replaceChildren(...lines.map(text => {
+            const line = document.createElement("div");
+            line.className = "conversation-info-line";
+            line.textContent = text;
+            return line;
+        }));
+    };
+    if (window.DMateLearningPanel?.update) window.DMateLearningPanel.update(hasInfo,render);
+    else {
+        render();
+        const section = document.getElementById("conversationInfoSection");
+        if (section) { section.hidden = !hasInfo; section.setAttribute("aria-hidden",String(!hasInfo)); }
+        document.getElementById("learningToolsPanel")?.setAttribute("data-has-conversation-info",String(hasInfo));
     }
-
-    info.replaceChildren(...lines.map(text => {
-        const line = document.createElement("div");
-        line.className = "conversation-info-line";
-        line.textContent = text;
-        return line;
-    }));
 }
 
 
