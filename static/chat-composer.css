@@ -48,17 +48,14 @@ body[data-appearance-theme] .interaction-mode-switch {
     --dmate-mode-track-bg:#ececec;
     --dmate-mode-thumb-bg:#fff;
     position:relative; isolation:isolate; display:inline-grid;
-    grid-template-columns:minmax(0,54fr) minmax(0,46fr);
+    /* Keep labels stationary while the independent selection surface slides. */
+    grid-template-columns:repeat(2,minmax(0,1fr));
     grid-template-rows:minmax(0,1fr); align-items:center; flex:none;
     box-sizing:border-box; width:200px; height:var(--dmate-mode-height,32px); padding:0; gap:0;
     border:0 !important; border-radius:999px;
     background:transparent !important; box-shadow:none !important;
     color:var(--text-secondary,#64748b); font-size:13px; line-height:1;
     white-space:nowrap;
-    transition:grid-template-columns .22s cubic-bezier(.2,.8,.2,1);
-}
-body[data-appearance-theme] .interaction-mode-switch[data-mode="question"] {
-    grid-template-columns:minmax(0,46fr) minmax(0,54fr);
 }
 body[data-appearance-theme="dark"] .interaction-mode-switch {
     --dmate-mode-track-bg:#1b1b1b;
