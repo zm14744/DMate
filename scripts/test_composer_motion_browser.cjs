@@ -1,9 +1,11 @@
 'use strict';
 // Run with Flask available at DMATE_TEST_BASE_URL (default localhost:5001).
-// No chat/model request is made: real newChat/renderChat paths use local state.
+// No chat/model request is made: real newChat/renderAll paths use local state.
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const base = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5001';
+const homeDraft = 'A draft with ∀ and ∈';
+const sessionDraft = 'Session draft ∃y';
 
 async function sample(page, action) {
     return page.evaluate(async action => {
@@ -18,8 +20,9 @@ async function sample(page, action) {
         const snapshot = () => ({...rect(capsule), mode:rect(mode), time:performance.now()});
         const first = snapshot(), rows = [];
         if (action === 'new') newChat();
-        else { currentId = null; renderChat(); }
+        else { currentId = null; renderAll(); }
         const sync = snapshot();
+        const syncDraft = text.value, syncCaret = [text.selectionStart,text.selectionEnd];
         await new Promise(resolve => {
             const started = performance.now();
             function tick(timestamp) {
@@ -29,7 +32,7 @@ async function sample(page, action) {
             }
             requestAnimationFrame(tick);
         });
-        return {first, sync, rows, sameText:text === document.getElementById('text'),
+        return {first, sync, rows, syncDraft, syncCaret, sameText:text === document.getElementById('text'),
             samePanel:panel === document.querySelector('.dmate-symbol-panel'),
             draft:text.value, caret:[text.selectionStart,text.selectionEnd],
             focused:document.activeElement === text, font:getComputedStyle(text).fontSize,
@@ -39,7 +42,7 @@ async function sample(page, action) {
     }, action);
 }
 
-function continuous(result, label) {
+function continuous(result, label, expectedDraft, expectedCaret) {
     for (const key of ['x','y','width','height']) {
         assert.ok(Math.abs(result.sync[key]-result.first[key]) < 2,
             `${label}: synchronous layout switch jumped ${key}`);
@@ -59,8 +62,10 @@ function continuous(result, label) {
     }
     assert.equal(result.sameText, true, label+': textarea replaced');
     assert.equal(result.samePanel, true, label+': symbol panel replaced');
-    assert.equal(result.draft, 'A draft with ∀ and ∈', label+': draft lost');
-    assert.deepEqual(result.caret, [2,7], label+': selection changed');
+    assert.equal(result.syncDraft, expectedDraft, label+': incorrect conversation draft applied');
+    assert.deepEqual(result.syncCaret, expectedCaret, label+': incorrect selection after draft restoration');
+    assert.equal(result.draft, expectedDraft, label+': motion changed the conversation draft');
+    assert.deepEqual(result.caret, result.syncCaret, label+': motion changed the restored selection');
     assert.equal(result.focused, true, label+': layout stole focus');
     assert.equal(result.font, '16px', label+': input font size changed');
     assert.equal(result.scale, 1, label+': mobile viewport zoom changed');
@@ -79,12 +84,12 @@ async function interrupted(page, desktop) {
             requestAnimationFrame(next);
         });
         const changes=[];
-        currentId=null; renderChat();
+        currentId=null; renderAll();
         await frames(4);
         const first=box(); newChat(); changes.push([first,box()]);
         if (desktop) document.getElementById('desktopSidebarOpen').click();
         await frames(4);
-        const second=box(); currentId=null; renderChat(); changes.push([second,box()]);
+        const second=box(); currentId=null; renderAll(); changes.push([second,box()]);
         await frames(3);
         const third=box(); newChat(); changes.push([third,box()]);
         if (desktop) document.getElementById('desktopSidebarToggle').click();
@@ -113,14 +118,14 @@ async function interrupted(page, desktop) {
                 await page.route('**/chat', route => { modelCalls++; return route.abort(); });
                 await page.goto(base,{waitUntil:'networkidle'});
                 await page.waitForFunction(() => window.dmateChatComposer && window.DMateChatComposer.transitionConversation);
-                await page.evaluate(language => {
+                await page.evaluate(({language,homeDraft}) => {
                     window.DMateI18n.setLanguage(language,false);
-                    currentId=null; renderChat();
+                    currentId=null; renderAll();
                     const t=document.getElementById('text');
-                    t.value='A draft with ∀ and ∈';t.dispatchEvent(new Event('input',{bubbles:true}));
+                    t.value=homeDraft;t.dispatchEvent(new Event('input',{bubbles:true}));
                     document.querySelector('.dmate-symbol-keyboard').click();
                     t.focus({preventScroll:true}); t.setSelectionRange(2,7);
-                },language);
+                },{language,homeDraft});
                 await page.waitForFunction(() => !document.querySelector('.center').hasAttribute('data-composer-motion'));
                 if (width<500) {
                     const geometry=await page.evaluate(() => {
@@ -132,8 +137,20 @@ async function interrupted(page, desktop) {
                     });
                     assert.deepEqual(geometry.before,geometry.after,'keyboard class changed capsule size');
                 }
-                continuous(await sample(page,'new'), `${width}/${language}/new`);cases++;
-                continuous(await sample(page,'home'), `${width}/${language}/home`);cases++;
+                // Conversation changes restore their own drafts; the motion
+                // must preserve that restored state throughout its frames.
+                // Both drafts fit one line, keeping resizing out of this fixture.
+                continuous(await sample(page,'new'), `${width}/${language}/new`, '', [0,0]);cases++;
+                const sessionId = await page.evaluate(sessionDraft => {
+                    const t=document.getElementById('text');
+                    t.value=sessionDraft;t.dispatchEvent(new Event('input',{bubbles:true}));
+                    t.setSelectionRange(3,9);
+                    return currentId;
+                },sessionDraft);
+                continuous(await sample(page,'home'), `${width}/${language}/home`, homeDraft,
+                    [homeDraft.length,homeDraft.length]);cases++;
+                assert.equal(await page.evaluate(id => getConversationComposerDraft(id).text,sessionId),sessionDraft,
+                    'Returning home must retain the other conversation\'s independent draft');
                 const rapid=await interrupted(page,width>1100);
                 for (const [before,after] of rapid.changes) for (const key of ['x','y','width','height']) {
                     assert.ok(Math.abs(before[key]-after[key])<2, `interrupted ${width}/${language} jumped ${key}`);
@@ -145,12 +162,12 @@ async function interrupted(page, desktop) {
                 assert.equal(modelCalls,0);assert.deepEqual(errors,[]);
                 await page.emulateMedia({reducedMotion:'reduce'});
                 const reduced=await page.evaluate(() => {
-                    currentId=null;renderChat();const home=document.querySelector('.input').getBoundingClientRect().y;
+                    currentId=null;renderAll();const home=document.querySelector('.input').getBoundingClientRect().y;
                     newChat();return {home,bottom:document.querySelector('.input').getBoundingClientRect().y,
                         moving:document.querySelector('.center').hasAttribute('data-composer-motion')};
                 });
                 assert.equal(reduced.moving,false);assert.ok(reduced.bottom-reduced.home>120);cases++;
-                console.log(`PASS ${width}px ${language}: bidirectional frames, interruption/sidebar, reduced motion; draft/caret/DOM preserved`);
+                console.log(`PASS ${width}px ${language}: bidirectional frames, interruption/sidebar, reduced motion; independent drafts and restored caret/DOM preserved`);
             } finally { await context.close(); }
         }
     } finally { await browser.close(); }
