@@ -67,10 +67,11 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       '/static/drawing-workspace.css?v=52', '/static/graph-editor.js?v=53', '/static/graph-editor-overlay.js?v=39', '/static/drawing-workspace.js?v=56', '/static/drawing-export.js?v=39',
       '/static/modal-chrome.css', '/static/modal-text.js?v=53', '/static/delete-confirm.js', '/static/guest-session.js?v=53', '/static/offline-interface-state.js?v=1', '/static/language.js?v=59',
       '/static/graph-editor-format.js?v=32', '/static/language-catalog.js?v=64', '/static/offline-privacy-motion.js?v=2', '/static/offline-shell.js?v=39',
-      '/static/offline-vault.js?v=2', '/static/offline-handoff.js?v=1', '/static/offline-storage.js?v=2',
-      '/static/vendor/fflate-0.8.2/fflate.min.js', '/static/offline-backup.js?v=2',
-      '/static/backup-download.js?v=1',
-      '/static/offline.js?v=65', '/static/offline-knowledge-graph.js?v=60',
+      '/static/offline-vault.js?v=2', '/static/offline-handoff.js?v=1', '/static/offline-storage.js?v=3',
+      '/static/vendor/fflate-0.8.2/fflate.min.js', '/static/offline-backup.js?v=3',
+      '/static/backup-download.js?v=1', '/static/appearance-bootstrap.js?v=1',
+      '/static/offline-appearance-preload.js?v=1', '/static/offline-appearance.js?v=9',
+      '/static/offline.js?v=66', '/static/offline-knowledge-graph.js?v=60',
       '/static/ui-tooltip.js?v=49',
       '/static/offline-knowledge-graph.css?v=54', '/static/offline-entry.js?v=48',
       '/static/search-controls.css?v=27', '/static/search-controls.js?v=27',
@@ -86,7 +87,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     // Simulate the pinned stylesheet left by the previous offline shell.
     await page.goto(new URL('/health', baseURL).href);
     await page.evaluate(async () => {
-      const cache = await caches.open('dmate-offline-shell-v93');
+      const cache = await caches.open('dmate-offline-shell-v94');
       await cache.put('/static/button-themes.css?v=54', new Response('/* obsolete graph navigation button styles */'));
     });
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });
@@ -104,7 +105,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       if (canonical.length !== 1) throw new Error('Expected exactly one precached shared stylesheet');
       return { name: names[0], canonical: canonical[0].url };
     }, assetPath);
-    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 94, 'The privacy button motion needs the refreshed offline cache');
+    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 95, 'Question merging and first-paint appearance need the refreshed offline cache');
     assert.equal((await fetchAsset(page, current.canonical)).text, networkCSS,
       'The refreshed shell loads current frameless controls instead of the obsolete stylesheet');
     for (const asset of sharedAssets) {

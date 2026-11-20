@@ -9,6 +9,7 @@ on:
       - 'question_topic_structure.py'
       - 'server_i18n.py'
       - 'classification_semantic.py'
+      - 'question_classification.py'
       - 'conversation_titles.py'
       - 'concept_notebook.py'
       - 'finite_algebra_diagrams.py'
@@ -49,6 +50,8 @@ on:
       - 'scripts/test_conversation_context_browser.cjs'
       - 'scripts/test_math_markdown.cjs'
       - 'scripts/test_offline_appearance_browser.cjs'
+      - 'scripts/test_appearance_bootstrap_browser.cjs'
+      - 'scripts/test_appearance_bootstrap.py'
       - 'scripts/test_offline_data_migration_browser.cjs'
       - 'scripts/test_offline_storage_browser.cjs'
       - 'scripts/test_offline_device_storage_browser.cjs'
@@ -57,12 +60,14 @@ on:
       - 'scripts/test_offline_interface_lifecycle_browser.cjs'
       - 'scripts/test_offline_privacy_motion_browser.cjs'
       - 'scripts/test_offline_backup_browser.cjs'
+      - 'scripts/test_offline_mistake_merge_browser.cjs'
       - 'scripts/test_online_backup_browser.cjs'
       - 'scripts/test_textarea_autogrow_browser.cjs'
       - 'scripts/offline-vault-browser-fixtures.cjs'
       - 'scripts/test_drawing_async_persistence_browser.cjs'
       - 'scripts/test_mobile_drawers_browser.cjs'
       - 'scripts/test_learning_panel_motion_browser.cjs'
+      - 'scripts/test_question_classification_consistency_browser.cjs'
       - 'scripts/test_service_worker_cache_browser.cjs'
       - 'scripts/test_image_export_browser.cjs'
       - 'scripts/test_mistake_action_chrome_browser.cjs'
@@ -109,6 +114,7 @@ on:
       - 'question_topic_structure.py'
       - 'server_i18n.py'
       - 'classification_semantic.py'
+      - 'question_classification.py'
       - 'conversation_titles.py'
       - 'concept_notebook.py'
       - 'finite_algebra_diagrams.py'
@@ -149,6 +155,8 @@ on:
       - 'scripts/test_conversation_context_browser.cjs'
       - 'scripts/test_math_markdown.cjs'
       - 'scripts/test_offline_appearance_browser.cjs'
+      - 'scripts/test_appearance_bootstrap_browser.cjs'
+      - 'scripts/test_appearance_bootstrap.py'
       - 'scripts/test_offline_data_migration_browser.cjs'
       - 'scripts/test_offline_storage_browser.cjs'
       - 'scripts/test_offline_device_storage_browser.cjs'
@@ -157,12 +165,14 @@ on:
       - 'scripts/test_offline_interface_lifecycle_browser.cjs'
       - 'scripts/test_offline_privacy_motion_browser.cjs'
       - 'scripts/test_offline_backup_browser.cjs'
+      - 'scripts/test_offline_mistake_merge_browser.cjs'
       - 'scripts/test_online_backup_browser.cjs'
       - 'scripts/test_textarea_autogrow_browser.cjs'
       - 'scripts/offline-vault-browser-fixtures.cjs'
       - 'scripts/test_drawing_async_persistence_browser.cjs'
       - 'scripts/test_mobile_drawers_browser.cjs'
       - 'scripts/test_learning_panel_motion_browser.cjs'
+      - 'scripts/test_question_classification_consistency_browser.cjs'
       - 'scripts/test_service_worker_cache_browser.cjs'
       - 'scripts/test_image_export_browser.cjs'
       - 'scripts/test_mistake_action_chrome_browser.cjs'
@@ -231,6 +241,8 @@ jobs:
           node --check static/offline-entry.js
           node --check static/offline-vault.js
           node --check static/offline-storage.js
+          node --check static/appearance-bootstrap.js
+          node --check static/offline-appearance-preload.js
           node --check static/offline-handoff.js
           node --check static/offline-service-worker.js
           node --check static/scrollbars.js
@@ -270,6 +282,7 @@ jobs:
           node --check scripts/test_conversation_context_browser.cjs
           node --check scripts/test_math_markdown.cjs
           node --check scripts/test_offline_appearance_browser.cjs
+          node --check scripts/test_appearance_bootstrap_browser.cjs
           node --check scripts/test_offline_data_migration_browser.cjs
           node --check scripts/test_offline_storage_browser.cjs
           node --check scripts/test_offline_device_storage_browser.cjs
@@ -278,12 +291,14 @@ jobs:
           node --check scripts/test_offline_interface_lifecycle_browser.cjs
           node --check scripts/test_offline_privacy_motion_browser.cjs
           node --check scripts/test_offline_backup_browser.cjs
+          node --check scripts/test_offline_mistake_merge_browser.cjs
           node --check scripts/test_online_backup_browser.cjs
           node --check scripts/test_textarea_autogrow_browser.cjs
           node --check scripts/offline-vault-browser-fixtures.cjs
           node --check scripts/test_drawing_async_persistence_browser.cjs
           node --check scripts/test_mobile_drawers_browser.cjs
           node --check scripts/test_learning_panel_motion_browser.cjs
+          node --check scripts/test_question_classification_consistency_browser.cjs
           node --check scripts/test_service_worker_cache_browser.cjs
           node --check scripts/test_image_export_browser.cjs
           node --check scripts/test_mistake_action_chrome_browser.cjs
@@ -362,6 +377,8 @@ jobs:
         run: python -m unittest discover -s scripts -p 'test_conversation_titles.py' -v
       - name: Verify selected concept explanation and relationship counts
         run: python -m unittest discover -s scripts -p 'test_concept_notebook_selection.py' -v
+      - name: Verify first-paint appearance uses only the verified current owner
+        run: python -m unittest discover -s scripts -p 'test_appearance_bootstrap.py' -v
       - name: Verify the original favicon variants on each platform
         env:
           OMP_NUM_THREADS: '1'
@@ -407,6 +424,7 @@ jobs:
           node scripts/test_offline_records_browser.cjs
           node scripts/test_offline_study_browser.cjs
           node scripts/test_offline_appearance_browser.cjs
+          node scripts/test_appearance_bootstrap_browser.cjs
           node scripts/test_offline_data_migration_browser.cjs
           node scripts/test_offline_storage_browser.cjs
           node scripts/test_offline_device_storage_browser.cjs
@@ -415,6 +433,7 @@ jobs:
           node scripts/test_offline_interface_lifecycle_browser.cjs
           node scripts/test_offline_privacy_motion_browser.cjs
           node scripts/test_offline_backup_browser.cjs
+          node scripts/test_offline_mistake_merge_browser.cjs
           node scripts/test_online_backup_browser.cjs
           node scripts/test_textarea_autogrow_browser.cjs
           node scripts/test_drawing_async_persistence_browser.cjs
@@ -450,6 +469,7 @@ jobs:
           node scripts/test_library_detail_view_browser.cjs
           node scripts/test_mobile_drawers_browser.cjs
           node scripts/test_learning_panel_motion_browser.cjs
+          node scripts/test_question_classification_consistency_browser.cjs
           node scripts/test_knowledge_graph_browser.cjs
           node scripts/test_graph_empty_recent_browser.cjs
           node scripts/test_graph_relation_navigation_browser.cjs

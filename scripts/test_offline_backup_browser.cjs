@@ -212,11 +212,15 @@ async function semanticMerge(browser) {
     };
     const identicalZIP = await legacyWrongTimesZIP(page,await createZIP(page,identical));
     await importZIP(page,identicalZIP);
-    assert.deepEqual(await businessRows(page),original,
-      'Identical actual content merges across record/editor IDs, timestamps and viewport without touching any local record');
+    const matched = await businessRows(page);
+    assert.deepEqual(matched.notes,original.notes,'Matching concepts preserve the local records');
+    assert.deepEqual(matched.drawings,original.drawings,'Matching drawings preserve the local gallery');
+    assert.equal(matched.mistakes.length,1,'Matching questions do not create another wrong-book record');
+    for (const [key,value] of Object.entries(localWrong)) assert.deepEqual(matched.mistakes[0][key],value,
+      'Question merging preserves the primary local '+key);
     await importZIP(page,identicalZIP);
-    assert.deepEqual(await businessRows(page),original,'Legacy timestamped backups remain duplicate-free on repeated imports');
-    console.log('PASS matching study content merges across IDs, timestamps and drawing viewport while retaining local records byte-for-byte');
+    assert.deepEqual(await businessRows(page),matched,'Legacy timestamped backups remain duplicate-free on repeated imports');
+    console.log('PASS matching study content merges across IDs, timestamps and drawing viewport while retaining primary local fields');
 
     const newNote = {...note,id:'new-note-one',title:'本次新增的概念',content:'相同内容在包内只保留一条。'};
     const newWrong = {...mistake,id:'new-wrong-one',statement:'本次新增的题目',answer:'这是一份新的答案'};
@@ -233,7 +237,7 @@ async function semanticMerge(browser) {
     assert.equal(merged.mistakes.length,2,'Two matching questions inside one archive add only one question');
     assert.equal(JSON.parse(merged.drawings[0].gallery).pages.length,2,'Two matching drawings inside one archive add only one drawing');
     assert.deepEqual(merged.notes.find(row=>row.id===localNote.id),localNote);
-    assert.deepEqual(merged.mistakes.find(row=>row.id===localWrong.id),localWrong);
+    assert.deepEqual(merged.mistakes.find(row=>row.id===localWrong.id),matched.mistakes[0]);
     assert.deepEqual(JSON.parse(merged.drawings[0].gallery).pages.find(row=>row.id===localGallery.activeId),localGallery.pages[0]);
     console.log('PASS duplicate content within one archive is merged once for concepts, mistakes and editable drawings');
 
@@ -245,10 +249,13 @@ async function semanticMerge(browser) {
     await importZIP(page,await createZIP(page,changed));
     const final = await businessRows(page);
     assert.equal(final.notes.length,3,'Different concept content adds a record');
-    assert.equal(final.mistakes.length,3,'Different answers add a record');
+    assert.equal(final.mistakes.length,2,'Different answers merge into the existing question');
     assert.equal(JSON.parse(final.drawings[0].gallery).pages.length,3,'Different edge weights add a drawing');
     assert.deepEqual(final.notes.find(row=>row.id===localNote.id),localNote,'Different incoming concept content cannot overwrite local content');
-    assert.deepEqual(final.mistakes.find(row=>row.id===localWrong.id),localWrong,'Different incoming answers cannot overwrite local answers');
+    const sameQuestion = final.mistakes.find(row=>row.id===localWrong.id);
+    for (const [key,value] of Object.entries(localWrong)) assert.deepEqual(sameQuestion[key],value,
+      'A different answer cannot overwrite primary local '+key);
+    assert.ok(JSON.stringify(sameQuestion).includes('真正不同的错题答案'),'The same question retains the differing imported answer');
     assert.deepEqual(JSON.parse(final.drawings[0].gallery).pages.find(row=>row.id===localGallery.activeId),localGallery.pages[0]);
     const changedAgain = structuredClone(changed);
     changedAgain.notes[0].id='changed-again-note';changedAgain.notes[0].updatedAt=1;
@@ -257,7 +264,7 @@ async function semanticMerge(browser) {
     await importZIP(page,await createZIP(page,changedAgain));
     assert.deepEqual(await businessRows(page),final,'Repackaging the same added content under new IDs still merges without changes');
     assert.deepEqual(fixture.errors,[]);assert.deepEqual(fixture.calls,[]);
-    console.log('PASS genuine note, answer and drawing differences are added without overwriting originals, then merge on retry');
+    console.log('PASS new concepts/drawings append and differing answers merge into the same question without overwriting primary fields');
   } finally {await fixture.context.close();}
 }
 
@@ -343,9 +350,11 @@ async function semanticMerge(browser) {
     assert.equal(firstRestored.notes.length,3,'Import merges concepts and retains unrelated notes');
     assert.ok(firstRestored.notes.some(row => row.id===note.id && row.content===localNote.content),'An existing conflicting note is retained');
     assert.ok(firstRestored.notes.some(row => row.content===edited),'The conflicting backup note is restored as a separate record');
-    assert.equal(firstRestored.mistakes.length,2);
+    assert.equal(firstRestored.mistakes.length,1,'The same question retains both answers in one record');
     assert.ok(firstRestored.mistakes.some(row => row.id===mistake.id && row.answer===localMistake.answer));
-    assert.ok(firstRestored.mistakes.some(row => row.answer===mistake.answer && row.explanation===mistake.explanation));
+    assert.ok([firstRestored.mistakes[0],...(firstRestored.mistakes[0].mergedRecords || [])]
+      .some(row => row.answer===mistake.answer && row.explanation===mistake.explanation),
+    'The imported answer and explanation remain in the merged question');
     const mergedGallery = JSON.parse(firstRestored.drawings[0].gallery);
     assert.equal(mergedGallery.pages.length,2,'A conflicting drawing is retained alongside its restored version');
     assert.ok(mergedGallery.pages.some(row => row.name===localGallery.pages[0].name));
@@ -355,7 +364,7 @@ async function semanticMerge(browser) {
     console.log('PASS mobile file chooser imports a portable ZIP into another account without overwriting existing or duplicating restored records');
 
     const copiedNote = firstRestored.notes.find(row=>row.content===edited);
-    const copiedMistake = firstRestored.mistakes.find(row=>row.answer===mistake.answer);
+    const copiedMistake = firstRestored.mistakes[0];
     await restored.evaluate(async ids => {
       await __offlineTestStore.batch([
         {type:'delete',store:'notes',id:ids.note},
@@ -369,7 +378,7 @@ async function semanticMerge(browser) {
     assert.equal(restoredAgain.notes.length,3);
     assert.ok(restoredAgain.notes.some(row=>row.content===edited && row.id!==copiedNote.id),
       'Deleting an earlier restored copy does not make a later restore invisible');
-    assert.equal(restoredAgain.mistakes.length,2);
+    assert.equal(restoredAgain.mistakes.length,1);
     assert.ok(restoredAgain.mistakes.some(row=>row.answer===mistake.answer && row.id!==copiedMistake.id));
     await importZIP(restored,exported.bytes);
     assert.deepEqual(await businessRows(restored),restoredAgain,'A restored replacement remains idempotent after an earlier copy was deleted');
@@ -453,9 +462,12 @@ async function semanticMerge(browser) {
     assert.equal((await records(restored,'notes')).length,complete.length,'Large repeated imports remain idempotent');
     console.log('PASS large imports cross encrypted batch limits, preserve existing data on failure and retry without duplicates');
 
+    const persistentMistakes = (await records(restored,'mistakes')).sort((a,b)=>a.id.localeCompare(b.id));
+    assert.equal(persistentMistakes.length,2,'Only the two different questions remain before reopening');
     await restored.reload({waitUntil:'domcontentloaded'});await revealInterface(restored);
     assert.equal((await records(restored,'notes')).length,complete.length,'Imported concepts survive reopening');
-    assert.equal((await records(restored,'mistakes')).length,3,'Imported wrong questions and answers survive reopening');
+    assert.deepEqual((await records(restored,'mistakes')).sort((a,b)=>a.id.localeCompare(b.id)),persistentMistakes,
+      'The merged wrong questions and every answer survive reopening');
     assert.equal(JSON.parse((await records(restored,'drawings'))[0].gallery).pages.length,3,'Imported drawings survive reopening');
     assert.deepEqual(source.errors,[]);assert.deepEqual(target.errors,[]);
     assert.deepEqual(source.calls,[]);assert.deepEqual(target.calls,[]);

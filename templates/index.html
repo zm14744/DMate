@@ -16,28 +16,8 @@
 <meta name="color-scheme" content="only light">
 <meta name="supported-color-schemes" content="light">
 <meta name="theme-color" content="#f8fafc">
-<script id="dmateAppearanceBootstrap">
-/* Account preferences are applied only after authentication. Until then the
-   first frame follows the OS without trusting a previous account's storage. */
-(function () {
-    var theme = "light";
-    try {
-        var nativeTheme = window.__DMATE_NATIVE_SYSTEM_THEME__;
-        if (nativeTheme === "dark" || nativeTheme === "light") {
-            theme = nativeTheme;
-        } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-            theme = "dark";
-        }
-    } catch (_) {}
-    var root = document.documentElement;
-    var scheme = theme === "light" ? "only light" : "dark";
-    root.dataset.appearanceTheme = theme;
-    root.style.colorScheme = scheme;
-    document.querySelector('meta[name="color-scheme"]').content = scheme;
-    document.querySelector('meta[name="supported-color-schemes"]').content = theme;
-    document.querySelector('meta[name="theme-color"]').content = theme === "light" ? "#f8fafc" : "#171717";
-})();
-</script>
+<script src="/static/guest-session.js?v={{ dmate_web_revision }}"></script>
+<script id="dmateAppearanceBootstrap" src="/static/appearance-bootstrap.js?v={{ dmate_web_revision }}" data-scope="online" data-owner="{{ dmate_initial_appearance_owner or '' }}"></script>
 <meta name="application-name" content="DMate">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="DMate">
@@ -9789,7 +9769,6 @@ window.DMATE_CLIENT_CONFIG = {{ {
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
 <script id="exerciseIntentRules" type="application/json">{{ exercise_intent_rules | tojson }}</script>
-<script defer src="/static/guest-session.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/offline-interface-state.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/language-catalog.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/language-knowledge.js?v={{ dmate_web_revision }}"></script>

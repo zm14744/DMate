@@ -209,17 +209,113 @@
     return {name:graph.name || '',directed:graph.directed ?? null,weighted:graph.weighted ?? null,
       bbox:graph.bbox || null,region_polygon:graph.region_polygon || null,vertices:vertices.map(vertex => vertex.value),edges};
   }
+  function mistakeQuestionText(value) {
+    let question = asText(value).normalize('NFC').replace(/\r\n?/g,'\n').trim();
+    if (question.startsWith('【当前指向题目】') && question.includes('【当前指向题目结束】'))
+      question = question.slice('【当前指向题目】'.length).split('【当前指向题目结束】')[0].trim();
+    const emptyGraphs = ['', '无', '无图形', '无图形信息', 'none', 'null', '[]', '{}'];
+    function graphSection(pattern) {
+      const marker = pattern.exec(question);
+      if (!marker) return;
+      const graph = question.slice(marker.index + marker[0].length).trim();
+      question = question.slice(0,marker.index).trim();
+      if (!emptyGraphs.includes(graph.toLowerCase())) question += '\n【图形信息】\n' + graph;
+    }
+    for (const marker of ['【题目文字】','【题干与公式识别】']) {
+      if (!question.startsWith(marker)) continue;
+      question = question.slice(marker.length).split('【我的要求】')[0].trim();
+      // OCR wrappers can place the graph marker on the same line. Bare
+      // mathematical text only recognizes a separate, headed graph section.
+      graphSection(/[^\S\n]*(?:【图形信息】|【图形结构识别】)/);
+      break;
+    }
+    if (question.startsWith('【题目】')) question = question.slice('【题目】'.length).trim();
+    graphSection(/(?:^|\n)[^\S\n]*(?:【图形信息】|【图形结构识别】)/);
+    return question.split('\n').map(line => line.replace(/[^\S\n]+/g,' ').trim()).join('\n').trim();
+  }
+  async function mistakeQuestionFingerprint(row) {
+    const statement = mistakeQuestionText(row.statement || row.question || row.content);
+    const documents = [];
+    for (const value of [row.questionDocument,row.question_document,row.questionGraph,row.questionGraphs]) {
+      if (!value) continue;
+      const document = Array.isArray(value) ? {graphs:value} : Array.isArray(value.graphs) ? value
+        : Array.isArray(value.vertices) && Array.isArray(value.edges) ? {graphs:[value]} : null;
+      if (document) documents.push(await contentFingerprint('drawings',{document:{...document,graphs:document.graphs.map(graph => {
+        const {bbox,region_polygon,...content} = graph; return content;
+      })}}));
+    }
+    const images = [];
+    for (const value of [row.questionImage,...(Array.isArray(row.questionImages) ? row.questionImages : [])]) {
+      if (value != null) images.push(value instanceof Blob ? new Blob([value],{type:value.type}) : withoutMistakeTimes(value));
+    }
+    // Missing question content is not evidence that two unknown records match.
+    const {mergedRecords,...record} = row;
+    return fingerprint({statement,documents:documents.sort(),images,
+      ...(statement || documents.length || images.length ? {} : {unidentified:await fingerprint(withoutMistakeTimes(record))})});
+  }
+  function mistakeSnapshot(row) {
+    const snapshot = withoutMistakeTimes(row);
+    delete snapshot.id;
+    delete snapshot.mergedRecords;
+    return snapshot;
+  }
+  async function mistakeClassification(row) {
+    const question = mistakeQuestionText(row.statement || row.question || row.content);
+    if (!question) return null;
+    const fields = ['related_categories','knowledge_points','related_knowledge_points','focus_points','node_ids','focus_node_ids'];
+    for (const value of [row.question_classification,row.questionClassification,row.questionTeaching?.question_classification]) {
+      if (!object(value) || value.version !== 1 || value.classification_source !== 'question_snapshot'
+        || value.classification_status !== 'fixed' || typeof value.question !== 'string'
+        || mistakeQuestionText(value.question) !== question || typeof value.category !== 'string'
+        || !['简单','中等','困难'].includes(value.difficulty)
+        || typeof value.catalog_revision !== 'string' || !value.catalog_revision.trim()
+        || !/^[a-f0-9]{64}$/i.test(value.question_sha256 || '')
+        || fields.some(field => !Array.isArray(value[field]) || value[field].some(item => typeof item !== 'string' || !item.trim()))
+        || value.focus_node_ids.some(id => !value.node_ids.includes(id))) continue;
+      if (value.question_sha256.toLowerCase() === await digest(encoder.encode(question))) return value;
+    }
+    return null;
+  }
+  async function mergeMistakes(local,incoming) {
+    const question = await mistakeQuestionFingerprint(local);
+    if (question !== await mistakeQuestionFingerprint(incoming)) fail();
+    const records = [], budget = {nodes:0};
+    async function collect(record,depth = 0) {
+      checkTree(depth,budget);
+      if (!object(record) || await mistakeQuestionFingerprint(record) !== question) fail();
+      if (own(record,'mergedRecords') && !Array.isArray(record.mergedRecords)) fail();
+      records.push(record);
+      for (const nested of record.mergedRecords || []) await collect(nested,depth+1);
+    }
+    await collect(local); await collect(incoming);
+    let primaryRow = local;
+    if (!await mistakeClassification(local)) for (const record of records) {
+      const fixed = await mistakeClassification(record);
+      if (fixed) { primaryRow = {...local,question_classification:fixed}; break; }
+    }
+    const primaryKey = await fingerprint(mistakeSnapshot(primaryRow));
+    const seen = new Set([primaryKey]), mergedRecords = [];
+    for (const record of records) {
+      const snapshot = mistakeSnapshot(record), key = await fingerprint(snapshot);
+      if (!seen.has(key)) { seen.add(key); mergedRecords.push(snapshot); }
+    }
+    if (!mergedRecords.length && !Object.hasOwn(local,'mergedRecords')) return primaryRow;
+    return {...primaryRow,mergedRecords};
+  }
+  async function aggregateMistakes(rows) {
+    const grouped = new Map();
+    for (const row of rows) {
+      const key = await mistakeQuestionFingerprint(row);
+      const value = await mergeMistakes(row,row);
+      grouped.set(key,grouped.has(key) ? await mergeMistakes(grouped.get(key),value) : value);
+    }
+    return [...grouped.values()];
+  }
   async function contentFingerprint(kind,value) {
     let content;
     if (kind === 'notes') content = {title:value.title,content:value.content};
-    else if (kind === 'mistakes') {
-      const reference = value.referenceAnswer;
-      content = {statement:asText(value.statement || value.question || value.content),
-        answer:asText(value.answer || (reference && typeof reference === 'object' ? reference.text || reference.answer || reference : reference)),
-        explanation:asText(value.explanation || value.analysis || value.solution),
-        note:asText(value.note || value.userNote),userAnswer:asText(value.userAnswer || value.studentAnswer),
-        feedback:withoutMistakeTimes(value.feedback ?? null)};
-    } else if (kind === 'drawings') {
+    else if (kind === 'mistakes') return mistakeQuestionFingerprint(value);
+    else if (kind === 'drawings') {
       const model = root.DMateGraphEditorModel;
       const document = model ? model.ensureAnonymousLabels(model.importDocument(value.document)) : value.document;
       const graphs = await Promise.all(document.graphs.map(async graph => {
@@ -244,7 +340,7 @@
   }
   async function create(data) {
     const zip = library(); validate(data);
-    data = {...data,mistakes:data.mistakes.map(row => withoutMistakeTimes(row))};
+    data = {...data,mistakes:(await aggregateMistakes(data.mistakes)).map(row => withoutMistakeTimes(row))};
     await checkRecordSizes(data);
     const files = Object.create(null), budget = {nodes:0,binary:0};
     for (const key of ['notes','mistakes','drawings']) {
@@ -301,7 +397,13 @@
     validate(result); await checkRecordSizes(result);
     const actual = counts(result);
     if (Object.keys(actual).some(key => manifest.counts[key] !== actual[key])) fail();
-    return result;
+    const mistakes = [];
+    for (const row of result.mistakes) {
+      const value = withoutMistakeTimes(row);
+      mistakes.push(await mergeMistakes(value,value));
+    }
+    return {...result,mistakes};
   }
-  root.DMateOfflineBackup = Object.freeze({create,read,fingerprint,contentFingerprint,withoutMistakeTimes});
+  root.DMateOfflineBackup = Object.freeze({create,read,fingerprint,contentFingerprint,withoutMistakeTimes,
+    mistakeQuestionText,mistakeQuestionFingerprint,mistakeClassification,mergeMistakes,aggregateMistakes});
 })();

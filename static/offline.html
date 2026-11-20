@@ -7,31 +7,9 @@
 <meta name="theme-color" content="#f8fafc">
 <!-- DMATE_CURRENT_ONLINE_FAVICON -->
 <title>DMate - 离散数学智能辅学系统</title>
-<script>
-/* Scoped appearance is applied after the tab's owner has been validated. */
-(function () {
-  try {
-    var settings = {};
-    var mode = ["light","dark","navy"].includes(settings.mode) ? settings.mode
-      : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-    var root = document.documentElement;
-    root.dataset.appearanceTheme = mode;
-    root.style.colorScheme = mode === "light" ? "only light" : "dark";
-    var accents = {
-      blue:["#3b82f6","59,130,246","#2563eb","#1d4ed8","#60a5fa","#93c5fd"],
-      purple:["#8b5cf6","139,92,246","#7c3aed","#6d28d9","#a78bfa","#c4b5fd"],
-      teal:["#14b8a6","20,184,166","#0d9488","#0f766e","#5eead4","#99f6e4"]
-    };
-    var accent = accents[settings.accent] || accents.blue;
-    ["--accent","--accent-rgb","--accent-deep","--accent-deeper","--accent-soft","--accent-pale"]
-      .forEach(function (key,index) { root.style.setProperty(key,accent[index]); });
-    root.style.setProperty("--accent-bg","rgba("+accent[1]+",.22)");
-    root.style.setProperty("--font-scale",settings.fontSize === "small" ? ".92" : settings.fontSize === "large" ? "1.08" : "1");
-    root.style.setProperty("--panel-alpha",String((Number(settings.panelOpacity) || 100)/100));
-    root.style.setProperty("--bubble-alpha",String((Number(settings.bubbleOpacity) || 100)/100));
-  } catch (_) {}
-})();
-</script>
+<script src="/static/appearance-bootstrap.js?v=1" data-scope="offline"></script>
+<script defer src="/static/offline-vault.js?v=2"></script>
+<script defer src="/static/offline-appearance-preload.js?v=1"></script>
 <link rel="stylesheet" href="/static/dmate-main.css?v=67">
 
 <link rel="stylesheet" href="/static/graph-editor.css?v=26">
@@ -76,19 +54,18 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/language-knowledge.js"></script>
 <script defer src="/static/language.js?v=59"></script>
 <script defer src="/static/modal-text.js?v=53"></script>
-<script defer src="/static/offline-appearance.js?v=8"></script>
+<script defer src="/static/offline-appearance.js?v=9"></script>
 <script defer src="/static/offline-privacy-motion.js?v=2"></script>
 <script defer src="/static/offline-shell.js?v=39"></script>
 <script defer src="/static/knowledge-graph-labels.js?v=17"></script>
 <script defer src="/static/offline-knowledge-graph.js?v=60"></script>
-<script defer src="/static/offline-vault.js?v=2"></script>
 <script defer src="/static/offline-handoff.js?v=1"></script>
-<script defer src="/static/offline-storage.js?v=2"></script>
+<script defer src="/static/offline-storage.js?v=3"></script>
 <script defer src="/static/vendor/fflate-0.8.2/fflate.min.js"></script>
-<script defer src="/static/offline-backup.js?v=2"></script>
+<script defer src="/static/offline-backup.js?v=3"></script>
 <script defer src="/static/backup-download.js?v=1"></script>
 <script defer src="/static/offline-entry.js?v=48"></script>
-<script defer src="/static/offline.js?v=65"></script>
+<script defer src="/static/offline.js?v=66"></script>
 </head>
 <body class="offline-workspace offline-content-hidden">
 <script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"light";</script>

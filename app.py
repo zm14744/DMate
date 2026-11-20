@@ -2480,8 +2480,16 @@ def home():
     # 避免前端再维护一份硬编码图谱而产生不同步。
     # 客户端通过远程网页获取新功能：不允许 WebView 缓存旧 HTML
     # 和旧 script.js 版本号，否则新版交互即使上线也可能不生效。
+    # Resolve only the current signed session's identity for local first-paint
+    # visuals. No email or learning state is exposed by this bootstrap hint.
+    try:
+        appearance_user = _current_auth_user()
+        appearance_owner = str(appearance_user["username"]) if appearance_user else None
+    except AuthBackendUnavailable:
+        appearance_owner = None
     response = make_response(render_template(
         "index.html",
+        dmate_initial_appearance_owner=appearance_owner,
         knowledge_graph_data=KNOWLEDGE_GRAPH_DATA,
         exercise_intent_rules=EXERCISE_INTENT_RULES,
         dmate_web_revision=(_RUNTIME_SOURCE.get("manifest_sha256")

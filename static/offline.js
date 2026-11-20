@@ -192,7 +192,7 @@
   const remove = (store, id) => transaction(store, "readwrite", os => os.delete(id));
   async function applyOriginalAppearance() {
     const saved = await transaction("settings", "readonly", os => os.get("appearance"));
-    window.DMateOfflineAppearance?.apply(saved?.settings || {}, saved?.backgroundBlob || null);
+    return window.DMateOfflineAppearance?.apply(saved?.settings || {}, saved?.backgroundBlob || null);
   }
 
   async function loadLibrarySelections() {
@@ -434,25 +434,32 @@
   }
 
   async function renderMistakes() {
+    const revision = state.mistakesRenderRevision = (state.mistakesRenderRevision || 0) + 1;
     const [saved, metadata] = await Promise.all([all("mistakes"), transaction("settings", "readonly", os => os.get("mistake-deletions"))]);
     const rows = saved.filter(row => !metadata?.deleted?.[row.id]
-      || noteTime(metadata.deleted[row.id]) < noteTime(row.updatedAt))
-      .sort((a,b) => noteTime(b.updatedAt) - noteTime(a.updatedAt));
-    $("mistakeCount").textContent = tr(rows.length + " 道错题", rows.length + " mistakes");
+      || noteTime(metadata.deleted[row.id]) < noteTime(row.updatedAt));
+    const groups = new Map();
+    for (const row of rows) {
+      const key = await window.DMateOfflineBackup.mistakeQuestionFingerprint(row), group = groups.get(key);
+      if (group) { group.value = await window.DMateOfflineBackup.mergeMistakes(group.value,row); group.records.push(row); }
+      else groups.set(key,{value:row,records:[row]});
+    }
+    const visible = await Promise.all([...groups.values()].map(async group => ({...group,
+      snapshot:await window.DMateOfflineBackup.mistakeClassification(group.value)})));
+    if (revision !== state.mistakesRenderRevision) return;
+    $("mistakeCount").textContent = tr(groups.size + " 道错题", groups.size + " mistakes");
     const list = $("mistakeList");
     list.classList.add("wrong-book-list");
     list.replaceChildren();
-    if (!rows.length) {
+    if (!groups.size) {
       list.append(el("div", "wrong-empty offline-empty", tr("无", "None")));
       return;
     }
-    for (const row of rows) {
+    for (const {value:row,records,snapshot} of visible) {
       const card = el("article", "wrong-card");
       card.dataset.recordId = row.id;
-      const top = el("div", "wrong-card-top");
-      top.append(el("span", "wrong-date", new Date(noteTime(row.createdAt || row.updatedAt)).toLocaleString()));
-      card.append(top, rich("wrong-question", row.statement || row.content || ""));
-      const focusPoints = row.focusPoints?.length ? row.focusPoints : row.knowledgePoints || [];
+      card.append(rich("wrong-question", row.statement || row.question || row.content || ""));
+      const focusPoints = snapshot ? snapshot.focus_points : row.focusPoints?.length ? row.focusPoints : row.knowledgePoints || [];
       const focusLabels = [...new Set(focusPoints.map(point => {
         const label = state.graph?.nodes?.find(node => node.id === point)?.name
         || state.concepts.find(concept => concept.id === point)?.title
@@ -464,11 +471,26 @@
         line.append(el("span", "wrong-meta-label", tr("难点", "Focus")), el("span", "wrong-meta-value", focusLabels.join(english() ? ", " : "、")));
         meta.append(line); card.append(meta);
       }
-      card.append(answerDetails("查看答案", row.answer || tr("这条记录没有保存参考答案。", "No reference answer was saved for this record.")));
+      const answers = [...new Set([row,...(row.mergedRecords || [])].map(record => {
+        const reference = record.referenceAnswer;
+        return String(record.answer || (typeof reference === "string" ? reference : reference?.text || reference?.answer) || "");
+      }).filter(Boolean))];
+      const answer = answers.length > 1 ? answers.map((value,index) => "**"+tr("答案", "Answer")+" "+(index+1)+"**\n\n"+value).join("\n\n")
+        : answers[0] || tr("这条记录没有保存参考答案。", "No reference answer was saved for this record.");
+      card.append(answerDetails("查看答案", answer));
       const actions = el("div", "wrong-actions record-actions");
       const deletion = action(tr("移出错题本"), "secondary danger", async () => {
-        if (await confirmDelete($("mistakesPanel"), "移出这道错题？", row.statement || row.title)) {
-          await deleteOfflineRecord("mistakes", row, "mistake-deletions"); await renderMistakes();
+        if (await confirmDelete($("mistakesPanel"), "移出这道错题？", row.statement || row.question || row.title)) {
+          for (let index=0;index<records.length;index+=window.DMateOfflineVault.limits.batchRecords-1) {
+            const batch = records.slice(index,index+window.DMateOfflineVault.limits.batchRecords-1);
+            const previous = await transaction("settings","readonly",os => os.get("mistake-deletions"));
+            const deleted = {...previous?.deleted};
+            for (const record of batch) deleted[record.id] = Math.max(Date.now(),noteTime(record.updatedAt)+1,noteTime(deleted[record.id]));
+            await state.storage.batch([{type:"put",store:"settings",value:{...previous,id:"mistake-deletions",deleted}},
+              ...batch.map(record => ({type:"delete",store:"mistakes",id:record.id}))]);
+            requireWorkspace();
+          }
+          await renderMistakes();
         }
       });
       deletion.dataset.action = "delete-mistake";
@@ -1073,15 +1095,34 @@
 
   async function planBackupImport(payload) {
     const operations = [];
-    const counts = {notes:0,mistakes:0,drawings:0};
+    const counts = {notes:0,mistakes:0,drawings:0,mergedMistakes:0};
     for (const [store,metadataId] of [["notes","notebook-deletions"],["mistakes","mistake-deletions"]]) {
       const [rows,metadata] = await Promise.all([all(store),transaction("settings","readonly",os => os.get(metadataId))]);
       const existing = new Map(rows.map(row => [row.id,row]));
-      const contents = new Set();
-      for (const row of rows) if (!metadata?.deleted?.[row.id] || noteTime(metadata.deleted[row.id]) < noteTime(row.updatedAt))
-        contents.add(await window.DMateOfflineBackup.contentFingerprint(store,row));
+      const revisions = new Map(rows.map(row => [row.id,state.storage.revisionOf(store,row)]));
+      const contents = new Set(), questions = new Map(), queued = new Map(), merged = new Set();
+      for (const row of rows) if (!metadata?.deleted?.[row.id] || noteTime(metadata.deleted[row.id]) < noteTime(row.updatedAt)) {
+        const content = await window.DMateOfflineBackup.contentFingerprint(store,row);
+        contents.add(content);
+        if (store === "mistakes") questions.set(content,questions.has(content)
+          ? await window.DMateOfflineBackup.mergeMistakes(questions.get(content),row) : row);
+      }
       for (const incoming of payload[store]) {
         const content = await window.DMateOfflineBackup.contentFingerprint(store,incoming);
+        if (store === "mistakes" && questions.has(content)) {
+          const current = questions.get(content), value = await window.DMateOfflineBackup.mergeMistakes(current,incoming);
+          if (!await sameBackupValue(current,value)) {
+            const operation = queued.get(current.id);
+            if (operation) operation.value = value;
+            else {
+              const update = {type:"put",store,value,expectedRevision:revisions.get(current.id)};
+              operations.push(update); queued.set(current.id,update);
+            }
+            if (!queued.get(current.id).expectAbsent) merged.add(content);
+            questions.set(content,value); existing.set(current.id,value);
+          }
+          continue;
+        }
         if (contents.has(content)) continue;
         let id = incoming.id;
         // Conflicting edits and previously deleted records get stable copy IDs.
@@ -1091,15 +1132,19 @@
           id = "restored-" + await window.DMateOfflineBackup.fingerprint({record:incoming,previous:id,
             deletedAt:metadata?.deleted?.[id] || null,local:existing.get(id) || null});
         }
-        const value = store === "mistakes" ? {...window.DMateOfflineBackup.withoutMistakeTimes(incoming),id,createdAt:stamp(),updatedAt:stamp()} : {...incoming,id};
+        const value = store === "mistakes" ? {...window.DMateOfflineBackup.withoutMistakeTimes(incoming),id} : {...incoming,id};
         if (existing.has(id)) continue;
         existing.set(id,value);
         contents.add(content);
-        operations.push({type:"put",store,value,expectAbsent:true}); counts[store]++;
+        const operation = {type:"put",store,value,expectAbsent:true};
+        operations.push(operation); counts[store]++;
+        if (store === "mistakes") { questions.set(content,value); queued.set(id,operation); }
       }
+      if (store === "mistakes") counts.mergedMistakes = merged.size;
     }
     if (payload.drawings) {
       const saved = await transaction("drawings","readonly",os => os.get("gallery"));
+      const expectedRevision = saved ? state.storage.revisionOf("drawings",saved) : null;
       const local = saved?.gallery ? JSON.parse(saved.gallery) : null;
       const pages = local?.pages?.slice() || [], existing = new Map(pages.map(page => [page.id,page]));
       const contents = new Set();
@@ -1119,7 +1164,7 @@
       }
       if (pages.reduce((count,page) => count+page.document.graphs.length,0) > 50)
         throw Object.assign(new Error(),{code:"BACKUP_TOO_LARGE"});
-      if (counts.drawings) operations.push({type:"put",store:"drawings",value:{...saved,id:"gallery",updatedAt:stamp(),
+      if (counts.drawings) operations.push({type:"put",store:"drawings",expectedRevision,value:{...saved,id:"gallery",updatedAt:stamp(),
         gallery:JSON.stringify({...payload.drawings,...local,pages})}});
     }
     return {operations,counts};
@@ -1168,7 +1213,8 @@
       }
       requireWorkspace();
       toast(tr("导入完成："+counts.notes+" 个概念、"+counts.mistakes+" 道错题、"+counts.drawings+" 幅绘图",
-        "Imported "+counts.notes+" concepts, "+counts.mistakes+" mistakes and "+counts.drawings+" drawings"));
+        "Imported "+counts.notes+" concepts, "+counts.mistakes+" mistakes and "+counts.drawings+" drawings")
+        +(counts.mergedMistakes ? tr("；合并 "+counts.mergedMistakes+" 道已有错题", "; merged "+counts.mergedMistakes+" existing mistakes") : ""));
     } catch (error) {
       if (!committed) throw error;
       throw new Error(tr("导入未完成，已恢复 "+committed+" 条记录，可重试；本机原有内容已保留。", "Import incomplete; "+committed+" records were restored. Retry to finish; existing content is retained.")+" "+storageError(error));
@@ -1213,7 +1259,7 @@
     if (changes?.removeBackground) delete value.backgroundBlob;
     else if (changes?.backgroundBlob instanceof Blob) value.backgroundBlob = changes.backgroundBlob;
     await put("settings", value);
-    window.DMateOfflineAppearance?.apply(next,value.backgroundBlob || null);
+    await window.DMateOfflineAppearance?.apply(next,value.backgroundBlob || null);
     window.dispatchEvent(new CustomEvent("offline:appearance-applied",{detail:{settings:next}}));
   }
 

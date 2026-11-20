@@ -191,6 +191,9 @@ const APPEARANCE_ACCENTS = Object.freeze({
 let appearanceSettings = { ...APPEARANCE_DEFAULTS };
 let appearanceCommittedSettings = { ...APPEARANCE_DEFAULTS };
 let appearanceBackgroundObjectUrl = "";
+let appearanceBackgroundVisualBlob = null;
+let appearanceBootstrapLoad = null;
+let appearanceBootstrapBackground = null;
 let appearanceHasBackground = false;
 let appearanceGuestCommittedBackgroundBlob = null;
 let appearanceSystemMedia = null;
@@ -264,6 +267,11 @@ function appearanceLocalStorageKey() {
 }
 
 function loadAppearanceSettings() {
+    // The server already verified this initial visual owner. Keep that paint
+    // while the full account API initializes, without treating it as a login.
+    if (accountState.configured === null && window.DMateAppearanceBootstrap?.scope === "online") {
+        return normalizeAppearanceSettings(window.DMateAppearanceBootstrap.settings);
+    }
     if (!shouldPersistClientState()) {
         return normalizeAppearanceSettings(window.DMateGuestSession?.read("appearance") || APPEARANCE_DEFAULTS);
     }
@@ -354,6 +362,7 @@ function applyAppearanceSettings(options = {}) {
 
     body.dataset.appearanceTheme = theme;
     root.dataset.appearanceTheme = theme;
+    root.style.backgroundColor = {light:"#f8fafc",dark:"#0d0d0d",navy:"#0f172a"}[theme];
 
     // 用户明确选择浅色时用 only light，阻止部分安卓浏览器再次强制染成深色。
     const browserColorScheme = theme === "light" ? "only light" : "dark";
@@ -595,6 +604,12 @@ async function readAppearanceBackgroundBlob() {
         return appearanceGuestCommittedBackgroundBlob || await window.DMateGuestSession?.readBlob("background");
     }
 
+    if (appearanceBootstrapBackground?.owner === accountState.username) {
+        const blob = appearanceBootstrapBackground.blob;
+        appearanceBootstrapBackground = null;
+        return blob;
+    }
+
     const db = await openAppearanceDatabase();
 
     try {
@@ -662,6 +677,9 @@ async function deleteAppearanceBackgroundBlob() {
 }
 
 function clearAppearanceBackgroundVisual() {
+    window.DMateAppearanceBootstrap?.cancel();
+    appearanceBootstrapBackground = null;
+    appearanceBackgroundVisualBlob = null;
     if (appearanceBackgroundObjectUrl) {
         URL.revokeObjectURL(appearanceBackgroundObjectUrl);
         appearanceBackgroundObjectUrl = "";
@@ -676,14 +694,16 @@ function clearAppearanceBackgroundVisual() {
     updateAppearanceBackgroundUi();
 }
 
-function setAppearanceBackgroundVisual(blob) {
+function setAppearanceBackgroundVisual(blob, decodedUrl = "") {
+    if (blob === appearanceBackgroundVisualBlob && appearanceBackgroundObjectUrl) return;
     clearAppearanceBackgroundVisual();
 
     if (!(blob instanceof Blob)) {
         return;
     }
 
-    appearanceBackgroundObjectUrl = URL.createObjectURL(blob);
+    appearanceBackgroundVisualBlob = blob;
+    appearanceBackgroundObjectUrl = decodedUrl || URL.createObjectURL(blob);
     appearanceHasBackground = true;
 
     const layer = document.getElementById("appearanceBackgroundLayer");
@@ -753,7 +773,24 @@ function closeAppearanceBackgroundViewer() {
 }
 
 async function loadAppearanceBackground() {
-    // 未经服务器验证时，不展示上一个使用者保留在 IndexedDB 的图片。
+    const bootstrap = window.DMateAppearanceBootstrap;
+    if (!appearanceBootstrapLoad && bootstrap?.scope === "online") {
+        appearanceBootstrapLoad = (async () => {
+            const picture = await bootstrap.takePicture();
+            const valid = bootstrap.owner
+                ? accountState.configured === null || accountState.authenticated && accountState.username === bootstrap.owner
+                : !accountState.authenticated && !window.DMateGuestSession?.getOwner();
+            if (picture && valid) {
+                setAppearanceBackgroundVisual(picture.blob, picture.url);
+                if (bootstrap.owner) appearanceBootstrapBackground = {owner:bootstrap.owner,blob:picture.blob};
+                else appearanceGuestCommittedBackgroundBlob = picture.blob;
+            } else if (picture) URL.revokeObjectURL(picture.url);
+        })();
+    }
+    if (appearanceBootstrapLoad) await appearanceBootstrapLoad;
+    // A signed-in initial paint may precede the complete account response.
+    if (bootstrap?.owner && accountState.configured === null) return;
+    // Unverified guests never read another account's IndexedDB picture.
     if (!shouldPersistClientState()) {
         const context = cloudSyncContextVersion, previous = appearanceGuestCommittedBackgroundBlob;
         const blob = appearanceGuestCommittedBackgroundBlob || await window.DMateGuestSession?.readBlob("background");
@@ -3951,6 +3988,12 @@ async function restoreVerifiedAccountSession() {
             clearCloudSyncMeta();
             if (wasAuthenticated) clearLoggedOutWorkspace();
             else purgeGuestPersistentState();
+            if (!wasAuthenticated && window.DMateAppearanceBootstrap?.owner) {
+                appearanceSettings = loadAppearanceSettings();
+                appearanceCommittedSettings = {...appearanceSettings};
+                clearAppearanceBackgroundVisual();
+                applyAppearanceSettings({save:false});
+            }
             // 删除旧版本遗留的 IndexedDB 用户背景（不再给游客读取）。
             try {
                 const db = await openAppearanceDatabase();
@@ -4533,6 +4576,75 @@ function questionGraphMatchesQuestion(graph, questionText, message = null) {
         generatedQuestion:message?.role === "ai" ? source : ""}).trim() === question;
 }
 
+function canonicalQuestionClassificationText(text) {
+    let value = String(text || "").normalize("NFC").replace(/\r\n?/g, "\n").trim();
+    if (value.startsWith("【当前指向题目】") && value.includes("【当前指向题目结束】"))
+        value = value.slice("【当前指向题目】".length).split("【当前指向题目结束】")[0].trim();
+    let wrapped = false;
+    for (const marker of ["【题目文字】", "【题干与公式识别】"]) {
+        if (!value.startsWith(marker)) continue;
+        value = value.slice(marker.length).split("【我的要求】")[0].trim();
+        wrapped = true;
+        break;
+    }
+    if (value.startsWith("【题目】")) value = value.slice("【题目】".length).trim();
+    const graphMarker = (wrapped ? /【图形信息】|【图形结构识别】/
+        : /(?:^|\n)(?:【图形信息】|【图形结构识别】)/).exec(value);
+    if (graphMarker) {
+        const graph = value.slice(graphMarker.index + graphMarker[0].length).trim();
+        value = value.slice(0, graphMarker.index).trim();
+        if (!["", "无", "无图形", "无图形信息", "none", "null", "[]", "{}"].includes(graph.toLowerCase()))
+            value += "\n【图形信息】\n" + graph;
+    }
+    return value.split("\n").map(line => line.replace(/[^\S\n]+/g, " ").trim()).join("\n").trim();
+}
+
+function normalizeQuestionClassification(value, questionText = "") {
+    if (!value || value.version !== 1 || typeof value.question !== "string" || !value.question.trim()
+        || !/^[a-f0-9]{64}$/.test(value.question_sha256 || "")
+        || typeof value.catalog_revision !== "string" || !value.catalog_revision
+        || !["简单", "中等", "困难"].includes(value.difficulty)) return null;
+    const sameQuestion = !questionText || canonicalQuestionClassificationText(value.question) === canonicalQuestionClassificationText(questionText);
+    if (!sameQuestion) return null;
+    const list = (values, limit = 68) => Array.isArray(values)
+        ? [...new Set(values.filter(item => typeof item === "string" && item.trim()).map(item => item.trim()))].slice(0, limit) : null;
+    const nodeIds = list(value.node_ids), focusIds = list(value.focus_node_ids, 2);
+    const points = list(value.knowledge_points), related = list(value.related_knowledge_points), focus = list(value.focus_points, 2);
+    const categories = list(value.related_categories, 10);
+    if (!nodeIds || !focusIds || !points || !related || !focus || !categories
+        || focusIds.some(id => !nodeIds.includes(id)) || typeof value.category !== "string") return null;
+    return {version:1, question:questionText || value.question, question_sha256:value.question_sha256,
+        catalog_revision:value.catalog_revision, category:value.category, related_categories:categories,
+        knowledge_points:points, related_knowledge_points:related, focus_points:focus,
+        difficulty:value.difficulty, node_ids:nodeIds, focus_node_ids:focusIds,
+        classification_source:"question_snapshot", classification_status:"fixed"};
+}
+
+function questionClassificationFor(teaching, questionText = "") {
+    const source = teaching?.question_graph?.sources?.question;
+    if (source && questionText && canonicalQuestionClassificationText(source) !== canonicalQuestionClassificationText(questionText)) return null;
+    return normalizeQuestionClassification(teaching?.question_classification, questionText || source || "");
+}
+
+function applyQuestionClassification(teaching, classification) {
+    if (!teaching || !classification) return teaching;
+    teaching.question_classification = classification;
+    for (const key of ["category", "related_categories", "knowledge_points", "related_knowledge_points", "focus_points"])
+        teaching[key] = Array.isArray(classification[key]) ? classification[key].slice() : classification[key];
+    return teaching;
+}
+
+function applyLearningQuestionClassification(row, classification) {
+    if (!row || !classification) return row;
+    row.questionClassification = classification;
+    row.category = classification.category;
+    row.relatedCategories = classification.related_categories.slice();
+    row.knowledgePoints = [...new Set([...classification.knowledge_points, ...classification.related_knowledge_points])].slice(0, 4);
+    row.focusPoints = classification.focus_points.slice();
+    row.difficulty = classification.difficulty;
+    return row;
+}
+
 function mergeQuestionTeaching(previous, incoming, questionText, message = null) {
     const next = normalizeTeaching(incoming);
     if (!next) return normalizeTeaching(previous);
@@ -4555,7 +4667,10 @@ function mergeQuestionTeaching(previous, incoming, questionText, message = null)
             next[key] = priorTeaching[key];
         }
     }
-    return next;
+    // Answer-bound graphs can retain their own evidence without replacing a
+    // fixed, question-only difficulty and scope with an older model judgment.
+    return applyQuestionClassification(next, questionClassificationFor(incoming, questionText)
+        || questionClassificationFor(previous, questionText));
 }
 
 function normalizeTeaching(value) {
@@ -4598,7 +4713,9 @@ function normalizeTeaching(value) {
         input_source: asText(value.input_source) || "文本输入"
     };
     const sourceQuestion = normalized.question_graph?.sources.question
+        || (typeof value.question_classification?.question === "string" ? value.question_classification.question : "")
         || (typeof value.registered_snapshot?.question === "string" ? value.registered_snapshot.question : "");
+    applyQuestionClassification(normalized, normalizeQuestionClassification(value.question_classification, sourceQuestion));
     normalized.registered_snapshot = sourceQuestion ? registeredQuestionSnapshot({
         ...normalized, registered_snapshot:value.registered_snapshot
     }, sourceQuestion) : null;
@@ -4608,6 +4725,9 @@ function normalizeTeaching(value) {
 function registeredQuestionSnapshot(teaching, question) {
     if (!teaching || typeof teaching !== "object" || typeof question !== "string" || !question.trim()) return null;
     const text = question.trim();
+    const fixed = questionClassificationFor(teaching, text);
+    if (fixed) return {version:1, question:text, difficulty:fixed.difficulty,
+        points:[...new Set([...fixed.knowledge_points, ...fixed.related_knowledge_points])], excludedIds:[]};
     const saved = teaching.registered_snapshot;
     const sameQuestion = value => typeof value === "string" && (value.trim() === text
         || sanitizeStoredWrongQuestionText(value).trim() === sanitizeStoredWrongQuestionText(text).trim());
@@ -4648,7 +4768,7 @@ function wrongQuestionRegisteredSnapshot(entry, question = entry?.question) {
     const saved = entry?.recognitionSnapshot;
     return registeredQuestionSnapshot({difficulty:entry?.difficulty,
         knowledge_points:entry?.knowledgePoints, focus_points:entry?.focusPoints,
-        registered_snapshot:saved}, String(question || ""));
+        registered_snapshot:saved, question_classification:entry?.questionClassification}, String(question || ""));
 }
 
 function normalizeReferenceAnswer(value) {
@@ -4740,17 +4860,19 @@ function normalizeLearningQuestion(value) {
             .slice(0, 2)
         : [];
 
+    const classification = normalizeQuestionClassification(value.questionClassification, text);
     return {
         text: limitQuestionText(text),
-        knowledgePoints,
-        focusPoints,
-        category: typeof value.category === "string"
+        questionClassification:classification,
+        knowledgePoints:classification ? [...new Set([...classification.knowledge_points, ...classification.related_knowledge_points])].slice(0, 4) : knowledgePoints,
+        focusPoints:classification ? classification.focus_points : focusPoints,
+        category: classification ? classification.category : typeof value.category === "string"
             ? value.category.trim()
             : "",
-        relatedCategories: Array.isArray(value.relatedCategories)
+        relatedCategories: classification ? classification.related_categories : Array.isArray(value.relatedCategories)
             ? value.relatedCategories.filter(cat => typeof cat === "string" && cat.trim()).slice(0, 3)
             : [],
-        difficulty: ["简单", "中等", "困难"].includes(value.difficulty)
+        difficulty: classification ? classification.difficulty : ["简单", "中等", "困难"].includes(value.difficulty)
             ? value.difficulty
             : "",
         source: value.source === "ocr"
@@ -4866,6 +4988,7 @@ function normalizeLearningState(value) {
                         ? item.relatedCategories.filter(cat => typeof cat === "string" && cat.trim()).slice(0, 3)
                         : [],
                     questionTeaching: null,
+                    questionClassification:normalizeQuestionClassification(item.questionClassification, question),
                     graphSolution: "",
                     recognitionSnapshot: item.recognitionSnapshot && typeof item.recognitionSnapshot === "object"
                         ? {version:1, question:String(item.recognitionSnapshot.question || ""),
@@ -4980,6 +5103,7 @@ function normalizeLearningState(value) {
                         entry.recognitionSnapshot = {version:1, question:source, difficulty:entry.difficulty, points:[]};
                     }
                 }
+                applyLearningQuestionClassification(entry, entry.questionClassification);
                 if (!entry.recognitionSnapshot) entry.recognitionSnapshot = wrongQuestionRegisteredSnapshot(entry);
                 return entry;
             })
@@ -5936,6 +6060,7 @@ function buildLearningQuestionFromSession(session, teaching, excludeLatest = fal
 
         return {
             text: limitQuestionText(questionText),
+            questionClassification:questionClassificationFor(teaching, questionText),
             knowledgePoints: [...new Set([
                 ...(teaching?.knowledge_points || []).slice(0, 3),
                 ...(teaching?.related_knowledge_points || []).slice(0, 2)
@@ -7638,6 +7763,7 @@ function storeWrongQuestionGraphTeaching(entry, teaching, question, solution = "
     // This text comes from an actual bound conversation or completed response,
     // independently of the graph's own claimed source. Preserve it verbatim.
     entry.graphSolution = solution;
+    applyLearningQuestionClassification(entry, questionClassificationFor(normalized, stem));
     if (recognition) entry.recognitionSnapshot = recognition;
     entry.classificationVersion = isWrongQuestionGraphReady(wrongQuestionGraphContext(entry, null)) ? 3 : 2;
     return true;
@@ -7754,6 +7880,7 @@ function addWrongQuestion(questionInfo, feedback, source = "auto") {
     const entry = {
         id: `wrong-${now}-${Math.random().toString(36).slice(2, 8)}`,
         question: info.text,
+        questionClassification:info.questionClassification,
         knowledgePoints: info.knowledgePoints,
         focusPoints: info.focusPoints,
         category: info.category,
@@ -7826,6 +7953,8 @@ function currentLearningQuestion(session, teaching) {
     );
 
     if (saved) {
+        const classification = questionClassificationFor(currentTeaching, saved.text) || saved.questionClassification;
+        if (classification) return applyLearningQuestionClassification({...saved}, classification);
         const livePoints = currentTeaching?.knowledge_points || [];
         const liveFocus = currentTeaching?.focus_points || [];
 
@@ -7901,6 +8030,7 @@ function processLearningFromReply(
     if (generatedExercise) {
         session.learningQuestion = {
             text: limitQuestionText(generatedExercise),
+            questionClassification:questionClassificationFor(normalized, generatedExercise),
             knowledgePoints: [...new Set([
                 ...points.slice(0, 3),
                 ...(normalized.related_knowledge_points || []).slice(0, 2)
@@ -7982,6 +8112,7 @@ function processLearningFromReply(
 
         session.learningQuestion = {
             text: limitQuestionText(learningQuestionText),
+            questionClassification:questionClassificationFor(normalized, learningQuestionText),
             knowledgePoints: points.slice(0, 4),
             focusPoints: normalized.focus_points.slice(0, 2),
             category: normalized.category,
@@ -8715,6 +8846,7 @@ function saveWrongEdit() {
     if (entry.question !== limitQuestionText(question)) {
         entry.classificationVersion = 0;
         entry.questionTeaching = null;
+        entry.questionClassification = null;
         entry.graphSolution = "";
         entry.recognitionSnapshot = null;
         entry.category = "待识别";
@@ -17512,6 +17644,7 @@ function questionInfoFromChatMessage(session, messageIndex) {
     return {
         text,
         sourceMessageId: message.messageId || "",
+        questionClassification:questionClassificationFor(recognitionTeaching, text),
         recognitionSnapshot: registeredQuestionSnapshot(recognitionTeaching, text),
         knowledgePoints: messageTeaching
             ? messageTeaching.knowledge_points.slice(0, 4)
@@ -19069,6 +19202,7 @@ function getEffectiveSessionTeaching(session) {
 
             return {
                 category: learningQuestion.category || "待识别",
+                question_classification:learningQuestion.questionClassification,
                 related_categories: learningQuestion.relatedCategories || [],
                 knowledge_points: learningQuestion.knowledgePoints,
                 focus_points: learningQuestion.focusPoints,
@@ -19552,6 +19686,7 @@ function candidateTeachingSnapshot(
     ) {
         return {
             category: saved.category || "待识别",
+            question_classification:saved.questionClassification,
             related_categories: saved.relatedCategories || [],
             knowledge_points: saved.knowledgePoints,
             focus_points: saved.focusPoints,
@@ -19615,6 +19750,7 @@ function applyQuestionCandidateAsCurrent(
 
     session.learningQuestion = {
         text: candidate.text,
+        questionClassification:questionClassificationFor(teaching, candidate.text),
         knowledgePoints: (
             teaching?.knowledge_points || []
         ).slice(0, 4),
@@ -20134,13 +20270,16 @@ function wrongQuestionGraphContext(entry, reference) {
     const foreignSource = Boolean(graph?.sources.question && !matchingQuestion);
     const registeredSnapshot = foreignSource ? null : registeredQuestionSnapshot(teaching, questionText)
         || wrongQuestionRegisteredSnapshot(entry, questionText);
-    return {category:teaching?.category || entry.category || "", categories:[], scope:"wrong",
-        focusPoints:entry.focusPoints || [], knowledgePoints:entry.knowledgePoints || [],
-        relatedPoints:teaching?.related_knowledge_points || [], prerequisitePoints:[], knowledgePath:[], questionCount:1,
+    const classification = questionClassificationFor(teaching, questionText)
+        || normalizeQuestionClassification(entry.questionClassification, questionText);
+    return {category:classification?.category || teaching?.category || entry.category || "", categories:[], scope:"wrong",
+        focusPoints:classification?.focus_points || entry.focusPoints || [],
+        knowledgePoints:classification?.knowledge_points || entry.knowledgePoints || [],
+        relatedPoints:classification?.related_knowledge_points || teaching?.related_knowledge_points || [], prerequisitePoints:[], knowledgePath:[], questionCount:1,
         // A copied, source-checked snapshot may retain its original question
         // heading. Keep that literal source for evidence quotes after verifying
         // its complete question projects to this exact wrong-book entry.
-        questionGraph:boundSnapshot ? graph : null, questionText, registeredSnapshot,
+        questionGraph:boundSnapshot ? graph : null, questionText, registeredSnapshot, questionClassification:classification,
         solutionText:solution, reviewSolutionText:solution, questionReference:reference};
 }
 
@@ -20167,12 +20306,12 @@ function knowledgeGraphQuestionContext(session, item, reference) {
     const hasKnownPoints = value => normalizeQuestionKnowledgeGraph(value?.question_graph)
         || ["focus_points", "knowledge_points", "related_knowledge_points"]
             .some(key => canonicalNames(value?.[key]).length);
-    let teaching = hasKnownPoints(own) ? own : (item.teaching || {});
+    let teaching = normalizeTeaching(hasKnownPoints(own) ? own : (item.teaching || {})) || {};
     const saved = normalizeLearningQuestion(session.learningQuestion);
     if (!hasKnownPoints(teaching) && saved
         && sanitizeStoredWrongQuestionText(saved.text).trim() === String(item.text || "").trim()) {
         teaching = { category:saved.category, focus_points:saved.focusPoints, knowledge_points:saved.knowledgePoints,
-            difficulty:saved.difficulty };
+            difficulty:saved.difficulty, question_classification:saved.questionClassification };
     }
     const graph = normalizeQuestionKnowledgeGraph(teaching.question_graph);
     const questionGraph = questionGraphMatchesQuestion(graph, item.text, message) ? graph : null;
@@ -20220,6 +20359,7 @@ function knowledgeGraphQuestionContext(session, item, reference) {
         knowledgePath:canonicalNames(teaching.knowledge_path), questionCount:1,
         questionGraph, questionText, solutionText, reviewSolutionText,
         registeredSnapshot:registeredQuestionSnapshot(teaching, questionText),
+        questionClassification:questionClassificationFor(teaching, questionText),
         questionReference:reference, questionOrder:item.order || 0
     };
 }

@@ -19,6 +19,7 @@ from pathlib import Path
 from teaching import (
     CATEGORY_RULES,
     _KNOWLEDGE_GRAPH,
+    attach_question_classification,
     enrich_question_graph,
 )
 
@@ -201,7 +202,7 @@ def local_catalog_classification(teaching, question, solution="", *, status="loc
                   classification_status=status, classification_source="local_structure", needs_review=True)
     result["question_graph"].update(classifier_revision=LOCAL_CLASSIFIER_REVISION,
         classification_status=status, classification_source="local_structure", needs_review=True)
-    return result
+    return attach_question_classification(result, question)
 
 
 def _catalog_evidence(records, sources):
@@ -450,7 +451,7 @@ def _apply_catalog_graph(teaching, graph, catalog):
         classification_revision=CATALOG_CLASSIFIER_REVISION,
         classification_source="AI语义复核", classification_status=graph["classification_status"],
         confidence="中" if nodes else "低", needs_review=graph["needs_review"])
-    return result
+    return attach_question_classification(result, graph["sources"]["question"])
 
 
 def _catalog_candidate_hints(local, question, solution, allowed):

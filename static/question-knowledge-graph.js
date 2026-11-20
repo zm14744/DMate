@@ -47,6 +47,14 @@
                 if (id && !recorded.has(id) && !excluded.has(id)) selected.add(id);
             }
         }
+        // A registered question's scope is fixed at recognition. Answer graphs
+        // still retain method evidence, but cannot change the assessed topics.
+        const fixed = context?.questionClassification;
+        if (fixed?.version === 1 && fixed.question === sourceText.question
+            && /^[a-f0-9]{64}$/.test(fixed.question_sha256 || '') && Array.isArray(fixed.node_ids)) {
+            selected.clear();
+            for (const id of fixed.node_ids.slice(0, byId.size)) if (byId.has(id)) selected.add(id);
+        }
         if (!selected.size) return empty();
 
         const order = new Map(nodes.map((node, index) => [node.id, index]));

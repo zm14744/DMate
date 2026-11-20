@@ -118,19 +118,13 @@ def _question_graph_task_points(text):
     return [by_id[identifier]["name"] for identifier in structural_topic_ids(text) if identifier in by_id]
 
 
-def enrich_question_graph(result, question_text, solution_text=""):
-    """Attach evidence for this exact problem, without course-neighbor expansion.
-
-    The optional solution must be the actual answer belonging to this problem,
-    not an older conversation answer or an unvalidated exercise template.
-    """
-    result = dict(result or {})
+def _build_question_evidence_graph(question_text, solution_text=""):
     aliases = {point: keywords for rule in CATEGORY_RULES.values()
                for point, keywords in (rule.get("points") or {}).items()}
     def source_categories(text):
         classified = _classify_content(text)
         return {classified.get("category"), *(classified.get("related_categories") or [])}
-    result["question_graph"] = build_question_graph(
+    return build_question_graph(
         question_text, solution_text, _KNOWLEDGE_GRAPH.get("nodes", []), aliases,
         _question_graph_structural_points,
         _english_analysis_aliases,
@@ -138,6 +132,43 @@ def enrich_question_graph(result, question_text, solution_text=""):
         _QUESTION_GRAPH_ENGLISH_LABELS,
         task_structural_evidence=_question_graph_task_points,
     )
+
+
+def _question_classification_projection(question_text):
+    """Intrinsic labels never depend on an answer or model-returned ordering."""
+    graph = _build_question_evidence_graph(question_text)
+    by_id = {node["id"]: node for node in _KNOWLEDGE_GRAPH.get("nodes", [])}
+    identifiers = sorted({node["id"] for node in graph["nodes"]})
+    nodes = [by_id[identifier] for identifier in identifiers]
+    counts = {node["category"]: sum(item["category"] == node["category"] for item in nodes) for node in nodes}
+    categories = sorted(counts, key=lambda name: (-counts[name], name))
+    primary = categories[0] if categories else "待识别"
+    points = [node["name"] for node in nodes if node["category"] == primary]
+    focus = _infer_focus_points([], primary, points, question_text, "hint", 0)
+    mode = _detect_mode(question_text)
+    classified = _classify_content(question_text)
+    return {"node_ids": identifiers,
+            "focus_node_ids": [node["id"] for point in focus for node in nodes if node["name"] == point],
+            "difficulty": _estimate_difficulty(question_text, classified["knowledge_points"],
+                                                _detect_question_type(question_text, mode))}
+
+
+def attach_question_classification(result, question_text):
+    from question_classification import question_classification
+    result = dict(result or {})
+    result["question_classification"] = question_classification(
+        question_text, _KNOWLEDGE_GRAPH.get("nodes", []), _question_classification_projection)
+    return result
+
+
+def enrich_question_graph(result, question_text, solution_text=""):
+    """Attach this answer's evidence and an independent stable question judgment.
+
+    The optional solution must be the actual answer belonging to this problem,
+    not an older conversation answer or an unvalidated exercise template.
+    """
+    result = attach_question_classification(result, question_text)
+    result["question_graph"] = _build_question_evidence_graph(question_text, solution_text)
     result.update(classification_revision="catalog-structure/2", classification_source="local_structure",
                   classification_status="local", needs_review=True)
     result["question_graph"].update(classifier_revision="catalog-structure/2", classification_source="local_structure",

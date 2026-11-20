@@ -26,7 +26,8 @@
       bubbleOpacity:clamp(source.bubbleOpacity,60,100,defaults.bubbleOpacity)
     };
   }
-  let committed = normalize(), committedBlob = null, settings = normalize();
+  const bootstrap = window.DMateAppearanceBootstrap?.scope === 'offline' ? window.DMateAppearanceBootstrap : null;
+  let committed = normalize(bootstrap?.settings), committedBlob = null, settings = {...committed};
   let visualBlob = null, backgroundURL = '', backgroundMode = 'unchanged';
   let opened = false, pending = false, processing = false, imageEpoch = 0, previousFocus = null;
   const modalHint = () => $('appearanceModal')?.querySelector('.appearance-apply-hint');
@@ -77,6 +78,7 @@
     const root = document.documentElement, body = document.body;
     const theme = resolvedTheme(), accent = accents[settings.accent], alpha = settings.panelOpacity / 100;
     root.dataset.appearanceTheme = body.dataset.appearanceTheme = theme;
+    root.style.backgroundColor = {light:'#f8fafc',dark:'#0d0d0d',navy:'#0f172a'}[theme];
     root.style.colorScheme = body.style.colorScheme = theme === 'light' ? 'only light' : 'dark';
     document.querySelector('meta[name="color-scheme"]')?.setAttribute('content',theme === 'light' ? 'only light' : 'dark');
     document.querySelector('meta[name="supported-color-schemes"]')?.setAttribute('content',theme === 'light' ? 'light' : 'dark');
@@ -96,11 +98,11 @@
     for (const [key,value] of Object.entries(values)) root.style.setProperty(key,String(value));
     syncControls();
   }
-  function background(blob) {
+  function background(blob, decodedURL = '') {
     const next = blob instanceof Blob && blob.size ? blob : null;
     if (next !== visualBlob) {
       if (backgroundURL) URL.revokeObjectURL(backgroundURL);
-      visualBlob = next; backgroundURL = next ? URL.createObjectURL(next) : '';
+      visualBlob = next; backgroundURL = next ? decodedURL || URL.createObjectURL(next) : '';
     }
     if ($('appearanceBackgroundLayer')) $('appearanceBackgroundLayer').style.backgroundImage = backgroundURL ? 'url("' + backgroundURL + '")' : 'none';
     document.body.classList.toggle('has-custom-background',Boolean(backgroundURL));
@@ -139,11 +141,22 @@
     if (!opened || pending) return;
     settings = {...committed}; backgroundMode = 'unchanged'; background(committedBlob); paint(); hideModal();
   }
-  function apply(value, blob = null) {
+  async function apply(value, blob = null) {
     committed = normalize(value); committedBlob = blob instanceof Blob && blob.size ? blob : null;
     settings = {...committed}; backgroundMode = 'unchanged';
-    const wasSaving = pending; pending = false; processing = false; imageEpoch++;
-    background(committedBlob); paint();
+    const wasSaving = pending, generation = ++imageEpoch;
+    pending = false; processing = false;
+    bootstrap?.rememberOffline(committed);
+    paint();
+    const early = await bootstrap?.takePicture(committedBlob);
+    let decodedURL = early?.url || '';
+    if (committedBlob && !decodedURL && committedBlob !== visualBlob) {
+      decodedURL = URL.createObjectURL(committedBlob);
+      const image = new Image(); image.src = decodedURL;
+      try { await image.decode(); } catch (_) { URL.revokeObjectURL(decodedURL); decodedURL = ''; }
+    }
+    if (generation !== imageEpoch) { if (decodedURL) URL.revokeObjectURL(decodedURL); return; }
+    background(committedBlob, decodedURL);
     if (wasSaving) hideModal();
   }
   async function notice(message) {

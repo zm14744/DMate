@@ -164,10 +164,15 @@
       ? root.DMateOfflineBackup.contentFingerprint(store,row)
       : migrationFingerprint({...row,id:undefined});
     const byContent = {notes:new Set(),mistakes:new Set(),drawings:new Set()};
+    const mistakeQuestions = new Map();
     for (const store of ['notes','mistakes']) {
       const metadata = local.settings.get(store === 'notes' ? 'notebook-deletions' : 'mistake-deletions');
       for (const row of local[store].values()) if (!metadata?.deleted?.[row.id]
-        || time(metadata.deleted[row.id]) < time(row.updatedAt)) byContent[store].add(await identity(store,row));
+        || time(metadata.deleted[row.id]) < time(row.updatedAt)) {
+        const hash = await identity(store,row);
+        byContent[store].add(hash);
+        if (store === 'mistakes' && !mistakeQuestions.has(hash)) mistakeQuestions.set(hash,row.id);
+      }
     }
     // Establish the absent/present revision before planning a possible write.
     const currentGallery = await read('drawings','gallery');
@@ -220,7 +225,18 @@
         }
       } else {
         const hash = await identity(store,row);
-        if (!byContent[store]?.has(hash)) {
+        const matchingId = store === 'mistakes' && mistakeQuestions.get(hash);
+        if (matchingId && root.DMateOfflineBackup?.mergeMistakes) {
+          // A same-question record may contain another answer or annotation.
+          // Keep it inside the existing question instead of dropping it or
+          // creating another card. Refresh before merging so CAS protects edits
+          // made by another page during the source migration.
+          const current = await read(store,matchingId);
+          if (!current || await identity(store,current) !== hash) throw error('CONFLICT');
+          const merged = await root.DMateOfflineBackup.mergeMistakes(current,row);
+          if (!await equal(current,merged)) operations.push({type:'put',store,value:merged});
+          local[store].set(matchingId,merged);
+        } else if (!byContent[store]?.has(hash)) {
           const metadata = local.settings.get(store === 'notes' ? 'notebook-deletions' : 'mistake-deletions');
           let id = row.id;
           if (local[store].has(id) || metadata?.deleted?.[id]) id = 'migrated-' + await migrationFingerprint({source,store,id,revision});
@@ -232,6 +248,7 @@
           if (concurrent && !await equal(concurrent,value)) throw error('CONFLICT');
           if (!concurrent) operations.push({type:'put',store,expectAbsent:true,value});
           local[store].set(id,value); byContent[store]?.add(hash);
+          if (store === 'mistakes') mistakeQuestions.set(hash,id);
         }
       }
       operations.push({type:'put',store:'settings',value:{...marker,records:{...marker.records,[sourceId]:signature}}});
@@ -323,10 +340,22 @@
     let closed = false, vault, legacy, destruction, releaseLease = () => {}, tail = Promise.resolve();
     const migrationWarnings = [];
     const revisions = new Map();
+    const snapshots = new WeakMap();
     const live = () => !closed && options.isCurrent()
       && (device || !root.DMateGuestSession || root.DMateGuestSession.getOwner() === owner);
     const check = () => { if (!live()) throw error('CLOSED'); };
     const key = (store, id) => store + '\0' + id;
+    const snapshot = (store, row, revision) => {
+      const value = clone(row);
+      snapshots.set(value,{store,id:value.id,revision});
+      return value;
+    };
+    const revisionOf = (store, row) => {
+      check();
+      const saved = row && snapshots.get(row);
+      if (!saved || saved.store !== store || saved.id !== row.id) throw error('INVALID_ARGUMENT');
+      return saved.revision;
+    };
     const run = action => {
       const pending = tail.catch(() => {}).then(async () => { check(); const value = await action(); check(); return value; });
       tail = pending; return pending;
@@ -352,7 +381,7 @@
         revisions.set(key(store, id), saved?.revision ?? null);
         if (!saved) return undefined;
         if (saved.value?.owner !== owner || saved.value?.row?.id !== id) throw error('STORAGE_FAILED');
-        return clone(saved.value.row);
+        return snapshot(store,saved.value.row,saved.revision);
       };
       const list = async store => {
         if (!STORES.includes(store)) throw error('INVALID_ARGUMENT');
@@ -361,7 +390,8 @@
         const result = [];
         for (const saved of rows) {
           if (saved.value?.owner !== owner || typeof saved.value?.row?.id !== 'string') throw error('STORAGE_FAILED');
-          revisions.set(key(store, saved.value.row.id), saved.revision); result.push(clone(saved.value.row));
+          revisions.set(key(store, saved.value.row.id), saved.revision);
+          result.push(snapshot(store,saved.value.row,saved.revision));
         }
         return result;
       };
@@ -370,10 +400,16 @@
         for (const op of operations) {
           const id = String(op.id ?? op.value?.id ?? '');
           if (!id || !STORES.includes(op.store) || !['put', 'delete'].includes(op.type)) throw error('INVALID_ARGUMENT');
-          if (!revisions.has(key(op.store, id))) await read(op.store, id);
-          if (op.expectAbsent && revisions.get(key(op.store,id)) !== null) throw error('CONFLICT');
+          // Read-modify-write callers can pin the revision of their actual
+          // snapshot. A later UI read on this same handle must not advance an
+          // older import plan's compare-and-swap precondition.
+          const explicit = Object.hasOwn(op,'expectedRevision');
+          if (!explicit && !revisions.has(key(op.store, id))) await read(op.store, id);
+          const expectedRevision = explicit ? op.expectedRevision : revisions.get(key(op.store,id));
+          if (expectedRevision !== null && typeof expectedRevision !== 'string') throw error('INVALID_ARGUMENT');
+          if (op.expectAbsent && expectedRevision !== null) throw error('CONFLICT');
           prepared.push({type:op.type, collection:op.store, id:await address(id),
-            expectedRevision:revisions.get(key(op.store, id)), ...(op.type === 'put' ? {value:{owner, row:clone({...op.value, id})}} : {}), logicalId:id});
+            expectedRevision, ...(op.type === 'put' ? {value:{owner, row:clone({...op.value, id})}} : {}), logicalId:id});
         }
         check();
         const saved = await vault.batch(prepared.map(({logicalId, ...op}) => op)); check();
@@ -515,6 +551,7 @@
         migrationWarnings:Object.freeze(migrationWarnings.slice()),
         get:(store, id) => run(() => read(store, String(id))),
         all:store => run(() => list(store)),
+        revisionOf,
         put:(store, row) => { const value = clone(row); return run(() => commit([{type:'put', store, value}])); },
         remove:(store, id) => run(() => commit([{type:'delete', store, id:String(id)}])),
         batch:operations => { const copy = clone(operations); return run(() => commit(copy)); },
