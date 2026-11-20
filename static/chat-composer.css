@@ -43,46 +43,47 @@ body[data-appearance-theme="navy"] {
     --dmate-composer-shadow:0 5px 18px rgba(2,6,23,.20),inset 0 1px 0 rgba(226,232,240,.035);
 }
 
-/* Input modes share a quiet track and one sliding selection surface. */
+/* Desktop-style segmented control: a flat, wider selection above a lower track. */
 body[data-appearance-theme] .interaction-mode-switch {
     --dmate-mode-track-bg:#ececec;
     --dmate-mode-thumb-bg:#fff;
-    --dmate-mode-thumb-border:rgba(0,0,0,.035);
-    --dmate-mode-thumb-shadow:0 1px 3px rgba(0,0,0,.09);
     position:relative; isolation:isolate; display:inline-grid;
-    grid-template-columns:repeat(2,minmax(0,1fr));
+    grid-template-columns:minmax(0,54fr) minmax(0,46fr);
     grid-template-rows:minmax(0,1fr); align-items:center; flex:none;
-    box-sizing:border-box; width:160px; height:var(--dmate-mode-height,32px); padding:0; gap:0;
+    box-sizing:border-box; width:200px; height:var(--dmate-mode-height,32px); padding:0; gap:0;
     border:0 !important; border-radius:999px;
-    background:var(--dmate-mode-track-bg) !important; box-shadow:none !important;
+    background:transparent !important; box-shadow:none !important;
     color:var(--text-secondary,#64748b); font-size:13px; line-height:1;
     white-space:nowrap;
+    transition:grid-template-columns .22s cubic-bezier(.2,.8,.2,1);
+}
+body[data-appearance-theme] .interaction-mode-switch[data-mode="question"] {
+    grid-template-columns:minmax(0,46fr) minmax(0,54fr);
 }
 body[data-appearance-theme="dark"] .interaction-mode-switch {
-    --dmate-mode-track-bg:#202020;
-    --dmate-mode-thumb-bg:#383838;
-    --dmate-mode-thumb-border:rgba(255,255,255,.045);
-    --dmate-mode-thumb-shadow:0 1px 3px rgba(0,0,0,.18);
+    --dmate-mode-track-bg:#1b1b1b;
+    --dmate-mode-thumb-bg:#242424;
 }
 body[data-appearance-theme="navy"] .interaction-mode-switch {
     --dmate-mode-track-bg:#132036;
-    --dmate-mode-thumb-bg:#293b55;
-    --dmate-mode-thumb-border:rgba(226,232,240,.06);
-    --dmate-mode-thumb-shadow:0 1px 3px rgba(2,6,23,.18);
+    --dmate-mode-thumb-bg:#1d2c43;
 }
 body[data-appearance-theme] .interaction-mode-switch::after {
-    content:none;
+    content:""; position:absolute; z-index:0; inset:2px 0;
+    border:0; border-radius:999px;
+    background:var(--dmate-mode-track-bg); pointer-events:none;
 }
 body[data-appearance-theme] .interaction-mode-switch::before {
-    content:""; position:absolute; z-index:1; top:2px; bottom:2px; left:2px;
-    box-sizing:border-box; width:calc(50% - 4px); border-radius:999px;
-    border:1px solid var(--dmate-mode-thumb-border);
+    content:""; position:absolute; z-index:1; top:0; bottom:0; left:0;
+    box-sizing:border-box; width:54%; border-radius:999px;
+    border:0;
     background:var(--dmate-mode-thumb-bg); pointer-events:none;
-    box-shadow:var(--dmate-mode-thumb-shadow);
+    box-shadow:none;
     transform:translateX(0);
     transition:transform .22s cubic-bezier(.2,.8,.2,1);
 }
-body[data-appearance-theme] .interaction-mode-switch[data-mode="question"]::before { transform:translateX(calc(100% + 4px)); }
+/* Move across the remaining 46% of the track using the thumb's own 54% width. */
+body[data-appearance-theme] .interaction-mode-switch[data-mode="question"]::before { transform:translateX(85.1851851852%); }
 body[data-appearance-theme] .interaction-mode-switch > button {
     position:relative; z-index:2; display:inline-flex !important;
     align-items:center; justify-content:center; box-sizing:border-box !important;
@@ -105,7 +106,7 @@ body[data-appearance-theme] .interaction-mode-switch > button:focus-visible::aft
 }
 body[data-appearance-theme] .interaction-mode-switch > button:disabled { cursor:not-allowed; }
 @media(max-width:1100px) {
-    body[data-appearance-theme] .interaction-mode-switch { width:min(160px,100%); }
+    body[data-appearance-theme] .interaction-mode-switch { width:min(200px,100%); }
 }
 
 /* iPad in both orientations and Split View: larger tappable symbol keys. */
