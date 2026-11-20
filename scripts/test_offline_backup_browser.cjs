@@ -28,6 +28,12 @@ const gallery = {version:2,activeId:'source-page',custom:{preserve:'gallery meta
   }]}
 }]};
 
+function withoutWrongTimes(value) {
+  const row = {...value};
+  delete row.createdAt; delete row.updatedAt;
+  return row;
+}
+
 async function open(browser,width,owner) {
   const context = await browser.newContext({viewport:{width,height:900},isMobile:width<1100,
     hasTouch:width<1100,serviceWorkers:'block',acceptDownloads:true});
@@ -154,6 +160,107 @@ async function nativeSaveProtocol(page) {
   }
 }
 
+function drawingCopy(page,id) {
+  const result = structuredClone(page);
+  result.id = id; result.createdAt = 123456; result.updatedAt = 987654;
+  result.viewState = {zoom:3,x:800,y:900};
+  result.document.graphs.forEach((graph,index) => {
+    graph.id = id+'-graph-'+index;
+    const ids = new Map(graph.vertices.map((vertex,i) => [vertex.id,id+'-vertex-'+i]));
+    graph.vertices = graph.vertices.map(vertex => ({...vertex,id:ids.get(vertex.id)}));
+    graph.edges = graph.edges.map((edge,i) => ({...edge,id:id+'-edge-'+i,
+      from:ids.get(edge.from),to:ids.get(edge.to)}));
+  });
+  return result;
+}
+
+async function legacyWrongTimesZIP(page,buffer) {
+  // Build the previous compatible ZIP format with genuine integrity metadata.
+  // The new exporter intentionally removes these values, so passing them to
+  // create() would no longer exercise legacy imports.
+  return Buffer.from(await page.evaluate(async bytes => {
+    const files = fflate.unzipSync(new Uint8Array(bytes));
+    const rows = JSON.parse(fflate.strFromU8(files['mistakes.json']));
+    for (const row of rows) {row.createdAt='2001-01-01T00:00:00.000Z';row.updatedAt='2002-02-02T00:00:00.000Z';}
+    const content = files['mistakes.json'] = fflate.strToU8(JSON.stringify(rows));
+    const manifest = JSON.parse(fflate.strFromU8(files['manifest.json']));
+    manifest.files['mistakes.json'] = {size:content.length,sha256:[...new Uint8Array(await crypto.subtle.digest('SHA-256',content))]
+      .map(byte => byte.toString(16).padStart(2,'0')).join('')};
+    files['manifest.json'] = fflate.strToU8(JSON.stringify(manifest));
+    return [...fflate.zipSync(files)];
+  },[...buffer]));
+}
+
+async function semanticMerge(browser) {
+  const fixture = await open(browser,1440,'backup-content-merge');
+  const page = fixture.page;
+  try {
+    const localNote = {...note,id:'semantic-local-note',updatedAt:'2030-01-01T00:00:00.000Z'};
+    const localWrong = {...mistake,id:'semantic-local-wrong',createdAt:'2029-01-01T00:00:00.000Z',updatedAt:'2030-01-01T00:00:00.000Z'};
+    const localGallery = {...structuredClone(gallery),activeId:'semantic-local-page'};
+    localGallery.pages[0].id = localGallery.activeId;
+    await page.evaluate(async data => {
+      await __offlineTestStore.put('notes',data.note);
+      await __offlineTestStore.put('mistakes',data.mistake);
+      await __offlineTestStore.put('drawings',{id:'gallery',gallery:JSON.stringify(data.gallery),updatedAt:12345});
+    },{note:localNote,mistake:localWrong,gallery:localGallery});
+    const original = await businessRows(page);
+    const identical = {
+      notes:[{...note,id:'different-note-id',updatedAt:'2000-01-01T00:00:00.000Z',custom:{source:'different import tracking'}}],
+      mistakes:[{...mistake,id:'different-wrong-id',status:'resolved',custom:{source:'different import tracking'}}],
+      drawings:{...structuredClone(gallery),activeId:'different-page-id',pages:[drawingCopy(gallery.pages[0],'different-page-id')]}
+    };
+    const identicalZIP = await legacyWrongTimesZIP(page,await createZIP(page,identical));
+    await importZIP(page,identicalZIP);
+    assert.deepEqual(await businessRows(page),original,
+      'Identical actual content merges across record/editor IDs, timestamps and viewport without touching any local record');
+    await importZIP(page,identicalZIP);
+    assert.deepEqual(await businessRows(page),original,'Legacy timestamped backups remain duplicate-free on repeated imports');
+    console.log('PASS matching study content merges across IDs, timestamps and drawing viewport while retaining local records byte-for-byte');
+
+    const newNote = {...note,id:'new-note-one',title:'本次新增的概念',content:'相同内容在包内只保留一条。'};
+    const newWrong = {...mistake,id:'new-wrong-one',statement:'本次新增的题目',answer:'这是一份新的答案'};
+    const newPage = structuredClone(gallery.pages[0]);
+    newPage.id='new-page-one';newPage.name='本次新增的绘图';newPage.document.graphs[0].vertices[0].x += 20;
+    const repeated = {
+      notes:[newNote,{...newNote,id:'new-note-two',updatedAt:123}],
+      mistakes:[newWrong,{...newWrong,id:'new-wrong-two',createdAt:456,updatedAt:789}],
+      drawings:{version:2,activeId:newPage.id,pages:[newPage,drawingCopy(newPage,'new-page-two')]}
+    };
+    await importZIP(page,await createZIP(page,repeated));
+    const merged = await businessRows(page);
+    assert.equal(merged.notes.length,2,'Two matching concepts inside one archive add only one concept');
+    assert.equal(merged.mistakes.length,2,'Two matching questions inside one archive add only one question');
+    assert.equal(JSON.parse(merged.drawings[0].gallery).pages.length,2,'Two matching drawings inside one archive add only one drawing');
+    assert.deepEqual(merged.notes.find(row=>row.id===localNote.id),localNote);
+    assert.deepEqual(merged.mistakes.find(row=>row.id===localWrong.id),localWrong);
+    assert.deepEqual(JSON.parse(merged.drawings[0].gallery).pages.find(row=>row.id===localGallery.activeId),localGallery.pages[0]);
+    console.log('PASS duplicate content within one archive is merged once for concepts, mistakes and editable drawings');
+
+    const changedPage = structuredClone(localGallery.pages[0]);
+    changedPage.document.graphs[0].edges[0].weight='8';
+    const changed = {notes:[{...localNote,content:'真正不同的概念内容'}],
+      mistakes:[{...localWrong,answer:'真正不同的错题答案'}],
+      drawings:{...localGallery,pages:[changedPage]}};
+    await importZIP(page,await createZIP(page,changed));
+    const final = await businessRows(page);
+    assert.equal(final.notes.length,3,'Different concept content adds a record');
+    assert.equal(final.mistakes.length,3,'Different answers add a record');
+    assert.equal(JSON.parse(final.drawings[0].gallery).pages.length,3,'Different edge weights add a drawing');
+    assert.deepEqual(final.notes.find(row=>row.id===localNote.id),localNote,'Different incoming concept content cannot overwrite local content');
+    assert.deepEqual(final.mistakes.find(row=>row.id===localWrong.id),localWrong,'Different incoming answers cannot overwrite local answers');
+    assert.deepEqual(JSON.parse(final.drawings[0].gallery).pages.find(row=>row.id===localGallery.activeId),localGallery.pages[0]);
+    const changedAgain = structuredClone(changed);
+    changedAgain.notes[0].id='changed-again-note';changedAgain.notes[0].updatedAt=1;
+    changedAgain.mistakes[0].id='changed-again-wrong';changedAgain.mistakes[0].updatedAt=2;
+    changedAgain.drawings.pages=[drawingCopy(changedPage,'changed-again-page')];
+    await importZIP(page,await createZIP(page,changedAgain));
+    assert.deepEqual(await businessRows(page),final,'Repackaging the same added content under new IDs still merges without changes');
+    assert.deepEqual(fixture.errors,[]);assert.deepEqual(fixture.calls,[]);
+    console.log('PASS genuine note, answer and drawing differences are added without overwriting originals, then merge on retry');
+  } finally {await fixture.context.close();}
+}
+
 (async () => {
   const directory = await mkdtemp(join(tmpdir(),'dmate-backup-browser-'));
   const browser = await chromium.launch(launch);
@@ -188,7 +295,10 @@ async function nativeSaveProtocol(page) {
     assert.equal(initial.notes[0].content,edited,'The currently edited concept is backed up');
     assert.deepEqual(initial.notes[0].custom,note.custom,'All note metadata survives export');
     assert.deepEqual(initial.attachment,{text:'PRIVATE ATTACHMENT',type:'text/plain'},'Binary note attachments survive the ZIP codec');
-    assert.deepEqual(initial.mistakes,[mistake],'Wrong-question text, answer, analysis and recognition fields remain intact');
+    assert.deepEqual(initial.mistakes,[withoutWrongTimes(mistake)],'Wrong-question content remains intact without time metadata');
+    assert.equal(Object.hasOwn(initial.mistakes[0],'createdAt'),false,'Wrong-question exports omit creation times');
+    assert.equal(Object.hasOwn(initial.mistakes[0],'updatedAt'),false,'Wrong-question exports omit update times');
+    assert.deepEqual(await records(page,'mistakes'),[mistake],'Omitting exported times does not erase the local wrong-question metadata');
     assert.deepEqual(initial.drawings,gallery,'The complete editable drawing gallery is exported');
 
     await navigate(page,'drawing');
@@ -350,6 +460,7 @@ async function nativeSaveProtocol(page) {
     assert.deepEqual(source.errors,[]);assert.deepEqual(target.errors,[]);
     assert.deepEqual(source.calls,[]);assert.deepEqual(target.calls,[]);
     console.log('PASS restored ZIP data persists in the encrypted workspace without backend or model calls');
+    await semanticMerge(browser);
   } finally {
     await source?.context.close();await target?.context.close();
     await browser.close();await rm(directory,{recursive:true,force:true});

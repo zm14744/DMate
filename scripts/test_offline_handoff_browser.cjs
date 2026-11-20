@@ -165,21 +165,23 @@ async function raw(page){
     assert.equal(dirtyGallery.activeId,'new-blank');assert.equal(dirtyGallery.pages[0].name,'PRIVATE NEW BLANK');
     assert.equal(dirtyGallery.privateLayout,'PRIVATE NEW METADATA');
     console.log('PASS the production bridge preserves blank named pages, order, active page, metadata and newer drafts after an online write failure');
+    await page.evaluate(()=>{
+      DMateOfflineBridge={snapshot:async()=>{sessionStorage.setItem('__unexpectedSnapshot','called');throw new Error('Snapshot must not run');}};
+      DMateOfflineHandoff={stage:async()=>{sessionStorage.setItem('__unexpectedStage','called');throw new Error('Staging must not run');}};
+    });
     await page.locator('#offlineWorkspaceBtn').click();await page.waitForURL(baseURL+'/offline');
     assert.equal(await page.evaluate(()=>sessionStorage.getItem('dmate_offline_migration_v1')),null);
-    const transferred=await page.evaluate(async()=>{const value=await DMateOfflineHandoff.read(DMateOfflineHandoff.pendingToken());return{username:value.username,
-      notes:value.notes,wrong:value.wrongQuestions,settings:value.appearance.settings,bytes:await value.appearance.backgroundBlob.text(),gallery:JSON.parse(value.drawings)};});
-    assert.equal(transferred.notes.length,1);assert.equal(transferred.wrong.length,1);assert.equal(transferred.settings.mode,'dark');
-    assert.equal(transferred.bytes,'PRIVATE IMAGE PIXELS');assert.deepEqual((await raw(page)).local,{});
-    assert.equal(transferred.gallery.activeId,'new-blank');assert.equal(transferred.gallery.pages[0].name,'PRIVATE NEW BLANK');
-    await page.evaluate(()=>DMateOfflineHandoff.ack(DMateOfflineHandoff.pendingToken()));
+    assert.equal(await page.evaluate(()=>DMateOfflineHandoff.pendingToken()),null,'Opening the local workspace does not stage online records');
+    assert.equal(await page.evaluate(()=>sessionStorage.getItem('__unexpectedSnapshot')),null,'Entry never requests a cloud snapshot');
+    assert.equal(await page.evaluate(()=>sessionStorage.getItem('__unexpectedStage')),null,'Entry never calls the handoff staging API');
+    const unstaged=await raw(page);
+    assert.equal(unstaged.stages.length,0);assert.equal(unstaged.chunks.length,0);assert.deepEqual(unstaged.local,{});
     await page.goto(baseURL+'/entry',{waitUntil:'load'});
-    await page.evaluate(()=>{DMateOfflineHandoff={stage:async()=>{throw new Error('Fixture secure-store failure');}};});
-    await page.locator('#offlineWorkspaceBtn').click();await page.waitForFunction(()=>testToasts.length===1);
-    assert.equal(new URL(page.url()).pathname,'/entry');assert.equal(await page.locator('#offlineWorkspaceBtn').isDisabled(),false);
-    assert.equal(await page.locator('#offlineWorkspaceBtn').getAttribute('aria-busy'),null);
-    assert.ok((await page.evaluate(()=>testToasts[0])).includes('当前页面内容仍保留'));
+    await page.evaluate(()=>{DMateOfflineBridge=null;DMateOfflineHandoff=null;});
+    await page.locator('#offlineWorkspaceBtn').click();await page.waitForURL(baseURL+'/offline');
+    assert.equal(await page.evaluate(()=>DMateOfflineHandoff.pendingToken()),null,'Missing online snapshot/handoff components do not block local entry');
+    assert.deepEqual(await page.evaluate(()=>testToasts),[],'Independent local entry does not report a cloud save failure');
     assert.deepEqual(errors,[]);
-    console.log('PASS the production bridge/entry navigate only after encrypted staging; failures restore the button and retain source data');
+    console.log('PASS production local entry never stages online records and opens normally with broken or absent cloud handoff components');
   }finally{await context.close();await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});

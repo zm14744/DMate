@@ -7,6 +7,8 @@
   const LEASE = 'dmate-offline-guest:';
   const STAMP = 'dmate:offline-guest-last-seen:';
   const SCOPE = 'dmate:offline-guest-scope:';
+  const DEVICE_VAULT = 'device-workspace-v1';
+  const DEVICE_OWNER = 'device-local';
   const leases = new Map();
   const encoder = new TextEncoder();
   const random = () => Array.from(root.crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
@@ -116,48 +118,213 @@
     };
   }
   root.addEventListener('pagehide', () => { for (const name of leases.keys()) touch(name); });
-  async function collectGuests(current) {
-    if (!root.navigator?.locks?.query) return;
-    let db;
-    try {
-      const locks = await root.navigator.locks.query();
-      const live = new Set((locks.held || []).map(row => row.name));
-      const names = await new Promise((resolve, reject) => {
-        const request = root.indexedDB.open('dmate-offline-vault-v1', 1);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          db = request.result;
-          const tx = db.transaction('vaults', 'readonly'), read = tx.objectStore('vaults').getAllKeys();
-          tx.oncomplete = () => resolve(read.result); tx.onerror = () => reject(tx.error);
-        };
-      });
-      for (const name of names) {
-        if (name === current || !/^guest-[a-f0-9]{32}$/.test(name) || live.has(LEASE + name) || leases.has(name)) continue;
-        let last = 0, scope;
-        try { last = Number(root.localStorage.getItem(STAMP + name)); scope = root.localStorage.getItem(SCOPE + name); } catch (_) { continue; }
-        if (scope && live.has('dmate-guest-assets:' + scope)) continue;
-        if (!last || last > Date.now() - 3600000) continue;
-        try {
-          await root.navigator.locks.request(LEASE + name, {mode:'exclusive', ifAvailable:true}, async lock => {
-            if (!lock || leases.has(name) || Number(root.localStorage.getItem(STAMP + name)) > Date.now() - 3600000) return;
-            const cleanup = async () => {
-              const vault = await root.DMateOfflineVault.open({name});
-              await vault.destroy(); root.localStorage.removeItem(STAMP + name); root.localStorage.removeItem(SCOPE + name);
-            };
-            if (scope) await root.navigator.locks.request('dmate-guest-assets:' + scope, {mode:'exclusive', ifAvailable:true}, lock => lock ? cleanup() : undefined);
-            else await cleanup();
-          });
-        } catch (_) { /* Missing keys and unavailable providers never reset a vault. */ }
+  async function storedVaultNames() {
+    return new Promise((resolve,reject) => {
+      const request = root.indexedDB.open('dmate-offline-vault-v1',1);
+      request.onerror = () => reject(error('STORAGE_FAILED'));
+      request.onsuccess = () => {
+        const db = request.result, tx = db.transaction('vaults','readonly');
+        const names = tx.objectStore('vaults').getAllKeys();
+        tx.oncomplete = () => { db.close(); resolve(names.result); };
+        tx.onerror = tx.onabort = () => { db.close(); reject(error('STORAGE_FAILED')); };
+      };
+    });
+  }
+  async function migrationFingerprint(value) {
+    if (root.DMateOfflineBackup?.fingerprint) return root.DMateOfflineBackup.fingerprint(value);
+    const visit = async item => {
+      if (item instanceof Blob) return {blob:await visit(new Uint8Array(await item.arrayBuffer())),
+        type:item.type,name:item.name,lastModified:item.lastModified};
+      if (item instanceof ArrayBuffer) item = new Uint8Array(item);
+      if (item instanceof Uint8Array) return {bytes:Array.from(item)};
+      if (Array.isArray(item)) return Promise.all(item.map(visit));
+      if (item && typeof item === 'object') {
+        const entries = [];
+        for (const key of Object.keys(item).sort()) entries.push([key,await visit(item[key])]);
+        return Object.fromEntries(entries);
       }
-    } catch (_) { /* Cleanup cannot block the active workspace. */ }
-    finally { db?.close(); }
+      return item;
+    };
+    return address(JSON.stringify(await visit(value)));
+  }
+  async function migrateDeviceSources(options) {
+    const migrate = () => migrateDeviceSourcesUnlocked(options);
+    try {
+      if (root.navigator?.locks?.request) await root.navigator.locks.request('dmate-offline-device-migration-v1',migrate);
+      else await migrate();
+    } catch (cause) {
+      if (cause?.code === 'CLOSED') throw cause;
+      options.warnings.push(cause?.code || 'STORAGE_FAILED');
+    }
+  }
+  async function migrateDeviceSourcesUnlocked({read,list,commit,check,legacy,warnings}) {
+    const local = Object.fromEntries(await Promise.all(STORES.map(async store => [store,new Map((await list(store)).map(row => [row.id,row]))])));
+    const identity = async (store,row) => root.DMateOfflineBackup?.contentFingerprint
+      && ['notes','mistakes','drawings'].includes(store)
+      ? root.DMateOfflineBackup.contentFingerprint(store,row)
+      : migrationFingerprint({...row,id:undefined});
+    const byContent = {notes:new Set(),mistakes:new Set(),drawings:new Set()};
+    for (const store of ['notes','mistakes']) {
+      const metadata = local.settings.get(store === 'notes' ? 'notebook-deletions' : 'mistake-deletions');
+      for (const row of local[store].values()) if (!metadata?.deleted?.[row.id]
+        || time(metadata.deleted[row.id]) < time(row.updatedAt)) byContent[store].add(await identity(store,row));
+    }
+    // Establish the absent/present revision before planning a possible write.
+    const currentGallery = await read('drawings','gallery');
+    if (currentGallery) local.drawings.set('gallery',currentGallery);
+    let gallery = currentGallery?.gallery ? JSON.parse(currentGallery.gallery) : null;
+    for (const page of gallery?.pages || []) byContent.drawings.add(await identity('drawings',page));
+    const copyRow = async (store,row,source,revision) => {
+      check();
+      if (!row || typeof row.id !== 'string') throw error('STORAGE_FAILED');
+      if (store === 'notes' && (typeof row.title !== 'string' || typeof row.content !== 'string')
+        || store === 'mistakes' && typeof row.statement !== 'string') throw error('STORAGE_FAILED');
+      const markerId = 'device-migration:' + await address(source+'|'+store);
+      const marker = await read('settings',markerId) || {id:markerId,records:{}};
+      const sourceId = await address(row.id), signature = String(revision);
+      if (marker.records?.[sourceId] === signature) return;
+      const operations = [];
+      if (store === 'drawings') {
+        if (row.id !== 'gallery' || typeof row.gallery !== 'string') throw error('STORAGE_FAILED');
+        const incoming = JSON.parse(row.gallery);
+        if (![1,2].includes(incoming?.version) || !Array.isArray(incoming.pages)) throw error('STORAGE_FAILED');
+        const pages = gallery?.pages?.slice() || [], ids = new Set(pages.map(page => page.id));
+        let changed = false;
+        for (const page of incoming.pages) {
+          if (typeof page?.id !== 'string' || !Array.isArray(page.document?.graphs) || !page.document.graphs.length
+            || page.document.graphs.some(graph => !Array.isArray(graph?.vertices) || !Array.isArray(graph?.edges))) throw error('STORAGE_FAILED');
+          const hash = await identity('drawings',page);
+          if (byContent.drawings.has(hash)) continue;
+          let id = page.id;
+          if (ids.has(id)) id = 'migrated-' + await migrationFingerprint({source,original:page.id,revision});
+          pages.push({...page,id}); ids.add(id); byContent.drawings.add(hash); changed = true;
+        }
+        if (pages.reduce((count,page) => count+page.document.graphs.length,0) > 50) throw error('TOO_LARGE');
+        if (changed) {
+          gallery = {...incoming,...gallery,pages};
+          const value = {id:'gallery',gallery:JSON.stringify(gallery),updatedAt:Date.now()};
+          operations.push({type:'put',store,expectAbsent:!local.drawings.has('gallery'),value}); local.drawings.set('gallery',value);
+        }
+      } else if (store === 'settings') {
+        // Deletion metadata belongs to its old partition; importing it could
+        // hide an unrelated record brought from another old workspace.
+        if (!['notebook-deletions','mistake-deletions'].includes(row.id)
+          && !row.id.startsWith('vault-migrated:') && !row.id.startsWith('device-migration:')) {
+          const id = row.id === 'view' ? 'view:'+root.name : row.id;
+          if (!local.settings.has(id)) {
+            const concurrent = await read(store,id);
+            if (!concurrent) {
+              const value = {...row,id}; operations.push({type:'put',store,expectAbsent:true,value}); local.settings.set(id,value);
+            } else local.settings.set(id,concurrent);
+          }
+        }
+      } else {
+        const hash = await identity(store,row);
+        if (!byContent[store]?.has(hash)) {
+          const metadata = local.settings.get(store === 'notes' ? 'notebook-deletions' : 'mistake-deletions');
+          let id = row.id;
+          if (local[store].has(id) || metadata?.deleted?.[id]) id = 'migrated-' + await migrationFingerprint({source,store,id,revision});
+          while (metadata?.deleted?.[id] || local[store].has(id) && !await equal(local[store].get(id),{...row,id}))
+            id = 'migrated-' + await migrationFingerprint({source,store,previous:id,revision,
+              deletedAt:metadata?.deleted?.[id] || null,local:local[store].get(id) || null});
+          const value = {...row,id};
+          const concurrent = await read(store,id);
+          if (concurrent && !await equal(concurrent,value)) throw error('CONFLICT');
+          if (!concurrent) operations.push({type:'put',store,expectAbsent:true,value});
+          local[store].set(id,value); byContent[store]?.add(hash);
+        }
+      }
+      operations.push({type:'put',store:'settings',value:{...marker,records:{...marker.records,[sourceId]:signature}}});
+      await commit(operations);
+    };
+    const migrateEncrypted = async () => {
+      for (const name of await storedVaultNames()) {
+        if (!/^(?:account|guest)-[a-f0-9]{32}$/.test(name)) continue;
+        let source;
+        try {
+          source = await root.DMateOfflineVault.open({name});
+          const snapshots = Object.fromEntries(await Promise.all(STORES.map(async store => [store,await source.list(store)])));
+          const metadata = new Map(snapshots.settings.map(saved => [saved.value?.row?.id,saved.value?.row]));
+          for (const store of STORES) for (const saved of snapshots[store]) {
+            const row = saved.value?.row;
+            if (!row || typeof row.id !== 'string'
+              || store === 'notes' && (typeof row.title !== 'string' || typeof row.content !== 'string')
+              || store === 'mistakes' && typeof row.statement !== 'string') {
+              warnings.push('STORAGE_FAILED'); continue;
+            }
+            const deleted = metadata.get(store === 'notes' ? 'notebook-deletions' : 'mistake-deletions')?.deleted?.[row.id];
+            if (['notes','mistakes'].includes(store) && deleted && time(deleted) >= time(row.updatedAt)) continue;
+            await copyRow(store,row,name,saved.revision);
+          }
+        } catch (cause) {
+          if (cause?.code === 'CLOSED') throw cause;
+          warnings.push(cause?.code || 'STORAGE_FAILED');
+          if (['QUOTA_EXCEEDED','TOO_LARGE','CONFLICT'].includes(cause?.code)) return;
+        } finally { source?.close(); }
+      }
+      // Older plaintext adapters are copied and verified before their source is
+      // removed. The encrypted source vaults above always remain untouched.
+      const legacySettings = await legacyOperation(legacy,'settings','readonly',(tx,done) => {
+        const request = tx.objectStore('settings').getAll(); request.onsuccess = () => done(new Map(request.result.map(row => [row.id,row])));
+      });
+      for (const store of STORES.slice(0,4)) {
+        const rows = await legacyOperation(legacy,store,'readonly',(tx,done) => {
+          const request = tx.objectStore(store).getAll(); request.onsuccess = () => done(request.result);
+        });
+        for (const original of rows) {
+          if (typeof original?.id !== 'string' || original.id.startsWith('vault-migrated:')) continue;
+          if (store === 'notes' && (typeof original.title !== 'string' || typeof original.content !== 'string')
+            || store === 'mistakes' && typeof original.statement !== 'string') {
+            warnings.push('STORAGE_FAILED'); continue;
+          }
+          const split = original.id.lastIndexOf('::');
+          let id = original.id;
+          try { if (split >= 0 && decodeURIComponent(original.id.slice(split+2)).startsWith('account:')) id = original.id.slice(0,split); }
+          catch (_) { /* An unscoped ID is itself user data. */ }
+          const suffix = original.id.slice(id.length);
+          const metadataId = store === 'notes' ? 'notebook-deletions' : 'mistake-deletions';
+          const deleted = legacySettings.get(metadataId+suffix)?.deleted?.[id];
+          if (['notes','mistakes'].includes(store) && deleted && time(deleted) >= time(original.updatedAt)) continue;
+          // Keep source tombstones alongside any skipped legacy ghosts; they
+          // must not be applied to another partition or removed before it.
+          if (store === 'settings' && ['notebook-deletions','mistake-deletions'].includes(id)) continue;
+          await copyRow(store,{...original,id},'legacy:'+original.id,await migrationFingerprint(original));
+          await legacyOperation(legacy,store,'readwrite',tx => {
+            const source = tx.objectStore(store), request = source.get(original.id);
+            request.onsuccess = () => { if (sameShape(request.result,original)) source.delete(original.id); };
+          });
+        }
+      }
+      for (const key of Object.keys(root.localStorage)) {
+        if (key.startsWith('dmate:offline:drawing-gallery:v1')) {
+          const value = root.localStorage.getItem(key);
+          await copyRow('drawings',{id:'gallery',gallery:value},'legacy:'+key,await address(value));
+          if (root.localStorage.getItem(key) === value) root.localStorage.removeItem(key);
+        } else if (key.startsWith('dmate:offline:appearance:v1')) {
+          const value = root.localStorage.getItem(key);
+          await copyRow('settings',{id:'appearance',settings:JSON.parse(value)},'legacy:'+key,await address(value));
+          if (root.localStorage.getItem(key) === value) root.localStorage.removeItem(key);
+        }
+      }
+      for (const store of STORES.slice(0,4)) {
+        const rows = root.DMateGuestSession?.read('offline-'+store);
+        if (!rows || typeof rows !== 'object') continue;
+        for (const row of Object.values(rows)) if (typeof row?.id === 'string')
+          await copyRow(store,row,'legacy-guest:'+store,await migrationFingerprint(row));
+        if (sameShape(root.DMateGuestSession.read('offline-'+store),rows)) root.DMateGuestSession.remove('offline-'+store);
+      }
+    };
+    await migrateEncrypted();
   }
   async function open(options = {}) {
-    const owner = options.owner;
+    const device = options.scope === 'device';
+    const owner = device ? DEVICE_OWNER : options.owner;
     if (typeof owner !== 'string' || typeof options.isCurrent !== 'function') throw error('INVALID_ARGUMENT');
     let closed = false, vault, legacy, destruction, releaseLease = () => {}, tail = Promise.resolve();
+    const migrationWarnings = [];
     const revisions = new Map();
-    const live = () => !closed && options.isCurrent() && (!root.DMateGuestSession || root.DMateGuestSession.getOwner() === owner);
+    const live = () => !closed && options.isCurrent()
+      && (device || !root.DMateGuestSession || root.DMateGuestSession.getOwner() === owner);
     const check = () => { if (!live()) throw error('CLOSED'); };
     const key = (store, id) => store + '\0' + id;
     const run = action => {
@@ -167,7 +334,8 @@
     check();
     let name;
     try {
-      if (owner) name = await accountName(owner, live);
+      if (device) name = DEVICE_VAULT;
+      else if (owner) name = await accountName(owner, live);
       else {
         const ref = root.DMateGuestSession?.read(REF);
         name = /^guest-[a-f0-9]{32}$/.test(ref?.name || '') ? ref.name : 'guest-' + random();
@@ -176,7 +344,8 @@
       }
       check();
       vault = await root.DMateOfflineVault.open({name}); check();
-      void collectGuests(owner ? root.DMateGuestSession?.read(REF)?.name : name);
+      // Offline guest vaults from older versions are migration sources. Keep
+      // them until their contents have been copied into device persistence.
       const read = async (store, id) => {
         if (!STORES.includes(store)) throw error('INVALID_ARGUMENT');
         const saved = await vault.read(store, await address(id)); check();
@@ -202,6 +371,7 @@
           const id = String(op.id ?? op.value?.id ?? '');
           if (!id || !STORES.includes(op.store) || !['put', 'delete'].includes(op.type)) throw error('INVALID_ARGUMENT');
           if (!revisions.has(key(op.store, id))) await read(op.store, id);
+          if (op.expectAbsent && revisions.get(key(op.store,id)) !== null) throw error('CONFLICT');
           prepared.push({type:op.type, collection:op.store, id:await address(id),
             expectedRevision:revisions.get(key(op.store, id)), ...(op.type === 'put' ? {value:{owner, row:clone({...op.value, id})}} : {}), logicalId:id});
         }
@@ -274,7 +444,9 @@
       legacy = await legacyDatabase(); check();
       const suffix = '::' + encodeURIComponent('account:' + owner);
       const sources = [], privateSections = ['offline-mistakes', 'offline-notes', 'offline-practice', 'offline-settings'];
-      if (owner) {
+      if (device) {
+        await migrateDeviceSources({read,list,commit,check,legacy,warnings:migrationWarnings});
+      } else if (owner) {
         for (const store of STORES.slice(0, 4)) {
           const rows = await legacyOperation(legacy, store, 'readonly', (tx, done) => {
             const request = tx.objectStore(store).getAll(); request.onsuccess = () => done(request.result);
@@ -340,6 +512,7 @@
       for (const store of STORES) await list(store);
       check();
       return Object.freeze({
+        migrationWarnings:Object.freeze(migrationWarnings.slice()),
         get:(store, id) => run(() => read(store, String(id))),
         all:store => run(() => list(store)),
         put:(store, row) => { const value = clone(row); return run(() => commit([{type:'put', store, value}])); },
@@ -347,7 +520,7 @@
         batch:operations => { const copy = clone(operations); return run(() => commit(copy)); },
         close() { if (closed) return; closed = true; releaseLease(); vault.close(); revisions.clear(); },
         destroyGuest() {
-          if (owner) return Promise.reject(error('INVALID_ARGUMENT'));
+          if (device || owner) return Promise.reject(error('INVALID_ARGUMENT'));
           if (!destruction) destruction = (async () => {
             if (closed) {
               const retained = await root.DMateOfflineVault.open({name}); await retained.destroy();

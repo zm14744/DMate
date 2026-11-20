@@ -192,13 +192,17 @@ async function run(browser,width,theme) {
     const reference=await onlineStyles(page,theme);
     await page.evaluate(async()=>{await navigator.serviceWorker.register('/offline-service-worker.js',{scope:'/'});await navigator.serviceWorker.ready;});
     await page.goto(baseURL+'/offline',{waitUntil:'networkidle'});await ready(page);await page.waitForFunction(()=>navigator.serviceWorker.controller);
+    // Local appearance is a device preference, independent of the online
+    // account. Give this visual comparison fixture its matching local theme.
+    await page.evaluate(theme=>__offlineTestStore.put('settings',{id:'appearance',settings:{mode:theme},updatedAt:Date.now()}),theme);
     page.on('requestfailed',request=>failures.push(request.url()));
     await context.setOffline(true);workerProtocol=await disconnectWorker(browser,page);
     await page.reload({waitUntil:'networkidle'});await ready(page);assert.equal(await page.evaluate(()=>navigator.onLine),false);
     await exercise(page,reference,width);
+    const savedMistakes=await records(page,'mistakes'),savedNotes=await records(page,'notes');
     const fresh=await context.newPage();await fresh.goto(baseURL+'/offline',{waitUntil:'networkidle'});await ready(fresh);
-    assert.deepEqual(await records(fresh,'mistakes'),[],'An ordinary new guest tab never inherits private wrong questions');
-    assert.deepEqual(await records(fresh,'notes'),[],'An ordinary new guest tab never inherits private notes');await fresh.close();
+    assert.deepEqual(await records(fresh,'mistakes'),savedMistakes,'A new tab opens the same device-local wrong questions');
+    assert.deepEqual(await records(fresh,'notes'),savedNotes,'A new tab opens the same device-local concepts');await fresh.close();
     assert.deepEqual(errors,[]);assert.deepEqual(apiRequests,[],'Local record actions make no online AI, OCR or study API calls');
     assert.deepEqual(failures,[],'The restored pages and their resources are fully cached');
     console.log('PASS '+width+'/'+theme+': simplified wrong-book actions, shared concept labels and online controls, saved wrong-question records and true offline persistence');
@@ -213,39 +217,58 @@ async function recordRaces(browser){
     route=>{calls.push(new URL(route.request().url()).pathname);return route.abort();});
   try{
     await page.goto(baseURL+'/offline',{waitUntil:'networkidle'});await ready(page);
-    await Promise.all([page.waitForNavigation({waitUntil:'networkidle'}),page.evaluate(()=>{
+    let navigations=0;
+    page.on('framenavigated',frame=>{if(frame===page.mainFrame())navigations++;});
+    await page.evaluate(()=>{
+      window.__deviceDocumentProbe=crypto.randomUUID();window.__deviceOriginalStore=__offlineTestStore;
+      DMateGuestSession.setAccountOwner('race-owner-a');
       window.dispatchEvent(new CustomEvent('dmate:account-state',{detail:{authenticated:true,username:'race-owner-a'}}));
-    })]);
-    await ready(page);await navigate(page,'notes');
-    await page.locator('#addNote').click();await page.locator('.dcn-title').fill('Private A concept');
+    });
+    const documentProbe=await page.evaluate(()=>__deviceDocumentProbe);
+    await navigate(page,'notes');
+    await page.locator('#addNote').click();await page.locator('.dcn-title').fill('Local device concept');
     await page.locator('.dcn-original').fill('A initial note');
     await page.waitForFunction(async()=>(await __offlineTestStore.all('notes')).some(row=>row.content==='A initial note'));
     await page.evaluate(()=>{window.__holdNextOfflineNoteSave=true;});
     await page.locator('.dcn-original').fill('A first held save');
     await page.waitForFunction(()=>typeof __releaseOfflineNoteSave==='function');
-    await page.locator('.dcn-original').fill('A PRIVATE QUEUED SAVE');
-    await Promise.all([page.waitForNavigation({waitUntil:'networkidle'}),page.evaluate(()=>{
+    const queued='LATEST DEVICE NOTE AFTER ACCOUNT CHANGE';
+    await page.locator('.dcn-original').fill(queued);
+    await page.evaluate(()=>{
       DMateGuestSession.setAccountOwner('race-owner-b');__releaseOfflineNoteSave();
       window.dispatchEvent(new CustomEvent('dmate:account-state',{detail:{authenticated:true,username:'race-owner-b'}}));
-    })]);await ready(page);
+    });
+    await page.waitForFunction(async content=>(await __offlineTestStore.all('notes')).some(row=>row.content===content),queued);
     assert.equal(await page.evaluate(()=>DMateGuestSession.getOwner()),'race-owner-b');
-    assert.deepEqual(await records(page,'notes'),[],'A delayed notebook save cannot write into a new owner');
-    await navigate(page,'notes');assert.equal(await page.locator('.dcn-note').count(),0,'The new account sees no previous private concepts');
-    await Promise.all([page.waitForNavigation({waitUntil:'networkidle'}),page.evaluate(()=>{
+    assert.equal(await page.evaluate(()=>__deviceOriginalStore===__offlineTestStore),true,'Changing the online account keeps the current device storage handle');
+    assert.equal(await page.locator('.dcn-original').inputValue(),queued,'The active editor and queued draft remain intact after A to B');
+    await page.evaluate(()=>{
+      DMateGuestSession.setAccountOwner('race-owner-a');
       window.dispatchEvent(new CustomEvent('dmate:account-state',{detail:{authenticated:true,username:'race-owner-a'}}));
-    })]);
-    await ready(page);
+    });
+    await settle(page);
     const saved=await records(page,'notes');
-    assert.ok(saved.some(row=>row.content==='A first held save'),'The authorized first save remains with account A');
-    assert.ok(!saved.some(row=>row.content==='A PRIVATE QUEUED SAVE'),'The cancelled queued edit is never persisted into either workspace');
+    assert.equal(saved.length,1,'Changing online accounts does not duplicate or partition the device note');
+    assert.equal(saved[0].content,queued,'The queued latest save finishes against the same local record across A/B/A');
+    assert.equal(await page.evaluate(()=>__deviceDocumentProbe),documentProbe,'Account events do not reload the active local document');
+    assert.equal(navigations,0,'Account events cause no local workspace navigation');
+    const fresh=await context.newPage();await fresh.goto(baseURL+'/offline',{waitUntil:'networkidle'});await ready(fresh);
+    assert.deepEqual(await records(fresh,'notes'),saved,'Another tab opens the same finished device note');
+    await fresh.close();
+    const afterClose='DEVICE NOTE REMAINS EDITABLE AFTER SECOND TAB CLOSES';
+    await page.locator('.dcn-original').fill(afterClose);
+    await page.waitForFunction(async content=>(await __offlineTestStore.all('notes')).some(row=>row.content===content),afterClose);
+    assert.equal(await page.evaluate(()=>__deviceDocumentProbe),documentProbe);
     assert.deepEqual(errors,[]);assert.deepEqual(calls,[]);
-    console.log('PASS delayed encrypted notebook saves retain their original owner after account changes');
+    console.log('PASS delayed encrypted notebook saves and the active editor survive online account A/B/A changes and shared-tab reopening');
   }finally{await context.close();}
 }
 (async()=>{
   const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.CHROMIUM_EXECUTABLE_PATH}:{})});
   try{
-    if(process.env.DMATE_TEST_RECORDS_ONLY!=='races')for(const [width,theme]of [[1440,'light'],[390,'dark'],[1440,'navy']])await run(browser,width,theme);
+    const themes=(process.env.DMATE_TEST_THEMES||'light,dark,navy').split(',');
+    if(process.env.DMATE_TEST_RECORDS_ONLY!=='races')for(const [width,theme]of [[1440,'light'],[390,'dark'],[1440,'navy']])
+      if(themes.includes(theme))await run(browser,width,theme);
     await recordRaces(browser);
   }
   finally{await browser.close();}

@@ -1,4 +1,4 @@
-/* Personal offline pages restore only their owner's records; no model API runs. */
+/* Offline pages retain this device's records independently of online identity. */
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
@@ -65,7 +65,7 @@ async function readState(page) {
       } catch(error) { reject(error); } finally { db.close(); }
     };
   }),{dbName,journalKey});
-  state.vault = {notes:await vaultRecords(page,'notes'),mistakes:await vaultRecords(page,'mistakes')};
+  state.vault = {notes:await vaultRecords(page,'notes'),mistakes:await vaultRecords(page,'mistakes'),practice:await vaultRecords(page,'practice')};
   return state;
 }
 async function migration(browser, legacy) {
@@ -112,41 +112,45 @@ async function migration(browser, legacy) {
     const note = id => state.vault.notes.find(row=>row.id===id);
     const mistake = id => state.vault.mistakes.find(row=>row.id===id);
     assert.equal(note('local-note').content,legacy?'Newest local note':'Older incoming text');
-    assert.equal(note('updated-note').content,'New online content');
+    assert.equal(note('updated-note').content,legacy?'Previous text':'New online content','Migration never replaces an existing device concept with a different payload');
+    assert.ok(state.vault.notes.some(row=>row.content==='New online content'),'The different incoming concept is retained alongside the local original');
     assert.equal(mistake('local-mistake').statement,legacy?'Newest local question':'Older incoming question');
-    assert.equal(mistake('updated-mistake').statement,'Updated online question');
-    assert.equal(mistake('updated-mistake').answer,'Updated answer');
-    assert.equal(mistake('updated-mistake').explanation,'Saved explanation');
-    assert.equal(mistake('updated-mistake').status,'resolved');
-    assert.equal(time(mistake('updated-mistake').createdAt),legacy?1000:5000,'Import keeps the original capture date');
-    assert.equal(state.records.notes.some(row=>row.id.endsWith(suffix(ownerA))),false,
-      'Verified encrypted migration removes only this owner’s old note sources');
-    assert.equal(state.records.mistakes.some(row=>row.id.endsWith(suffix(ownerA))),false);
+    assert.equal(mistake('updated-mistake').statement,legacy?'Old question':'Updated online question');
+    const importedMistake=state.vault.mistakes.find(row=>row.statement==='Updated online question');
+    assert.equal(importedMistake.answer,'Updated answer');
+    assert.equal(importedMistake.explanation,'Saved explanation');
+    assert.equal(importedMistake.status,'resolved');
+    if(legacy)assert.equal(time(mistake('updated-mistake').createdAt),1000,'The local mistake keeps its original capture date');
+    assert.ok(time(importedMistake.createdAt)>0,'A newly restored mistake has a usable local display date');
+    assert.deepEqual(state.records.notes,[],'Verified device migration removes old plaintext note sources after copying them into ciphertext');
+    assert.deepEqual(state.records.mistakes,[],'Verified device migration removes old plaintext mistake sources after copying them into ciphertext');
     if (legacy) {
-      assert.equal(note('deleted-note'),undefined);assert.equal(mistake('deleted-mistake'),undefined);
       assert.equal(note('updated-note').custom,oldNote.custom);assert.equal(mistake('updated-mistake').custom,oldMistake.custom);
-      assert.deepEqual(state.records.notes.find(row=>row.id===globalNote.id),globalNote);
-      assert.deepEqual(state.records.mistakes.find(row=>row.id===globalMistake.id),globalMistake);
-      assert.deepEqual(state.records.notes.find(row=>row.id===otherNote.id),otherNote);
-      assert.deepEqual(state.records.mistakes.find(row=>row.id===otherMistake.id),otherMistake);
-      assert.deepEqual(state.records.practice,records.practice);
+      assert.ok(state.vault.notes.some(row=>row.content===globalNote.content),'Unpartitioned legacy notes already on this device remain available');
+      assert.ok(state.vault.mistakes.some(row=>row.statement===globalMistake.statement),'Unpartitioned legacy mistakes already on this device remain available');
+      assert.ok(state.vault.notes.some(row=>row.content===otherNote.content),'Notes saved under another old online account join the same device workspace');
+      assert.ok(state.vault.mistakes.some(row=>row.statement===otherMistake.statement),'Mistakes saved under another old online account join the same device workspace');
+      assert.deepEqual(state.vault.practice.find(row=>row.id==='legacy-practice'),records.practice[0]);
+      assert.deepEqual(state.records.practice,[],'Practice records are encrypted before removing their old plaintext copies');
     }
     await page.locator('.offline-nav-item[data-panel="notes"]').click();
     await page.locator('#notesPanel .dcn-note-open').first().waitFor({state:'visible'});
-    assert.ok(!(await page.locator('#notesPanel').textContent()).includes('PRIVATE'));
-    assert.equal(await page.locator('#notesPanel [data-note-id="unknown-note"]').count(),0);
+    if(legacy)assert.equal(await page.locator('#notesPanel [data-note-id="unknown-note"]').count(),1,'The shared device UI includes its unpartitioned legacy note');
     await page.locator('.offline-nav-item[data-panel="mistakes"]').click();
     await page.locator('#mistakeList [data-record-id]').first().waitFor({state:'visible'});
-    assert.ok(!(await page.locator('#mistakesPanel').textContent()).includes('PRIVATE'));
-    assert.equal(await page.locator('#mistakeList [data-record-id="unknown-mistake"]').count(),0);
-    assert.ok(!(await page.locator('#mistakeList').textContent()).includes('Other owner question'));
+    if(legacy) {
+      assert.equal(await page.locator('#mistakeList [data-record-id="unknown-mistake"]').count(),1);
+      assert.ok((await page.locator('#mistakeList').textContent()).includes('Other owner question'),'The same device retains mistakes from old account partitions');
+    }
     assert.equal(await page.locator('#mistakeList .wrong-status,#mistakeList .wrong-analysis-details,#mistakeList [data-action="edit-mistake"],#addMistake,#recordDialog').count(),0,
       'Stored correction and explanation data do not recreate removed offline controls');
     assert.equal(await page.locator('#mistakeList [data-action="delete-mistake"] svg').count(),0);
     assert.ok((await page.locator('#mistakeList .wrong-date').count())>0,'Original capture dates remain visible');
     const savedGallery = (await vaultRow(page,'drawings','gallery')).gallery;
     const gallery = typeof savedGallery === 'string' ? JSON.parse(savedGallery) : savedGallery;
-    assert.deepEqual(gallery.pages.map(row=>row.id),['shared','incoming-only']);
+    assert.equal(gallery.pages.length,legacy?3:2,'Different incoming drawings are appended without replacing a local page with the same ID');
+    assert.ok(gallery.pages.some(row=>row.name==='Incoming duplicate'));
+    assert.ok(gallery.pages.some(row=>row.id==='incoming-only'));
     if (legacy) { assert.equal(gallery.pages[0].name,'Existing drawing');assert.equal(gallery.activeId,'shared');assert.deepEqual(gallery.custom,localGallery.custom); }
     assert.equal(await page.evaluate(key=>localStorage.getItem(key),'dmate:offline:drawing-gallery:v1'+suffix(ownerA)),null,
       'The migrated gallery no longer has a plaintext offline localStorage copy');
@@ -155,14 +159,18 @@ async function migration(browser, legacy) {
     assert.equal(state.vault.notes.filter(row=>row.id==='local-note').length,1,'Re-entry does not duplicate notes');
     assert.equal(state.vault.mistakes.filter(row=>row.id==='local-mistake').length,1,'Re-entry does not duplicate mistakes');
     if (legacy) {
+      const beforeLogin = {notes:state.vault.notes,mistakes:state.vault.mistakes};
       await page.evaluate(owner=>DMateGuestSession.setAccountOwner(owner),ownerB);await page.reload();await ready(page);
       await page.locator('.offline-nav-item[data-panel="notes"]').click();
       await page.locator('#notesPanel .dcn-note-open').filter({hasText:'PRIVATE OTHER ACCOUNT NOTE'}).waitFor({state:'visible'});
       assert.ok((await page.locator('#notesPanel').textContent()).includes('PRIVATE OTHER ACCOUNT NOTE'));
-      assert.ok(!(await page.locator('#notesPanel').textContent()).includes('Newest local note'));
+      assert.ok((await page.locator('#notesPanel').textContent()).includes('Local title'));
+      const afterLogin = await readState(page);
+      assert.deepEqual(afterLogin.vault.notes,beforeLogin.notes,'Changing the online account does not replace migrated device concepts');
+      assert.deepEqual(afterLogin.vault.mistakes,beforeLogin.mistakes,'Changing the online account does not replace migrated device mistakes');
     }
     assert.deepEqual(errors,[]);assert.deepEqual(forbidden,[]);
-    console.log('PASS '+(legacy?'legacy v2 upgrade':'fresh v2 upgrade')+': scoped records, local edits, tombstones, immutable dates and original drawing migration');
+    console.log('PASS '+(legacy?'legacy v2 upgrade':'fresh v2 upgrade')+': device records, retained local edits, plaintext cleanup, immutable dates and original drawing migration');
   } finally { await context.close(); }
 }
 async function guestMigration(browser) {
@@ -182,10 +190,10 @@ async function guestMigration(browser) {
     await page.reload();await ready(page);
     assert.equal((await vaultRecords(page,'notes')).length,1);
     const fresh=await context.newPage();await fresh.goto(baseURL+'/offline');await ready(fresh);
-    assert.deepEqual(await vaultRecords(fresh,'notes'),[]);
-    assert.deepEqual(await vaultRecords(fresh,'mistakes'),[]);
+    assert.deepEqual(await vaultRecords(fresh,'notes'),await vaultRecords(page,'notes'),'A fresh unsigned-in tab opens the same persistent device concepts');
+    assert.deepEqual(await vaultRecords(fresh,'mistakes'),await vaultRecords(page,'mistakes'),'A fresh unsigned-in tab opens the same persistent device mistakes');
     assert.equal(await page.evaluate(()=>[...Object.values(localStorage),...Object.values(sessionStorage)].some(value=>value.includes('Temporary text')||value.includes('Temporary question'))),false);
-    console.log('PASS guest records: current-tab import and refresh, empty new tab, no permanent personal records');
+    console.log('PASS unsigned-in device records: legacy import, refresh and new-tab persistence without plaintext copies');
   } finally { await context.close(); }
 }
 async function bridge(browser) {
@@ -228,24 +236,19 @@ async function entry(browser,kind) {
       if(key==='discrete_math_ai_learning_v1')throw new Error('Fallback must not read unverified old learning caches');
       return get.call(this,key);
     };
-    if(kind==='bridge')window.DMateOfflineBridge={snapshot:async()=>({username,drawings:gallery.pages,notes,wrongQuestions})};
+    if(kind==='bridge')window.DMateOfflineBridge={snapshot:async()=>{
+      sessionStorage.setItem('__unexpectedOnlineSnapshot','called');
+      return {username,drawings:gallery.pages,notes,wrongQuestions};
+    }};
   },{kind,username,gallery,notes,wrongQuestions});
   const page=await context.newPage();
   try {
     await page.goto(baseURL+'/__offline-entry-test');await page.locator('#offlineWorkspaceBtn').click();
-    if(kind==='bridge') {
-      await page.waitForURL(baseURL+'/offline');
-      const payload=await page.evaluate(()=>DMateOfflineHandoff.read(DMateOfflineHandoff.pendingToken()));
-      assert.deepEqual(Object.keys(payload).sort(),['appearance','drawings','notes','username','wrongQuestions']);
-      assert.equal(payload.username,username);assert.deepEqual(payload.notes,notes);assert.deepEqual(payload.wrongQuestions,wrongQuestions);
-      assert.deepEqual(JSON.parse(payload.drawings).pages,gallery.pages);
-      assert.equal(await page.evaluate(key=>sessionStorage.getItem(key),migrationKey),null,'New navigation never writes the old plaintext payload');
-    } else {
-      await page.waitForFunction(()=>!document.getElementById('offlineWorkspaceBtn').disabled);
-      assert.equal(new URL(page.url()).pathname,'/__offline-entry-test','A missing bridge preserves this page instead of reading old plaintext caches');
-      assert.equal(await page.evaluate(()=>DMateOfflineHandoff.pendingToken()),null);
-    }
-    console.log('PASS entry '+kind+': encrypted current-memory handoff or recoverable missing bridge');
+    await page.waitForURL(baseURL+'/offline');
+    assert.equal(await page.evaluate(()=>DMateOfflineHandoff.pendingToken()),null,'Opening offline mode never stages new online account records');
+    assert.equal(await page.evaluate(()=>sessionStorage.getItem('__unexpectedOnlineSnapshot')),null,'Offline entry does not snapshot online study records');
+    assert.equal(await page.evaluate(key=>sessionStorage.getItem(key),migrationKey),null,'New navigation never writes the old plaintext payload');
+    console.log('PASS entry '+kind+': direct account-independent device navigation without online data injection');
   } finally { await context.close(); }
 }
 async function blockedUpgrade(browser) {

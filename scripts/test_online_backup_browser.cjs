@@ -63,6 +63,8 @@ async function run(browser,width) {
     assert.equal(exported.statement,wrong.question);
     assert.equal(exported.answer,wrong.referenceAnswer.text);
     assert.equal(exported.explanation,wrong.analysis);
+    assert.equal(Object.hasOwn(exported,'createdAt'),false,'Online ZIPs omit wrong-question creation times');
+    assert.equal(Object.hasOwn(exported,'updatedAt'),false,'Online ZIPs omit wrong-question update times');
     assert.deepEqual(exported.referenceAnswer,wrong.referenceAnswer);
     assert.deepEqual(exported.recognitionSnapshot,wrong.recognitionSnapshot);
     assert.deepEqual(standard.drawings,gallery,'The complete editable gallery is included');
@@ -70,6 +72,11 @@ async function run(browser,width) {
     const restored = await page.evaluate(async bytes => DMateOfflineBackup.read(new Uint8Array(bytes)),[...bytes]);
     assert.deepEqual(restored.notes,[note]);
     assert.equal(restored.mistakes[0].answer,wrong.referenceAnswer.text);
+    assert.equal(Object.hasOwn(restored.mistakes[0],'createdAt'),false);
+    assert.equal(Object.hasOwn(restored.mistakes[0],'updatedAt'),false);
+    assert.deepEqual(await page.evaluate(() => ({createdAt:learningState.wrongQuestions[0].createdAt,
+      updatedAt:learningState.wrongQuestions[0].updatedAt})),{createdAt:wrong.createdAt,updatedAt:wrong.updatedAt},
+      'Time-free exports retain the source learning record unchanged');
     assert.deepEqual(restored.drawings,gallery,'The ZIP is readable by offline mode without conversion');
     await page.waitForFunction(() => !document.getElementById('exportDataBtn').disabled);
     console.log('PASS online '+width+': real study ZIP includes notes, full answers and editable drawings without unrelated records');

@@ -51,6 +51,7 @@ on:
       - 'scripts/test_offline_appearance_browser.cjs'
       - 'scripts/test_offline_data_migration_browser.cjs'
       - 'scripts/test_offline_storage_browser.cjs'
+      - 'scripts/test_offline_device_storage_browser.cjs'
       - 'scripts/test_offline_handoff_browser.cjs'
       - 'scripts/test_offline_vault_workspace_browser.cjs'
       - 'scripts/test_offline_interface_lifecycle_browser.cjs'
@@ -149,6 +150,7 @@ on:
       - 'scripts/test_offline_appearance_browser.cjs'
       - 'scripts/test_offline_data_migration_browser.cjs'
       - 'scripts/test_offline_storage_browser.cjs'
+      - 'scripts/test_offline_device_storage_browser.cjs'
       - 'scripts/test_offline_handoff_browser.cjs'
       - 'scripts/test_offline_vault_workspace_browser.cjs'
       - 'scripts/test_offline_interface_lifecycle_browser.cjs'
@@ -267,6 +269,7 @@ jobs:
           node --check scripts/test_offline_appearance_browser.cjs
           node --check scripts/test_offline_data_migration_browser.cjs
           node --check scripts/test_offline_storage_browser.cjs
+          node --check scripts/test_offline_device_storage_browser.cjs
           node --check scripts/test_offline_handoff_browser.cjs
           node --check scripts/test_offline_vault_workspace_browser.cjs
           node --check scripts/test_offline_interface_lifecycle_browser.cjs
@@ -402,6 +405,7 @@ jobs:
           node scripts/test_offline_appearance_browser.cjs
           node scripts/test_offline_data_migration_browser.cjs
           node scripts/test_offline_storage_browser.cjs
+          node scripts/test_offline_device_storage_browser.cjs
           node scripts/test_offline_handoff_browser.cjs
           node scripts/test_offline_vault_workspace_browser.cjs
           node scripts/test_offline_interface_lifecycle_browser.cjs

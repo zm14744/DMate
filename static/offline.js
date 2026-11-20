@@ -67,7 +67,7 @@
       LEGACY_BLOCKED:["请关闭旧版离线页面后重试", "Close older offline pages and try again"],
       QUOTA_EXCEEDED:["设备存储空间不足，当前编辑仍保留，请释放空间后重试", "Storage is full; your draft is retained. Free some space and retry"],
       TOO_LARGE:["内容超过加密存储上限，当前内容与原数据仍保留", "This content exceeds the encrypted storage limit; current and original data are retained"],
-      CLOSED:["账号状态已变化，请重新打开离线页面", "The account changed; reopen the offline workspace"],
+      CLOSED:["本地工作区已关闭，请重新打开离线版", "The local workspace is closed; reopen offline mode"],
       BACKUP_INVALID:["备份包损坏或格式不正确，原数据未改动", "The backup is damaged or invalid; existing data is unchanged"],
       BACKUP_UNSUPPORTED:["无法读取此版本的备份包，请更新应用后重试", "Update the app to read this backup version"],
       BACKUP_TOO_LARGE:["备份内容超过大小或绘图库数量上限，原数据未改动", "The backup exceeds the size or drawing limit; existing data is unchanged"]
@@ -106,23 +106,22 @@
   }
   const escapeHtml = value => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const workspaceOwner = window.DMateGuestSession?.getOwner() || "";
-  // Account tabs keep independent workspaces; guest vaults are already tab scoped.
-  const viewRecordId = workspaceOwner ? "view:" + window.name : "view";
+  // Business records belong to this device; only navigation is tab-specific.
+  // workspaceOwner is used solely to verify an older, pending online handoff.
+  const viewRecordId = "view:" + window.name;
   let workspaceActive = true;
-  const workspaceCurrent = () => workspaceActive && (window.DMateGuestSession?.getOwner() || "") === workspaceOwner;
-  function invalidateWorkspace(resetGuest = false) {
+  const workspaceCurrent = () => workspaceActive;
+  function invalidateWorkspace() {
     if (!workspaceActive) return;
     workspaceActive = false;
     state.ready = false;
     state.noteRows = []; state.noteDrafts.clear();
     state.drawingController?.destroy?.();
     const storage = state.storage; state.storage = null;
-    if (resetGuest && !workspaceOwner) void storage?.destroyGuest?.().catch(() => {});
-    else storage?.close();
+    storage?.close();
     for (const dialog of document.querySelectorAll("dialog[open]")) dialog.close();
     for (const id of ["mistakeList", "noteList", "offlineDrawingHost"]) $(id)?.replaceChildren();
     window.DMateOfflineAppearance?.apply?.({}, null);
-    if (resetGuest) window.DMateGuestSession?.reset();
     sessionStorage.removeItem("dmate_offline_migration_v1");
     delete document.documentElement.dataset.offlineReady;
     window.location.reload();
@@ -130,13 +129,10 @@
   function requireWorkspace() {
     if (workspaceCurrent()) return;
     invalidateWorkspace();
-    throw new Error(tr("账号状态已变化，请重新打开离线页面", "The account has changed; reopen the offline workspace"));
+    throw new Error(tr("本地工作区已关闭，请重新打开", "The local workspace is closed; reopen it"));
   }
-  window.addEventListener("dmate:account-state", () => { if (!workspaceCurrent()) invalidateWorkspace(); });
-  window.addEventListener("dmate:guest-session-end", () => invalidateWorkspace(true));
-  window.addEventListener("storage", event => {
-    if (event.key === "dmate_account_logout_signal_v1" && event.newValue) invalidateWorkspace(true);
-  });
+  // Online account and guest-session events do not switch, close or erase the
+  // device's local workspace. Closing a tab also leaves its encrypted data.
   function configureRenderer() {
     window.DMateAIAnswer?.configure({
       markdownToHtml(value) {
@@ -265,80 +261,45 @@
 
   async function importOfflineSnapshot(payload) {
     if (!payload || typeof payload !== "object" || String(payload.username || "") !== workspaceOwner)
-      throw new Error(tr("资料所属账号已变化，请从在线版重新进入", "The snapshot account changed; reopen offline mode from the online page"));
-    const written = [];
-    const save = async (store,value) => { await put(store,value); written.push([store,value]); };
-    const mistakes = new Map((await all("mistakes")).map(row => [row.id,row]));
-    const mistakeMetadata = await transaction("settings","readonly",os => os.get("mistake-deletions"));
-    for (const item of Array.isArray(payload.wrongQuestions) ? payload.wrongQuestions : []) {
-      if (!item || typeof item.question !== "string" || !item.question.trim()) continue;
-      const id = String(item.id || uid()), existing = mistakes.get(id), incomingAt = noteTime(item.updatedAt || item.createdAt);
-      if (noteTime(mistakeMetadata?.deleted?.[id]) >= incomingAt && mistakeMetadata?.deleted?.[id]) continue;
-      if (existing && incomingAt <= noteTime(existing.updatedAt)) {
-        if (incomingAt === noteTime(existing.updatedAt) && !Array.isArray(existing.focusPoints)
-            && Array.isArray(item.focusPoints) && item.focusPoints.length) {
-          await save("mistakes", {...existing,focusPoints:item.focusPoints});
-        }
-        continue;
-      }
-      const reference = item.referenceAnswer;
-      const answer = item.answer || (typeof reference === "string" ? reference
-        : reference && typeof reference === "object" ? reference.text || reference.answer || JSON.stringify(reference) : "");
-      const row = {...existing,id,title:String(item.category || item.question).slice(0,160),statement:item.question,
-        answer:String(answer || ""),explanation:String(item.analysis || item.solution || ""),
-        knowledgePoints:Array.isArray(item.knowledgePoints) ? item.knowledgePoints : [],
-        focusPoints:Array.isArray(item.focusPoints) ? item.focusPoints : existing?.focusPoints || [],status:item.corrected ? "resolved" : "pending",
-        createdAt:existing?.createdAt || existing?.updatedAt || new Date(noteTime(item.createdAt) || incomingAt || Date.now()).toISOString(),
-        updatedAt:new Date(incomingAt || Date.now()).toISOString()};
-      await save("mistakes",row); mistakes.set(id,row);
+      throw new Error(tr("旧交接资料所属账号已变化，源数据仍保留", "The legacy handoff owner changed; its source is retained"));
+    const notes = (Array.isArray(payload.notes) ? payload.notes : []).filter(note => note
+      && typeof note.title === "string" && typeof note.content === "string").map(note => ({...note,id:String(note.id || uid())}));
+    const mistakes = (Array.isArray(payload.wrongQuestions) ? payload.wrongQuestions : [])
+      .filter(item => item && typeof item.question === "string" && item.question.trim()).map(item => {
+        const reference = item.referenceAnswer;
+        const answer = item.answer || (typeof reference === "string" ? reference
+          : reference && typeof reference === "object" ? reference.text || reference.answer || JSON.stringify(reference) : "");
+        return {...item,id:String(item.id || uid()),title:String(item.title || item.category || item.question),
+          statement:item.question,answer:String(answer || ""),explanation:String(item.analysis || item.solution || ""),
+          knowledgePoints:Array.isArray(item.knowledgePoints) ? item.knowledgePoints : [],
+          focusPoints:Array.isArray(item.focusPoints) ? item.focusPoints : [],status:item.corrected ? "resolved" : "pending"};
+      });
+    const drawings = typeof payload.drawings === "string" && payload.drawings ? JSON.parse(payload.drawings) : null;
+    if (drawings && (![1,2].includes(drawings.version) || !Array.isArray(drawings.pages)
+      || new Set(drawings.pages.map(page => page?.id)).size !== drawings.pages.length
+      || drawings.pages.some(page => typeof page?.id !== "string" || !page.id
+        || !Array.isArray(page.document?.graphs) || !page.document.graphs.length
+        || page.document.graphs.some(graph => !Array.isArray(graph?.vertices) || !Array.isArray(graph?.edges)))))
+      throw new Error(tr("旧绘图库格式无法读取，源数据仍保留", "The legacy gallery could not be read; its source is retained"));
+    const {operations} = await planBackupImport({notes,mistakes,drawings});
+    const appearance = await transaction("settings","readonly",os => os.get("appearance"));
+    if (!appearance && payload.appearance && typeof payload.appearance.settings === "object") {
+      operations.push({type:"put",store:"settings",expectAbsent:true,value:{id:"appearance",settings:payload.appearance.settings,
+        ...(payload.appearance.backgroundBlob instanceof Blob ? {backgroundBlob:payload.appearance.backgroundBlob} : {})}});
     }
-    const notes = new Map((await all("notes")).map(row => [row.id,row]));
-    const noteMetadata = await transaction("settings","readonly",os => os.get("notebook-deletions"));
-    for (const note of Array.isArray(payload.notes) ? payload.notes : []) {
-      if (!note || typeof note.title !== "string" || typeof note.content !== "string") continue;
-      const id = String(note.id || uid()), existing = notes.get(id), incomingAt = noteTime(note.updatedAt);
-      if (noteTime(noteMetadata?.deleted?.[id]) >= incomingAt && noteMetadata?.deleted?.[id]) continue;
-      if (existing && incomingAt <= noteTime(existing.updatedAt)) continue;
-      const row = {...existing,id,title:note.title,content:note.content,updatedAt:new Date(incomingAt || Date.now()).toISOString()};
-      await save("notes",row); notes.set(id,row);
+    const limits = window.DMateOfflineVault.limits;
+    let chunk = [], bytes = 0;
+    const flush = async () => {
+      if (!chunk.length) return;
+      await state.storage.batch(chunk); requireWorkspace(); chunk = []; bytes = 0;
+    };
+    for (const operation of operations) {
+      const size = transferBytes(operation.value);
+      if (size > limits.recordBytes) throw Object.assign(new Error(),{code:"TOO_LARGE"});
+      if (chunk.length && (chunk.length >= limits.batchRecords || bytes+size > limits.batchBytes/2)) await flush();
+      chunk.push(operation); bytes += size;
     }
-    if (typeof payload.drawings === "string" && payload.drawings) {
-      const saved = await transaction("drawings","readonly",os => os.get("gallery"));
-      let gallery = payload.drawings;
-      const incoming = JSON.parse(gallery);
-      if (![1,2].includes(incoming?.version) || !Array.isArray(incoming.pages)
-          || new Set(incoming.pages.map(page => page?.id)).size !== incoming.pages.length
-          || incoming.pages.some(page => !page || typeof page.id !== "string" || !page.id
-            || !Array.isArray(page.document?.graphs) || !page.document.graphs.length
-            || page.document.graphs.some(graph => !graph || !Array.isArray(graph.vertices) || !Array.isArray(graph.edges)))) {
-        throw new Error(tr("绘图库格式无法读取，原数据已保留", "The gallery format could not be read; original data is retained"));
-      }
-      const pageCount = pages => pages.reduce((count,page) => count + page.document.graphs.length,0);
-      if (pageCount(incoming.pages) > 50) throw Object.assign(new Error(),{code:"TOO_LARGE"});
-      if (saved?.gallery) {
-        const local = JSON.parse(saved.gallery);
-        if (Array.isArray(local?.pages) && Array.isArray(incoming?.pages)) {
-          const pages = local.pages.slice(), ids = new Set(pages.map(page => page.id));
-          for (const page of incoming.pages) if (!ids.has(page.id)) {
-            if (pages.length >= 50) throw Object.assign(new Error(),{code:"TOO_LARGE"});
-            pages.push(page); ids.add(page.id);
-          }
-          if (pageCount(pages) > 50) throw Object.assign(new Error(),{code:"TOO_LARGE"});
-          gallery = JSON.stringify({...local,pages});
-        } else throw new Error(tr("绘图库格式无法读取，原数据已保留", "The gallery format could not be read; original data is retained"));
-      }
-      await save("drawings",{id:"gallery",gallery,updatedAt:stamp()});
-    }
-    if (payload.appearance && typeof payload.appearance.settings === "object") {
-      const value = {id:"appearance",settings:payload.appearance.settings,updatedAt:stamp()};
-      if (payload.appearance.backgroundBlob instanceof Blob) value.backgroundBlob = payload.appearance.backgroundBlob;
-      await save("settings",value);
-    }
-    for (const [store,value] of written) {
-      const saved = await transaction(store,"readonly",os => os.get(value.id));
-      if (!await sameStoredValue(saved,value)) throw new Error(tr("加密保存校验未通过，原数据已保留", "Encrypted save verification failed; original data is retained"));
-    }
-    requireWorkspace();
+    await flush();
   }
 
   async function migrateCurrentAccountData() {
@@ -1116,10 +1077,13 @@
     for (const [store,metadataId] of [["notes","notebook-deletions"],["mistakes","mistake-deletions"]]) {
       const [rows,metadata] = await Promise.all([all(store),transaction("settings","readonly",os => os.get(metadataId))]);
       const existing = new Map(rows.map(row => [row.id,row]));
+      const contents = new Set();
+      for (const row of rows) if (!metadata?.deleted?.[row.id] || noteTime(metadata.deleted[row.id]) < noteTime(row.updatedAt))
+        contents.add(await window.DMateOfflineBackup.contentFingerprint(store,row));
       for (const incoming of payload[store]) {
+        const content = await window.DMateOfflineBackup.contentFingerprint(store,incoming);
+        if (contents.has(content)) continue;
         let id = incoming.id;
-        if (existing.has(id) && await sameBackupValue(existing.get(id),incoming)
-          && (!metadata?.deleted?.[id] || noteTime(metadata.deleted[id]) < noteTime(incoming.updatedAt))) continue;
         // Conflicting edits and previously deleted records get stable copy IDs.
         // A repeated restore finds the same copy instead of creating duplicates.
         if (existing.has(id) || metadata?.deleted?.[id]) id = "restored-" + await window.DMateOfflineBackup.fingerprint(incoming);
@@ -1127,17 +1091,22 @@
           id = "restored-" + await window.DMateOfflineBackup.fingerprint({record:incoming,previous:id,
             deletedAt:metadata?.deleted?.[id] || null,local:existing.get(id) || null});
         }
-        const value = {...incoming,id};
+        const value = store === "mistakes" ? {...window.DMateOfflineBackup.withoutMistakeTimes(incoming),id,createdAt:stamp(),updatedAt:stamp()} : {...incoming,id};
         if (existing.has(id)) continue;
         existing.set(id,value);
-        operations.push({type:"put",store,value}); counts[store]++;
+        contents.add(content);
+        operations.push({type:"put",store,value,expectAbsent:true}); counts[store]++;
       }
     }
     if (payload.drawings) {
       const saved = await transaction("drawings","readonly",os => os.get("gallery"));
       const local = saved?.gallery ? JSON.parse(saved.gallery) : null;
       const pages = local?.pages?.slice() || [], existing = new Map(pages.map(page => [page.id,page]));
+      const contents = new Set();
+      for (const page of pages) contents.add(await window.DMateOfflineBackup.contentFingerprint("drawings",page));
       for (const page of payload.drawings.pages) {
+        const content = await window.DMateOfflineBackup.contentFingerprint("drawings",page);
+        if (contents.has(content)) continue;
         let id = page.id;
         if (existing.has(id) && await sameBackupValue(existing.get(id),page)) continue;
         if (existing.has(id)) id = "restored-" + await window.DMateOfflineBackup.fingerprint(page);
@@ -1146,7 +1115,7 @@
         }
         if (existing.has(id)) continue;
         const value = {...page,id};
-        existing.set(id,value); pages.push(value); counts.drawings += value.document.graphs.length;
+        existing.set(id,value); pages.push(value); contents.add(content); counts.drawings += value.document.graphs.length;
       }
       if (pages.reduce((count,page) => count+page.document.graphs.length,0) > 50)
         throw Object.assign(new Error(),{code:"BACKUP_TOO_LARGE"});
@@ -1346,10 +1315,12 @@
     try {
       setNetworkStatus();
       const token = window.DMateOfflineHandoff?.pendingToken?.();
-      state.storage = await window.DMateOfflineStorage.open({owner:workspaceOwner,isCurrent:workspaceCurrent,
+      state.storage = await window.DMateOfflineStorage.open({scope:"device",owner:workspaceOwner,isCurrent:workspaceCurrent,
         preserveSharedGuestSource:Boolean(token)});
       requireWorkspace();
-      await migrateCurrentAccountData();
+      let legacyWarning = false;
+      try { await migrateCurrentAccountData(); }
+      catch (_) { legacyWarning = true; /* Leave unacknowledged source data retryable. */ }
       await applyOriginalAppearance();
       const language = await transaction("settings", "readonly", os => os.get("language"));
       if (language?.value === "en" || language?.value === "zh-CN") window.DMateI18n?.setLanguage?.(language.value, false);
@@ -1375,6 +1346,8 @@
       document.documentElement.dataset.offlineReady = "true";
       $("offlineMain").inert = false;
       for (const button of startupControls) button.disabled = false;
+      if (legacyWarning || state.storage.migrationWarnings?.length)
+        toast(tr("部分旧资料暂未迁移，源数据仍保留；当前本地资料可继续使用", "Some legacy data could not be migrated; its source is retained and local data remains available"));
     } catch (error) {
       toast(storageError(error));
     } finally {

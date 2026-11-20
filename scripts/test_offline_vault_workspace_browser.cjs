@@ -49,7 +49,14 @@ async function navigate(page,panel) {
 }
 async function createNote(page,title,content) {
   await navigate(page,'notes');
+  const previous=(await records(page,'notes')).map(note=>note.id);
   await page.locator('#addNote').click();
+  await page.waitForFunction(previous=>{
+    const selected=document.querySelector('.dcn-note.is-current');
+    return selected&&!previous.includes(selected.dataset.noteId)
+      &&document.querySelector('.dcn-title')?.value===''
+      &&document.querySelector('.dcn-original')?.value==='';
+  },previous);
   await page.locator('.dcn-title').fill(title);
   await page.locator('.dcn-original').fill(content);
   await page.waitForFunction(async ({title,content}) => (await __offlineTestStore.all('notes'))
@@ -161,7 +168,7 @@ async function accountUI(browser) {
     // overwriting a note read before another window committed its edit.
     const cas=await page.evaluate(async note=>{
       const first=__offlineTestStore;
-      const second=await DMateOfflineStorage.open({owner:DMateGuestSession.getOwner(),isCurrent:()=>true});
+      const second=await DMateOfflineStorage.open({scope:'device',isCurrent:()=>true});
       try {
         const stale=await second.get('notes',note.id);
         await first.put('notes',{...note,content:'Committed concurrent UI value'});
@@ -171,13 +178,39 @@ async function accountUI(browser) {
     },note);
     assert.equal(cas.code,'CONFLICT');assert.equal(cas.content,'Committed concurrent UI value');
     await context.setOffline(false);
-    const other=await enter(context,'vault-ui-other');await ready(other);assert.deepEqual(await records(other,'notes'),[]);
+    const stable = {notes:await records(page,'notes'),mistakes:await records(page,'mistakes'),gallery:await row(page,'drawings','gallery')};
+    await page.evaluate(() => {
+      window.__deviceOfflineDocument = crypto.randomUUID();
+      DMateGuestSession.setAccountOwner('vault-ui-other');
+      dispatchEvent(new CustomEvent('dmate:account-state'));
+    });
+    const documentToken=await page.evaluate(()=>window.__deviceOfflineDocument);
+    await page.evaluate(() => new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    assert.equal(await page.evaluate(()=>window.__deviceOfflineDocument),documentToken,'Signing in does not reload or replace the active offline workspace');
+    assert.deepEqual(await records(page,'notes'),stable.notes);
+    assert.deepEqual(await records(page,'mistakes'),stable.mistakes);
+    assert.deepEqual(await row(page,'drawings','gallery'),stable.gallery);
+    await page.evaluate(() => {
+      DMateGuestSession.reset();
+      dispatchEvent(new CustomEvent('dmate:guest-session-end'));
+      dispatchEvent(new StorageEvent('storage',{key:'dmate_account_logout_signal_v1',newValue:String(Date.now())}));
+    });
+    await page.evaluate(() => new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    assert.equal(await page.evaluate(()=>window.__deviceOfflineDocument),documentToken,'Logging out preserves the same active offline document');
+    assert.equal(await page.locator('html').getAttribute('data-offline-ready'),'true');
+    assert.deepEqual(await records(page,'notes'),stable.notes);
+    assert.deepEqual(await records(page,'mistakes'),stable.mistakes);
+    assert.deepEqual(await row(page,'drawings','gallery'),stable.gallery);
+    const other=await enter(context,'vault-ui-other');await ready(other);
+    assert.deepEqual(await records(other,'notes'),stable.notes,'A different online account sees the same device concepts');
+    assert.deepEqual(await records(other,'mistakes'),stable.mistakes,'A different online account sees the same device mistakes');
+    assert.deepEqual(await row(other,'drawings','gallery'),stable.gallery,'A different online account sees the same editable device gallery');
     await other.close();await page.close();
     const reopened=await enter(context,owner);await ready(reopened);
     assert.equal((await records(reopened,'notes'))[0].content,'Committed concurrent UI value');
     raw=await inspectPersistence(reopened,[...Object.values(secret),'Committed concurrent UI value'],imageBytes);
     assert.deepEqual(raw.findings,[]);assert.deepEqual(network,[]);assert.deepEqual(errors,[]);
-    console.log('PASS vault UI: real cached/offline notes, wrong questions, drawing and wallpaper; raw privacy, reload, concurrency and owner isolation');
+    console.log('PASS vault UI: real cached/offline notes, mistakes, drawings and wallpaper; ciphertext privacy, reload, concurrency and login-independent device contents');
   } finally {await context.close();}
 }
 
@@ -204,9 +237,14 @@ async function migrationFailure(browser,native=false) {
       });
     }
     await page.goto(baseURL+'/offline',{waitUntil:'networkidle'});
-    await page.waitForFunction(()=>Boolean(window.__offlineTestOpenError));
-    assert.notEqual(await page.locator('html').getAttribute('data-offline-ready'),'true','A failed vault init never becomes an empty working database');
-    if(native)assert.equal(await page.evaluate(()=>__offlineTestOpenError.code),'NATIVE_UNAVAILABLE');
+    if(native) {
+      await page.waitForFunction(()=>Boolean(window.__offlineTestOpenError));
+      assert.notEqual(await page.locator('html').getAttribute('data-offline-ready'),'true','An unavailable native vault never falls back to a working plaintext database');
+      assert.equal(await page.evaluate(()=>__offlineTestOpenError.code),'NATIVE_UNAVAILABLE');
+    } else {
+      await ready(page);
+      assert.equal(await page.locator('html').getAttribute('data-offline-ready'),'true','An old-source migration error leaves the existing device workspace usable');
+    }
     const legacy=await page.evaluate(()=>new Promise((resolve,reject)=>{const r=indexedDB.open('dmate-offline-workspace');r.onsuccess=()=>{const db=r.result,tx=db.transaction('notes'),get=tx.objectStore('notes').getAll();tx.oncomplete=()=>{db.close();resolve(get.result);};};r.onerror=()=>reject(r.error);}));
     assert.deepEqual(legacy,[original],'Encryption/key failure preserves the exact old source for retry');
     const storage=await page.evaluate(()=>[...Object.values(localStorage),...Object.values(sessionStorage)]);
@@ -220,7 +258,7 @@ async function migrationFailure(browser,native=false) {
         'After verified migration, plaintext source is removed and only ciphertext remains');
     }
     assert.deepEqual(network,[]);
-    console.log('PASS '+(native?'old native client':'vault transaction failure')+': visible initialization failure, retained old source and no plaintext fallback');
+    console.log('PASS '+(native?'old native client':'old-source write failure')+': visible feedback, retained old source and no plaintext fallback');
   } finally {await context.close();}
 }
 
@@ -230,18 +268,21 @@ async function processLifetime() {
   try {
     context=await chromium.launchPersistentContext(profile,{...launch,serviceWorkers:'block'});await prepare(context);
     const account=await enter(context,owner);await ready(account);await createNote(account,'Process account note','RESTART-ACCOUNT-SECRET-97');
-    const guest=await enter(context);await ready(guest);await createNote(guest,'Process guest note','RESTART-GUEST-SECRET-101');
-    const reference=await guest.evaluate(()=>DMateGuestSession.read('offline-vault-ref'));
-    assert.deepEqual(Object.keys(reference),['name']);
-    await guest.reload();await ready(guest);assert.equal((await records(guest,'notes')).length,1,'Reload keeps this guest tab’s encrypted vault');
+    const guest=await enter(context);await ready(guest);
+    assert.ok((await records(guest,'notes')).some(note=>note.content==='RESTART-ACCOUNT-SECRET-97'),'Signing out leaves the device concept visible');
+    await createNote(guest,'Process unsigned-in note','RESTART-GUEST-SECRET-101');
+    await guest.reload();await ready(guest);
+    assert.deepEqual((await records(guest,'notes')).map(note=>note.content).sort(),
+      ['RESTART-ACCOUNT-SECRET-97','RESTART-GUEST-SECRET-101'].sort(),'Reload retains both device concepts without login');
     await context.close();context=null;
     context=await chromium.launchPersistentContext(profile,{...launch,serviceWorkers:'block'});await prepare(context);
-    const reopened=await enter(context,owner);await ready(reopened);
-    assert.equal((await records(reopened,'notes'))[0].content,'RESTART-ACCOUNT-SECRET-97','Reverified accounts recover after a real browser process restart');
-    const freshGuest=await enter(context);await ready(freshGuest);assert.deepEqual(await records(freshGuest,'notes'),[],'A new launch never adopts the old guest vault');
-    assert.notEqual((await freshGuest.evaluate(()=>DMateGuestSession.read('offline-vault-ref'))).name,reference.name);
+    const reopened=await enter(context);await ready(reopened);
+    const expectedContents=['RESTART-ACCOUNT-SECRET-97','RESTART-GUEST-SECRET-101'].sort();
+    assert.deepEqual((await records(reopened,'notes')).map(note=>note.content).sort(),expectedContents,'A real browser restart restores device concepts without login');
+    const signedIn=await enter(context,'another-online-account');await ready(signedIn);
+    assert.deepEqual((await records(signedIn,'notes')).map(note=>note.content).sort(),expectedContents,'Signing into another account after reopening does not partition device data');
     assert.deepEqual((await inspectPersistence(reopened,['RESTART-ACCOUNT-SECRET-97','RESTART-GUEST-SECRET-101'])).findings,[]);
-    console.log('PASS real browser restart: account records recover after verification, guests remain launch-scoped and private');
+    console.log('PASS real browser restart: encrypted device concepts persist before and after login without a server or account verification');
   } finally {if(context)await context.close();await rm(profile,{recursive:true,force:true});}
 }
 
@@ -261,8 +302,9 @@ async function handoffOverflow(browser) {
     });
     await page.reload({waitUntil:'networkidle'});
     await page.waitForFunction(()=>Boolean(document.getElementById('offlineToast').textContent.trim()));
-    assert.notEqual(await page.locator('html').getAttribute('data-offline-ready'),'true');
-    assert.match(await page.locator('#offlineToast').textContent(),/过大|大小|上限|large|limit/i,'The gallery limit has explicit feedback');
+    await ready(page);
+    assert.equal(await page.locator('html').getAttribute('data-offline-ready'),'true','A legacy handoff that exceeds the gallery limit does not disable the existing device workspace');
+    assert.match(await page.locator('#offlineToast').textContent(),/迁移|保留|retained|migration/i,'An over-limit legacy handoff has visible retained-source feedback');
     assert.equal(await page.evaluate(()=>DMateOfflineHandoff.pendingToken()),staged.token,'Overflow never acknowledges or discards the source handoff');
     const original=(await row(page,'drawings','gallery')).gallery;
     assert.deepEqual(JSON.parse(original),staged.gallery,'All fifty existing drawings remain byte-for-byte logically intact');

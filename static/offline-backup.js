@@ -167,6 +167,73 @@
     const encoded = await encodeValue(value,null,{nodes:0,binary:0});
     return digest(encoder.encode(JSON.stringify(encoded)));
   }
+  const timeFields = new Set(['createdat','updatedat','answerupdatedat','analysisupdatedat','solutionupdatedat',
+    'lastwrongat','correctedat','retestpassedat','lastretestat','timestamp','savedat','importedat','exportedat',
+    'deletedat','answeredat','reviewedat','lastreviewedat','lastpracticedat','recognizedat']);
+  function withoutMistakeTimes(value,depth = 0,tracking = false) {
+    if (!value || typeof value !== 'object' || value instanceof Blob
+      || value instanceof ArrayBuffer || ArrayBuffer.isView(value)) return value;
+    if (Array.isArray(value)) return value.map(item => withoutMistakeTimes(item,depth+1,tracking));
+    return Object.fromEntries(Object.entries(value).filter(([key]) => {
+      const name = key.replace(/[_-]/g,'').toLowerCase();
+      return !timeFields.has(name) && !((depth === 0 || tracking) && ['time','date','at'].includes(name));
+    }).map(([key,item]) => [key,withoutMistakeTimes(item,depth+1,tracking || /retest|review|history/i.test(key))]));
+  }
+  async function binaryContent(value,path = [],result = []) {
+    if (value instanceof Blob || value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
+      const file = typeof root.File === 'function' && value instanceof root.File;
+      result.push({path,value:file ? {name:value.name,data:new Blob([value],{type:value.type})} : value});
+    } else if (value && typeof value === 'object') {
+      for (const key of Object.keys(value).sort()) await binaryContent(value[key],[...path,key],result);
+    }
+    return result;
+  }
+  const asText = value => typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value);
+  const byJSON = (left,right) => JSON.stringify(left).localeCompare(JSON.stringify(right));
+  function graphContent(graph) {
+    const vertices = graph.vertices.map((vertex,index) => ({id:String(vertex.id),index,value:{
+      label:vertex.label == null ? null : String(vertex.label),
+      display_label:vertex.label ? null : vertex.display_label || null,
+      x:vertex.x ?? null,y:vertex.y ?? null
+    }})).sort((a,b) => byJSON(a.value,b.value) || a.index-b.index);
+    const ids = new Map(vertices.map((vertex,index) => [vertex.id,'v'+index]));
+    const edges = graph.edges.map(edge => {
+      let from = ids.get(String(edge.from)) ?? 'missing:'+String(edge.from);
+      let to = ids.get(String(edge.to)) ?? 'missing:'+String(edge.to);
+      const direction = edge.direction || (graph.directed === true ? 'forward' : graph.directed === false ? 'undirected' : 'unknown');
+      let path = edge.path || null;
+      if (direction === 'undirected' && from > to) { [from,to] = [to,from]; if (path) path = path.slice().reverse(); }
+      return {from,to,direction,weight:edge.weight ?? null,edge_label:edge.edge_label ?? null,
+        color:edge.color ?? null,style:edge.style ?? null,path,edge_label_is_explicit:edge.edge_label_is_explicit === true};
+    }).sort(byJSON);
+    return {name:graph.name || '',directed:graph.directed ?? null,weighted:graph.weighted ?? null,
+      bbox:graph.bbox || null,region_polygon:graph.region_polygon || null,vertices:vertices.map(vertex => vertex.value),edges};
+  }
+  async function contentFingerprint(kind,value) {
+    let content;
+    if (kind === 'notes') content = {title:value.title,content:value.content};
+    else if (kind === 'mistakes') {
+      const reference = value.referenceAnswer;
+      content = {statement:asText(value.statement || value.question || value.content),
+        answer:asText(value.answer || (reference && typeof reference === 'object' ? reference.text || reference.answer || reference : reference)),
+        explanation:asText(value.explanation || value.analysis || value.solution),
+        note:asText(value.note || value.userNote),userAnswer:asText(value.userAnswer || value.studentAnswer),
+        feedback:withoutMistakeTimes(value.feedback ?? null)};
+    } else if (kind === 'drawings') {
+      const model = root.DMateGraphEditorModel;
+      const document = model ? model.ensureAnonymousLabels(model.importDocument(value.document)) : value.document;
+      const graphs = await Promise.all(document.graphs.map(async graph => {
+        const content = graphContent(graph);
+        return {id:String(graph.id),content,key:await fingerprint(content)};
+      }));
+      const graphIds = new Map(graphs.map(graph => [graph.id,graph.key]));
+      const context = Object.fromEntries(['legends','captions'].map(kind => [kind,(document.text_context?.[kind] || [])
+        .map(row => ({text:row.text,graph_ids:(row.graph_ids || []).map(id => graphIds.get(String(id)) || 'missing:'+id).sort()})).sort(byJSON)]));
+      content = {name:value.name || '',requirement:value.requirement || '',body_text:document.body_text || '',
+        text_context:context,graphs:graphs.map(graph => graph.content).sort(byJSON)};
+    } else fail('BACKUP_UNSUPPORTED');
+    return fingerprint({content,attachments:await binaryContent(value)});
+  }
   async function checkRecordSizes(data) {
     // Bound each record before the caller starts writing to encrypted storage.
     for (const row of [...data.notes,...data.mistakes,...(data.drawings ? [data.drawings] : [])]) {
@@ -176,7 +243,9 @@
     }
   }
   async function create(data) {
-    const zip = library(); validate(data); await checkRecordSizes(data);
+    const zip = library(); validate(data);
+    data = {...data,mistakes:data.mistakes.map(row => withoutMistakeTimes(row))};
+    await checkRecordSizes(data);
     const files = Object.create(null), budget = {nodes:0,binary:0};
     for (const key of ['notes','mistakes','drawings']) {
       files[key+'.json'] = encoder.encode(JSON.stringify(await encodeValue(data[key],files,budget)));
@@ -234,5 +303,5 @@
     if (Object.keys(actual).some(key => manifest.counts[key] !== actual[key])) fail();
     return result;
   }
-  root.DMateOfflineBackup = Object.freeze({create,read,fingerprint});
+  root.DMateOfflineBackup = Object.freeze({create,read,fingerprint,contentFingerprint,withoutMistakeTimes});
 })();

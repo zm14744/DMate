@@ -194,7 +194,7 @@ async function createNote(page) {
   await page.waitForFunction(async content => (await __offlineTestStore.all('notes')).some(note => note.content===content),content);
   // Checkpointing must commit the current module, not just its data records.
   await page.waitForFunction(async () => {
-    const id = DMateGuestSession.getOwner() ? 'view:'+window.name : 'view';
+    const id = 'view:'+window.name;
     return (await __offlineTestStore.get('settings',id))?.panel==='notes';
   });
 }
@@ -247,8 +247,8 @@ async function navigationSession(browser, width, username) {
       assert.equal(await page.locator('body').evaluate(node => node.classList.contains('offline-nav-open')),true);
       await page.locator('#offlineNavClose').click();
     }
-    // Use the real online entry and its encrypted handoff, rather than copying
-    // the session marker into another fixture document.
+    // Use the real online entry, which opens the same device workspace rather
+    // than replacing it with the currently signed-in account's cloud records.
     const onlineOpener = page.locator(width<=1100 ? '#offlineNavToggle' : '#offlineDesktopSidebarOpen');
     if(await onlineOpener.getAttribute('aria-expanded')!=='true')await onlineOpener.click();
     await page.locator('#returnOnline').click();
@@ -280,21 +280,16 @@ async function navigationSession(browser, width, username) {
     const copied = page.waitForEvent('popup');
     await page.evaluate(() => window.open('/offline','_blank'));
     const other = await copied;await ready(other);await assertAutoEntry(other,'opener-copied new tab');
-    if(username) {
-      await other.goto(baseURL+'/__offline-interface-fixture');
-      await other.evaluate(username=>DMateGuestSession.setAccountOwner(username),username);
-      await other.locator('a[href="/offline"]').click();await ready(other);await revealInterface(other);
-      await navigate(other,'questions');
-      await other.waitForFunction(async () => (await __offlineTestStore.get('settings','view:'+window.name))?.panel==='questions');
-      await page.reload({waitUntil:'networkidle'});await ready(page);await assertAutoEntry(page,'independent account tab navigation');await assertVisible(page,'independent account tab navigation');
-      assert.doesNotMatch(await page.locator('#offlineToast').textContent(),/CONFLICT|另一页面|another page/i);
-    }
+    assert.ok((await records(other,'notes')).some(note=>note.content===content),'Every tab sees this device’s offline concepts without verifying an account');
+    await revealInterface(other);await navigate(other,'questions');
+    await other.waitForFunction(async () => (await __offlineTestStore.get('settings','view:'+window.name))?.panel==='questions');
+    await page.reload({waitUntil:'networkidle'});await ready(page);await assertAutoEntry(page,'independent device tab navigation');await assertVisible(page,'independent device tab navigation');
+    assert.doesNotMatch(await page.locator('#offlineToast').textContent(),/CONFLICT|另一页面|another page/i);
     await other.close();await assertVisible(page,'source tab after opening another tab');
     await page.close();
     const reopened = await enter(context,username);await assertAutoEntry(reopened,'closed tab opened again');
     const restored = await records(reopened,'notes');
-    if(username)assert.ok(restored.some(note=>note.content===content),'Account data remains available after a new-session introduction');
-    else assert.deepEqual(restored,[],'A new guest tab does not adopt the old guest note');
+    assert.ok(restored.some(note=>note.content===content),'Device data remains available after closing the original tab, including without an account');
     assert.deepEqual(models,[]);assert.deepEqual(errors,[]);
     console.log('PASS interface session '+width+'/'+(username?'account':'guest')+': buttonless automatic entry, manual cover, frame-by-frame restored panel, refresh, drawer state, real online hop and copied/new tabs');
   } finally {await context.close();}
@@ -305,13 +300,13 @@ async function restoredBrowserProcess() {
   const options = {...launch,args:['--restore-last-session'],serviceWorkers:'block',viewport:{width:1440,height:900},reducedMotion:'no-preference'};
   let context;
   try {
-    context = await chromium.launchPersistentContext(profile,options);await prepare(context,account);
+    context = await chromium.launchPersistentContext(profile,options);await prepare(context);
     for(const blank of context.pages())if(blank.url()==='about:blank')await blank.close();
-    const page = await enter(context,account);await assertAutoEntry(page,'first browser process');
+    const page = await enter(context);await assertAutoEntry(page,'first unsigned-in browser process');
     await revealInterface(page);await createNote(page);
     await page.evaluate(() => sessionStorage.setItem('__interface_restore_probe','restored-session-storage'));
     await context.close();context=null;
-    context = await chromium.launchPersistentContext(profile,options);await prepare(context,account);
+    context = await chromium.launchPersistentContext(profile,options);await prepare(context);
     // Chromium restores the actual previous /offline tab, including its
     // sessionStorage. A new page here would miss the critical restored-tab case.
     const candidates = context.pages();
@@ -330,17 +325,24 @@ async function restoredBrowserProcess() {
     // Session restoration starts while launchPersistentContext is resolving,
     // before prepare() can install frame observers on the existing document.
     await assertAutoEntry(restored,'restarted browser restored tab',{sampled:false});
-    // Restored browser tabs may no longer be verified as the old account.
-    // Reverify through the local fixture, then confirm the persistent records.
+    const restoredNotes=await restored.evaluate(async()=>{
+      // The restored document can finish before prepare installs its probe.
+      // Read the same device vault through a second real adapter in that case.
+      if(window.__offlineTestStore)return __offlineTestStore.all('notes');
+      const storage=await DMateOfflineStorage.open({scope:'device',isCurrent:()=>true});
+      try{return await storage.all('notes');}finally{storage.close();}
+    });
+    assert.ok(restoredNotes.some(note=>note.content===content),'Device notes survive a real process restart without account verification');
+    // Signing in after reopening changes online identity, not offline contents.
     await restored.goto(baseURL+'/__offline-interface-fixture');
     await restored.evaluate(username=>DMateGuestSession.setAccountOwner(username),account);
     await restored.locator('a[href="/offline"]').click();await ready(restored);
-    assert.ok((await records(restored,'notes')).some(note=>note.content===content),'Encrypted account notes survive a real process restart');
-    console.log('PASS real process restore: retained sessionStorage plays automatic entry; account records survive ('+originState.type+')');
+    assert.ok((await records(restored,'notes')).some(note=>note.content===content),'Signing in after restart retains the same encrypted device notes');
+    console.log('PASS real process restore: retained sessionStorage plays automatic entry; device notes survive without login ('+originState.type+')');
   } finally {await context?.close();await rm(profile,{recursive:true,force:true});}
 }
 
-async function nativeLaunchReset(browser) {
+async function nativeLaunchPersistence(browser) {
   let nativeLaunch = 'interface-native-launch-one';
   const context = await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'no-preference'});
   const models = await prepare(context,'',()=>nativeLaunch);
@@ -350,9 +352,10 @@ async function nativeLaunchReset(browser) {
     await page.reload({waitUntil:'networkidle'});await ready(page);await assertAutoEntry(page,'same native launch refresh');await assertVisible(page,'same native launch refresh');
     nativeLaunch = 'interface-native-launch-two';
     await page.reload({waitUntil:'networkidle'});await ready(page);await assertAutoEntry(page,'new native launch');
-    assert.deepEqual(await records(page,'notes'),[],'A new native guest launch rejects the previous guest workspace');
+    assert.ok((await records(page,'notes')).some(note=>note.content===content),'A new native launch retains device notes even when the online guest session changes');
+    await navigate(page,'notes');await assertVisible(page,'new native launch device contents');
     assert.deepEqual(models,[]);
-    console.log('PASS native launch marker: every launch enters automatically; same-launch state remains and a new launch resets the guest workspace');
+    console.log('PASS native launch marker: every launch enters automatically and device concepts survive a new online guest session');
   } finally {await context.close();}
 }
 
@@ -362,7 +365,7 @@ async function nativeLaunchReset(browser) {
   try {
     if(!selected || selected==='account')await navigationSession(browser,1440,account);
     if(!selected || selected==='guest')await navigationSession(browser,390,'');
-    if(!selected || selected==='native')await nativeLaunchReset(browser);
+    if(!selected || selected==='native')await nativeLaunchPersistence(browser);
   }
   finally {await browser.close();}
   if(!selected || selected==='process')await restoredBrowserProcess();
