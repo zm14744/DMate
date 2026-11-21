@@ -201,7 +201,8 @@ async function offlineHeader(page, wallpaper = false) {
   assert.equal(result.background, result.main, 'Topbar and main share the background paint');
   assert.equal(result.branding, 0, 'The centered logo and panel title are removed');
   assert.equal(result.text, '', 'The header has no leftover branding text');
-  assert.deepEqual(result.buttons, ['offlineNavToggle'], 'The header retains only the learning-tool drawer button');
+  assert.deepEqual(result.buttons, ['offlineNavToggle', 'offlineMobilePrivacyToggle'],
+    'The mobile header contains the learning-tool drawer and privacy buttons in order');
   assert.ok(result.toggle.left >= 0 && result.toggle.left < 25, 'The drawer button stays at the left edge');
   assert.ok(result.toggle.width >= 42 && result.toggle.height >= 42, 'The drawer button keeps its mobile touch target');
   if (wallpaper) assert.equal(result.ownBackground, result.mainBackground, 'Wallpaper uses the same transparent background through the header');

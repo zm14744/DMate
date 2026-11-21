@@ -21,8 +21,8 @@ const longConcepts = concepts.filter(concept => concept.id !== concept.graph_nod
   return size(b) - size(a);
 });
 const longQuestion = questions.filter(question => question.source?.migrated_from?.kind !== 'concept_example').sort((a, b) => {
-  const size = question => JSON.stringify([question.statement, question.options, question.answer_text,
-    question.explanation, question.grading_criteria]).length;
+  const size = question => JSON.stringify([question.statement, question.options,
+    question.answer_text || question.answer, question.explanation]).length;
   return size(b) - size(a);
 })[0];
 assert.ok(child && longConcepts.length && longQuestion, 'Real packs provide representative concepts and exercises');
@@ -288,8 +288,10 @@ async function runCase(browser, width, height) {
     await page.locator('#questionList .question-item[data-question-id="' + longQuestion.id + '"]').click();
     await page.locator('#questionSearch').fill('');
     await openLibraryDetail(page, 'questions');
-    if (!await page.locator('#questionDetail .wrong-answer-details').evaluate(node => node.open))
-      await page.locator('#questionDetail .wrong-answer-summary').click();
+    for (const kind of ['answer', 'analysis']) {
+      const details = page.locator('#questionDetail .wrong-' + kind + '-details');
+      if (!await details.evaluate(node => node.open)) await details.locator('summary').click();
+    }
     await page.waitForFunction(() => !document.querySelector('#questionDetail [data-dmate-render-state="pending"]'));
     await settle(page);
     await independentScroll(page, 'questions', 'detail');

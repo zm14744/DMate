@@ -131,7 +131,8 @@ async function safeHistoryDelete(page, name) {
     'Drawing confirmation heading shares ordinary modal typography');
   assert.deepEqual(await paint(prompt.locator('.dmate-delete-confirm-close')), await paint(reference),
     'Drawing confirmation also uses the shared red close dot');
-  assert.ok((await prompt.innerText()).includes(name), 'Confirmation names the drawing being removed');
+  assert.equal(await prompt.locator('.dmate-delete-confirm-body').innerText(), '删除后，绘画内容将不可恢复');
+  assert.ok(!(await prompt.innerText()).includes(name), 'The confirmation omits the drawing name');
   await prompt.locator('.dmate-delete-confirm-close').click();
   assert.deepEqual(await page.evaluate(() => window.__drawingControlsController.getPages().map(page => ({ id: page.id, name: page.name }))), before,
     'Cancel leaves every drawing intact');

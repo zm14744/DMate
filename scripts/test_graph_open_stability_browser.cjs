@@ -3,7 +3,7 @@
  */
 'use strict';
 const assert = require('node:assert/strict');
-const { revealInterface } = require('./offline-vault-browser-fixtures.cjs');
+const { installStorageProbe, revealInterface, row } = require('./offline-vault-browser-fixtures.cjs');
 const { writeFileSync } = require('node:fs');
 const { chromium } = require('playwright');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
@@ -283,6 +283,7 @@ async function offlineCase(browser, width) {
 
 async function offlineEntry(browser, width) {
   const context = await browser.newContext({ viewport: { width, height: 900 }, serviceWorkers: 'block' });
+  await installStorageProbe(context);
   await context.addInitScript(() => {
     const never = new Promise(() => {});
     Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: {
@@ -293,24 +294,40 @@ async function offlineEntry(browser, width) {
   try {
     await page.route('**/auth/me', route => route.fulfill({ contentType: 'application/json', body: '{"configured":true,"authenticated":false}' }));
     await page.goto(baseURL, { waitUntil: 'networkidle' });
-    await page.evaluate(() => {
-      window.DMateOfflineBridge = { snapshot: () => new Promise(resolve => { window.releaseOfflineSnapshot = () => resolve({ username: '', drawings: [] }); }) };
-    });
+    const note = { id: 'staged-note', title: 'Retained note', content: 'Staged before opening offline mode' };
+    await page.evaluate(async note => {
+      await DMateOfflineHandoff.stage({ username: '', notes: [note] });
+      window.DMateOfflineBridge = { snapshot: () => {
+        sessionStorage.setItem('entry-requested-snapshot', 'true');
+        return new Promise(() => {});
+      } };
+    }, note);
     await page.locator(width <= 1100 ? '#mobileNavBtn' : '#desktopSidebarOpen').click();
-    const button = page.locator('#offlineWorkspaceBtn'), label = button.locator('.dmate-ui-label');
-    const original = await label.innerText();
-    await button.click();
-    assert.equal(await button.isDisabled(), true); assert.equal(await button.getAttribute('aria-busy'), 'true');
-    for (let index = 0; index < 12; index++) {
-      await frames(page, 1); assert.equal(await label.innerText(), original, 'Offline entry never shows a preparation label');
-    }
-    const navigation = page.waitForURL('**/offline', { waitUntil: 'commit', timeout: 10000 });
-    await page.evaluate(() => releaseOfflineSnapshot());
-    await navigation;
-    // Navigation has committed without the service worker; settle the new
-    // document before disposing its context to avoid racing browser teardown.
-    await page.waitForLoadState('domcontentloaded');
-    console.log('PASS offline entry/' + width + ': stable label, retained snapshot handoff and navigation bypasses unresolved service-worker promises');
+    const button = page.locator('#offlineWorkspaceBtn');
+    const original = await button.evaluate(button => {
+      const label = () => button.querySelector('.dmate-ui-label')?.innerText;
+      const labels = new Set([label()]);
+      new MutationObserver(() => labels.add(label())).observe(button, {
+        childList: true, subtree: true, characterData: true
+      });
+      window.addEventListener('pagehide', () => {
+        labels.add(label());
+        sessionStorage.setItem('entry-button-state', JSON.stringify({
+          labels: [...labels], disabled: button.disabled, busy: button.getAttribute('aria-busy')
+        }));
+      }, { once: true });
+      return label();
+    });
+    await Promise.all([
+      page.waitForURL('**/offline', { waitUntil: 'domcontentloaded', timeout: 10000 }),
+      button.click()
+    ]);
+    assert.deepEqual(await page.evaluate(() => JSON.parse(sessionStorage.getItem('entry-button-state'))),
+      { labels: [original], disabled: true, busy: 'true' }, 'The entry remains busy and keeps its label until navigation');
+    await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('entry-requested-snapshot')), null);
+    assert.deepEqual(await row(page, 'notes', note.id), note, 'Previously staged data survives direct entry');
+    console.log('PASS offline entry/' + width + ': stable label and direct navigation without a fresh snapshot or a ready service worker; previously staged data retained');
   } finally { await context.close(); }
 }
 

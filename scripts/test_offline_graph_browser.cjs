@@ -187,13 +187,10 @@ async function onlineReference(browser, width, theme, available) {
     await page.evaluate(value => {
       appearanceSettings = {...APPEARANCE_DEFAULTS, mode:value};
       applyAppearanceSettings({save:true});
-    }, theme);
-    await page.evaluate(theme => {
       DMateI18n.setLanguage('zh-CN', false);
-      document.documentElement.dataset.appearanceTheme = theme;
-      document.body.dataset.appearanceTheme = theme;
       openKnowledgeGraph();
     }, theme);
+    assert.equal(await page.locator('body').getAttribute('data-appearance-theme'), theme);
     await page.waitForFunction(() => knowledgeGraphInitialized);
     await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
     await frame(page).locator('.kg-section').waitFor();
@@ -579,8 +576,6 @@ async function runCase(browser, width, theme) {
   page.on('pageerror', error => errors.push(error.message));
   try {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
-    await page.evaluate(mode => DMateGuestSession.write('appearance',
-      { mode, accent: 'blue', panelOpacity: 100 }), theme);
     await page.evaluate(async () => {
       await navigator.serviceWorker.register('/offline-service-worker.js', { scope: '/' });
       const registration = await navigator.serviceWorker.ready, worker = registration.active;
@@ -591,6 +586,10 @@ async function runCase(browser, width, theme) {
     await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => navigator.serviceWorker.controller && document.documentElement.dataset.offlineReady === 'true');
     await revealInterface(page);
+    await page.evaluate(() => DMateOfflineAppearance.open());
+    await page.locator('#appearanceModal [data-appearance-mode="' + theme + '"]').click();
+    await page.locator('#appearanceDone').click();
+    await page.locator('#appearanceModal').waitFor({state:'hidden'});
     await openOfflineGraph(page);
     await inlineLayout(page);
     const available = await frame(page).locator('.graph-modal-card').evaluate(card => {
@@ -609,6 +608,7 @@ async function runCase(browser, width, theme) {
     });
     await page.reload({ waitUntil: 'networkidle' });
     await openOfflineGraph(page);
+    assert.equal(await page.locator('body').getAttribute('data-appearance-theme'), theme, 'The device retains its theme offline');
     assert.equal(await page.evaluate(() => navigator.onLine), false);
     assert.equal(await frame(page).locator('#knowledgeGraphFocusBtn').count(), 0,
       'The offline graph omits the redundant All knowledge button');
