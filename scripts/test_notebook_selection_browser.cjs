@@ -67,9 +67,14 @@ async function runCase(browser, width, theme) {
           inputs: ['.dcn-title', '.dcn-original', '.dcn-question'].map(selector => paint(document.querySelector(selector))),
           labelWeight: getComputedStyle(document.querySelector('.dcn-title').parentElement).fontWeight };
       }, scale);
-      for (const input of fonts.inputs) assert.deepEqual(input, fonts.expected,
-        'All three editable inputs match wrong-book notes at scale ' + scale);
-      assert.equal(fonts.expected.fontWeight, '400');
+      const {lineHeight: wrongBookLineHeight, ...wrongBookFont} = fonts.expected;
+      assert.equal(wrongBookLineHeight, 'normal', 'Wrong-book notes use the default line height');
+      for (const {lineHeight, ...font} of fonts.inputs) {
+        assert.deepEqual(font, wrongBookFont, 'Notebook and wrong-book fonts match at scale ' + scale);
+        assert.ok(Math.abs(parseFloat(lineHeight) - 1.5 * parseFloat(font.fontSize)) < 0.01,
+          'Autosizing notebook fields use 1.5 line spacing at scale ' + scale);
+      }
+      assert.equal(wrongBookFont.fontWeight, '400');
       assert.equal(fonts.labelWeight, '600', 'Label emphasis stays separate from editable text');
     }
     await page.evaluate(() => document.documentElement.style.removeProperty('--font-scale'));
