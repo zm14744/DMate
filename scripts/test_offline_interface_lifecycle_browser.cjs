@@ -297,7 +297,9 @@ async function navigationSession(browser, width, username) {
 
 async function restoredBrowserProcess() {
   const profile = await mkdtemp(join(tmpdir(),'dmate-interface-restored-'));
-  const options = {...launch,args:['--restore-last-session'],serviceWorkers:'block',viewport:{width:1440,height:900},reducedMotion:'no-preference'};
+  // Restoring browser tabs requires full Chromium's session service.
+  const options = {...launch,...(launch.executablePath ? {} : {channel:'chromium'}),
+    args:['--restore-last-session'],serviceWorkers:'block',viewport:{width:1440,height:900},reducedMotion:'no-preference'};
   let context;
   try {
     context = await chromium.launchPersistentContext(profile,options);await prepare(context);

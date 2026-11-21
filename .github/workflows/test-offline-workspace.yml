@@ -443,7 +443,8 @@ jobs:
           node scripts/test_offline_device_storage_browser.cjs
           node scripts/test_offline_handoff_browser.cjs
           node scripts/test_offline_vault_workspace_browser.cjs
-          node scripts/test_offline_interface_lifecycle_browser.cjs
+          # Session restoration needs the full Chrome included on the Ubuntu runner.
+          CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome node scripts/test_offline_interface_lifecycle_browser.cjs
           node scripts/test_offline_privacy_motion_browser.cjs
           node scripts/test_offline_backup_browser.cjs
           node scripts/test_offline_mistake_merge_browser.cjs
