@@ -33,6 +33,9 @@ on:
       - 'scripts/test_offline_content*.py'
       - 'scripts/test_favicon_consistency.py'
       - 'scripts/test_offline_workspace_browser.cjs'
+      - 'scripts/stage_native_offline.py'
+      - 'scripts/test_native_offline_bundle_browser.cjs'
+      - 'scripts/test_offline_auto_entry_browser.cjs'
       - 'scripts/test_offline_records_browser.cjs'
       - 'scripts/test_knowledge_graph_browser.cjs'
       - 'scripts/test_graph_empty_recent_browser.cjs'
@@ -138,6 +141,9 @@ on:
       - 'scripts/test_offline_content*.py'
       - 'scripts/test_favicon_consistency.py'
       - 'scripts/test_offline_workspace_browser.cjs'
+      - 'scripts/stage_native_offline.py'
+      - 'scripts/test_native_offline_bundle_browser.cjs'
+      - 'scripts/test_offline_auto_entry_browser.cjs'
       - 'scripts/test_offline_records_browser.cjs'
       - 'scripts/test_knowledge_graph_browser.cjs'
       - 'scripts/test_graph_empty_recent_browser.cjs'
@@ -405,6 +411,8 @@ jobs:
         env:
           DMATE_TEST_BASE_URL: 'http://127.0.0.1:5000'
         run: node scripts/test_chat_finalization_browser.cjs
+      - name: Verify packaged offline assets start without browser cache or network
+        run: node scripts/test_native_offline_bundle_browser.cjs
       - name: Verify assistant transcript and floating composer
         env:
           DMATE_TEST_BASE_URL: 'http://127.0.0.1:5000'
@@ -438,6 +446,7 @@ jobs:
           node scripts/test_textarea_autogrow_browser.cjs
           node scripts/test_drawing_async_persistence_browser.cjs
           node scripts/test_service_worker_cache_browser.cjs
+          node scripts/test_offline_auto_entry_browser.cjs
           node scripts/test_image_export_browser.cjs
           node scripts/test_mistake_action_chrome_browser.cjs
           node scripts/test_conversation_header_browser.cjs

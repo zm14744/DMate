@@ -957,10 +957,15 @@ version = "1.0.2"
 dependencies = [
  "dmate-offline-vault",
  "getrandom 0.2.17",
+ "objc2",
+ "objc2-foundation",
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-opener",
+ "webkit2gtk",
+ "webview2-com",
+ "windows",
  "zeroize",
 ]
 

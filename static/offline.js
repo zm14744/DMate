@@ -1064,7 +1064,7 @@
     if (!await flushNoteDrafts()) return toast(tr("笔记尚未保存，请重试后再离开", "The note is not saved; retry before leaving"));
     if (state.drawingController && !await state.drawingController.flush()) return;
     await Promise.all([state.viewSaveQueue,state.appearanceQueue,state.selectionQueue]);
-    window.location.assign("/");
+    window.location.assign(new URL("/", window.location.origin).href);
   }
 
   async function flushTransferDrafts() {

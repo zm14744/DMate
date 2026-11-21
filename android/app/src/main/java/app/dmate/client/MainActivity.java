@@ -19,11 +19,19 @@ import androidx.webkit.ScriptHandler;
 import androidx.webkit.WebSettingsCompat;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
+import androidx.webkit.ServiceWorkerClientCompat;
+import androidx.webkit.ServiceWorkerControllerCompat;
 import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Locale;
@@ -34,8 +42,13 @@ import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
@@ -45,6 +58,7 @@ import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -71,6 +85,17 @@ public final class MainActivity extends Activity {
     private ScriptHandler systemThemeStartScript;
     private String documentStartSystemTheme;
     private OfflineVaultBridge offlineVaultBridge;
+    private OfflineBundle offlineBundle;
+    private volatile boolean offlineBundleMode;
+    private boolean offlineFallbackPending;
+    private long offlineNavigationRevision;
+    private String offlineNavigationUrl;
+    private ScriptHandler offlineStartScript;
+    private boolean offlineWorkerInterceptInstalled;
+    private ConnectivityManager connectivityManager;
+    private ConnectivityManager.NetworkCallback connectivityCallback;
+    private final Handler networkHandler = new Handler(Looper.getMainLooper());
+    private final Runnable offlineConnectivityCheck = this::checkOfflineConnectivity;
     private ValueCallback<Uri[]> pendingFileCallback;
     private boolean filePickerTriedDocuments;
     private boolean filePickerMultiple;
@@ -133,9 +158,10 @@ public final class MainActivity extends Activity {
         }
 
         if (savedInstanceState == null) {
-            webView.loadUrl(HOME_URL);
+            loadInitialPage();
         } else {
-            webView.restoreState(savedInstanceState);
+            if (webView.restoreState(savedInstanceState) == null) loadInitialPage();
+            else checkOfflineConnectivity();
         }
     }
 
@@ -238,6 +264,7 @@ public final class MainActivity extends Activity {
         installBackupSaveBridge();
         installLanguageBridge();
         offlineVaultBridge = OfflineVaultBridge.install(this, webView);
+        configureOfflineBundle();
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             guestSessionStartScript = WebViewCompat.addDocumentStartJavaScript(
                 webView, GuestSession.script(guestSessionToken), Collections.singleton("https://" + HOME_HOST));
@@ -248,6 +275,118 @@ public final class MainActivity extends Activity {
         webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
             openExternal(Uri.parse(url));
         });
+    }
+
+    private void configureOfflineBundle() {
+        try (InputStreamReader manifest = new InputStreamReader(
+            getAssets().open("dmate-offline/paths.txt"), StandardCharsets.UTF_8)) {
+            offlineBundle = OfflineBundle.read(manifest);
+        } catch (IOException | IllegalArgumentException error) {
+            // Packaging fails when staging fails. Keep a safe online fallback
+            // for an incomplete development installation, without claiming it
+            // has an offline bundle or weakening the vault's origin policy.
+            offlineBundle = null;
+            return;
+        }
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            offlineStartScript = WebViewCompat.addDocumentStartJavaScript(
+                webView, OfflineBundle.markerScript(), Collections.singleton("https://" + HOME_HOST));
+        }
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.SERVICE_WORKER_BASIC_USAGE)
+            && WebViewFeature.isFeatureSupported(WebViewFeature.SERVICE_WORKER_SHOULD_INTERCEPT_REQUEST)) {
+            ServiceWorkerControllerCompat.getInstance().setServiceWorkerClient(new ServiceWorkerClientCompat() {
+                @Override
+                public WebResourceResponse shouldInterceptRequest(WebResourceRequest request) {
+                    return interceptOfflineResource(request);
+                }
+            });
+            offlineWorkerInterceptInstalled = true;
+        }
+        connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        if (connectivityManager != null) {
+            connectivityCallback = new ConnectivityManager.NetworkCallback() {
+                private void changed() {
+                    networkHandler.removeCallbacks(offlineConnectivityCheck);
+                    // A Wi-Fi/mobile handover can briefly lose its old network.
+                    networkHandler.postDelayed(offlineConnectivityCheck, 500);
+                }
+                @Override public void onAvailable(Network network) { changed(); }
+                @Override public void onLost(Network network) { changed(); }
+                @Override public void onCapabilitiesChanged(Network network, NetworkCapabilities capabilities) { changed(); }
+            };
+            try { connectivityManager.registerDefaultNetworkCallback(connectivityCallback); }
+            catch (RuntimeException error) { connectivityCallback = null; }
+        }
+    }
+
+    private boolean hasValidatedNetwork() {
+        if (connectivityManager == null) return false;
+        try {
+            Network network = connectivityManager.getActiveNetwork();
+            NetworkCapabilities capabilities = network == null ? null : connectivityManager.getNetworkCapabilities(network);
+            return capabilities != null && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+        } catch (SecurityException error) { return false; }
+    }
+
+    private void loadInitialPage() {
+        String url = offlineBundle != null ? OfflineBundle.initialUrl(hasValidatedNetwork()) : HOME_URL;
+        offlineNavigationUrl = url;
+        offlineBundleMode = OfflineBundle.isOfflinePage(url);
+        webView.loadUrl(url);
+    }
+
+    private void prepareOfflineNavigation(String url) {
+        if (offlineBundle != null && OfflineBundle.isTrustedPage(url)) {
+            offlineNavigationUrl = url;
+            offlineBundleMode = OfflineBundle.isOfflinePage(url);
+            offlineFallbackPending = false;
+        }
+    }
+
+    private void checkOfflineConnectivity() {
+        if (offlineBundle == null || webView == null || isFinishing() || isDestroyed() || hasValidatedNetwork()) return;
+        String current = offlineNavigationUrl != null ? offlineNavigationUrl : webView.getUrl();
+        if (OfflineBundle.isOfflinePage(current)) { offlineBundleMode = true; return; }
+        if (OfflineBundle.shouldSwitchOffline(current, false)) openBundledOffline();
+    }
+
+    private void openBundledOffline() {
+        if (offlineBundle == null || webView == null || isFinishing() || isDestroyed() || offlineFallbackPending) return;
+        String current = offlineNavigationUrl != null ? offlineNavigationUrl : webView.getUrl();
+        if (!OfflineBundle.isTrustedPage(current) || OfflineBundle.isOfflinePage(current)) return;
+        offlineFallbackPending = true;
+        offlineBundleMode = true;
+        offlineNavigationUrl = OfflineBundle.OFFLINE_URL;
+        webView.stopLoading();
+        webView.loadUrl(OfflineBundle.OFFLINE_URL);
+    }
+
+    private WebResourceResponse interceptOfflineResource(WebResourceRequest request) {
+        OfflineBundle bundle = offlineBundle;
+        if (bundle == null || request == null) return null;
+        String url = request.getUrl().toString();
+        if (request.isForMainFrame() && OfflineBundle.isTrustedPage(url)) {
+            // Manual return to the online homepage remains a network request.
+            offlineBundleMode = OfflineBundle.isOfflinePage(url);
+        }
+        String asset = bundle.assetPath(url, request.getMethod(), offlineBundleMode);
+        if (asset == null) return null;
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Cache-Control", "no-store");
+        headers.put("X-Content-Type-Options", "nosniff");
+        headers.put("X-DMate-Native-Offline", "android-bundle");
+        try {
+            InputStream stream = getAssets().open("dmate-offline/" + asset);
+            String type = OfflineBundle.contentType(asset);
+            String encoding = type.startsWith("text/") || type.contains("javascript") || type.contains("json")
+                || type.contains("svg") ? "UTF-8" : null;
+            return new WebResourceResponse(type, encoding, 200, "OK", headers, stream);
+        } catch (IOException error) {
+            // Never substitute a remote page or a private online endpoint.
+            return new WebResourceResponse("text/plain", "UTF-8", 404, "Not Found", headers,
+                new ByteArrayInputStream("Bundled offline resource missing".getBytes(StandardCharsets.UTF_8)));
+        }
     }
 
     private boolean usesEnglish() {
@@ -670,6 +809,10 @@ public final class MainActivity extends Activity {
     private final class DmateWebViewClient extends WebViewClient {
         @Override
         public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+            offlineNavigationRevision++;
+            offlineNavigationUrl = url;
+            offlineFallbackPending = false;
+            if (OfflineBundle.isTrustedPage(url)) offlineBundleMode = OfflineBundle.isOfflinePage(url);
             if (offlineVaultBridge != null) offlineVaultBridge.navigated();
             cancelBackupSave();
             cancelPendingMicrophoneRequest();
@@ -678,12 +821,14 @@ public final class MainActivity extends Activity {
 
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+            if (request.isForMainFrame()) prepareOfflineNavigation(request.getUrl().toString());
             return handleNavigation(request.getUrl());
         }
 
         @SuppressWarnings("deprecation")
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, String url) {
+            prepareOfflineNavigation(url);
             return handleNavigation(Uri.parse(url));
         }
 
@@ -694,7 +839,26 @@ public final class MainActivity extends Activity {
             if (view == webView) {
                 webView.evaluateJavascript(GuestSession.script(guestSessionToken), null);
                 refreshSystemThemeBridge();
+                if (offlineBundle != null) {
+                    webView.evaluateJavascript(OfflineBundle.markerScript(), null);
+                    checkOfflineConnectivity();
+                    if (OfflineBundle.isTrustedPage(url) && !OfflineBundle.isOfflinePage(url)) {
+                        final long revision = offlineNavigationRevision;
+                        // Older service workers can return offline HTML at '/'.
+                        // Canonicalize that document before allowing vault use.
+                        webView.evaluateJavascript("document.documentElement.dataset.offlineWorkspace==='true'", result -> {
+                            if ("true".equals(result) && webView != null && revision == offlineNavigationRevision
+                                && url.equals(offlineNavigationUrl)) openBundledOffline();
+                        });
+                    }
+                }
             }
+        }
+
+        @Override
+        public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+            WebResourceResponse bundled = interceptOfflineResource(request);
+            return bundled != null ? bundled : super.shouldInterceptRequest(view, request);
         }
 
         @Override
@@ -707,7 +871,10 @@ public final class MainActivity extends Activity {
         public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
             super.onReceivedError(view, request, error);
             if (request.isForMainFrame()) {
-                showOfflinePage();
+                if (offlineBundle != null && OfflineBundle.isTrustedPage(request.getUrl().toString())
+                    && !OfflineBundle.isOfflinePage(request.getUrl().toString())
+                    && OfflineBundle.isConnectionError(error.getErrorCode())) openBundledOffline();
+                else if (!OfflineBundle.isOfflinePage(request.getUrl().toString())) showOfflinePage();
             }
         }
 
@@ -904,11 +1071,22 @@ public final class MainActivity extends Activity {
         if (webView != null) {
             webView.onResume();
             refreshSystemThemeBridge();
+            networkHandler.post(offlineConnectivityCheck);
         }
     }
 
     @Override
     protected void onDestroy() {
+        networkHandler.removeCallbacks(offlineConnectivityCheck);
+        if (connectivityManager != null && connectivityCallback != null) {
+            try { connectivityManager.unregisterNetworkCallback(connectivityCallback); }
+            catch (RuntimeException ignored) {}
+            connectivityCallback = null;
+        }
+        if (offlineWorkerInterceptInstalled) {
+            ServiceWorkerControllerCompat.getInstance().setServiceWorkerClient(null);
+            offlineWorkerInterceptInstalled = false;
+        }
         if (isFinishing()) GuestSession.end(guestSessionToken);
         cancelPendingMicrophoneRequest();
         cancelBackupSave();
@@ -923,6 +1101,10 @@ public final class MainActivity extends Activity {
             offlineVaultBridge = null;
         }
         if (webView != null) {
+            if (offlineStartScript != null) {
+                offlineStartScript.remove();
+                offlineStartScript = null;
+            }
             if (guestSessionStartScript != null) {
                 guestSessionStartScript.remove();
                 guestSessionStartScript = null;

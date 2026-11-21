@@ -4,6 +4,17 @@ plugins {
 
 def releaseKeystore = System.getenv("DMATE_KEYSTORE_PATH")
 def hasReleaseSigning = releaseKeystore != null && !releaseKeystore.trim().isEmpty()
+def offlineAssets = project.layout.buildDirectory.dir('generated/offlineAssets')
+def stageOfflineBundle = tasks.register('stageOfflineBundle', Exec) {
+    workingDir rootProject.projectDir.parentFile
+    inputs.file new File(rootProject.projectDir.parentFile, 'scripts/stage_native_offline.py')
+    inputs.file new File(rootProject.projectDir.parentFile, 'static/offline.html')
+    inputs.file new File(rootProject.projectDir.parentFile, 'static/offline-service-worker.js')
+    inputs.dir new File(rootProject.projectDir.parentFile, 'static')
+    outputs.dir offlineAssets
+    commandLine 'python3', 'scripts/stage_native_offline.py', '--destination',
+        offlineAssets.get().dir('dmate-offline').asFile.absolutePath
+}
 
 android {
     namespace 'app.dmate.client'
@@ -23,6 +34,8 @@ android {
     buildFeatures {
         buildConfig true
     }
+
+    sourceSets.main.assets.srcDir offlineAssets.get().asFile
 
     signingConfigs {
         if (hasReleaseSigning) {
@@ -54,6 +67,8 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 }
+
+tasks.named('preBuild').configure { dependsOn stageOfflineBundle }
 
 // Origin-bound JavaScript-to-native image-saving bridge. Web features update from Zeabur.
 dependencies {

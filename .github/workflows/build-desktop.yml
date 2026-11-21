@@ -18,6 +18,8 @@ on:
       - main
     paths:
       - "scripts/generate_icons.py"
+      - "scripts/stage_native_offline.py"
+      - "static/offline*"
       - "desktop/src-tauri/**"
       - ".github/workflows/build-desktop.yml"
 

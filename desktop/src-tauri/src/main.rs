@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod guest_session;
+mod offline_bundle;
 mod offline_vault;
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
@@ -83,7 +84,9 @@ mod system_theme {
 }
 
 fn main() {
-    let builder = offline_vault::configure(guest_session::configure(tauri::Builder::default()));
+    let builder = offline_bundle::configure(offline_vault::configure(guest_session::configure(
+        tauri::Builder::default(),
+    )));
     #[cfg(any(target_os = "windows", target_os = "macos"))]
     let builder = system_theme::configure(builder);
     // Linux has no Tauri ThemeChanged event. Keep its live media-query path

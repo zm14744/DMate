@@ -1,8 +1,75 @@
 (() => {
   "use strict";
   const button = document.getElementById("offlineWorkspaceBtn");
-  let opening = false;
-  async function openOfflineWorkspace() {
+  const workerURL = new URL("/offline-service-worker.js",location.origin).href;
+  const supportsWorker = "serviceWorker" in navigator && window.isSecureContext
+    && !document.documentElement.hasAttribute("data-native-offline-bundle")
+    && window.__DMATE_NATIVE_OFFLINE_AVAILABLE__ !== true;
+  let opening = false, checking = false, checkAgain = false, preparation = null;
+  function clearPreparationNotice() {
+    document.getElementById("offlinePreparationStatus")?.remove();
+  }
+  function showPreparationNotice() {
+    if (document.getElementById("offlinePreparationStatus")) return;
+    const notice = document.createElement("div");
+    notice.id = "offlinePreparationStatus";
+    notice.className = "copy-toast";
+    notice.setAttribute("role","status");
+    notice.setAttribute("aria-live","polite");
+    notice.style.maxWidth = "calc(100vw - 32px)";
+    notice.textContent = window.DMateI18n?.t?.("离线资源尚未准备完成，请联网打开离线版后重试",
+      "Offline resources are not ready. Reconnect and open offline mode, then retry.")
+      || "离线资源尚未准备完成，请联网打开离线版后重试";
+    document.body.append(notice);
+  }
+  async function shellIsCached() {
+    if (!supportsWorker || !("caches" in window)) return false;
+    try {
+      const registration = await navigator.serviceWorker.getRegistration(location.origin + "/");
+      if (registration?.active?.scriptURL !== workerURL) return false;
+      const names = (await caches.keys()).filter(name => name.startsWith("dmate-offline-shell-"));
+      for (const name of names) {
+        const response = await (await caches.open(name)).match("/offline");
+        const complete = await (await caches.open(name)).match("/__dmate_offline_ready__/"+name);
+        if (response?.ok && complete?.ok) return true;
+      }
+    } catch (_) { /* A blocked cache must not turn a loaded page into a network error. */ }
+    return false;
+  }
+  async function prepareOfflineResources() {
+    if (!supportsWorker) return;
+    if (!preparation) preparation = navigator.serviceWorker.register(workerURL,{scope:"/"})
+      .then(registration => {
+        if (navigator.onLine) {
+          registration.active?.postMessage({type:"dmate:prepare-offline"});
+          void registration.update().catch(() => {});
+        }
+        return registration;
+      }).catch(error => {
+        console.warn("DMate 离线资源准备失败：",error);
+        preparation = null;
+      });
+    return preparation;
+  }
+  async function automaticallyOpenOffline() {
+    // New native hosts own their bundled fallback. Older clients still use the
+    // browser cache path; a user-agent string alone is not a capability signal.
+    if (!button || navigator.onLine || opening
+      || window.__DMATE_NATIVE_OFFLINE_AVAILABLE__ === true) return;
+    if (checking) { checkAgain = true; return; }
+    checking = true;
+    try {
+      if (!await shellIsCached()) {
+        if (!navigator.onLine) showPreparationNotice();
+        return;
+      }
+      if (!navigator.onLine) await openOfflineWorkspace(true);
+    } finally {
+      checking = false;
+      if (checkAgain) { checkAgain = false; void automaticallyOpenOffline(); }
+    }
+  }
+  async function openOfflineWorkspace(automatic = false) {
     if (opening) return;
     opening = true;
     if (button) {
@@ -11,18 +78,22 @@
     }
     // Opening local mode never copies the signed-in account's cloud records.
     // ZIP export/import is the explicit transfer mechanism between the modes.
-    if ("serviceWorker" in navigator && window.isSecureContext) {
+    void prepareOfflineResources();
+    clearPreparationNotice();
+    // Draft checkpoint listeners can run before navigation; pagehide remains
+    // the final synchronous checkpoint for the existing conversation state.
+    window.dispatchEvent(new CustomEvent("dmate:before-offline-navigation",{detail:{automatic}}));
+    if (automatic && window.DMateAccountOcrDrafts?.flush) {
+      let timer;
       try {
-        // Cache installation continues across the navigation. Enter the real
-        // workspace without showing a preparation screen or waiting for every
-        // offline asset to finish downloading.
-        void navigator.serviceWorker.register("/offline-service-worker.js", {scope:"/"})
-          .catch(error => console.warn("离线资源尚未完全准备：", error));
-      } catch (error) {
-        console.warn("离线资源尚未完全准备：", error);
-      }
+        await Promise.race([
+          Promise.resolve().then(() => window.DMateAccountOcrDrafts.flush()).catch(() => {}),
+          new Promise(resolve => { timer = setTimeout(resolve,750); })
+        ]);
+      } finally { clearTimeout(timer); }
     }
-    window.location.assign("/offline");
+    if (automatic) window.location.replace("/offline");
+    else window.location.assign("/offline");
   }
   if (button) {
     // Removing the native title also invalidates an already-held tooltip
@@ -37,15 +108,23 @@
       button.disabled = false;
       button.removeAttribute("aria-busy");
     }
+    void automaticallyOpenOffline();
   });
-  if (!("serviceWorker" in navigator) || !window.isSecureContext) {
-    return;
+  window.addEventListener("offline",() => { void automaticallyOpenOffline(); });
+  window.addEventListener("online",() => {
+    clearPreparationNotice();
+    preparation = null;
+    void prepareOfflineResources();
+  });
+  if (supportsWorker) {
+    navigator.serviceWorker.addEventListener("controllerchange",() => { void automaticallyOpenOffline(); });
+    navigator.serviceWorker.addEventListener("message",event => {
+      if (event.source?.scriptURL === workerURL && event.data?.type === "dmate:offline-ready")
+        void automaticallyOpenOffline();
+    });
   }
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/offline-service-worker.js", {scope:"/"})
-      .then(registration => registration.update().catch(() => {}))
-      .catch(error => {
-        console.warn("DMate 离线资源准备失败：", error);
-      });
-  }, {once:true});
+  // Start before window.load: already-open pages can lose their connection
+  // while other assets are still loading, and restored pages may start offline.
+  void prepareOfflineResources();
+  void automaticallyOpenOffline();
 })();

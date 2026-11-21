@@ -1,5 +1,6 @@
 "use strict";
-const CACHE_NAME = "dmate-offline-shell-v95";
+const CACHE_NAME = "dmate-offline-shell-v96";
+const CACHE_READY = "/__dmate_offline_ready__/"+CACHE_NAME;
 const PRECACHE = [
   "/static/appearance-bootstrap.js?v=1",
   "/static/offline-appearance-preload.js?v=1",
@@ -61,8 +62,8 @@ const PRECACHE = [
   "/static/vendor/fflate-0.8.2/fflate.min.js",
   "/static/offline-backup.js?v=3",
   "/static/backup-download.js?v=1",
-  "/static/offline-entry.js?v=48",
-  "/static/offline.js?v=66",
+  "/static/offline-entry.js?v=49",
+  "/static/offline.js?v=67",
   "/static/icons/dmate-brand-v52.svg",
   "/static/offline-content/concepts.zh-CN.json?v=34",
   "/static/offline-content/questions.zh-CN.json?v=34",
@@ -132,6 +133,7 @@ self.addEventListener("install", event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
     await cache.addAll(PRECACHE);
+    await cache.put(CACHE_READY,new Response("ready"));
     await self.skipWaiting();
   })());
 });
@@ -143,6 +145,23 @@ self.addEventListener("activate", event => {
       .map(key => caches.delete(key)));
     await self.clients.claim();
   })());
+});
+
+let preparingCache = null;
+self.addEventListener("message",event => {
+  if (event.data?.type !== "dmate:prepare-offline") return;
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    // Installation populates this cache atomically. Repair a cleared cache
+    // once on reconnection instead of downloading the study pack on every load.
+    if (!await cache.match(CACHE_READY)) {
+      if (!preparingCache) preparingCache = cache.addAll(PRECACHE)
+        .then(() => cache.put(CACHE_READY,new Response("ready"))).finally(() => { preparingCache = null; });
+      await preparingCache;
+    }
+    for (const client of await self.clients.matchAll({type:"window",includeUncontrolled:true}))
+      client.postMessage({type:"dmate:offline-ready"});
+  })().catch(() => {}));
 });
 
 self.addEventListener("fetch", event => {
@@ -163,7 +182,12 @@ self.addEventListener("fetch", event => {
       } catch (_) {
         const cache = await caches.open(CACHE_NAME);
         const cached = await cache.match("/offline");
-        if (cached) return cached;
+        if (cached && await cache.match(CACHE_READY)) {
+          // Serving offline HTML under '/' leaves native vault authorization
+          // on the wrong path. Redirect once, then serve the canonical shell.
+          if (url.pathname !== "/offline") return Response.redirect(new URL("/offline",self.location.origin).href,302);
+          return cached;
+        }
         return new Response(
           "<!doctype html><html lang='zh-CN'><meta charset='utf-8'><title>DMate 离线</title><body><p>离线学习资源尚未准备。请在有网络时打开 DMate 并进入离线版完成准备。</p></body></html>",
           {headers:{"Content-Type":"text/html; charset=utf-8"},status:503}

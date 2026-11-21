@@ -100,6 +100,9 @@ pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
                     if webview.label() != "main" {
                         return false;
                     }
+                    if crate::offline_bundle::startup_document(url) {
+                        return true;
+                    }
                     if trusted_origin(url) {
                         navigation_state.generation.fetch_add(1, Ordering::SeqCst);
                         return true;
