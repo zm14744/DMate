@@ -48,6 +48,8 @@ DOWNLOAD_PROGRESS_INTERVAL = 15
 DOWNLOAD_PROGRESS_TIMEOUT = 60
 DOWNLOAD_RATE_WINDOW = 30
 MIN_DOWNLOAD_RATE = 128 * 1024
+SLOW_MIRROR_REMAINING_SECONDS = 120
+MIRROR_SPEEDUP_RATIO = 1.5
 MODEL_LOCK_PATH = Path(__file__).with_name('ocr-model-lock.json')
 
 
@@ -308,7 +310,7 @@ def _download_official_file(http, name, filename, record, destination, timeout_s
     if not sources:
         raise CachePreparationError('no_official_file_sources')
     blocked_sources = set()
-    slow_sources = set()
+    slow_rates = {}
     source_attempts = {}
     # One bounded budget is shared by mirrors and retries. The 130 MB layout
     # weights need about 33 minutes on a 65 KiB/s link; 300 seconds cannot work.
@@ -391,16 +393,26 @@ def _download_official_file(http, name, filename, record, destination, timeout_s
                             now = time.monotonic()
                             elapsed = now - transfer_started
                             if (elapsed >= DOWNLOAD_RATE_WINDOW and len(available) > 1
-                                    and source['url'] not in slow_sources):
+                                    and source['url'] not in slow_rates):
                                 rate = (received - offset) / elapsed
                                 remaining = hard_deadline - now
-                                if (rate < MIN_DOWNLOAD_RATE and received < expected_size
-                                        and (expected_size - received) / max(rate, 1) > remaining):
-                                    # A slow mirror can still be the only one
-                                    # reachable. Prefer another once, then allow
-                                    # resuming here if the alternatives fail.
-                                    slow_sources.add(source['url'])
-                                    raise CachePreparationError('official_transfer_too_slow')
+                                bytes_left = expected_size - received
+                                patience = min(remaining, SLOW_MIRROR_REMAINING_SECONDS)
+                                if rate < MIN_DOWNLOAD_RATE and bytes_left > rate * patience:
+                                    untried = any(item['url'] not in source_attempts for item in available)
+                                    earlier_rate = max(slow_rates.get(item['url'], 0) for item in available)
+                                    # On a long transfer, a 1.5x speedup saves at
+                                    # least 40s. Near the deadline even a smaller
+                                    # advantage matters if only that source can finish.
+                                    worthwhile = (earlier_rate > rate and earlier_rate >= MIRROR_SPEEDUP_RATIO * rate
+                                                  and bytes_left > rate * SLOW_MIRROR_REMAINING_SECONDS)
+                                    meets_deadline = rate * remaining < bytes_left <= earlier_rate * remaining
+                                    if untried or worthwhile or meets_deadline:
+                                        slow_rates[source['url']] = rate
+                                        print(f'{prefix}: {rate / 1024:.1f} KiB/s with {bytes_left} bytes left; '
+                                              'switching mirrors and requesting the remaining bytes.',
+                                              file=sys.stderr, flush=True)
+                                        raise CachePreparationError('official_transfer_too_slow')
                             if now - last_progress >= DOWNLOAD_PROGRESS_INTERVAL:
                                 print(f'{prefix}: '
                                       f'{received}/{expected_size} bytes '

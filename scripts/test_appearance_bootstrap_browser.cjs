@@ -117,7 +117,9 @@ async function guestIsolation(context) {
   const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.CHROMIUM_EXECUTABLE_PATH}:{})});
   try {
     for (const width of [1440,390]) {
-      const context=await browser.newContext({viewport:{width,height:900},colorScheme:'light'});
+      // The offline seed page can install a worker that bypasses the routed HTML
+      // identity and the deliberately held scripts used by these first-paint checks.
+      const context=await browser.newContext({viewport:{width,height:900},colorScheme:'light',serviceWorkers:'block'});
       await installStorageProbe(context);await captureFrames(context);
       const seedPage=await context.newPage();await seed(seedPage);await seedPage.close();
       await verifiedOnline(context);await offlineStartup(context);await guestIsolation(context);

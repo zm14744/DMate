@@ -937,6 +937,12 @@ async function runCase(browser, width, theme) {
   try {
     const themes = (process.env.DMATE_TEST_THEMES || 'light,dark,navy').split(',');
     assert.ok(themes.length && themes.every(theme => ['light', 'dark', 'navy'].includes(theme)), 'Supported theme selection');
-    for (const width of [1440, 390]) for (const theme of themes) await runCase(browser, width, theme);
+    for (const theme of themes) {
+      // Each viewport owns its browser context, service-worker target and screenshots.
+      const cases = await Promise.allSettled([1440, 390].map(width => runCase(browser, width, theme)));
+      for (const result of cases) {
+        if (result.status === 'rejected') throw result.reason;
+      }
+    }
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

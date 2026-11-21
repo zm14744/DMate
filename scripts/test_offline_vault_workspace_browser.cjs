@@ -27,13 +27,17 @@ async function prepare(context) {
     const value = request.url() + '\n' + (request.postData() || '');
     if (Object.values(secret).some(marker => value.includes(marker))) network.push(value);
   });
-  await context.route('**/__offline-vault-ui-fixture', route => route.fulfill({contentType:'text/html',body:
-    '<!doctype html><title>Verified owner fixture</title><script src="/static/guest-session.js"></script>'}));
   return network;
 }
-async function enter(context, username='') {
+async function fixturePage(context) {
   const page = await context.newPage();
-  await page.goto(baseURL+'/__offline-vault-ui-fixture');
+  // Use a real same-origin resource even when the offline worker owns navigation.
+  await page.goto(baseURL+'/robots.txt');
+  await page.setContent('<!doctype html><title>Verified owner fixture</title><script src="/static/guest-session.js"></script>');
+  return page;
+}
+async function enter(context, username='') {
+  const page = await fixturePage(context);
   await page.evaluate(username => DMateGuestSession.setAccountOwner(username),username);
   await page.goto(baseURL+'/offline',{waitUntil:'networkidle'});
   return page;
@@ -219,7 +223,7 @@ async function migrationFailure(browser,native=false) {
   const network=await prepare(context);
   const original={id:'failure-note::'+encodeURIComponent('account:'+owner),title:'Failure source',content:'KEEP-PRIVATE-MIGRATION-SOURCE-89',updatedAt:1000};
   try {
-    const page=await context.newPage();await page.goto(baseURL+'/__offline-vault-ui-fixture');
+    const page=await fixturePage(context);
     await page.evaluate(async({owner,original})=>{
       DMateGuestSession.setAccountOwner(owner);
       const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('dmate-offline-workspace',3);r.onupgradeneeded=()=>{for(const name of ['mistakes','notes','practice','settings'])r.result.createObjectStore(name,{keyPath:'id'});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});

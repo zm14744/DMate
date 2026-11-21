@@ -1,4 +1,5 @@
-FROM python:3.10-slim
+# syntax=docker/dockerfile:1
+FROM python:3.10-slim AS runtime-deps
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -24,20 +25,34 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements-agents.txt ./
-RUN python -m pip install --upgrade pip && \
+RUN --mount=type=cache,id=dmate-pip,target=/root/.cache/pip,sharing=locked \
+    unset PIP_NO_CACHE_DIR && python -m pip install --upgrade pip && \
     python -m pip install -r requirements.txt
 
+FROM runtime-deps AS web-icons
+RUN --mount=type=bind,source=scripts/generate_icons.py,target=/opt/dmate-icon-build/scripts/generate_icons.py \
+    python /opt/dmate-icon-build/scripts/generate_icons.py --web-only
+
+# Assemble UI updates on the small Python base, independently of OCR weights.
+FROM python:3.10-slim AS app-files
+WORKDIR /app
+COPY . .
+RUN python -m compileall -q -l .
+COPY --link --from=web-icons /opt/dmate-icon-build/static/icons/ /app/static/icons/
+
+FROM runtime-deps
 # Fetch verified official Hugging Face files, with ModelScope as fallback,
 # then export the same two Small text models to ONNX without running inference.
 # Keep completed models and resumable downloads when BuildKit retains its cache;
 # copy only the verified runtime files into the image.
-COPY ocr_runtime.py image_upload_limits.py ./
-COPY scripts/prepare_ocr_model_cache.py ./scripts/prepare_ocr_model_cache.py
-COPY scripts/ocr-model-lock.json ./scripts/ocr-model-lock.json
 # A 130 MB file needs over half an hour on a healthy 65 KiB/s link. This is a
 # build-time file budget, separate from short HTTP/idle timeouts and gunicorn.
 ARG DMATE_MODEL_DOWNLOAD_TIMEOUT=3600
-RUN --mount=type=cache,id=dmate-ocr-model-cache-v2,target=/var/cache/dmate-model-build,sharing=locked \
+RUN --mount=type=bind,source=ocr_runtime.py,target=/app/ocr_runtime.py \
+    --mount=type=bind,source=image_upload_limits.py,target=/app/image_upload_limits.py \
+    --mount=type=bind,source=scripts/prepare_ocr_model_cache.py,target=/app/scripts/prepare_ocr_model_cache.py \
+    --mount=type=bind,source=scripts/ocr-model-lock.json,target=/app/scripts/ocr-model-lock.json \
+    --mount=type=cache,id=dmate-ocr-model-cache-v2,target=/var/cache/dmate-model-build,sharing=locked \
     python scripts/prepare_ocr_model_cache.py --cache-dir /var/cache/dmate-model-build \
         --download-timeout "$DMATE_MODEL_DOWNLOAD_TIMEOUT" && \
     mkdir -p /opt/dmate-model-cache/paddlex && \
@@ -46,17 +61,8 @@ RUN --mount=type=cache,id=dmate-ocr-model-cache-v2,target=/var/cache/dmate-model
         /var/cache/dmate-model-build/paddlex/dmate-model-manifest.json \
         /opt/dmate-model-cache/paddlex/
 
-# Cache generated web icons independently of ordinary application changes.
-# Stage them outside /app so COPY cannot overwrite them with older artifacts.
-COPY scripts/generate_icons.py /opt/dmate-icon-build/scripts/generate_icons.py
-RUN python /opt/dmate-icon-build/scripts/generate_icons.py --web-only
-
-COPY . .
-
-# Reject application syntax errors during the build, before replacing a running service.
-RUN python -m compileall -q -l . && \
-    cp -a /opt/dmate-icon-build/static/icons/. /app/static/icons/ && \
-    rm -rf /opt/dmate-icon-build
+# A web-only change can replace this layer without rebuilding the OCR runtime.
+COPY --link --from=app-files /app/ /app/
 
 # Four independent image requests plus capacity for cancellation, health and chat.
 # The local model scheduler, rather than HTTP threads, limits inference memory.

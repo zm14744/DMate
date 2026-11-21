@@ -4,6 +4,8 @@
  */
 'use strict';
 const assert = require('node:assert/strict');
+// Playwright 1.56 requires this opt-in to observe requests made by the worker.
+process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS = '1';
 const { chromium } = require('playwright');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const assetPath = '/static/button-themes.css';

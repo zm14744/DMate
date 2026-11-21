@@ -121,7 +121,8 @@ async function migration(browser, legacy) {
     assert.equal(importedMistake.explanation,'Saved explanation');
     assert.equal(importedMistake.status,'resolved');
     if(legacy)assert.equal(time(mistake('updated-mistake').createdAt),1000,'The local mistake keeps its original capture date');
-    assert.ok(time(importedMistake.createdAt)>0,'A newly restored mistake has a usable local display date');
+    assert.ok(!Object.hasOwn(importedMistake,'createdAt') && !Object.hasOwn(importedMistake,'updatedAt'),
+      'A newly restored mistake omits the source capture and update times');
     assert.deepEqual(state.records.notes,[],'Verified device migration removes old plaintext note sources after copying them into ciphertext');
     assert.deepEqual(state.records.mistakes,[],'Verified device migration removes old plaintext mistake sources after copying them into ciphertext');
     if (legacy) {
@@ -145,7 +146,8 @@ async function migration(browser, legacy) {
     assert.equal(await page.locator('#mistakeList .wrong-status,#mistakeList .wrong-analysis-details,#mistakeList [data-action="edit-mistake"],#addMistake,#recordDialog').count(),0,
       'Stored correction and explanation data do not recreate removed offline controls');
     assert.equal(await page.locator('#mistakeList [data-action="delete-mistake"] svg').count(),0);
-    assert.ok((await page.locator('#mistakeList .wrong-date').count())>0,'Original capture dates remain visible');
+    assert.equal(await page.locator('#mistakeList .wrong-date:visible').count(),0,'Migrated mistake cards hide capture dates');
+    assert.doesNotMatch(await page.locator('#mistakeList').innerText(),/1970/,'Legacy record times do not appear elsewhere on the cards');
     const savedGallery = (await vaultRow(page,'drawings','gallery')).gallery;
     const gallery = typeof savedGallery === 'string' ? JSON.parse(savedGallery) : savedGallery;
     assert.equal(gallery.pages.length,legacy?3:2,'Different incoming drawings are appended without replacing a local page with the same ID');
@@ -170,7 +172,7 @@ async function migration(browser, legacy) {
       assert.deepEqual(afterLogin.vault.mistakes,beforeLogin.mistakes,'Changing the online account does not replace migrated device mistakes');
     }
     assert.deepEqual(errors,[]);assert.deepEqual(forbidden,[]);
-    console.log('PASS '+(legacy?'legacy v2 upgrade':'fresh v2 upgrade')+': device records, retained local edits, plaintext cleanup, immutable dates and original drawing migration');
+    console.log('PASS '+(legacy?'legacy v2 upgrade':'fresh v2 upgrade')+': device records, retained local edits, plaintext cleanup, timestamp-free mistake imports and original drawing migration');
   } finally { await context.close(); }
 }
 async function guestMigration(browser) {

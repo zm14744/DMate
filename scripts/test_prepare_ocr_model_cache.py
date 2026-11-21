@@ -151,6 +151,73 @@ class DownloadTests(unittest.TestCase):
         self.assertEqual(http.ranges, ['bytes=0-', 'bytes=1-'])
         self.assertEqual(self.destination.read_bytes(), b'a' * 100)
 
+    @contextmanager
+    def simulated_transfer_time(self):
+        now = 0.
+
+        def advance(seconds):
+            nonlocal now
+            now += seconds
+
+        with patch.object(time, 'monotonic', side_effect=lambda: now), \
+                patch.object(time, 'sleep', side_effect=advance):
+            yield
+
+    def test_slow_primary_tries_a_new_mirror_even_when_it_could_meet_the_hour_budget(self):
+        sources = self.sources() + [{'label': 'fallback', 'url': 'https://fallback.invalid/model',
+                                     'params': None}]
+        # 30 bytes in 30 seconds would leave another 970 seconds on this host.
+        http = HTTP([Response([b'a' * 30, b'a' * 970], delay=30),
+                     Response([b'a' * 970], status=206, content_range='bytes 30-999/1000')])
+        with self.simulated_transfer_time():
+            self.download(http, expected=b'a' * 1000, timeout=3600, sources=sources)
+        self.assertEqual(http.urls, [source['url'] for source in sources])
+        self.assertEqual(http.ranges, ['bytes=0-', 'bytes=30-'])
+        self.assertEqual(self.destination.read_bytes(), b'a' * 1000)
+
+    def test_slow_mirror_finishes_a_short_remaining_transfer_without_switching(self):
+        sources = self.sources() + [{'label': 'fallback', 'url': 'https://fallback.invalid/model',
+                                     'params': None}]
+        http = HTTP([Response([b'a' * 30, b'a' * 70], delay=30)])
+        with self.simulated_transfer_time():
+            self.download(http, expected=b'a' * 100, timeout=3600, sources=sources)
+        self.assertEqual(http.urls, [sources[0]['url']])
+
+    def test_comparably_slow_mirrors_keep_the_second_stream_open(self):
+        sources = self.sources() + [{'label': 'fallback', 'url': 'https://fallback.invalid/model',
+                                     'params': None}]
+        http = HTTP([Response([b'a' * 30, b'a' * 970], delay=30),
+                     Response([b'a' * 28, b'a' * 942], status=206,
+                              content_range='bytes 30-999/1000', delay=30)])
+        with self.simulated_transfer_time():
+            self.download(http, expected=b'a' * 1000, timeout=3600, sources=sources)
+        self.assertEqual(http.ranges, ['bytes=0-', 'bytes=30-'])
+        self.assertEqual(self.destination.read_bytes(), b'a' * 1000)
+
+    def test_return_to_the_much_faster_first_mirror_when_both_could_meet_the_deadline(self):
+        sources = self.sources() + [{'label': 'fallback', 'url': 'https://fallback.invalid/model',
+                                     'params': None}]
+        http = HTTP([Response([b'a' * 60, b'a' * 940], delay=30),
+                     Response([b'a' * 15, b'a' * 925], status=206, content_range='bytes 60-999/1000', delay=30),
+                     Response([b'a' * 40, b'a' * 885], status=206, content_range='bytes 75-999/1000', delay=30)])
+        with self.simulated_transfer_time():
+            self.download(http, expected=b'a' * 1000, timeout=3600, sources=sources)
+        self.assertEqual(http.urls, [sources[0]['url'], sources[1]['url'], sources[0]['url']])
+        self.assertEqual(http.ranges, ['bytes=0-', 'bytes=60-', 'bytes=75-'])
+        self.assertEqual(self.destination.read_bytes(), b'a' * 1000)
+
+    def test_return_to_the_first_mirror_if_only_it_can_still_meet_the_deadline(self):
+        sources = self.sources() + [{'label': 'fallback', 'url': 'https://fallback.invalid/model',
+                                     'params': None}]
+        http = HTTP([Response([b'a' * 60, b'a' * 940], delay=30),
+                     Response([b'a' * 50, b'a' * 890], status=206, content_range='bytes 60-999/1000', delay=30),
+                     Response([b'a' * 890], status=206, content_range='bytes 110-999/1000')])
+        with self.simulated_transfer_time():
+            self.download(http, expected=b'a' * 1000, timeout=530, sources=sources)
+        self.assertEqual(http.urls, [sources[0]['url'], sources[1]['url'], sources[0]['url']])
+        self.assertEqual(http.ranges, ['bytes=0-', 'bytes=60-', 'bytes=110-'])
+        self.assertEqual(self.destination.read_bytes(), b'a' * 1000)
+
     def test_slow_source_is_resumable_after_alternative_is_forbidden(self):
         sources = self.sources() + [{'label': 'fallback', 'url': 'https://fallback.invalid/model',
                                      'params': None}]
