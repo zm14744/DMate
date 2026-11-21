@@ -61,19 +61,26 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     assert.equal(reference.status(), 200, 'The server must provide the shared stylesheet');
     const networkCSS = await reference.text();
     assert.ok(networkCSS.trim().length, 'The shared stylesheet must not be empty');
+    const packURL = new URL('/static/offline-content/questions.zh-CN.json?v=34', baseURL).href;
+    const [plainPack, compressedPack] = await Promise.all(['identity', 'gzip'].map(encoding =>
+      context.request.get(packURL, {headers:{'Accept-Encoding':encoding}})));
+    assert.equal(compressedPack.headers()['content-encoding'], 'gzip');
+    assert.match(compressedPack.headers().vary, /Accept-Encoding/i);
+    assert.ok(Number(compressedPack.headers()['content-length']) < Number(plainPack.headers()['content-length']));
+    assert.deepEqual(await compressedPack.body(), await plainPack.body(), 'Compressed study content decodes to the original bytes');
     const sharedAssets = await Promise.all(['/static/dmate-main.css?v=67', '/static/graph-editor.css?v=26', '/static/button-themes.css?v=65', '/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
       '/static/select-controls.css?v=43', '/static/mobile-select.js?v=26', '/static/offline.css?v=65',
       '/static/concept-notebook.css?v=3', '/static/textarea-autosize.css?v=1', '/static/textarea-autosize.js?v=1',
       '/static/drawing-workspace.css?v=52', '/static/graph-editor.js?v=53', '/static/graph-editor-overlay.js?v=39', '/static/drawing-workspace.js?v=56', '/static/drawing-export.js?v=39',
       '/static/modal-chrome.css', '/static/modal-text.js?v=53', '/static/delete-confirm.js', '/static/guest-session.js?v=53', '/static/offline-interface-state.js?v=1', '/static/language.js?v=59',
-      '/static/graph-editor-format.js?v=32', '/static/language-catalog.js?v=64', '/static/offline-privacy-motion.js?v=2', '/static/offline-shell.js?v=39',
-      '/static/offline-vault.js?v=2', '/static/offline-handoff.js?v=1', '/static/offline-storage.js?v=3',
+      '/static/graph-editor-format.js?v=32', '/static/language-catalog.js?v=64', '/static/offline-privacy-motion.js?v=3', '/static/offline-shell.js?v=40',
+      '/static/offline-vault.js?v=2', '/static/offline-handoff.js?v=1', '/static/offline-storage.js?v=4',
       '/static/vendor/fflate-0.8.2/fflate.min.js', '/static/offline-backup.js?v=3',
       '/static/backup-download.js?v=1', '/static/appearance-bootstrap.js?v=1',
       '/static/offline-appearance-preload.js?v=1', '/static/offline-appearance.js?v=9',
-      '/static/offline.js?v=67', '/static/offline-knowledge-graph.js?v=60',
+      '/static/offline.js?v=68', '/static/offline-knowledge-graph.js?v=60',
       '/static/ui-tooltip.js?v=49',
-      '/static/offline-knowledge-graph.css?v=54', '/static/offline-entry.js?v=49',
+      '/static/offline-knowledge-graph.css?v=54', '/static/offline-entry.js?v=50',
       '/static/search-controls.css?v=27', '/static/search-controls.js?v=27',
       '/static/offline-content/concepts.zh-CN.json?v=34', '/static/offline-content/questions.zh-CN.json?v=34',
       '/static/offline-content/knowledge_graph.json?v=28',
@@ -84,12 +91,21 @@ async function disconnectWorkerNetwork(browser, workerURL) {
         return { path, text: await response.text() };
       }));
 
-    // Simulate the pinned stylesheet left by the previous offline shell.
-    await page.goto(new URL('/health', baseURL).href);
-    await page.evaluate(async () => {
-      const cache = await caches.open('dmate-offline-shell-v95');
-      await cache.put('/static/button-themes.css?v=54', new Response('/* obsolete graph navigation button styles */'));
+    const reusablePacks = sharedAssets.filter(asset => asset.path.startsWith('/static/offline-content/'));
+    const workerRequests = [];
+    context.on('request',request => {
+      if(typeof request.serviceWorker === 'function' && request.serviceWorker()) workerRequests.push(request.url());
     });
+    // A complete previous release can contribute exact immutable URLs, while
+    // changed versions and unversioned application code still come fresh.
+    await page.goto(new URL('/health', baseURL).href);
+    await page.evaluate(async packs => {
+      const cache = await caches.open('dmate-offline-shell-v96');
+      await cache.put('/static/button-themes.css?v=54', new Response('/* obsolete graph navigation button styles */'));
+      await cache.put('/static/graph-editor-model.js',new Response('/* obsolete unversioned editor model */'));
+      for(const asset of packs) await cache.put(asset.path,new Response(asset.text,{headers:{'Content-Type':'application/json'}}));
+      await cache.put('/__dmate_offline_ready__/dmate-offline-shell-v96',new Response('ready'));
+    },reusablePacks);
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });
     await page.evaluate(async () => {
       await navigator.serviceWorker.register('/offline-service-worker.js', { scope: '/' });
@@ -105,7 +121,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       if (canonical.length !== 1) throw new Error('Expected exactly one precached shared stylesheet');
       return { name: names[0], canonical: canonical[0].url };
     }, assetPath);
-    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 96, 'Automatic offline navigation needs the refreshed offline cache');
+    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 97, 'Faster offline preparation needs the refreshed offline cache');
     assert.equal((await fetchAsset(page, current.canonical)).text, networkCSS,
       'The refreshed shell loads current frameless controls instead of the obsolete stylesheet');
     for (const asset of sharedAssets) {
@@ -115,6 +131,17 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       }, { name: current.name, path: asset.path });
       assert.equal(cached, asset.text, 'The refreshed shell precaches ' + asset.path);
     }
+    assert.ok(workerRequests.length > 0,'The browser exposes actual service-worker network requests');
+    for(const asset of reusablePacks) assert.ok(!workerRequests.includes(new URL(asset.path,baseURL).href),
+      'Upgrade reuses the complete prior immutable study pack without downloading it again: '+asset.path);
+    assert.ok(workerRequests.includes(new URL('/static/offline.js?v=68',baseURL).href),'A changed offline revision is fetched');
+    assert.ok(workerRequests.includes(new URL('/static/graph-editor-model.js',baseURL).href),'Unversioned application code is fetched');
+    assert.notEqual(await page.evaluate(async name => (await(await caches.open(name)).match('/static/graph-editor-model.js')).text(),current.name),
+      '/* obsolete unversioned editor model */');
+    const redundant = /\/(?:output\/svg\/fonts\/tex|input\/tex\/extensions\/(?:ams|newcommand|noundefined|require|autoload|configmacros))\.js$/;
+    assert.ok(!workerRequests.some(url=>redundant.test(new URL(url).pathname)),
+      'The combined MathJax bundle does not download its seven duplicate components');
+    console.log('PASS cache upgrades reuse '+reusablePacks.length+' unchanged study packs, fetch changed code and skip duplicate MathJax components');
     const token = Date.now().toString(36);
     const revision = assetPath + '?v=online-cache-regression-' + token;
     const unseen = assetPath + '?v=unseen-cache-regression-' + token;

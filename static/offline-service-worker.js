@@ -1,5 +1,6 @@
 "use strict";
-const CACHE_NAME = "dmate-offline-shell-v96";
+const CACHE_NAME = "dmate-offline-shell-v97";
+const PREVIOUS_CACHE_NAME = "dmate-offline-shell-v96";
 const CACHE_READY = "/__dmate_offline_ready__/"+CACHE_NAME;
 const PRECACHE = [
   "/static/appearance-bootstrap.js?v=1",
@@ -53,29 +54,26 @@ const PRECACHE = [
   "/static/language.js?v=59",
   "/static/knowledge-graph-labels.js?v=17",
   "/static/offline-appearance.js?v=9",
-  "/static/offline-privacy-motion.js?v=2",
-  "/static/offline-shell.js?v=39",
+  "/static/offline-privacy-motion.js?v=3",
+  "/static/offline-shell.js?v=40",
   "/static/offline-knowledge-graph.js?v=60",
   "/static/offline-vault.js?v=2",
   "/static/offline-handoff.js?v=1",
-  "/static/offline-storage.js?v=3",
+  "/static/offline-storage.js?v=4",
   "/static/vendor/fflate-0.8.2/fflate.min.js",
   "/static/offline-backup.js?v=3",
   "/static/backup-download.js?v=1",
-  "/static/offline-entry.js?v=49",
-  "/static/offline.js?v=67",
+  "/static/offline-entry.js?v=50",
+  "/static/offline.js?v=68",
   "/static/icons/dmate-brand-v52.svg",
   "/static/offline-content/concepts.zh-CN.json?v=34",
   "/static/offline-content/questions.zh-CN.json?v=34",
   "/static/offline-content/knowledge_graph.json?v=28",
   "/static/offline-content/translations.en.json?v=34",
   "/static/offline-content/references.zh-CN.json",
-  "/static/vendor/mathjax-3.2.2/es5/output/svg/fonts/tex.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/action.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/all-packages.js",
-  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/ams.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/amscd.js",
-  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/autoload.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/bbox.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/boldsymbol.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/braket.js",
@@ -86,7 +84,6 @@ const PRECACHE = [
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/color.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/colortbl.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/colorv2.js",
-  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/configmacros.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/empheq.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/enclose.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/extpfeil.js",
@@ -94,11 +91,8 @@ const PRECACHE = [
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/html.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/mathtools.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/mhchem.js",
-  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/newcommand.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/noerrors.js",
-  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/noundefined.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/physics.js",
-  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/require.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/setoptions.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/tagformat.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/textcomp.js",
@@ -129,11 +123,41 @@ const PRECACHE = [
   "/static/icons/dmate-bing-v55-192.png"
 ];
 
+function immutableAsset(path) {
+  const url = new URL(path,self.location.origin);
+  // App revisions must be bumped when their content changes. Never promote an
+  // online revision URL to an unrelated offline key or reuse unversioned code.
+  return url.pathname.startsWith("/static/") && (url.searchParams.has("v")
+    || /^\/static\/vendor\/[^/]+-\d[^/]*\//.test(url.pathname)
+    || /^\/static\/icons\/[^/]*-v\d/.test(url.pathname));
+}
+
+async function prepareCache() {
+  const cache = await caches.open(CACHE_NAME);
+  const previous = (await caches.keys()).includes(PREVIOUS_CACHE_NAME) ? await caches.open(PREVIOUS_CACHE_NAME) : null;
+  const reusePrevious = previous && !!await previous.match("/__dmate_offline_ready__/"+PREVIOUS_CACHE_NAME);
+  const currentURLs = new Set((await cache.keys()).map(request => request.url));
+  const previousURLs = new Set(reusePrevious ? (await previous.keys()).map(request => request.url) : []);
+  const pending = [];
+  await Promise.all(PRECACHE.map(async path => {
+    if (immutableAsset(path)) {
+      const href = new URL(path,self.location.origin).href;
+      const current = currentURLs.has(href) && await cache.match(href);
+      if (current?.ok) return;
+      const reusable = previousURLs.has(href) && await previous.match(href);
+      if (reusable?.ok) { await cache.put(href,reusable); return; }
+    }
+    // The HTML, changed versions and unversioned app code always reach the
+    // current deployment. A failed update leaves the old complete cache intact.
+    pending.push(path);
+  }));
+  if (pending.length) await cache.addAll(pending);
+  await cache.put(CACHE_READY,new Response("ready"));
+}
+
 self.addEventListener("install", event => {
   event.waitUntil((async () => {
-    const cache = await caches.open(CACHE_NAME);
-    await cache.addAll(PRECACHE);
-    await cache.put(CACHE_READY,new Response("ready"));
+    await prepareCache();
     await self.skipWaiting();
   })());
 });
@@ -155,8 +179,7 @@ self.addEventListener("message",event => {
     // Installation populates this cache atomically. Repair a cleared cache
     // once on reconnection instead of downloading the study pack on every load.
     if (!await cache.match(CACHE_READY)) {
-      if (!preparingCache) preparingCache = cache.addAll(PRECACHE)
-        .then(() => cache.put(CACHE_READY,new Response("ready"))).finally(() => { preparingCache = null; });
+      if (!preparingCache) preparingCache = prepareCache().finally(() => { preparingCache = null; });
       await preparingCache;
     }
     for (const client of await self.clients.matchAll({type:"window",includeUncontrolled:true}))

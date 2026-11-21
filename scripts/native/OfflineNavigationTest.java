@@ -97,6 +97,10 @@ public final class OfflineNavigationTest {
             System.out.print(OfflineBundle.markerScript());
             return;
         }
+        if (args.length == 2 && args[0].equals("network")) {
+            System.out.print(OfflineBundle.networkStatusScript(Boolean.parseBoolean(args[1])));
+            return;
+        }
         routing();
         lifecycle();
         System.out.println("PASS Android bundled offline policy: " + checks + " routing, lifecycle, allowlist and vault-origin assertions");

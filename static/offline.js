@@ -190,13 +190,11 @@
   const put = (store, value) => transaction(store, "readwrite", os => os.put(value));
   const all = store => transaction(store, "readonly", os => os.getAll());
   const remove = (store, id) => transaction(store, "readwrite", os => os.delete(id));
-  async function applyOriginalAppearance() {
-    const saved = await transaction("settings", "readonly", os => os.get("appearance"));
+  function applyOriginalAppearance(saved) {
     return window.DMateOfflineAppearance?.apply(saved?.settings || {}, saved?.backgroundBlob || null);
   }
 
-  async function loadLibrarySelections() {
-    const saved = await transaction("settings", "readonly", os => os.get("library-selections"));
+  function loadLibrarySelections(saved) {
     for (const kind of ["concepts", "questions"]) {
       const ids = new Set(state[kind].map(item => item.id));
       state.librarySelections[kind] = new Set((Array.isArray(saved?.[kind]) ? saved[kind] : [])
@@ -342,9 +340,13 @@
     state.translations = translations;
   }
 
+  function networkOnline() {
+    return typeof window.__DMATE_NATIVE_NETWORK_ONLINE__ === "boolean"
+      ? window.__DMATE_NATIVE_NETWORK_ONLINE__ : navigator.onLine;
+  }
+
   function setNetworkStatus() {
-    const online = navigator.onLine;
-    $("returnOnline").disabled = !online;
+    $("returnOnline").disabled = !networkOnline();
     // Entry controls keep their accessible name without hover tooltips.
     $("returnOnline").removeAttribute("title");
   }
@@ -1060,7 +1062,7 @@
   }
 
   async function returnOnline() {
-    if (!navigator.onLine) return toast(tr("当前没有网络，在线版暂时无法打开"));
+    if (!networkOnline()) return toast(tr("当前没有网络，在线版暂时无法打开"));
     if (!await flushNoteDrafts()) return toast(tr("笔记尚未保存，请重试后再离开", "The note is not saved; retry before leaving"));
     if (state.drawingController && !await state.drawingController.flush()) return;
     await Promise.all([state.viewSaveQueue,state.appearanceQueue,state.selectionQueue]);
@@ -1339,8 +1341,6 @@
       closeLibraryDetail(false);
       article.focus({preventScroll:true});
     });
-    window.addEventListener("online", setNetworkStatus);
-    window.addEventListener("offline", setNetworkStatus);
     window.addEventListener("dmate:languagechange", event => {
       if (state.panel === "questions") renderQuestions();
       if (state.panel === "concepts") renderConcepts();
@@ -1358,6 +1358,9 @@
   }
 
   async function init() {
+    // Public course files and the encrypted workspace have no dependency on
+    // each other. Observe failures immediately while both start in parallel.
+    const resources = loadResources().then(() => ({ok:true}), error => ({ok:false,error}));
     try {
       setNetworkStatus();
       const token = window.DMateOfflineHandoff?.pendingToken?.();
@@ -1367,15 +1370,19 @@
       let legacyWarning = false;
       try { await migrateCurrentAccountData(); }
       catch (_) { legacyWarning = true; /* Leave unacknowledged source data retryable. */ }
-      await applyOriginalAppearance();
-      const language = await transaction("settings", "readonly", os => os.get("language"));
+      const [, language, selections, view, loaded] = await Promise.all([
+        transaction("settings", "readonly", os => os.get("appearance")).then(applyOriginalAppearance),
+        transaction("settings", "readonly", os => os.get("language")),
+        transaction("settings", "readonly", os => os.get("library-selections")),
+        transaction("settings", "readonly", os => os.get(viewRecordId)),
+        resources
+      ]);
+      if (!loaded.ok) throw loaded.error;
       if (language?.value === "en" || language?.value === "zh-CN") window.DMateI18n?.setLanguage?.(language.value, false);
       configureRenderer();
-      await loadResources();
-      await loadLibrarySelections();
+      loadLibrarySelections(selections);
       bind();
       window.DMateI18n?.translate?.(document.body);
-      const view = await transaction("settings","readonly",os => os.get(viewRecordId));
       if (view) {
         for (const key of ["graphCategory", "graphSelectedNodeId", "questionCategory", "questionDifficulty", "questionType", "questionSelection", "questionQuery", "conceptCategory", "conceptSelection", "conceptQuery", "graphQuery", "selectedNoteId", "noteQuery"])
           if (typeof view[key] === "string") state[key] = view[key];
@@ -1392,6 +1399,7 @@
       document.documentElement.dataset.offlineReady = "true";
       $("offlineMain").inert = false;
       for (const button of startupControls) button.disabled = false;
+      setNetworkStatus();
       if (legacyWarning || state.storage.migrationWarnings?.length)
         toast(tr("部分旧资料暂未迁移，源数据仍保留；当前本地资料可继续使用", "Some legacy data could not be migrated; its source is retained and local data remains available"));
     } catch (error) {
@@ -1400,11 +1408,22 @@
       // Reveal the selected page only after its saved view has been restored.
       // Failed initialization still leaves the return-online control reachable.
       delete document.documentElement.dataset.offlineInterfacePending;
+      setNetworkStatus();
     }
   }
-  const startupControls = [...document.querySelectorAll(".offline-nav-item")];
+  const startupControls = [...document.querySelectorAll(".offline-nav-item")]
+    .filter(button => button.id !== "returnOnline");
   for (const button of startupControls) button.disabled = true;
   $("offlineMain").inert = true;
   $("returnOnline").addEventListener("click",() => { void returnOnline().catch(error => toast(storageError(error))); });
+  // Connectivity is independent of storage, migration and study-pack readiness.
+  // Register before the first await so a startup-time reconnect is never lost.
+  window.addEventListener("online", setNetworkStatus);
+  window.addEventListener("offline", setNetworkStatus);
+  window.addEventListener("focus", setNetworkStatus);
+  window.addEventListener("pageshow", setNetworkStatus);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) setNetworkStatus(); });
+  window.addEventListener("dmate:native-network-change", setNetworkStatus);
+  setNetworkStatus();
   init();
 })();

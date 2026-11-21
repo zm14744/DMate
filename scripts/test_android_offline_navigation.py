@@ -2,8 +2,8 @@
 
 This does not execute an Android WebView, ConnectivityManager callbacks or a
 device keystore. APK compilation and airplane-mode checks still need the Android
-SDK and a device/emulator. The emitted document-start marker is also executed
-in Node VM contexts to verify origin and frame restrictions.
+SDK and a device/emulator. The emitted scripts run in Node VM contexts to verify
+origin restrictions and reconnect notifications in the same document.
 """
 import json
 from pathlib import Path
@@ -76,6 +76,44 @@ console.log('PASS Android native offline availability marker: trusted origin, to
         completed = subprocess.run([NODE, "-e", code], input=json.dumps(self.invoke("marker")),
                                    check=True, capture_output=True, text=True)
         self.assertIn("PASS Android native offline availability marker", completed.stdout)
+        print(completed.stdout.strip())
+
+    @unittest.skipUnless(NODE, "Node is required for native connection event checks")
+    def test_reconnect_updates_the_same_trusted_offline_document(self):
+        code = r'''
+const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const {online, offline} = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
+for (const [href, mainFrame, allowed] of [
+  ['https://dmate.zeabur.app/offline?native_offline=1', true, true],
+  ['https://dmate.zeabur.app/static/offline.html', true, true],
+  ['https://dmate.zeabur.app/', true, false],
+  ['https://dmate.zeabur.app/offline/extra', true, false],
+  ['https://dmate.zeabur.app/offline', false, false],
+  ['https://other.example/offline', true, false],
+  ['http://dmate.zeabur.app/offline', true, false],
+  ['https://user@dmate.zeabur.app/offline', true, false],
+]) {
+  const events = [];
+  const window = {dispatchEvent(event) { events.push([event.type, event.detail.online]); }};
+  window.top = mainFrame ? window : {};
+  const location = Object.freeze({href});
+  class CustomEvent {
+    constructor(type, {detail}) { this.type = type; this.detail = detail; }
+  }
+  const sandbox = vm.createContext({window, location, URL, CustomEvent});
+  for (const [script, status] of [[offline, false], [online, true], [online, true], [offline, false]]) {
+    vm.runInContext(script, sandbox);
+    assert.equal(window.__DMATE_NATIVE_NETWORK_ONLINE__, allowed ? status : undefined, href);
+  }
+  assert.deepEqual(events, allowed ? [false, true, false].map(online => ['dmate:native-network-change', online]) : [], href);
+  assert.equal(sandbox.location.href, href, 'No notification should navigate the page');
+}
+console.log('PASS Android live connection events: trusted offline document only, reconnect without navigation');
+'''
+        scripts = {key: self.invoke("network", flag) for key, flag in [("online", "true"), ("offline", "false")]}
+        completed = subprocess.run([NODE, "-e", code], input=json.dumps(scripts),
+                                   check=True, capture_output=True, text=True)
         print(completed.stdout.strip())
 
 

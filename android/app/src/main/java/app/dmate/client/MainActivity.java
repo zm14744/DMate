@@ -345,10 +345,17 @@ public final class MainActivity extends Activity {
     }
 
     private void checkOfflineConnectivity() {
-        if (offlineBundle == null || webView == null || isFinishing() || isDestroyed() || hasValidatedNetwork()) return;
+        if (offlineBundle == null || webView == null || isFinishing() || isDestroyed()) return;
+        boolean online = hasValidatedNetwork();
         String current = offlineNavigationUrl != null ? offlineNavigationUrl : webView.getUrl();
-        if (OfflineBundle.isOfflinePage(current)) { offlineBundleMode = true; return; }
-        if (OfflineBundle.shouldSwitchOffline(current, false)) openBundledOffline();
+        if (OfflineBundle.isOfflinePage(current)) {
+            offlineBundleMode = true;
+            if (OfflineBundle.isOfflinePage(webView.getUrl())) {
+                webView.evaluateJavascript(OfflineBundle.networkStatusScript(online), null);
+            }
+            return;
+        }
+        if (OfflineBundle.shouldSwitchOffline(current, online)) openBundledOffline();
     }
 
     private void openBundledOffline() {

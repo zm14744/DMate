@@ -10,12 +10,15 @@ import ssl
 import hmac
 import requests
 import hashlib
+import gzip
+from functools import lru_cache
+from io import BytesIO
 from email.message import EmailMessage
 from datetime import timedelta
 from collections import defaultdict, deque, OrderedDict
 import ipaddress
 
-from flask import Flask, jsonify, render_template, request, session, make_response, has_request_context
+from flask import Flask, jsonify, render_template, request, session, make_response, has_request_context, send_file
 from ios_webclip import build_ios_webclip_profile
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -197,9 +200,46 @@ from server_i18n import (normalize_language, localized, request_language,
 _RUNTIME_SOURCE, _ = compute_runtime_source(os.path.dirname(os.path.abspath(__file__)))
 
 
+# Compress the largest public offline files at the origin. The browser
+# decodes them before the service worker stores or runs the same resources.
+_COMPRESSED_OFFLINE_ASSETS = {
+    '/static/offline-content/concepts.zh-CN.json',
+    '/static/offline-content/questions.zh-CN.json',
+    '/static/offline-content/translations.en.json',
+    '/static/offline-content/knowledge_graph.json',
+    '/static/vendor/mathjax-3.2.2/es5/tex-svg.js',
+}
+
+
+@lru_cache(maxsize=len(_COMPRESSED_OFFLINE_ASSETS))
+def _compressed_offline_asset(filename, modified_ns, size):
+    with open(filename, 'rb') as source:
+        encoded = gzip.compress(source.read(), compresslevel=5, mtime=0)
+    return encoded, hashlib.sha256(encoded).hexdigest()
+
+
+@app.before_request
+def serve_compressed_offline_asset():
+    if (request.endpoint != 'static' or request.path not in _COMPRESSED_OFFLINE_ASSETS
+            or request.method not in ('GET', 'HEAD') or 'Range' in request.headers
+            or request.accept_encodings['gzip'] <= 0):
+        return None
+    filename = os.path.join(app.root_path, request.path.lstrip('/'))
+    try:
+        stat = os.stat(filename)
+        encoded, etag = _compressed_offline_asset(filename, stat.st_mtime_ns, stat.st_size)
+    except OSError:
+        return None
+    response = send_file(BytesIO(encoded), download_name=os.path.basename(filename),
+                         etag=etag, last_modified=stat.st_mtime)
+    response.headers['Content-Encoding'] = 'gzip'
+    return response
+
+
 @app.after_request
 def localize_application_errors(response):
-    if response.is_json and request_language(request) == "en":
+    if (request.path not in _COMPRESSED_OFFLINE_ASSETS and response.is_json
+            and request_language(request) == "en"):
         payload = response.get_json(silent=True)
         translated = localize_error_payload(payload, "en")
         if translated is not payload:
@@ -219,6 +259,8 @@ def attach_runtime_source(response):
 @app.after_request
 def no_stale_web_application_assets(response):
     path = request.path
+    if path in _COMPRESSED_OFFLINE_ASSETS:
+        response.vary.add('Accept-Encoding')
     if (response.status_code in (200, 206, 304) and re.match(
             r'^/static/vendor/(?:mathjax|marked|dompurify|html2canvas|jspdf)-[0-9]+\.[0-9]+\.[0-9]+/', path)):
         response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'

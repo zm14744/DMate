@@ -36,6 +36,7 @@ on:
       - 'scripts/stage_native_offline.py'
       - 'scripts/test_native_offline_bundle_browser.cjs'
       - 'scripts/test_offline_auto_entry_browser.cjs'
+      - 'scripts/test_offline_startup_network_browser.cjs'
       - 'scripts/test_offline_records_browser.cjs'
       - 'scripts/test_knowledge_graph_browser.cjs'
       - 'scripts/test_graph_empty_recent_browser.cjs'
@@ -144,6 +145,7 @@ on:
       - 'scripts/stage_native_offline.py'
       - 'scripts/test_native_offline_bundle_browser.cjs'
       - 'scripts/test_offline_auto_entry_browser.cjs'
+      - 'scripts/test_offline_startup_network_browser.cjs'
       - 'scripts/test_offline_records_browser.cjs'
       - 'scripts/test_knowledge_graph_browser.cjs'
       - 'scripts/test_graph_empty_recent_browser.cjs'
@@ -296,6 +298,7 @@ jobs:
           node --check scripts/test_offline_vault_workspace_browser.cjs
           node --check scripts/test_offline_interface_lifecycle_browser.cjs
           node --check scripts/test_offline_privacy_motion_browser.cjs
+          node --check scripts/test_offline_startup_network_browser.cjs
           node --check scripts/test_offline_backup_browser.cjs
           node --check scripts/test_offline_mistake_merge_browser.cjs
           node --check scripts/test_online_backup_browser.cjs
@@ -447,6 +450,7 @@ jobs:
           node scripts/test_drawing_async_persistence_browser.cjs
           node scripts/test_service_worker_cache_browser.cjs
           node scripts/test_offline_auto_entry_browser.cjs
+          node scripts/test_offline_startup_network_browser.cjs
           node scripts/test_image_export_browser.cjs
           node scripts/test_mistake_action_chrome_browser.cjs
           node scripts/test_conversation_header_browser.cjs

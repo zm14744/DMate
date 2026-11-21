@@ -158,36 +158,72 @@
     }
   }
   async function migrateDeviceSourcesUnlocked({read,list,commit,check,legacy,warnings}) {
-    const local = Object.fromEntries(await Promise.all(STORES.map(async store => [store,new Map((await list(store)).map(row => [row.id,row]))])));
+    let local, gallery;
     const identity = async (store,row) => root.DMateOfflineBackup?.contentFingerprint
       && ['notes','mistakes','drawings'].includes(store)
       ? root.DMateOfflineBackup.contentFingerprint(store,row)
       : migrationFingerprint({...row,id:undefined});
     const byContent = {notes:new Set(),mistakes:new Set(),drawings:new Set()};
     const mistakeQuestions = new Map();
-    for (const store of ['notes','mistakes']) {
-      const metadata = local.settings.get(store === 'notes' ? 'notebook-deletions' : 'mistake-deletions');
-      for (const row of local[store].values()) if (!metadata?.deleted?.[row.id]
-        || time(metadata.deleted[row.id]) < time(row.updatedAt)) {
-        const hash = await identity(store,row);
-        byContent[store].add(hash);
-        if (store === 'mistakes' && !mistakeQuestions.has(hash)) mistakeQuestions.set(hash,row.id);
+    const prepareLocal = async () => {
+      if (local) return;
+      // Most opens have no new legacy records. Do not decrypt and fingerprint
+      // the entire current workspace merely to discover that migration is done.
+      const current = Object.fromEntries(await Promise.all(STORES.map(async store =>
+        [store,new Map((await list(store)).map(row => [row.id,row]))])));
+      for (const values of Object.values(byContent)) values.clear();
+      mistakeQuestions.clear();
+      for (const store of ['notes','mistakes']) {
+        const metadata = current.settings.get(store === 'notes' ? 'notebook-deletions' : 'mistake-deletions');
+        for (const row of current[store].values()) if (!metadata?.deleted?.[row.id]
+          || time(metadata.deleted[row.id]) < time(row.updatedAt)) {
+          const hash = await identity(store,row);
+          byContent[store].add(hash);
+          if (store === 'mistakes' && !mistakeQuestions.has(hash)) mistakeQuestions.set(hash,row.id);
+        }
       }
-    }
-    // Establish the absent/present revision before planning a possible write.
-    const currentGallery = await read('drawings','gallery');
-    if (currentGallery) local.drawings.set('gallery',currentGallery);
-    let gallery = currentGallery?.gallery ? JSON.parse(currentGallery.gallery) : null;
-    for (const page of gallery?.pages || []) byContent.drawings.add(await identity('drawings',page));
+      // Establish the absent/present revision before planning a possible write.
+      const currentGallery = await read('drawings','gallery');
+      if (currentGallery) current.drawings.set('gallery',currentGallery);
+      gallery = currentGallery?.gallery ? JSON.parse(currentGallery.gallery) : null;
+      for (const page of gallery?.pages || []) byContent.drawings.add(await identity('drawings',page));
+      local = current;
+    };
     const copyRow = async (store,row,source,revision) => {
       check();
       if (!row || typeof row.id !== 'string') throw error('STORAGE_FAILED');
       if (store === 'notes' && (typeof row.title !== 'string' || typeof row.content !== 'string')
         || store === 'mistakes' && typeof row.statement !== 'string') throw error('STORAGE_FAILED');
       const markerId = 'device-migration:' + await address(source+'|'+store);
-      const marker = await read('settings',markerId) || {id:markerId,records:{}};
+      let marker = await read('settings',markerId) || {id:markerId,records:{}};
       const sourceId = await address(row.id), signature = String(revision);
       if (marker.records?.[sourceId] === signature) return;
+      if (store === 'settings') {
+        const operations = [];
+        let id, value;
+        // Old views and appearance only need their matching target record.
+        // Partition tombstones must never hide another partition's records.
+        if (!['notebook-deletions','mistake-deletions'].includes(row.id)
+          && !row.id.startsWith('vault-migrated:') && !row.id.startsWith('device-migration:')) {
+          id = row.id === 'view' ? 'view:'+root.name : row.id;
+          value = await read(store,id);
+          if (!value) {
+            value = {...row,id};
+            operations.push({type:'put',store,expectAbsent:true,value});
+          }
+        }
+        operations.push({type:'put',store:'settings',value:{...marker,records:{...marker.records,[sourceId]:signature}}});
+        await commit(operations);
+        if (value) local?.settings.set(id,value);
+        return;
+      }
+      if (!local) {
+        await prepareLocal();
+        // Listing settings refreshes revision tokens. Re-read the matching
+        // marker so its value and compare-and-swap precondition stay together.
+        marker = await read('settings',markerId) || {id:markerId,records:{}};
+        if (marker.records?.[sourceId] === signature) return;
+      }
       const operations = [];
       if (store === 'drawings') {
         if (row.id !== 'gallery' || typeof row.gallery !== 'string') throw error('STORAGE_FAILED');
@@ -209,19 +245,6 @@
           gallery = {...incoming,...gallery,pages};
           const value = {id:'gallery',gallery:JSON.stringify(gallery),updatedAt:Date.now()};
           operations.push({type:'put',store,expectAbsent:!local.drawings.has('gallery'),value}); local.drawings.set('gallery',value);
-        }
-      } else if (store === 'settings') {
-        // Deletion metadata belongs to its old partition; importing it could
-        // hide an unrelated record brought from another old workspace.
-        if (!['notebook-deletions','mistake-deletions'].includes(row.id)
-          && !row.id.startsWith('vault-migrated:') && !row.id.startsWith('device-migration:')) {
-          const id = row.id === 'view' ? 'view:'+root.name : row.id;
-          if (!local.settings.has(id)) {
-            const concurrent = await read(store,id);
-            if (!concurrent) {
-              const value = {...row,id}; operations.push({type:'put',store,expectAbsent:true,value}); local.settings.set(id,value);
-            } else local.settings.set(id,concurrent);
-          }
         }
       } else {
         const hash = await identity(store,row);
@@ -545,7 +568,8 @@
         }
       }
       legacy.close(); legacy = null;
-      for (const store of STORES) await list(store);
+      // Reads establish their own snapshot tokens; writes fetch a missing
+      // token for the touched ID. Unopened panels need no eager decryption.
       check();
       return Object.freeze({
         migrationWarnings:Object.freeze(migrationWarnings.slice()),

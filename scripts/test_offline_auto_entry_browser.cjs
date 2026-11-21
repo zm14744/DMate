@@ -77,9 +77,9 @@ async function warm(page) {
   const deadline=Date.now()+30000;
   while(Date.now()<deadline) {
     if(await page.evaluate(async()=>{
-      const cache=await caches.open('dmate-offline-shell-v96');
+      const cache=await caches.open('dmate-offline-shell-v97');
       return !!await cache.match('/offline')
-        && !!await cache.match('/__dmate_offline_ready__/dmate-offline-shell-v96');
+        && !!await cache.match('/__dmate_offline_ready__/dmate-offline-shell-v97');
     }))return;
     await page.waitForTimeout(50);
   }
@@ -155,7 +155,7 @@ async function manualReturn(page) {
     await page.evaluate(()=>{window.__DMATE_NATIVE_OFFLINE_AVAILABLE__=true;});
     await network(true);
     await startup.setContent('<!doctype html><html><body><button id="offlineWorkspaceBtn">离线版</button>'
-      +'<script src="'+baseURL+'/static/offline-entry.js?v=49"></script></body></html>',{waitUntil:'domcontentloaded'});
+      +'<script src="'+baseURL+'/static/offline-entry.js?v=50"></script></body></html>',{waitUntil:'domcontentloaded'});
     await offline(startup);await startup.close();
     console.log('PASS entry scripts initialized while already disconnected use the cached offline workspace automatically');
     assert.deepEqual(errors,[],'Automatic navigation and cache repair raise no page errors');

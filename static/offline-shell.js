@@ -80,7 +80,7 @@
     interfaceState?.update({hidden:true});
     syncPrivacyControls();
     focusPrivacyCover();
-    const playback = privacyMotion?.play();
+    const playback = privacyMotion?.play({intro:autoplay});
     if (autoplay) Promise.resolve(playback).then(() => {
       // Paint the completed logo before entering the fully restored workspace.
       requestAnimationFrame(() => {

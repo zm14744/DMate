@@ -104,4 +104,16 @@ final class OfflineBundle {
             + "if(window!==window.top||p.origin!=='" + ORIGIN + "'||p.username||p.password)return;"
             + "Object.defineProperty(window,'__DMATE_NATIVE_OFFLINE_AVAILABLE__',{value:true,configurable:false});})();";
     }
+
+    static String networkStatusScript(boolean online) {
+        // The page can change after Java schedules the script. Check the exact
+        // offline document again before publishing the host's connectivity.
+        return "(()=>{const p=new URL(location.href);"
+            + "if(window!==window.top||p.origin!=='" + ORIGIN + "'||p.username||p.password"
+            + "||(p.pathname!=='/offline'&&p.pathname!=='/static/offline.html'))return;"
+            + "const online=" + online + ";"
+            + "if(window.__DMATE_NATIVE_NETWORK_ONLINE__===online)return;"
+            + "window.__DMATE_NATIVE_NETWORK_ONLINE__=online;"
+            + "window.dispatchEvent(new CustomEvent('dmate:native-network-change',{detail:{online}}));})();";
+    }
 }

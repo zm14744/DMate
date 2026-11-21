@@ -88,17 +88,18 @@
       resolvePlayback = null;
       resolve?.();
     }
-    function play() {
+    function play({intro = false} = {}) {
       finish();
       const completed = new Promise(resolve => { resolvePlayback = resolve; });
       if (!cover.open || document.hidden || reducedMotion.matches) { finish(); return completed; }
+      const duration = intro ? 450 : 740;
       render(0);
       let start = null;
       function tick(now) {
         raf = 0;
         if (!cover.open || document.hidden || reducedMotion.matches) { finish(); return; }
         if (start === null) start = now;
-        const progress = clamp((now-start)/740,0,1);
+        const progress = clamp((now-start)/duration,0,1);
         if (progress === 1) { finish(); return; }
         render(maxDistance*(1-Math.pow(1-progress,1.65)));
         raf = requestAnimationFrame(tick);

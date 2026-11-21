@@ -16,12 +16,107 @@ const server = http.createServer((request,response) => {
     response.end(fs.readFileSync(path.join(root,request.url)));
   } else {response.writeHead(404);response.end();}
 });
+async function lazyDeviceOpen(browser,base) {
+  const context = await browser.newContext(), page = await context.newPage();
+  try {
+    await page.goto(base,{waitUntil:'networkidle'});
+    const result = await page.evaluate(async () => {
+      const original = DMateOfflineVault, scans = [];
+      window.DMateOfflineVault = {...original,async open(options) {
+        const vault = await original.open(options);
+        return {...vault,list(store) {
+          if (options.name === 'device-workspace-v1') scans.push(store);
+          return vault.list(store);
+        }};
+      }};
+      const open = () => DMateOfflineStorage.open({scope:'device',isCurrent:()=>true});
+      let store = await open();
+      const coldScans = scans.splice(0);
+      for (let offset=0;offset<320;offset+=80) await store.batch(Array.from({length:80},(_,index) => ({
+        type:'put',store:'notes',expectAbsent:true,
+        value:{id:'large-'+(offset+index),title:'Retained concept '+(offset+index),content:'PRIVATE '.repeat(100),updatedAt:1}
+      })));
+      store.close();
+      const started = performance.now();
+      store = await open();
+      const reopenMs = performance.now()-started, reopenScans = scans.splice(0);
+      // A first write must fetch the touched record, rather than requiring an
+      // eager scan to populate every compare-and-swap token during open().
+      await store.put('notes',{id:'large-0',title:'Updated',content:'FIRST UNREAD WRITE',updatedAt:2});
+      let explicit, absent;
+      try { await store.batch([{type:'put',store:'notes',expectedRevision:null,
+        value:{id:'large-0',title:'Invalid replace',content:'MUST NOT REPLACE'}}]); }
+      catch (error) { explicit = error.code; }
+      const untouched = await store.get('notes','large-319');
+      const first = await open(), second = await open();
+      try { await first.batch([{type:'put',store:'notes',expectAbsent:true,
+        value:{id:'large-0',title:'Invalid insert',content:'MUST NOT REPLACE'}}]); }
+      catch (error) { absent = error.code; }
+      const old = await first.get('notes','large-1'), revision = first.revisionOf('notes',old);
+      await second.put('notes',{...old,content:'OTHER HANDLE EDIT',updatedAt:3});
+      await first.all('notes');
+      let stale;
+      try { await first.batch([{type:'put',store:'notes',expectedRevision:revision,
+        value:{...old,content:'STALE SNAPSHOT'}}]); } catch (error) { stale = error.code; }
+      const latest = await first.get('notes','large-1');
+      await first.batch([{type:'delete',store:'notes',id:latest.id,expectedRevision:first.revisionOf('notes',latest)},
+        {type:'put',store:'settings',value:{id:'notebook-deletions',deleted:{[latest.id]:4}}}]);
+      first.close(); second.close(); store.close();
+      scans.length = 0;
+      store = await open();
+      const deletedOpenScans = scans.splice(0);
+      const deleted = await store.get('notes','large-1'), tombstone = await store.get('settings','notebook-deletions');
+      const retained = await store.get('notes','large-0');
+      store.close();
+      DMateGuestSession.setAccountOwner('lazy-source');
+      let source = await DMateOfflineStorage.open({owner:'lazy-source',isCurrent:()=>true});
+      await source.put('notes',{id:'incoming',title:'Legacy concept',content:'SOURCE VERSION ONE',updatedAt:10});
+      source.close(); DMateGuestSession.setAccountOwner('');
+      scans.length = 0;
+      store = await open();
+      const firstMigrationScans = scans.splice(0);
+      const migrated = (await store.all('notes')).filter(row => row.content === 'SOURCE VERSION ONE').length;
+      store.close(); scans.length = 0;
+      store = await open();
+      const unchangedMigrationScans = scans.splice(0);
+      store.close();
+      // An old page can still save another revision after its first migration.
+      DMateGuestSession.setAccountOwner('lazy-source');
+      source = await DMateOfflineStorage.open({owner:'lazy-source',isCurrent:()=>true});
+      await source.put('notes',{id:'incoming',title:'Legacy concept',content:'SOURCE VERSION TWO',updatedAt:20});
+      source.close(); DMateGuestSession.setAccountOwner('');
+      scans.length = 0;
+      store = await open();
+      const laterMigrationScans = scans.splice(0), rows = await store.all('notes');
+      store.close(); scans.length = 0;
+      store = await open();
+      const retriedScans = scans.splice(0), retried = await store.all('notes');
+      store.close();
+      return {coldScans,reopenScans,reopenMs,deletedOpenScans,explicit,absent,stale,untouched,retained,
+        deleted:deleted === undefined,tombstone,migrated,firstMigrationScans,unchangedMigrationScans,laterMigrationScans,
+        versions:rows.filter(row => row.id === 'incoming' || row.id.startsWith('migrated-')).map(row => row.content).sort(),
+        retriedScans,stable:JSON.stringify(retried) === JSON.stringify(rows)};
+    });
+    for (const name of ['coldScans','reopenScans','deletedOpenScans','unchangedMigrationScans','retriedScans'])
+      assert.deepEqual(result[name],[],name+': opening an unchanged device vault must not decrypt complete collections');
+    for (const name of ['explicit','absent','stale']) assert.equal(result[name],'CONFLICT',name+': lazy opening preserves compare-and-swap checks');
+    assert.equal(result.untouched.title,'Retained concept 319');
+    assert.equal(result.retained.content,'FIRST UNREAD WRITE');
+    assert.equal(result.deleted,true); assert.equal(result.tombstone.deleted['large-1'],4);
+    assert.equal(result.migrated,1);
+    assert.equal(result.firstMigrationScans.length,5,'A new migration still initializes the complete deduplication indexes');
+    assert.equal(result.laterMigrationScans.length,5,'A returning old source still imports its later edit');
+    assert.deepEqual(result.versions,['SOURCE VERSION ONE','SOURCE VERSION TWO']); assert.equal(result.stable,true);
+    console.log('PASS lazy open of 320 encrypted records: no eager collection decryption; unread writes, explicit revisions, insert-only CAS, tombstones and later source migrations remain safe ('+result.reopenMs.toFixed(1)+' ms local reopen)');
+  } finally {await context.close();}
+}
 (async () => {
   await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
   const base = 'http://127.0.0.1:'+server.address().port;
   const browser = await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE_PATH
     ? {executablePath:process.env.CHROMIUM_EXECUTABLE_PATH} : {})});
   try {
+    await lazyDeviceOpen(browser,base);
     const context = await browser.newContext(), page = await context.newPage();
     await page.goto(base,{waitUntil:'networkidle'});
     const seeded = await page.evaluate(async () => {

@@ -42,7 +42,11 @@
       .then(registration => {
         if (navigator.onLine) {
           registration.active?.postMessage({type:"dmate:prepare-offline"});
-          void registration.update().catch(() => {});
+          // Existing clients should discover the new release immediately;
+          // a first install already has an installing worker and needs no
+          // second update/download job competing with its initial preparation.
+          if (registration.active && !registration.installing && !registration.waiting)
+            void registration.update().catch(() => {});
         }
         return registration;
       }).catch(error => {
