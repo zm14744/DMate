@@ -20,6 +20,10 @@ apps:
   dmate:
     command: usr/bin/dmate-desktop
     extensions: [gnome]
+    environment:
+      # Encrypted collection; its master secret comes from the desktop Secret
+      # portal. If the portal is unavailable, fail instead of using a fallback.
+      SECRET_BACKEND: file
     plugs:
       - network
       - home
@@ -36,3 +40,10 @@ parts:
     # Tauri uses WebKitGTK; the GNOME extension alone does not supply it.
     stage-packages:
       - libwebkit2gtk-4.1-0
+      - libsecret-1-0
+
+  vault-probe:
+    plugin: dump
+    source: ./snap-test
+    organize:
+      dmate-vault-probe: usr/lib/dmate/dmate-vault-probe

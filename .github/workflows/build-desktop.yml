@@ -19,7 +19,9 @@ on:
     paths:
       - "scripts/generate_icons.py"
       - "scripts/stage_native_offline.py"
-      - "static/offline*"
+      # The native offline bundle embeds the complete precache dependency list,
+      # including shared styles, graph tools, icons and content packs.
+      - "static/**"
       - "desktop/src-tauri/**"
       - ".github/workflows/build-desktop.yml"
 
@@ -48,6 +50,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
+            libsecret-1-dev \
             libappindicator3-dev \
             librsvg2-dev \
             patchelf \

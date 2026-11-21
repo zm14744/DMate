@@ -12,7 +12,7 @@ on:
         required: true
         default: upload-new-build
       build_run_id:
-        description: Successful Build DMate Snap run ID (required for upload-new-build)
+        description: Successful Snap build run ID (required for upload and for promotion to stable)
         type: string
         required: false
       revision:
@@ -40,10 +40,10 @@ concurrency:
 
 jobs:
   publish:
+    if: github.repository == 'zm14744/DMate' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout release configuration
-        if: inputs.operation == 'upload-new-build'
         uses: actions/checkout@v4
 
       - name: Check Snap Store credentials
@@ -56,50 +56,22 @@ jobs:
             exit 1
           fi
 
-      - name: Install Snapcraft for existing revision
-        if: inputs.operation == 'promote-existing'
-        run: sudo snap install snapcraft --classic
-
-      - name: Promote revision without re-uploading
-        if: inputs.operation == 'promote-existing'
-        shell: bash
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
-          REVISION: ${{ inputs.revision }}
-          CHANNEL: ${{ inputs.channel }}
-        run: |
-          set -euo pipefail
-          if [[ ! "$REVISION" =~ ^[1-9][0-9]*$ ]]; then
-            echo "::error::Revision must be a positive integer."
-            exit 1
-          fi
-          /snap/bin/snapcraft release dmate "$REVISION" "$CHANNEL"
-
       - name: Verify the explicitly selected Snap build
-        if: inputs.operation == 'upload-new-build'
+        if: inputs.operation == 'upload-new-build' || inputs.channel == 'stable' || inputs.build_run_id != ''
         id: source
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           BUILD_RUN_ID: ${{ inputs.build_run_id }}
+          CHANNEL: ${{ inputs.channel }}
         run: |
           set -euo pipefail
-          if [[ ! "$BUILD_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
-            echo "::error::Enter the successful Build DMate Snap run ID in build_run_id."
-            exit 1
-          fi
-          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${BUILD_RUN_ID}" > "$RUNNER_TEMP/snap-build-run.json"
-          jq -e --arg repo "$GITHUB_REPOSITORY" '
-            .status == "completed" and .conclusion == "success" and
-            .head_branch == "main" and .path == ".github/workflows/build-snap.yml" and
-            .repository.full_name == $repo and .head_repository.full_name == $repo
-          ' "$RUNNER_TEMP/snap-build-run.json" > /dev/null
-          echo "run_id=$BUILD_RUN_ID" >> "$GITHUB_OUTPUT"
-          echo "Using successful Snap build run $BUILD_RUN_ID"
-          jq -r '"Source commit: " + .head_sha' "$RUNNER_TEMP/snap-build-run.json"
+          options=(--build-run-id "$BUILD_RUN_ID")
+          if [[ "$CHANNEL" == stable ]]; then options+=(--stable); fi
+          python3 scripts/verify_release_checks.py "${options[@]}" >> "$GITHUB_OUTPUT"
 
       - name: Download existing Snap artifact
-        if: inputs.operation == 'upload-new-build'
+        if: steps.source.outputs.run_id != ''
         uses: actions/download-artifact@v4
         with:
           name: DMate-linux-snap-amd64
@@ -108,7 +80,7 @@ jobs:
           github-token: ${{ github.token }}
 
       - name: Locate and verify Snap package
-        if: inputs.operation == 'upload-new-build'
+        if: steps.source.outputs.run_id != ''
         id: pkg
         shell: bash
         run: |
@@ -139,14 +111,45 @@ jobs:
           ls -lh "${snaps[0]}"
           sha256sum "${snaps[0]}"
 
-      - name: Check whether the exact Snap is already released
-        if: inputs.operation == 'upload-new-build'
+      - name: Verify Store bytes and avoid duplicate uploads
+        if: steps.source.outputs.run_id != ''
         id: store
         shell: bash
         env:
           SNAP_PATH: ${{ steps.pkg.outputs.snap }}
           CHANNEL: ${{ inputs.channel }}
-        run: python3 scripts/check_snap_store_channel.py "$SNAP_PATH" "$CHANNEL" >> "$GITHUB_OUTPUT"
+          OPERATION: ${{ inputs.operation }}
+          REVISION: ${{ inputs.revision }}
+        run: |
+          set -euo pipefail
+          options=("$SNAP_PATH" "$CHANNEL")
+          if [[ "$OPERATION" == promote-existing ]]; then
+            if [[ ! "$REVISION" =~ ^[1-9][0-9]*$ ]]; then
+              echo "::error::Revision must be a positive integer."
+              exit 1
+            fi
+            options+=(--revision "$REVISION")
+          fi
+          python3 scripts/check_snap_store_channel.py "${options[@]}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Snapcraft for existing revision
+        if: inputs.operation == 'promote-existing' && steps.store.outputs.already_released != 'true'
+        run: sudo snap install snapcraft --classic
+
+      - name: Promote verified revision without re-uploading
+        if: inputs.operation == 'promote-existing' && steps.store.outputs.already_released != 'true'
+        shell: bash
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+          REVISION: ${{ inputs.revision }}
+          CHANNEL: ${{ inputs.channel }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$REVISION" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Revision must be a positive integer."
+            exit 1
+          fi
+          /snap/bin/snapcraft release dmate "$REVISION" "$CHANNEL"
 
       - name: Upload and release Snap
         if: inputs.operation == 'upload-new-build' && steps.store.outputs.already_released != 'true'

@@ -6,7 +6,7 @@ publish = false
 
 [features]
 default = ["system-keyring"]
-system-keyring = ["dep:keyring", "dep:fs2"]
+system-keyring = ["dep:keyring", "dep:fs2", "dep:libsecret", "dep:gio"]
 
 [dependencies]
 aes-gcm = { version = "0.10.3", features = ["zeroize"] }
@@ -22,3 +22,14 @@ zeroize = "1.8"
 url = "2"
 fs2 = { version = "0.4.3", optional = true }
 keyring = { version = "3.6.3", default-features = false, features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust", "vendored"], optional = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Match Tauri's GLib/GIO 0.18 dependency family. The Snap runtime supplies
+# libsecret >= 0.20.5, which supports the per-application Secret portal.
+libsecret = { version = "0.4.0", features = ["v0_20"], optional = true }
+gio = { version = "0.18", optional = true }
+
+[[bin]]
+name = "dmate-vault-probe"
+path = "src/bin/dmate-vault-probe.rs"
+required-features = ["system-keyring"]

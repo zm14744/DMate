@@ -1,4 +1,4 @@
-param([switch]$PublishOnly)
+param([switch]$PublishOnly, [switch]$InstallSmoke)
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -15,6 +15,11 @@ $publisher = 'CN=F4B4F5DD-9B90-49AA-A3A9-C0B049718711'
 $runtimeVersion = '157.0.4341.42'
 $runtimeName = "Microsoft.WebView2.FixedVersionRuntime.$runtimeVersion.x64.cab"
 $runtimeUrl = "https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/b7b22a57-b321-483e-9855-d260b076f1a7/$runtimeName"
+$releaseHelper = Join-Path $PSScriptRoot 'windows_store_release.py'
+$packages = @(
+    @{ Layout='modern'; Version='1.0.3.0'; Extension='msix'; Bundle='DMate_1.0.3.0.msixbundle' },
+    @{ Layout='classic'; Version='1.0.2.0'; Extension='appx'; Bundle='DMate_1.0.2.0.classic.appxbundle' }
+)
 
 function Run-Checked([string]$Program, [string[]]$Arguments) {
     Write-Host "Running $(Split-Path -Leaf $Program)"
@@ -27,34 +32,18 @@ function Require-Hash([string]$Path, [string]$Expected) {
     }
 }
 
+if ($InstallSmoke) {
+    if ($PublishOnly) { throw 'Choose installation smoke testing or publication, not both' }
+    $verifyArguments = @($releaseHelper,'verify-directory','--directory',$outputRoot,
+        '--publisher',$publisher,'--source-hash',$sourceHash,'--app-hash',$appHash,'--runtime-version',$runtimeVersion)
+    foreach ($package in $packages) { $verifyArguments += @('--package',"$($package.Bundle)=$($package.Version)") }
+    Run-Checked 'python' $verifyArguments
+    & (Join-Path $PSScriptRoot 'test_windows_store_install.ps1') -Directory $outputRoot -Publisher $publisher -Packages $packages
+    exit 0
+}
+
 if ($PublishOnly) {
-    $report = Get-Content (Join-Path $outputRoot 'DMate-Microsoft-Store-verification.json') -Raw | ConvertFrom-Json
-    if ($report.status -ne 'passed') { throw 'Store package verification did not pass' }
-    $release = (& gh release view $releaseTag --repo $repository --json assets,body | ConvertFrom-Json)
-    if ($LASTEXITCODE -ne 0) { throw 'Cannot read GitHub Release' }
-    $alreadyPublished = @($release.assets | ForEach-Object { $_.name })
-    foreach ($item in $report.files) {
-        $path = Join-Path $outputRoot $item.name
-        Require-Hash $path $item.sha256
-    }
-    foreach ($file in Get-ChildItem $outputRoot -File) {
-        if ($alreadyPublished -contains $file.Name) {
-            throw "Release asset already exists; keep the published version intact: $($file.Name)"
-        }
-    }
-    foreach ($file in Get-ChildItem $outputRoot -File) {
-        Run-Checked 'gh' @('release','upload',$releaseTag,$file.FullName,'--repo',$repository)
-    }
-    $verifyRoot = Join-Path $env:RUNNER_TEMP 'dmate-store-published-verification'
-    New-Item -ItemType Directory -Force $verifyRoot | Out-Null
-    foreach ($item in $report.files) {
-        Run-Checked 'gh' @('release','download',$releaseTag,'--repo',$repository,'--pattern',$item.name,'--dir',$verifyRoot)
-        Require-Hash (Join-Path $verifyRoot $item.name) $item.sha256
-    }
-    $notes = [string]$release.body
-    $notes += @"
-
-
+    $notes = @"
 ### Microsoft Store submission packages
 
 - ``DMate_1.0.3.0.msixbundle``: modern desktop package, Windows 10 build 19041 or later.
@@ -64,8 +53,11 @@ Both contain the same latest Windows application 1.0.2 x64 and the bundled Micro
 "@
     $notesFile = Join-Path $env:RUNNER_TEMP 'dmate-store-release-notes.md'
     [IO.File]::WriteAllText($notesFile, $notes, [Text.UTF8Encoding]::new($false))
-    Run-Checked 'gh' @('release','edit',$releaseTag,'--repo',$repository,'--notes-file',$notesFile)
-    Write-Host 'Verified Store submission files are published to GitHub Release.'
+    $publishArguments = @($releaseHelper,'publish','--repository',$repository,'--tag',$releaseTag,
+        '--directory',$outputRoot,'--publisher',$publisher,'--source-hash',$sourceHash,
+        '--app-hash',$appHash,'--runtime-version',$runtimeVersion,'--notes-file',$notesFile)
+    foreach ($package in $packages) { $publishArguments += @('--package',"$($package.Bundle)=$($package.Version)") }
+    Run-Checked 'python' $publishArguments
     exit 0
 }
 
@@ -136,10 +128,6 @@ foreach ($index in $pri.SelectNodes('//index')) { $index.SetAttribute('startInde
 foreach ($packaging in @($pri.SelectNodes('//packaging'))) { [void]$packaging.ParentNode.RemoveChild($packaging) }
 $pri.Save($priConfig)
 
-$packages = @(
-    @{ Layout='modern'; Version='1.0.3.0'; Extension='msix'; Bundle='DMate_1.0.3.0.msixbundle' },
-    @{ Layout='classic'; Version='1.0.2.0'; Extension='appx'; Bundle='DMate_1.0.2.0.classic.appxbundle' }
-)
 $certificate = New-SelfSignedCertificate -Type Custom -Subject $publisher -KeyUsage DigitalSignature `
     -FriendlyName 'DMate Store Submission' -CertStoreLocation 'Cert:/CurrentUser/My' `
     -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3','2.5.29.19={text}')
@@ -160,7 +148,7 @@ foreach ($package in $packages) {
     $inner = Join-Path $innerRoot "DMate_$($package.Version)_x64.$($package.Extension)"
     Run-Checked $makeAppx @('pack','/d',$layout,'/p',$inner,'/h','SHA256','/o')
     $bundle = Join-Path $outputRoot $package.Bundle
-    Run-Checked $makeAppx @('bundle','/d',$innerRoot,'/p',$bundle,'/o')
+    Run-Checked $makeAppx @('bundle','/d',$innerRoot,'/p',$bundle,'/bv',$package.Version,'/o')
     Run-Checked $signTool @('sign','/fd','SHA256','/sha1',$certificate.Thumbprint,'/s','My',$bundle)
     Run-Checked $signTool @('verify','/pa',$bundle)
     $unbundle = Join-Path $work "verified/$($package.Layout)"
@@ -178,7 +166,9 @@ foreach ($package in $packages) {
     if (@(Get-ChildItem (Join-Path $unpack 'App/WebView2') -Recurse -File).Count -ne $expectedRuntimeFiles) {
         throw 'The packaged WebView2 runtime is incomplete'
     }
-    $records += @{name=$package.Bundle; sha256=(Get-FileHash $bundle -Algorithm SHA256).Hash.ToLowerInvariant(); bytes=(Get-Item $bundle).Length; package_version=$package.Version}
+    Run-Checked 'python' @($releaseHelper,'verify-bundle','--bundle',$bundle,'--version',$package.Version,
+        '--publisher',$publisher,'--app-hash',$appHash)
+    $records += @{name=$package.Bundle; sha256=(Get-FileHash $bundle -Algorithm SHA256).Hash.ToLowerInvariant(); bytes=(Get-Item $bundle).Length; package_version=$package.Version; bundle_version=$package.Version}
 }
 $readme = @"
 DMate Microsoft Store submission packages
@@ -196,6 +186,7 @@ The distinct Store versions maintain the primary/fallback order shown in Partner
 Upload these two bundles to the existing DMate product in Partner Center. Select Windows 10/11 Desktop; the packaged desktop application does not declare Mixed Reality or Mobile support.
 The files use a temporary, matching-publisher submission signature. Microsoft re-signs accepted Store packages. No private key or local-installation certificate is distributed.
 If Partner Center requests a runFullTrust explanation: DMate uses a standard desktop process to display its WebView2 interface; it does not request administrator rights.
+Verification covers package integrity, signatures, identities and inner/outer versions. The verification report records the separate hosted Windows installation, launch and package-upgrade smoke result. Windows App Certification Kit, offline/vault business behavior, user-data migration and Partner Center certification are separate checks.
 
 Microsoft WebView2 Fixed Runtime source: $runtimeUrl
 Original installer SHA256: $sourceHash
@@ -209,7 +200,9 @@ $sumsFile = Join-Path $outputRoot 'DMate-Microsoft-Store-SHA256SUMS.txt'
 foreach ($file in @($readmeFile,$sumsFile)) {
     $records += @{name=(Split-Path -Leaf $file); sha256=(Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant(); bytes=(Get-Item $file).Length}
 }
-$report = @{status='passed'; source_version='1.0.2'; source_installer_sha256=$sourceHash; source_executable_sha256=$appHash; publisher=$publisher; runtime_version=$runtimeVersion; signature='self-signed for Store submission; Store re-signing required'; files=$records}
+$report = @{schema_version=2; status='package_integrity_passed'; installation_test='not_run'; upgrade_test='not_run'; wack_test='not_run'; offline_functional_test='not_run'; vault_functional_test='not_run'; user_data_migration_test='not_run'; store_certification='not_run'; build_commit=$env:GITHUB_SHA; build_run_id=$env:GITHUB_RUN_ID; source_version='1.0.2'; source_installer_sha256=$sourceHash; source_executable_sha256=$appHash; publisher=$publisher; runtime_version=$runtimeVersion; signature='self-signed for Store submission; Store re-signing required'; files=$records}
 $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $outputRoot 'DMate-Microsoft-Store-verification.json') -Encoding utf8
 Remove-Item $cer -Force
-Write-Host 'Both Store submission bundles were built, signed and unpacked for verification.'
+Remove-Item -LiteralPath "Cert:/LocalMachine/Root/$($certificate.Thumbprint)" -Force
+Remove-Item -LiteralPath "Cert:/CurrentUser/My/$($certificate.Thumbprint)" -Force
+Write-Host 'Both Store submission bundles passed package-integrity verification. Installation and Store certification were not tested.'

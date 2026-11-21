@@ -8,7 +8,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: dmate-github-desktop-release
+  group: dmate-github-release-assets
   cancel-in-progress: false
 
 jobs:

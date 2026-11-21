@@ -40,6 +40,8 @@ OLD_FILES = (
     "DMate_1.0.0_x64-setup.exe", "DMate_1.0.0_amd64.deb",
     "DMate_1.0.0_amd64.AppImage", "DMate_1.0.0_universal.dmg",
 )
+NOTES_START = "<!-- DMATE-DESKTOP-RELEASE-BEGIN -->"
+NOTES_END = "<!-- DMATE-DESKTOP-RELEASE-END -->"
 
 
 class PublishError(Exception):
@@ -76,6 +78,29 @@ def asset_named(item, name):
     if len(matches) > 1:
         raise PublishError(f"Duplicate release attachment: {name}")
     return matches[0] if matches else None
+
+
+def merge_release_notes(current, reviewed):
+    """Own only the desktop block; preserve Store and other release notes."""
+    current = current or ""
+    reviewed = reviewed.strip()
+    if not reviewed:
+        raise PublishError("The reviewed release notes are empty")
+    if NOTES_START in reviewed or NOTES_END in reviewed:
+        raise PublishError("The reviewed release notes contain reserved markers")
+    block = f"{NOTES_START}\n{reviewed}\n{NOTES_END}"
+    if NOTES_START in current or NOTES_END in current:
+        if current.count(NOTES_START) != 1 or current.count(NOTES_END) != 1:
+            raise PublishError("The existing desktop release notes have invalid markers")
+        start, end = current.index(NOTES_START), current.index(NOTES_END)
+        if end < start:
+            raise PublishError("The existing desktop release notes have invalid markers")
+        return current[:start] + block + current[end + len(NOTES_END):]
+    # Migrate the previous unmarked notes without duplicating them or removing
+    # the Microsoft Store section appended by its independent publisher.
+    if reviewed in current:
+        return current.replace(reviewed, block, 1)
+    return current.rstrip() + ("\n\n" if current.strip() else "") + block + "\n"
 
 
 def verify_file(path, size, digest):
@@ -120,7 +145,10 @@ def verify_public(name, size, digest, directory):
             time.sleep(2 ** (attempt + 1))
 
 
-def verified_builds(directory):
+def verified_builds(directory, names=None):
+    names = set(FILES if names is None else names)
+    if not names or not names.issubset(FILES):
+        raise PublishError("Expected configured release attachments")
     directory.mkdir(parents=True, exist_ok=True)
     for run_id, commit, artifact_name in BUILDS:
         run = api(f"actions/runs/{run_id}")
@@ -133,15 +161,21 @@ def verified_builds(directory):
             raise PublishError(f"Unexpected or unsuccessful source build: {run_id}")
         artifacts = api(f"actions/runs/{run_id}/artifacts")
         matches = [a for a in artifacts.get("artifacts", []) if a.get("name") == artifact_name]
-        if len(matches) != 1 or matches[0].get("expired"):
-            raise PublishError(f"Missing or expired verified artifact: {run_id}")
+        if len(matches) > 1:
+            raise PublishError(f"Ambiguous verified artifact: {run_id}")
+        if not matches or matches[0].get("expired"):
+            # Other platforms may already be publicly verified. Only missing
+            # release bytes need to come from the pinned source artifacts.
+            continue
         gh("run", "download", str(run_id), "--repo", REPO, "--name", artifact_name,
            "--dir", str(directory / str(run_id)))
     found = {}
     for name, (size, digest) in FILES.items():
+        if name not in names:
+            continue
         paths = list(directory.rglob(name))
         if len(paths) != 1 or not paths[0].resolve().is_relative_to(directory.resolve()):
-            raise PublishError(f"Expected exactly one verified artifact file: {name}")
+            raise PublishError(f"Missing, expired or ambiguous verified artifact file: {name}")
         verify_file(paths[0], size, digest)
         found[name] = paths[0]
     return found
@@ -156,18 +190,18 @@ def publish():
         raise PublishError("The reviewed release notes are missing")
     with tempfile.TemporaryDirectory(prefix="dmate-desktop-release-") as temporary:
         directory = Path(temporary)
-        local = verified_builds(directory / "artifacts")
         downloads = directory / "verified-downloads"
         downloads.mkdir()
         initial = release()
-        # Existing immutable new-version files must match, never be clobbered.
+        # Already published bytes remain a valid source after Actions artifacts
+        # expire. Verify every existing asset before doing any release writes.
+        missing = []
         for name, (size, digest) in FILES.items():
             if asset_named(initial, name):
                 verify_public(name, size, digest, downloads)
             else:
-                gh("release", "upload", TAG, str(local[name]), "--repo", REPO)
-            verify_public(name, size, digest, downloads)
-            print(f"Verified GitHub attachment: {name}")
+                missing.append(name)
+        local = verified_builds(directory / "artifacts", missing) if missing else {}
         # iOS is restored/published by its separate GitHub-only workflow. Do not
         # edit it here, and do not publish checksums or notes for old bytes.
         verify_public(*IOS, downloads)
@@ -177,19 +211,33 @@ def publish():
         sums.write_text("".join(f"{digest}  {name}\n" for name, digest in entries), encoding="utf-8")
         sums_size = sums.stat().st_size
         sums_digest = hashlib.sha256(sums.read_bytes()).hexdigest()
-        if asset_named(release(), sums.name):
+        if asset_named(initial, sums.name):
             verify_public(sums.name, sums_size, sums_digest, downloads)
-        else:
+        # Validate the notes before uploading or deleting anything. Read them
+        # again immediately before editing to preserve newer unrelated sections.
+        reviewed_notes = NOTES.read_text(encoding="utf-8")
+        merge_release_notes(initial.get("body"), reviewed_notes)
+        for name in missing:
+            size, digest = FILES[name]
+            if not asset_named(release(), name):
+                gh("release", "upload", TAG, str(local[name]), "--repo", REPO)
+            verify_public(name, size, digest, downloads)
+        for name in FILES:
+            print(f"Verified GitHub attachment: {name}")
+        if not asset_named(release(), sums.name):
             gh("release", "upload", TAG, str(sums), "--repo", REPO)
-            verify_public(sums.name, sums_size, sums_digest, downloads)
+        verify_public(sums.name, sums_size, sums_digest, downloads)
         # Every replacement and the manifest have passed public byte checks.
         for name in OLD_FILES:
             if asset_named(release(), name):
                 gh("release", "delete-asset", TAG, name, "--repo", REPO, "--yes")
                 print(f"Removed replaced desktop attachment: {name}")
-        gh("release", "edit", TAG, "--repo", REPO,
-           "--title", "DMate — Desktop 1.0.2 / Android 1.0.3",
-           "--notes-file", str(NOTES))
+        current = release()
+        merged_notes = merge_release_notes(current.get("body"), reviewed_notes)
+        if merged_notes != (current.get("body") or ""):
+            notes_file = directory / "release-notes.md"
+            notes_file.write_text(merged_notes, encoding="utf-8")
+            gh("release", "edit", TAG, "--repo", REPO, "--notes-file", str(notes_file))
         final = release()
         if any(asset_named(final, name) for name in OLD_FILES):
             raise PublishError("An old desktop attachment is still present")

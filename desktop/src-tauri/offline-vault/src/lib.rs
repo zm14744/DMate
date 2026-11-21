@@ -41,6 +41,9 @@ impl VaultError {
 
 pub type Result<T> = std::result::Result<T, VaultError>;
 
+#[cfg(all(feature = "system-keyring", target_os = "linux"))]
+mod snap_portal;
+
 /// No Debug implementation: requests may contain plaintext.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -257,6 +260,8 @@ pub mod system {
     pub struct SystemStore {
         lock_path: PathBuf,
         process_lock: Mutex<()>,
+        #[cfg(target_os = "linux")]
+        snap: bool,
     }
 
     impl SystemStore {
@@ -264,6 +269,10 @@ pub mod system {
             Self {
                 lock_path,
                 process_lock: Mutex::new(()),
+                #[cfg(target_os = "linux")]
+                snap: ["SNAP", "SNAP_NAME", "SNAP_INSTANCE_NAME"]
+                    .iter()
+                    .any(|name| std::env::var_os(name).is_some()),
             }
         }
 
@@ -293,42 +302,60 @@ pub mod system {
         fn entry(id: &str) -> Result<keyring::Entry> {
             keyring::Entry::new(SERVICE, id).map_err(|_| VaultError::unavailable())
         }
+
+        fn lookup(&self, id: &str) -> Result<Option<Zeroizing<Vec<u8>>>> {
+            #[cfg(target_os = "linux")]
+            if self.snap {
+                return super::snap_portal::lookup(SERVICE, id);
+            }
+            match Self::entry(id)?.get_secret() {
+                Ok(secret) => Ok(Some(Zeroizing::new(secret))),
+                Err(keyring::Error::NoEntry) => Ok(None),
+                Err(_) => Err(VaultError::unavailable()),
+            }
+        }
+
+        fn store(&self, id: &str, secret: &[u8]) -> Result<()> {
+            #[cfg(target_os = "linux")]
+            if self.snap {
+                return super::snap_portal::store(SERVICE, id, secret);
+            }
+            Self::entry(id)?
+                .set_secret(secret)
+                .map_err(|_| VaultError::unavailable())
+        }
+
+        fn remove(&self, id: &str) -> Result<()> {
+            #[cfg(target_os = "linux")]
+            if self.snap {
+                return super::snap_portal::remove(SERVICE, id);
+            }
+            match Self::entry(id)?.delete_credential() {
+                Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+                Err(_) => Err(VaultError::unavailable()),
+            }
+        }
     }
 
     impl SecretStore for SystemStore {
         fn probe(&self) -> Result<()> {
             self.locked(|| {
-                // Read-only health probe, never writes or creates a credential.
-                match Self::entry("backend-health-probe")?.get_secret() {
-                    Ok(secret) => {
-                        drop(Zeroizing::new(secret));
-                        Ok(())
-                    }
-                    Err(keyring::Error::NoEntry) => Ok(()),
-                    Err(_) => Err(VaultError::unavailable()),
-                }
+                // Never creates a vault key. On Snap, libsecret may initialize
+                // its app-scoped portal secret and encrypted collection.
+                self.lookup("backend-health-probe").map(|_| ())
             })
         }
 
         fn create(&self, id: &str, secret: &[u8]) -> Result<()> {
             self.locked(|| {
-                let entry = Self::entry(id)?;
-                match entry.get_secret() {
-                    Ok(old) => {
-                        drop(Zeroizing::new(old));
-                        return Err(VaultError::new(
-                            "KEY_EXISTS",
-                            "The offline vault key already exists",
-                        ));
-                    }
-                    Err(keyring::Error::NoEntry) => {}
-                    Err(_) => return Err(VaultError::unavailable()),
+                if self.lookup(id)?.is_some() {
+                    return Err(VaultError::new(
+                        "KEY_EXISTS",
+                        "The offline vault key already exists",
+                    ));
                 }
-                entry
-                    .set_secret(secret)
-                    .map_err(|_| VaultError::unavailable())?;
-                let saved =
-                    Zeroizing::new(entry.get_secret().map_err(|_| VaultError::unavailable())?);
+                self.store(id, secret)?;
+                let saved = self.lookup(id)?.ok_or_else(VaultError::unavailable)?;
                 if saved.as_slice() != secret {
                     return Err(VaultError::unavailable());
                 }
@@ -337,22 +364,11 @@ pub mod system {
         }
 
         fn read(&self, id: &str) -> Result<Zeroizing<Vec<u8>>> {
-            self.locked(|| {
-                Self::entry(id)?
-                    .get_secret()
-                    .map(Zeroizing::new)
-                    .map_err(|error| match error {
-                        keyring::Error::NoEntry => VaultError::missing(),
-                        _ => VaultError::unavailable(),
-                    })
-            })
+            self.locked(|| self.lookup(id)?.ok_or_else(VaultError::missing))
         }
 
         fn delete(&self, id: &str) -> Result<()> {
-            self.locked(|| match Self::entry(id)?.delete_credential() {
-                Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-                Err(_) => Err(VaultError::unavailable()),
-            })
+            self.locked(|| self.remove(id))
         }
     }
 }

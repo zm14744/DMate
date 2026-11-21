@@ -1,0 +1,67 @@
+name: Test release workflow guards
+
+on:
+  push:
+    paths:
+      - '.github/workflows/*desktop*.yml'
+      - '.github/workflows/*snap*.yml'
+      - '.github/workflows/*windows-store*.yml'
+      - '.github/workflows/test-release-workflows.yml'
+      - 'scripts/*release*.py'
+      - 'scripts/*windows_store*'
+      - 'scripts/check_snap_store_channel.py'
+      - 'scripts/smoke_snap_package.sh'
+      - 'snap/**'
+  pull_request:
+    paths:
+      - '.github/workflows/*desktop*.yml'
+      - '.github/workflows/*snap*.yml'
+      - '.github/workflows/*windows-store*.yml'
+      - '.github/workflows/test-release-workflows.yml'
+      - 'scripts/*release*.py'
+      - 'scripts/*windows_store*'
+      - 'scripts/check_snap_store_channel.py'
+      - 'scripts/smoke_snap_package.sh'
+      - 'snap/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exercise release recovery, provenance and channel guards without publishing
+        run: python -m unittest discover -s scripts -p 'test_*release*.py' -v
+      - name: Parse packaged Snap installation check
+        if: runner.os == 'Linux'
+        run: bash -n scripts/smoke_snap_package.sh
+      - name: Parse Microsoft Store packaging script
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          foreach ($script in @('scripts/build_windows_store.ps1', 'scripts/test_windows_store_install.ps1')) {
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Join-Path $PWD $script), [ref]$tokens, [ref]$parseErrors
+            ) | Out-Null
+            if ($parseErrors.Count) {
+              $parseErrors | ForEach-Object { Write-Error $_.Message }
+              exit 1
+            }
+          }
