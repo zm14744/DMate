@@ -96,16 +96,16 @@ function mount(options){
   if(total>LIMITS.total&&total>=previousTotal){saved.textContent='笔记总内容已达上限，请精简后继续。';(field==='title'?title:original).value=note[field];return;}
   note[field]=value;note.updatedAt=updatedAt(note);invalidate();persist();renderList();
  }
- function askToDelete(note){
-  const settings={title:'删除这个概念？',body:'删除后无法恢复。\n'+noteName(note),content:noteName(note),confirmText:'删除概念',cancelText:'取消',confirmTone:'danger',fallbackText:uiText('确定删除“'+noteName(note)+'”吗？删除后无法恢复','Delete “'+noteName(note)+'”? This cannot be undone')};
+ function askToDelete(){
+  const title='删除这个概念？',bodyText='删除后，笔记内容将不可恢复';
+  const settings={title,body:bodyText,confirmText:'删除概念',cancelText:'取消',confirmTone:'danger',fallbackText:uiText(title)+'\n\n'+uiText(bodyText)};
   if(typeof options.confirmDelete==='function')return options.confirmDelete(settings);
   return new Promise(resolve=>{
    const prompt=el('dialog','dcn-confirm'),head=el('header','dcn-confirm-head'),heading=el('h3','',settings.title);
    heading.id='conceptNotebookDeleteTitle';prompt.setAttribute('aria-labelledby',heading.id);
    const finish=value=>{if(deletePrompt?.node!==prompt)return;deletePrompt=null;if(prompt.open)prompt.close();prompt.remove();resolve(Boolean(value));};
    const cancel=action('',()=>finish(false),'dcn-close');cancel.setAttribute('aria-label','取消删除');cancel.title='取消删除';head.append(heading,cancel);
-   const body=el('p','dcn-confirm-body',uiText('删除后无法恢复','This cannot be undone')),actions=el('footer','dcn-confirm-actions');
-   body.append(d.createTextNode('\n'),contentNode(el('span','',settings.content)));
+   const body=el('p','dcn-confirm-body',uiText(bodyText)),actions=el('footer','dcn-confirm-actions');
    actions.append(action(settings.confirmText,()=>finish(true),'dcn-confirm-delete'));
    prompt.append(head,body,actions);dialog.append(prompt);deletePrompt={node:prompt,finish};
    prompt.addEventListener('cancel',event=>{event.preventDefault();finish(false);});prompt.addEventListener('close',()=>finish(false));
@@ -118,7 +118,7 @@ function mount(options){
   const note=state.notes.find(item=>item.id===identifier);if(!note||deletePending)return;
   const op={context:contextKey(),id:note.id,note:JSON.stringify(note)};deletePending=op;renderActions();
   try{
-   const confirmed=await askToDelete(note);
+   const confirmed=await askToDelete();
    const currentNote=state.notes.find(item=>item.id===op.id);
    if(!confirmed||destroyed||!dialog.open||deletePending!==op||op.context!==contextKey()||JSON.stringify(currentNote)!==op.note)return;
    const index=state.notes.findIndex(item=>item.id===op.id);

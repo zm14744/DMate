@@ -8689,7 +8689,7 @@ async function removeWrongQuestion(id) {
     try {
         confirmed = await showAppConfirm({
             title: "移出错题本",
-            body: "确定要把这道题移出错题本吗？这不会删除原聊天",
+            body: "确定要把这道题移出错题本吗？",
             confirmText: "移出",
             confirmTone: "danger"
         });
@@ -8721,7 +8721,7 @@ function clearCompletedWrongQuestions() {
     }
 
     const confirmed = window.confirm(
-        `确定移出 ${completed.length} 道已完成的错题吗？原聊天不会被删除`
+        `确定移出 ${completed.length} 道已完成的错题吗？`
     );
 
     if (!confirmed) return;

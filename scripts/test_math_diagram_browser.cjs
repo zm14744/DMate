@@ -81,7 +81,7 @@ async function passiveGenerationPanel(page, mock, guideRequests, initial, langua
     assert.deepEqual(current.document, initial.document, label + ': current drawing stays intact');
   };
   const requiredLabel = language === 'en' ? 'Diagram request' : '绘图要求';
-  const optionalLabel = language === 'en' ? 'Diagram request (optional)' : '绘图要求（可选）';
+  const guidanceLabel = language === 'en' ? 'Guidance request' : '指导要求';
   const request = 'K5 request retained without submitting';
   await ai(page, '');
   assert.equal(await page.locator('.ddw-side-panel h3').innerText(), language === 'en' ? 'AI generation' : 'AI生成');
@@ -149,13 +149,23 @@ async function passiveGenerationPanel(page, mock, guideRequests, initial, langua
     return p.left < r.right && p.right > r.left && p.top < r.bottom && p.bottom > r.top;
   });
   assert.equal(popoverIntersectsRail, false, 'Guidance leaves every wrapped toolbar row reachable');
-  assert.equal(await page.locator('.ddw-ai-requirement').getAttribute('aria-label'), optionalLabel);
-  assert.equal(await page.locator('.ddw-ai-requirement').getAttribute('required'), null);
+  assert.equal(await page.locator('.ddw-ai-requirement').getAttribute('aria-label'), guidanceLabel);
+  assert.equal(await page.locator('.ddw-ai-requirement').getAttribute('required'), '');
   assert.deepEqual(await panelStyle(page, '[data-drawing-guide]'), generationStyle,
     'Generation and guidance share the same popover, input and enabled arrow styling');
-  await page.locator('.ddw-ai-requirement').fill('');
-  assert.equal(await page.locator('[data-drawing-guide]').isEnabled(), true, 'AI guidance accepts an optional empty requirement');
+  for (const value of ['', '  \n\t　']) {
+    await page.locator('.ddw-ai-requirement').fill(value);
+    const send = page.locator('[data-drawing-guide]');
+    assert.equal(await send.isDisabled(), true, 'Blank guidance disables the arrow');
+    assert.deepEqual((await panelStyle(page, '[data-drawing-guide]')).button, disabledStyle.button,
+      'Blank guidance matches the disabled generation arrow');
+    await send.dispatchEvent('click');
+    await page.locator('.ddw-ai-requirement').press('Enter');
+    await settle(page);
+    await unchanged('Blank guidance, click and Enter');
+  }
   await page.locator('.ddw-ai-requirement').fill(request);
+  assert.equal(await page.locator('[data-drawing-guide]').isEnabled(), true, 'Typing a guidance request enables the arrow');
   await unchanged('Switching to guidance');
   await generation.click();
   await page.evaluate(value => DMateI18n.setLanguage(value, false), language === 'en' ? 'zh-CN' : 'en');

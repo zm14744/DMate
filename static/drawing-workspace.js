@@ -167,7 +167,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    settingsButton.disabled=empty||disabled;informationButton.disabled=empty||disabled;if(aiButton)aiButton.disabled=disabled;
    if(generateButton){generateButton.disabled=disabled;generateButton.setAttribute('aria-busy',String(aiTask==='generate'));}
    const send=panel.querySelector('[data-drawing-guide],[data-math-diagram-generate]');
-   if(send){send.disabled=disabled||Boolean(aiAbort)||(panelMode==='generate'?!requirement.trim():!active());send.setAttribute('aria-busy',String(aiTask===(panelMode==='generate'?'generate':'guide')));}
+   if(send){send.disabled=disabled||Boolean(aiAbort)||!requirement.trim()||(panelMode==='ai'&&empty);send.setAttribute('aria-busy',String(aiTask===(panelMode==='generate'?'generate':'guide')));}
    shell.classList.toggle('is-empty',empty);
    if(palette){palette.open=toolsExpanded&&!empty;const trigger=palette.querySelector(':scope > summary');trigger?.setAttribute('aria-expanded',String(palette.open));trigger?.setAttribute('aria-disabled',String(disabled));}
    for(const item of editorHost.querySelectorAll('.dge-float-panel')){
@@ -329,8 +329,8 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
      row.append(open,remove);list.append(row);
     });if(!pages.length)list.append(el('p','ddw-history-empty','无'));panel.append(list);syncChrome();return;
    }
-   const generating=panelMode==='generate',requestLabel=generating?uiText('绘图要求','Diagram request'):uiText('绘图要求（可选）','Diagram request (optional)');
-   const label=el('label','ddw-ai-label',requestLabel),input=el('textarea','ddw-ai-requirement');input.rows=3;input.maxLength=2000;input.value=requirement;input.required=generating;input.setAttribute('aria-label',requestLabel);
+   const generating=panelMode==='generate',requestLabel=generating?uiText('绘图要求','Diagram request'):uiText('指导要求','Guidance request');
+   const label=el('label','ddw-ai-label',requestLabel),input=el('textarea','ddw-ai-requirement');input.rows=3;input.maxLength=2000;input.value=requirement;input.required=true;input.setAttribute('aria-label',requestLabel);
    input.addEventListener('input',()=>{requirement=input.value;const p=active();if(p){p.requirement=requirement;p.updatedAt=Date.now();schedule();}invalidateAnswer();});label.append(input);
    const actionRow=el('div','ddw-ai-actions');
    const ask=button('',()=>generating?requestGenerate():requestGuide(),'ddw-guide-button');ask.append(sendIcon());
@@ -371,7 +371,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    setStatus('');
   }
   async function requestGuide(){
-   if(!features.ai||aiAbort||destroyed||!active())return;collect();persist();
+   if(!features.ai||aiAbort||destroyed||panelMode!=='ai'||!active()||!requirement.trim())return;collect();persist();
    const snapshot=clone(currentDocument()),snapshotKey=fingerprint(snapshot),request=requirement,selected=activeId,epoch=++aiEpoch;
    const controller=new win.AbortController();aiAbort=controller;aiTask='guide';answer='';renderPanel();setStatus('');
    try{

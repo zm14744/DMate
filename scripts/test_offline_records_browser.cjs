@@ -4,6 +4,8 @@ const assert = require('node:assert/strict');
 const {chromium} = require('playwright');
 const {installStorageProbe,records, revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
+const mistakeRemovalText = '确定要把这道题移出错题本吗？';
+const noteDeletionText = '删除后，笔记内容将不可恢复';
 const savedQuestion = require('../static/offline-content/questions.zh-CN.json').questions
   .find(question => question.statement && (question.answer_text || question.answer?.length));
 const styleKeys = ['fontFamily','fontSize','fontWeight','lineHeight','color','backgroundColor',
@@ -42,6 +44,10 @@ async function onlineStyles(page,theme) {
   await page.mouse.move(0,0);await settle(page);
   const result={removeAction:await style(removeAction)};
   if(page.viewportSize().width>1100){await removeAction.hover();await settle(page);result.removeActionHover=await style(removeAction);await page.mouse.move(0,0);}
+  await removeAction.click();
+  await page.locator('#appConfirmBody').waitFor({state:'visible'});
+  assert.equal(await page.locator('#appConfirmBody').innerText(),mistakeRemovalText);
+  await page.locator('#appConfirmClose').click();
   await page.locator('#wrongBookClose').click();
   await page.evaluate(()=>{
     learningState.conceptNotebook={notes:[{id:'style-note',title:'样式参考',content:'参考笔记',updatedAt:1}],deleted:{}};
@@ -54,6 +60,9 @@ async function onlineStyles(page,theme) {
   assert.equal(await notebook.locator('.dcn-original').getAttribute('aria-label'),'概念内容');
   assert.equal((await notebook.locator('.dcn-editor label').last().innerText()).trim(),'概念内容');
   result.remove=await circle(notebook.locator('.dcn-note-delete'));
+  await notebook.locator('.dcn-note-delete').click();
+  assert.equal(await notebook.locator('.dcn-confirm-body').innerText(),noteDeletionText);
+  await notebook.locator('.dcn-confirm .dcn-close').click();
   await notebook.locator('.dcn-close').first().click();
   return result;
 }
@@ -81,8 +90,9 @@ async function disconnectWorker(browser,page) {
   assert.equal(probe.result.value,true,'The worker cannot silently use the server');
   return protocol;
 }
-async function confirmDeletion(page) {
+async function confirmDeletion(page,expectedBody) {
   const dialog=page.locator('.dmate-delete-confirm[open]');await dialog.waitFor({state:'visible'});
+  assert.equal(await dialog.locator('.dmate-delete-confirm-body').innerText(),expectedBody);
   await dialog.locator('.dmate-delete-confirm-delete').click();await dialog.waitFor({state:'detached'});
 }
 async function noOverflow(page,panel) {
@@ -125,7 +135,7 @@ async function exercise(page,reference,width) {
   assert.ok((await card.locator('.wrong-answer-inner').textContent()).trim());
   await remove.click();await page.locator('.dmate-delete-confirm-close').click();
   assert.equal((await records(page,'mistakes')).length,1,'Cancel removal retains the original record');
-  await remove.click();await confirmDeletion(page);
+  await remove.click();await confirmDeletion(page,mistakeRemovalText);
   await page.waitForFunction(async()=>(await __offlineTestStore.all('mistakes')).length===0);
   await page.waitForFunction(()=>document.getElementById('mistakeList').textContent.trim()==='无');
   assert.equal((await page.locator('#mistakeList').innerText()).trim(),'无');
@@ -175,7 +185,7 @@ async function exercise(page,reference,width) {
   assert.equal((await records(page,'notes')).length,2,'Notes survive a fully offline refresh');
   await page.locator('.dcn-note[data-note-id="'+firstNote.id+'"] .dcn-note-open').click();
   assert.equal(await page.locator('.dcn-original').inputValue(),'保留我的原始推导：幂集含有所有子集');
-  await page.locator('.dcn-note[data-note-id="'+firstNote.id+'"] .dcn-note-delete').click();await confirmDeletion(page);
+  await page.locator('.dcn-note[data-note-id="'+firstNote.id+'"] .dcn-note-delete').click();await confirmDeletion(page,noteDeletionText);
   await page.waitForFunction(async()=>(await __offlineTestStore.all('notes')).length===1);
   await navigate(page,'mistakes');await page.locator('#mistakeList .wrong-card').waitFor({state:'visible'});
   assert.equal(await page.locator('.wrong-card').count(),1,'The existing saved wrong question survives the same offline refresh');

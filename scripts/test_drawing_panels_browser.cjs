@@ -385,15 +385,11 @@ async function viewportAndPopoverChecks(page, mobile, label, online = true) {
         'Only the guidance panel contains its explicit guidance send button');
       assert.equal(await page.locator(panel + ' .ddw-panel-header>h3').innerText(), generating ? 'AI生成' : 'AI指导');
       const requirementLabel = await page.locator(panel + ' .ddw-ai-label').innerText();
-      if (generating) {
-        assert.equal(requirementLabel, '绘图要求', 'Generation has a plain required request label');
-        assert.equal(await page.locator(panel + ' .ddw-ai-requirement').getAttribute('required'), '');
-        const requirement = await page.locator(panel + ' .ddw-ai-requirement').inputValue();
-        assert.equal(await page.locator(panel + ' [data-math-diagram-generate]').isEnabled(), Boolean(requirement.trim()));
-      } else {
-        assert.match(requirementLabel, /可选|optional/i, 'Guidance requirements remain optional');
-        assert.equal(await page.locator(panel + ' .ddw-ai-requirement').getAttribute('required'), null);
-      }
+      assert.equal(requirementLabel, generating ? '绘图要求' : '指导要求');
+      assert.equal(await page.locator(panel + ' .ddw-ai-requirement').getAttribute('required'), '');
+      const requirement = await page.locator(panel + ' .ddw-ai-requirement').inputValue();
+      const send = page.locator(panel + (generating ? ' [data-math-diagram-generate]' : ' [data-drawing-guide]'));
+      assert.equal(await send.isEnabled(), Boolean(requirement.trim()));
     }
     try { metrics[name] = await compactPanel(page, panel, mobile); }
     catch (error) {

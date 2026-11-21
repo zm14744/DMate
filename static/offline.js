@@ -172,9 +172,9 @@
     });
     return details;
   }
-  async function confirmDelete(owner, title, content) {
+  async function confirmDelete(owner, settings) {
     if (!window.DMateDeleteConfirm?.request) { toast(tr("删除确认组件尚未加载，请刷新后重试")); return false; }
-    return window.DMateDeleteConfirm.request(owner, {title, body:"删除后无法恢复", content, confirmText:"删除"});
+    return window.DMateDeleteConfirm.request(owner, settings);
   }
   async function transaction(store, _mode, action) {
     requireWorkspace();
@@ -482,7 +482,7 @@
       card.append(answerDetails("查看答案", answer));
       const actions = el("div", "wrong-actions record-actions");
       const deletion = action(tr("移出错题本"), "secondary danger", async () => {
-        if (await confirmDelete($("mistakesPanel"), "移出这道错题？", row.statement || row.question || row.title)) {
+        if (await confirmDelete($("mistakesPanel"), {title:"移出错题本", body:"确定要把这道题移出错题本吗？", confirmText:"移出"})) {
           for (let index=0;index<records.length;index+=window.DMateOfflineVault.limits.batchRecords-1) {
             const batch = records.slice(index,index+window.DMateOfflineVault.limits.batchRecords-1);
             const previous = await transaction("settings","readonly",os => os.get("mistake-deletions"));
@@ -620,7 +620,7 @@
           if (state.noteDeletePending) return;
           state.noteDeletePending = row.id; renderActions();
           try {
-            if (!await confirmDelete($("notesPanel"), "删除这个概念？", title)) return;
+            if (!await confirmDelete($("notesPanel"), {title:"删除这个概念？", body:"删除后，笔记内容将不可恢复"})) return;
             if (!await flushNoteDrafts()) { toast("笔记尚未保存，请保留当前页面后重试。"); return; }
             await deleteNote(state.noteRows.find(note => note.id === row.id) || row); await renderNotes();
           } finally {
