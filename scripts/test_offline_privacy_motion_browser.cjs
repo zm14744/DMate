@@ -250,7 +250,17 @@ async function assertLayout(page) {
       assertGrowth(coldFrames,'cold entry',false);
       assertIntro(coldFrames,'cold entry');
       await assertNoLateUpdates(page,'automatically revealed cover');
+      const clockStart = new Date('2025-01-01T00:00:00Z');
+      await page.clock.install({time:clockStart});
+      await page.clock.pauseAt(new Date(clockStart.getTime()+60000));
       await page.reload({waitUntil:'domcontentloaded'});
+      await page.clock.runFor(704);
+      const growing = await page.evaluate(() => __privacyMotionSnapshot());
+      assert.ok(growing.open && growing.partial > 0,'The original 740 ms intro is still drawing at 704 ms');
+      await page.clock.runFor(80);
+      const complete = await page.evaluate(() => __privacyMotionSnapshot());
+      assert.ok(complete.visible === 21 && complete.partial === 0,'All edges are drawn by the frame after completion');
+      await page.clock.resume();
       await page.waitForFunction(() => window.__privacyColdSampleComplete);
       const reloadFrames = await page.evaluate(() => __privacyColdFrames);
       assertGrowth(reloadFrames,'reload entry',false);
