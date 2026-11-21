@@ -263,10 +263,11 @@ async function onlineCase(browser, width, theme) {
 async function ocrSelectors(page) {
   await page.evaluate(() => {
     closeKnowledgeGraph();
+    if (!currentId) newChat();
     const originalUrl = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="white"/></svg>');
     ocrTasks.clear();
     ocrTasks.set('select-fixture', { id: 'select-fixture', groupId: '1', isQuestion: true, state: 'ready',
-      file: new File(['local fixture'], 'local-selector.png', { type: 'image/png' }), sessionId: currentId,
+      file: new File(['local fixture'], 'local-selector.png', { type: 'image/png' }), sessionId: currentId, contextVersion: cloudSyncContextVersion,
       originalUrl, startedAt: performance.now(), finishedAt: performance.now(),
       draft: { body_text: '本地选择器测试', graphs: [] }, initialDocument: { body_text: '本地选择器测试', graphs: [] } });
     renderOcrTasks(); openOcrGrouping();
