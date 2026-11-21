@@ -4473,7 +4473,7 @@ function refreshInputAvailability() {
         sendBtn.textContent = stoppingAllowed ? "停止" : "发送";
         sendBtn.classList.toggle("ai-stop-button", stoppingAllowed);
         sendBtn.setAttribute("aria-label", stoppingAllowed ? "停止当前 AI 回复" : "发送消息");
-        sendBtn.title = stoppingAllowed ? "停止当前 AI 回复" : "发送";
+        sendBtn.title = stoppingAllowed ? "停止回复" : "发送（Enter）";
         setInputControlVisible(sendBtn, sendVisible);
         if (visibleMode === "idle" && window.dmateVoiceInput?.state && window.dmateVoiceInput.state !== "idle") {
             sendBtn.disabled = true;
@@ -7208,7 +7208,7 @@ function createChatTextCopyButton(onCopy) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "rich-copy-smart chat-text-copy";
-    button.title = "复制这条消息的可编辑文本";
+    button.title = "复制文本";
     button.setAttribute("aria-label", "复制文本");
     button.appendChild(createChatActionIcon("copy"));
     button.addEventListener("click", () => {
@@ -10599,7 +10599,7 @@ function renderWrongBook() {
             retestButton.textContent = item.retestPassed
                 ? "再测一次"
                 : "再测一道";
-            retestButton.title = "生成一道同知识点、难度相近的新题进行验证";
+            retestButton.title = "同知识点、相近难度";
             retestButton.onclick = () => (
                 startWrongQuestionRetest(item.id)
             );
@@ -10609,7 +10609,7 @@ function renderWrongBook() {
             passButton.type = "button";
             passButton.className = "secondary";
             passButton.textContent = "查看复测";
-            passButton.title = "查看每一次复测题并选择通过记录";
+            passButton.title = "标记通过的复测";
             passButton.onclick = () => openWrongRetestReview(item.id);
             actions.appendChild(passButton);
         }
@@ -16342,7 +16342,7 @@ function renderOcrTasks() {
         remove.dataset.ocrAction = task.state === "recognizing" ? "cancel" : "remove";
         remove.dataset.taskId = task.id;
         remove.setAttribute("aria-label", (task.state === "recognizing" ? "取消图片：" : "移除图片：") + (task.file.name || "图片"));
-        remove.title = task.state === "recognizing" ? "取消识别" : "移除";
+        remove.title = task.state === "recognizing" ? "取消识别" : "移除图片";
         remove.disabled = Boolean(task.confirming || task.sending);
         card.append(remove);
         fragment.append(card);
@@ -18600,7 +18600,7 @@ function renderChat(preparedReply = null) {
             wrongButton.className = "chat-wrong-book";
             wrongButton.setAttribute("aria-label", "记为错题");
             wrongButton.appendChild(createChatActionIcon("book-plus"));
-            wrongButton.title = "把这一条题目加入错题本";
+            wrongButton.title = "记为错题";
             wrongButton.onclick = () => (
                 markChatMessageAsWrong(
                     session.id,
@@ -18625,9 +18625,9 @@ function renderChat(preparedReply = null) {
         const deleteButton = document.createElement("button");
         deleteButton.type = "button";
         deleteButton.className = "danger chat-message-delete";
-        deleteButton.setAttribute("aria-label", "删除这一条聊天消息");
+        deleteButton.setAttribute("aria-label", "删除消息");
         deleteButton.appendChild(createChatActionIcon("trash"));
-        deleteButton.title = "删除这一条聊天消息";
+        deleteButton.title = "删除消息";
         deleteButton.onclick = () => (
             deleteChatMessage(
                 session.id,
@@ -18899,11 +18899,8 @@ function renderSessions() {
         del.className = "del";
         del.type = "button";
         del.textContent = "";
-        del.title = "删除这个对话";
-        del.setAttribute(
-            "aria-label",
-            "删除这个对话"
-        );
+        del.title = "删除对话";
+        del.setAttribute("aria-label", "删除对话");
 
         del.onclick = async event => {
             event.stopPropagation();
@@ -21241,7 +21238,6 @@ function updateKnowledgeGraphScopeButton() {
         button.hidden = knowledgeGraphViewMode === "wrong" || !available;
         button.classList.toggle("hidden", button.hidden);
         button.textContent = "最近一题关联";
-        button.title = "仅显示最近一道题目实际涉及的知识点及该题的知识关系";
         button.classList.toggle("active", knowledgeGraphViewMode === "focus");
         button.setAttribute("aria-pressed", String(knowledgeGraphViewMode === "focus"));
     }
@@ -21272,7 +21268,6 @@ function updateKnowledgeGraphModeButton() {
         button.hidden = knowledgeGraphViewMode === "wrong";
         button.classList.toggle("hidden", button.hidden);
         button.textContent = "全部知识";
-        button.title = "显示完整知识图谱的全部节点与关系线；可使用模块下拉框筛选";
         button.classList.toggle("active", knowledgeGraphViewMode === "full");
         button.setAttribute("aria-pressed", String(knowledgeGraphViewMode === "full"));
     }
@@ -21546,6 +21541,7 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     zoomOut.className = "kg-mobile-zoom-btn";
     zoomOut.textContent = "−";
     zoomOut.setAttribute("aria-label", "缩小图谱");
+    zoomOut.title = dmateUiText("缩小", "Zoom out");
 
     const zoomLabel = document.createElement("span");
     zoomLabel.className = "kg-mobile-zoom-label";
@@ -21556,15 +21552,13 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     zoomIn.className = "kg-mobile-zoom-btn";
     zoomIn.textContent = "+";
     zoomIn.setAttribute("aria-label", "放大图谱");
+    zoomIn.title = dmateUiText("放大", "Zoom in");
 
     const zoomFit = document.createElement("button");
     zoomFit.type = "button";
     zoomFit.className = "kg-mobile-zoom-fit";
     zoomFit.textContent = "适应";
-    zoomFit.setAttribute("aria-label", dmateUiText("适应可读大小，可拖动查看全部节点",
-        "Fit to a readable size; drag to explore all concepts"));
-    zoomFit.title = dmateUiText("小图居中显示，大图保持可读，可拖动查看全部节点",
-        "Center small graphs and keep large graphs readable; drag to explore all concepts");
+    zoomFit.title = dmateUiText("调整到可读大小", "Fit to a readable size");
 
     zoomControls.append(zoomOut, zoomLabel, zoomIn, zoomFit);
     section.appendChild(zoomControls);

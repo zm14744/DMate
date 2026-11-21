@@ -1,5 +1,5 @@
-/* Shared hints on the real file picker, above available controls, and deliberate
- * keyboard navigation; OS capture/restore and modal autofocus stay quiet. */
+/* Verify helpful hints on the file picker, conversation list and icon buttons
+ * with mouse, keyboard and touch in the application's real tooltip layer. */
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
@@ -27,7 +27,7 @@ async function hint(page, target, label, above = true) {
 }
 
 async function test(browser, width) {
-  const context = await browser.newContext({viewport:{width, height:900}, serviceWorkers:'block'});
+  const context = await browser.newContext({viewport:{width, height:900}, hasTouch:width <= 1100, serviceWorkers:'block'});
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -53,19 +53,26 @@ async function test(browser, width) {
     await page.mouse.move(2, 2);
     await hidden(page, 'Picker close and pointer leave hide the shared hint');
 
-    await page.evaluate(() => {
-      sessions = [{id:'tooltip-title', name:'集合运算与德摩根律', nameSource:'user', messages:[]}];
+    const longName = '集合运算与德摩根律'.repeat(7);
+    await page.evaluate(longName => {
+      sessions = [{id:'tooltip-title', name:longName, nameSource:'user', messages:[]},
+        {id:'tooltip-short', name:'并集', nameSource:'user', messages:[]}];
       currentId = 'tooltip-title'; renderAll();
-    });
+    }, longName);
     const sidebarButton = page.locator(width <= 1100 ? '#mobileNavBtn' : '#desktopSidebarOpen');
     await sidebarButton.click();
     await page.waitForFunction(() => innerWidth <= 1100 ? document.body.classList.contains('mobile-left-open')
       : document.documentElement.dataset.desktopSidebar === 'expanded');
     await page.evaluate(async () => Promise.all(document.getAnimations().filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity)
       .map(animation => animation.finished.catch(() => {}))));
-    const name = page.locator('#sessions [data-session-name]');
-    await hint(page, name, '集合运算与德摩根律');
-    assert.equal(await name.getAttribute('title'), '', 'Conversation name uses shared rather than native tooltip');
+    const longLabel = page.locator('#sessions .session[data-session-id="tooltip-title"] [data-session-name]');
+    assert.ok(await longLabel.evaluate(node => node.scrollWidth > node.clientWidth), 'The long conversation title is truncated');
+    await hint(page, longLabel, longName);
+    assert.equal(await longLabel.getAttribute('title'), '', 'Conversation name uses shared rather than native tooltip');
+    const shortLabel = page.locator('#sessions .session[data-session-id="tooltip-short"] [data-session-name]');
+    await shortLabel.hover();
+    await hidden(page, 'A complete short conversation name needs no duplicate hint');
+    assert.ok(!(await shortLabel.getAttribute('title')), 'A short name avoids the native tooltip as well');
     await page.locator(width <= 1100 ? '#mobileNavClose' : '#desktopSidebarToggle').click();
     await page.mouse.move(2, 2);
 
@@ -101,18 +108,48 @@ async function test(browser, width) {
     await page.evaluate(() => {
       const dialog = document.createElement('dialog'); dialog.id = 'tooltip-test-dialog';
       dialog.style.cssText = 'position:fixed;inset:200px auto auto 24px;margin:0;width:280px;transform:scale(.9);overflow:visible';
-      dialog.innerHTML = '<button title="第一个">甲</button><button title="第二个">乙</button>';
+      dialog.innerHTML = '<button title="搜索"><span>搜索</span></button>'
+        + '<button aria-label="撤销" aria-describedby="hint-description"><svg width="16" height="16" aria-hidden="true"></svg></button>'
+        + '<button title="发送 (Ctrl+Enter)">发送</button><p id="hint-description">画板操作</p>';
       document.body.append(dialog); dialog.showModal();
     });
     await hidden(page, 'Native dialog autofocus is quiet too');
     await page.keyboard.press('Tab');
     const popup = page.locator('.dm-ui-tooltip:visible');
     await popup.waitFor();
-    assert.equal(await popup.innerText(), '第二个', 'Real Tab navigation gets a focus hint');
+    assert.equal(await popup.innerText(), '撤销', 'Keyboard focus names an icon even when only aria-label supplies its name');
     assert.equal(await popup.evaluate(node => node.parentElement.id), 'tooltip-test-dialog', 'Tooltip remains in the native dialog top layer');
     const focusedBox = await page.locator('#tooltip-test-dialog button').nth(1).boundingBox();
     const popupBox = await popup.boundingBox();
     assert.ok(popupBox.y + popupBox.height <= focusedBox.y - 6, 'Scaled native dialogs still place hints above');
+    const dialog = page.locator('#tooltip-test-dialog');
+    const icon = dialog.getByRole('button', {name:'撤销'});
+    await icon.evaluate(node => node.setAttribute('aria-label', '重做'));
+    await page.waitForFunction(() => document.querySelector('.dm-ui-tooltip:not([hidden])')?.textContent === '重做');
+    await page.keyboard.press('Tab');
+    await popup.waitFor();
+    assert.equal(await popup.innerText(), '发送 (Ctrl+Enter)', 'A keyboard shortcut adds useful information to a labeled button');
+    const redo = dialog.getByRole('button', {name:'重做'});
+    assert.equal(await redo.getAttribute('aria-describedby'), 'hint-description', 'Original descriptions survive blur');
+    assert.equal(await redo.getAttribute('aria-label'), '重做', 'The application keeps ownership of dynamic accessible names');
+    const search = dialog.getByRole('button', {name:'搜索'});
+    await search.hover();
+    await hidden(page, 'A button with fully visible matching text is self-explanatory');
+    assert.ok(!(await search.getAttribute('title')), 'No native duplicate search hint appears');
+    // Compact toolbars can keep a text name in the DOM while drawing only an icon.
+    await page.mouse.move(2, 2);
+    await search.evaluate(button => { button.style.fontSize = '0px'; });
+    await hint(page, search, '搜索');
+    await hint(page, redo, '重做');
+    await page.evaluate(() => DMateI18n.setLanguage('en', false));
+    await page.mouse.move(2, 2);
+    await hint(page, dialog.getByRole('button', {name:'Redo'}), 'Redo');
+    await page.evaluate(() => DMateI18n.setLanguage('zh-CN', false));
+    await page.mouse.move(2, 2);
+    if (width <= 1100) {
+      await redo.tap();
+      await hidden(page, 'A real touch tap never opens a hover hint');
+    }
     await page.evaluate(() => document.getElementById('tooltip-test-dialog').remove());
     await page.mouse.move(2, 2);
     await hidden(page, 'Closing the dialog removes its hint');
@@ -126,7 +163,7 @@ async function test(browser, width) {
     await hidden(page, 'Protected answer content is not turned into an interface tooltip');
     assert.equal(await page.locator('#tooltip-protected-content').getAttribute('title'), '正文里的原始标题');
     assert.deepEqual(errors, []);
-    console.log('PASS ' + width + ': native plus picker, above placement, screenshot/autofocus suppression, real keyboard focus, scaled dialog and protected content');
+    console.log('PASS ' + width + ': picker, truncated names, meaningful text hints, icon states, language, input modality, modal placement and protected content');
   } finally { await context.close(); }
 }
 

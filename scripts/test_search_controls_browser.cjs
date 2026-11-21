@@ -242,7 +242,8 @@ async function onlineSearches(page, reference) {
   await toolsEntry(page, 'conceptNotebookBtn');
   await page.locator('#conceptNotebookDialog').waitFor({ state: 'visible' });
   const notebook = page.locator('#conceptNotebookDialog .dcn-search');
-  await checkSearch(notebook, reference);
+  const notebookRadius = await page.locator('#conceptNotebookDialog .dcn-new').evaluate(button => getComputedStyle(button).borderRadius);
+  await checkSearch(notebook, { ...reference, radius: notebookRadius });
   assert.ok((await clearButton(notebook).getAttribute('class')).includes('dcn-search-clear'), 'Reuse notebook clear control');
   await expectClear(notebook, false);
   for (const name of ['Alpha Graph', 'Beta Logic']) {

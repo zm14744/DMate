@@ -886,6 +886,7 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     zoomOut.type = "button";
     zoomOut.className = "kg-mobile-zoom-btn";
     zoomOut.textContent = "−";
+    zoomOut.title = dmateUiText("缩小", "Zoom out");
     zoomOut.setAttribute("aria-label", "缩小图谱");
 
     const zoomLabel = document.createElement("span");
@@ -896,16 +897,14 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     zoomIn.type = "button";
     zoomIn.className = "kg-mobile-zoom-btn";
     zoomIn.textContent = "+";
+    zoomIn.title = dmateUiText("放大", "Zoom in");
     zoomIn.setAttribute("aria-label", "放大图谱");
 
     const zoomFit = document.createElement("button");
     zoomFit.type = "button";
     zoomFit.className = "kg-mobile-zoom-fit";
     zoomFit.textContent = "适应";
-    zoomFit.setAttribute("aria-label", dmateUiText("适应可读大小，可拖动查看全部节点",
-        "Fit to a readable size; drag to explore all concepts"));
-    zoomFit.title = dmateUiText("小图居中显示，大图保持可读，可拖动查看全部节点",
-        "Center small graphs and keep large graphs readable; drag to explore all concepts");
+    zoomFit.title = dmateUiText("调整到可读大小", "Fit to a readable size");
 
     zoomControls.append(zoomOut, zoomLabel, zoomIn, zoomFit);
     section.appendChild(zoomControls);

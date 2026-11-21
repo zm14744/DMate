@@ -31,6 +31,27 @@ async function navigate(page, panel) {
   await page.locator('.offline-nav-item[data-panel="'+panel+'"]').click();
   await page.locator('#'+panel+'Panel').waitFor({state:'visible'});
 }
+async function checkNoteControlRow(panel) {
+  const page = panel.page(), viewport = page.viewportSize();
+  const widths = viewport.width > 1100 ? [viewport.width] : [320, viewport.width, 768];
+  for (const width of widths) {
+    await page.setViewportSize({...viewport,width});
+    const row = await panel.evaluate(panel => {
+      const shape = selector => {
+        const element = panel.querySelector(selector), box = element.getBoundingClientRect(), css = getComputedStyle(element);
+        return {left:box.left,right:box.right,top:box.top,width:box.width,height:box.height,
+          radius:css.borderRadius,border:css.borderTopWidth,style:css.borderTopStyle};
+      };
+      return {create:shape('.dcn-new'),search:shape('.dcn-search')};
+    });
+    for (const key of ['top','width','height']) assert.ok(Math.abs(row.create[key]-row.search[key]) < 1,
+      width+': new concept and search share their '+key);
+    for (const key of ['radius','border','style']) assert.equal(row.create[key],row.search[key]);
+    assert.ok(row.create.left >= 0 && row.create.right < row.search.left && row.search.right <= width,
+      'Both notebook controls fit side by side');
+  }
+  await page.setViewportSize(viewport);
+}
 async function onlineStyles(page,theme) {
   await page.goto(baseURL,{waitUntil:'networkidle'});
   await page.evaluate(theme=>{
@@ -55,6 +76,7 @@ async function onlineStyles(page,theme) {
   });
   const notebook=page.locator('#conceptNotebookDialog');
   await notebook.waitFor({state:'visible'});
+  await checkNoteControlRow(notebook);
   result.create=await style(notebook.locator('.dcn-new'));
   assert.equal(await notebook.locator('.dcn-new').innerText(),'＋ 新概念');
   assert.equal(await notebook.locator('.dcn-original').getAttribute('aria-label'),'概念内容');
@@ -150,7 +172,9 @@ async function exercise(page,reference,width) {
   await navigate(page,'notes');
   assert.equal(await page.locator('#notesPanel .dcn-ai,#notesPanel .dcn-ai-actions,#notesPanel .dcn-question').count(),0,'The restored notebook has its original local controls and no AI panel');
   assert.equal((await page.locator('#addNote').innerText()).trim(),'＋ 新概念');
+  await checkNoteControlRow(page.locator('#notesPanel'));
   await page.locator('#addNote').click();
+  await checkNoteControlRow(page.locator('#notesPanel'));
   assert.equal(await page.locator('.dcn-original').getAttribute('aria-label'),'概念内容');
   assert.equal((await page.locator('.dcn-editor label').last().innerText()).trim(),'概念内容');
   await page.locator('.dcn-title').fill('集合笔记');await page.locator('.dcn-original').fill('保留我的原始推导：幂集含有所有子集');

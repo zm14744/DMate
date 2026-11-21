@@ -967,7 +967,9 @@ body[data-appearance-theme="light"] #sendBtn.ai-stop-button:hover {
 }
 
 .wrong-filters {
-    display:flex;
+    display:grid;
+    grid-auto-flow:column;
+    grid-auto-columns:1fr;
     gap:6px;
 }
 
@@ -2229,16 +2231,6 @@ input[type="search"]::-webkit-search-cancel-button {
 }
 
 @media (max-width:700px) {
-    .wrong-toolbar {
-        align-items:flex-start;
-        flex-direction:column;
-    }
-
-    .wrong-filter-group {
-        align-items:flex-start;
-        flex-direction:column;
-    }
-
     .wrong-actions {
         flex-wrap:wrap;
     }
@@ -3273,9 +3265,10 @@ body[data-appearance-theme="light"] .msg-actions button {
     }
 
     .wrong-toolbar {
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        align-items:center;
         flex:0 0 auto;
-        align-items:stretch;
-        flex-direction:column;
         gap:8px;
         padding:8px 10px;
     }
@@ -3283,31 +3276,14 @@ body[data-appearance-theme="light"] .msg-actions button {
     .wrong-stats {
         font-size:12px;
         line-height:1.5;
+        text-wrap:balance;
+        overflow-wrap:anywhere;
     }
-
-    .wrong-filter-group {
-        width:100%;
-        align-items:stretch;
-        flex-direction:column;
-        gap:6px;
-    }
-
-    .wrong-filters {
-        width:100%;
-        display:flex;
-        gap:6px;
-        overflow-x:auto;
-        overflow-y:hidden;
-        padding-bottom:1px;
-        scrollbar-width:none;
-    }
-
-    .wrong-filters::-webkit-scrollbar { display:none; }
 
     .wrong-filters button {
-        flex:0 0 auto;
         min-height:36px;
-        padding:7px 10px;
+        padding:7px 9px;
+        white-space:nowrap;
     }
 
     .wrong-tools {
@@ -9013,7 +8989,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
         <button id="mobileNavBtn" class="mobile-topbar-button" type="button" aria-label="打开对话列表" aria-controls="conversationSidebar" title="对话列表">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
         </button>
-        <button id="mobileNewChatBtn" class="mobile-topbar-button" type="button" onclick="newChat()" aria-label="＋ 新对话" title="＋ 新对话">
+        <button id="mobileNewChatBtn" class="mobile-topbar-button" type="button" onclick="newChat()" aria-label="新建对话" title="新建对话">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="square-pen"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M16 3a2.121 2.121 0 0 1 3 3l-9 9-4 1 1-4Z"/></svg>
         </button>
     </div>
@@ -9065,7 +9041,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
             <button id="desktopSidebarOpen" class="desktop-shell-button" type="button" aria-label="展开对话列表" title="展开对话列表" aria-controls="conversationSidebar" aria-expanded="false">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
             </button>
-            <button id="desktopNewChatBtn" class="desktop-shell-button" type="button" onclick="newChat()" aria-label="＋ 新对话" title="＋ 新对话">
+            <button id="desktopNewChatBtn" class="desktop-shell-button" type="button" onclick="newChat()" aria-label="新建对话" title="新建对话">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="square-pen"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M16 3a2.121 2.121 0 0 1 3 3l-9 9-4 1 1-4Z"/></svg>
             </button>
             <div id="desktopConversationTitle" class="desktop-conversation-title" data-i18n-content hidden></div>
@@ -9099,8 +9075,8 @@ window.DMATE_CLIENT_CONFIG = {{ {
     </div>
     <div class="input-wrap">
         <div id="manualQuestionMode" class="manual-question-mode interaction-mode-switch" data-mode="chat" role="group" aria-label="输入模式">
-            <button type="button" class="manual-question-choice" data-manual-question="no" aria-pressed="true" title="本条作为普通聊天">聊天</button>
-            <button type="button" class="manual-question-choice" data-manual-question="yes" aria-pressed="false" title="本条作为题目，自动识别难度">解题</button>
+            <button type="button" class="manual-question-choice" data-manual-question="no" aria-pressed="true">聊天</button>
+            <button type="button" class="manual-question-choice" data-manual-question="yes" aria-pressed="false" title="自动识别题目难度">解题</button>
         </div>
         <div class="input">
             <div class="manual-question-composer">
@@ -9110,7 +9086,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
                 </button>
             </div>
             <span class="image-picker-wrap" id="imagePickerWrap">
-                <button id="imageBtn" type="button" title="一次选择 1–4 张图片，也可以拖放或粘贴">上传图片</button>
+                <button id="imageBtn" type="button" title="添加图片（最多 4 张，可拖放或粘贴）">上传图片</button>
                 <input id="imageInput" type="file" accept="image/*" multiple tabindex="-1" aria-label="选择图片">
                 <button id="voiceCancelBtn" class="voice-input-button voice-input-cancel" type="button" aria-label="取消语音输入" title="取消语音输入" aria-hidden="true" tabindex="-1" disabled inert></button>
             </span>
@@ -9576,7 +9552,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
             <div id="wrongBookStats" class="wrong-stats"></div>
             <div class="wrong-filter-group">
                 <div class="wrong-filters">
-                    <button type="button" data-wrong-filter="pending">待订正</button>
+                    <button type="button" data-wrong-filter="pending" data-i18n-en="Pending">待订正</button>
                     <button type="button" data-wrong-filter="corrected">已订正</button>
                 </div>
             </div>
@@ -9593,7 +9569,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
                 <option value="oldest">最早更新</option>
             </select>
             <button id="wrongBookSortTrigger" type="button" aria-label="错题排序，选择排序方式" aria-haspopup="dialog" aria-controls="mobileChoiceModal">最近更新</button>
-            <button id="wrongPdfBtn" type="button" title="导出当前筛选结果为 PDF">导出 PDF</button>
+            <button id="wrongPdfBtn" type="button" title="只导出筛选结果">导出 PDF</button>
         </div>
 
         <div id="wrongBookList"></div>
@@ -9739,7 +9715,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
                 <button type="button" id="knowledgeGraphDesktopZoomOut" title="缩小" aria-label="缩小图谱">−</button>
                 <span id="knowledgeGraphDesktopZoomLabel" aria-live="off">100%</span>
                 <button type="button" id="knowledgeGraphDesktopZoomIn" title="放大" aria-label="放大图谱">+</button>
-                <button type="button" id="knowledgeGraphDesktopZoomFit" title="智能适应：大图优先保证文字可读，可滚动查看全部节点">适应</button>
+                <button type="button" id="knowledgeGraphDesktopZoomFit" title="调整到可读大小">适应</button>
             </div>
         </div>
 

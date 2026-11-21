@@ -72,7 +72,7 @@ function mount(options){
    check.addEventListener('change',()=>{if(check.checked)selected.add(note.id);else selected.delete(note.id);invalidate();renderActions();});
    const openNote=action(noteName(note),()=>{currentId=note.id;renderList();renderEditor();renderActions();},'dcn-note-open');
    const remove=action('',event=>{event.stopPropagation();void removeNote(note.id);},'dcn-note-delete');
-   remove.disabled=!!deletePending;remove.title=uiText('删除'+(note.title.trim()||'未命名概念'),'Delete '+(note.title.trim()||'Untitled concept'));
+   remove.disabled=!!deletePending;remove.title=uiText('删除概念','Delete concept');
    remove.setAttribute('aria-label',uiText('删除概念：'+(note.title.trim()||'未命名概念')+(names.get(noteName(note))>1?'（'+note.id+'）':''),'Delete concept: '+(note.title.trim()||'Untitled concept')+(names.get(noteName(note))>1?'（'+note.id+'）':'')));
    if(note.title.trim())contentNode(openNote);
    openNote.setAttribute('aria-current',String(note.id===currentId));row.append(hit,openNote,remove);list.append(row);

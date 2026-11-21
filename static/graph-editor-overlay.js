@@ -131,10 +131,10 @@ function mount(host,o){
    scroll.scrollTop=(.5-world.top)*scale*h/w-viewportHeight/2;
  };
  const zoomOut=button('－','zoom-out',()=>{zoom(s.zoom/1.25);draw();},viewControls);
- zoomOut.setAttribute('aria-label','缩小原图');
+ zoomOut.title='缩小';zoomOut.setAttribute('aria-label',zoomOut.title);
  const value=d.createElement('span');value.className='dge-overlay-zoom';viewControls.append(value);
  const zoomIn=button('＋','zoom-in',()=>{zoom(s.zoom*1.25);draw();},viewControls);
- zoomIn.setAttribute('aria-label','放大原图');
+ zoomIn.title='放大';zoomIn.setAttribute('aria-label',zoomIn.title);
  button('适应','zoom-fit',()=>fitView(),viewControls);
  // Hide the source photo independently from the drawing layer.
  // visibility:hidden preserves its dimensions and all source coordinates.

@@ -58,6 +58,25 @@ async function expectFilter(page, filter, visible) {
     'Only records in the selected status are displayed, in the chosen order');
 }
 
+async function checkMobileFilterRow(page) {
+  const viewport = page.viewportSize();
+  for (const width of [320, viewport.width, 768]) {
+    await page.setViewportSize({ ...viewport, width });
+    const row = await page.locator('.wrong-toolbar').evaluate(toolbar => {
+      const box = selector => toolbar.querySelector(selector).getBoundingClientRect().toJSON();
+      return { stats: box('.wrong-stats'), left: box('[data-wrong-filter="pending"]'),
+        right: box('[data-wrong-filter="corrected"]'),
+        end: toolbar.getBoundingClientRect().right - parseFloat(getComputedStyle(toolbar).paddingRight) };
+    });
+    assert.ok(row.stats.right < row.left.left && row.left.right < row.right.left);
+    assert.ok(Math.abs(row.stats.top + row.stats.height / 2 - row.left.top - row.left.height / 2) < 1);
+    assert.ok(Math.abs(row.end - row.right.right) < 1, 'Filters stay at the trailing edge');
+    for (const key of ['top', 'width', 'height']) assert.ok(Math.abs(row.left[key] - row.right[key]) < 1,
+      width + ': both mobile filters share their ' + key);
+  }
+  await page.setViewportSize(viewport);
+}
+
 async function reopen(page) {
   await page.locator('#wrongBookClose').click();
   await page.locator('#wrongBookModal').waitFor({ state: 'hidden' });
@@ -195,6 +214,7 @@ async function runCase(browser, width) {
     for (const [language, empty] of [['zh-CN', '无'], ['en', 'None']]) {
       await page.evaluate(language => DMateI18n.setLanguage(language, false), language);
       assert.equal(await page.locator('#wrongBookSearch').getAttribute('placeholder'), language === 'en' ? 'Search' : '搜索');
+      if (width <= 1100) await checkMobileFilterRow(page);
       await page.locator('#wrongBookSearch').fill('__no_matching_concept__');
       assert.equal(await page.locator('#wrongBookList .wrong-empty').innerText(), empty, 'No search match');
       await page.locator('#wrongBookSearch').fill('');

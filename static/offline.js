@@ -101,7 +101,6 @@
     if (mark) node.append(mark);
     node.append(el("span", "dmate-ui-label", text));
     node.setAttribute("aria-label", text);
-    node.title = text;
     return node;
   }
   const escapeHtml = value => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -627,7 +626,7 @@
             state.noteDeletePending = null; renderActions();
           }
         });
-        deletion.title = tr("删除", "Delete") + title;
+        deletion.title = tr("删除概念", "Delete concept");
         deletion.setAttribute("aria-label", tr("删除概念：" + title, "Delete concept: " + title) + (names.get(title) > 1 ? "（" + row.id + "）" : ""));
         item.append(open, deletion); list.append(item);
       }

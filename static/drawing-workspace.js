@@ -46,7 +46,6 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   historyButton.setAttribute('aria-expanded','false');aiButton?.setAttribute('aria-expanded','false');
   const newButton=button('新建空白页',()=>newPage()),exportButton=button('',()=>exportImage(),'ddw-header-export'),uploadButton=features.upload?button('上传',()=>uploadImage(),'ddw-primary ddw-upload-button'):null;
   exportButton.dataset.drawingExport='true';exportButton.title=uiText('以图片形式导出','Export as image');exportButton.setAttribute('aria-label',exportButton.title);exportButton.append(imageIcon());
-  if(uploadButton){uploadButton.setAttribute('aria-label','上传');uploadButton.title='上传';}
   actions.append(newButton,historyButton);if(uploadButton)actions.append(uploadButton);top.append(name,actions);rail.append(settingsButton,informationButton);if(aiButton)rail.append(aiButton,generateButton);body.append(editorHost,rail);shell.append(top,body,panel,noticeOwner);host.replaceChildren(shell);host.classList.add('has-drawing-workspace');
   const exportHeader=host.closest('.graph-editor-dialog')?.querySelector(':scope > .graph-editor-dialog-head')||top;
   let requirement='',answer='',answerDocument='',answerRequirement='',nameFollowsGraph=false,aiTask='';
@@ -325,7 +324,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
      const row=el('div','ddw-history-item'+(p.id===activeId?' is-current':'')),open=button(p.name,()=>switchPage(p.id),'ddw-history-open');
      open.setAttribute('data-i18n-content','');
      open.setAttribute('aria-current',String(p.id===activeId));
-     const remove=button('',()=>requestRemovePage(p.id,remove),'ddw-history-delete');remove.setAttribute('aria-label',uiText('删除绘图：'+p.name+'（'+p.id+'）','Delete drawing: '+p.name+'（'+p.id+'）'));remove.title=uiText('删除'+p.name,'Delete '+p.name);remove.disabled=Boolean(deletePending);
+     const remove=button('',()=>requestRemovePage(p.id,remove),'ddw-history-delete');remove.setAttribute('aria-label',uiText('删除绘图：'+p.name+'（'+p.id+'）','Delete drawing: '+p.name+'（'+p.id+'）'));remove.title=uiText('删除绘图','Delete drawing');remove.disabled=Boolean(deletePending);
      row.append(open,remove);list.append(row);
     });if(!pages.length)list.append(el('p','ddw-history-empty','无'));panel.append(list);syncChrome();return;
    }
@@ -335,7 +334,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    const actionRow=el('div','ddw-ai-actions');
    const ask=button('',()=>generating?requestGenerate():requestGuide(),'ddw-guide-button');ask.append(sendIcon());
    if(generating){ask.dataset.mathDiagramGenerate='true';ask.setAttribute('aria-label',uiText('请求 AI 生成','Request AI generation'));ask.title=uiText('生成数学图','Generate diagram');}
-   else{ask.dataset.drawingGuide='true';ask.setAttribute('aria-label','请求 AI 指导');ask.title='指导当前图形';}
+   else{ask.dataset.drawingGuide='true';ask.setAttribute('aria-label',uiText('请求 AI 指导','Request AI guidance'));ask.title=uiText('获取指导','Get guidance');}
    const result=el('div','ddw-ai-answer');result.setAttribute('data-i18n-content','');result.setAttribute('aria-live','polite');
    actionRow.append(ask);panel.append(label,actionRow,result);
    if(!generating&&answer){

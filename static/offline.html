@@ -10,12 +10,12 @@
 <script src="/static/appearance-bootstrap.js?v=1" data-scope="offline"></script>
 <script defer src="/static/offline-vault.js?v=2"></script>
 <script defer src="/static/offline-appearance-preload.js?v=1"></script>
-<link rel="stylesheet" href="/static/dmate-main.css?v=67">
+<link rel="stylesheet" href="/static/dmate-main.css?v=68">
 
 <link rel="stylesheet" href="/static/graph-editor.css?v=26">
 <link rel="stylesheet" href="/static/drawing-workspace.css?v=52">
 <link rel="stylesheet" href="/static/modal-chrome.css">
-<link rel="stylesheet" href="/static/concept-notebook.css?v=3">
+<link rel="stylesheet" href="/static/concept-notebook.css?v=4">
 <link rel="stylesheet" href="/static/ai-answer-renderer.css?v=22">
 <link rel="stylesheet" href="/static/red-circle-controls.css">
 <link rel="stylesheet" href="/static/ui-tooltip.css">
@@ -25,7 +25,7 @@
 <link rel="stylesheet" href="/static/textarea-autosize.css?v=1">
 <link rel="stylesheet" href="/static/button-themes.css?v=65">
 <link rel="stylesheet" href="/static/offline-knowledge-graph.css?v=54">
-<link rel="stylesheet" href="/static/offline.css?v=65">
+<link rel="stylesheet" href="/static/offline.css?v=66">
 <link rel="stylesheet" href="/static/select-controls.css?v=43">
 <link rel="stylesheet" href="/static/scrollbars.css?v=25">
 <script defer src="/static/mobile-select.js?v=26"></script>
@@ -34,23 +34,23 @@
 <script defer src="/static/scrollbars.js?v=25"></script>
 <script defer src="/static/graph-editor-model.js"></script>
 <script defer src="/static/graph-editor-format.js?v=32"></script>
-<script defer src="/static/graph-editor-overlay.js?v=39"></script>
+<script defer src="/static/graph-editor-overlay.js?v=40"></script>
 <script defer src="/static/math-markdown.js?v=22"></script>
 <script defer src="/static/ai-answer-renderer.js?v=22"></script>
 <script defer src="/static/delete-confirm.js"></script>
 <script defer src="/static/drawing-export.js?v=39"></script>
-<script defer src="/static/graph-editor.js?v=53"></script>
-<script defer src="/static/drawing-workspace.js?v=57"></script>
+<script defer src="/static/graph-editor.js?v=54"></script>
+<script defer src="/static/drawing-workspace.js?v=58"></script>
 <script>
 window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:{inlineMath:[['\\(','\\)'],['$','$']],displayMath:[['\\[','\\]'],['$$','$$']]},svg:{fontCache:'none'},startup:{typeset:false},options:{enableMenu:false}};
 </script>
 <script defer src="/static/vendor/mathjax-3.2.2/es5/tex-svg.js"></script>
 <script defer src="/static/vendor/marked-15.0.12/marked.umd.js"></script>
 <script defer src="/static/vendor/dompurify-3.2.6/purify.min.js"></script>
-<script defer src="/static/ui-tooltip.js?v=49"></script>
+<script defer src="/static/ui-tooltip.js?v=50"></script>
 <script defer src="/static/guest-session.js?v=53"></script>
 <script defer src="/static/offline-interface-state.js?v=1"></script>
-<script defer src="/static/language-catalog.js?v=65"></script>
+<script defer src="/static/language-catalog.js?v=66"></script>
 <script defer src="/static/language-knowledge.js"></script>
 <script defer src="/static/language.js?v=59"></script>
 <script defer src="/static/modal-text.js?v=53"></script>
@@ -58,14 +58,14 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/offline-privacy-motion.js?v=4"></script>
 <script defer src="/static/offline-shell.js?v=41"></script>
 <script defer src="/static/knowledge-graph-labels.js?v=17"></script>
-<script defer src="/static/offline-knowledge-graph.js?v=60"></script>
+<script defer src="/static/offline-knowledge-graph.js?v=61"></script>
 <script defer src="/static/offline-handoff.js?v=1"></script>
 <script defer src="/static/offline-storage.js?v=4"></script>
 <script defer src="/static/vendor/fflate-0.8.2/fflate.min.js"></script>
 <script defer src="/static/offline-backup.js?v=3"></script>
 <script defer src="/static/backup-download.js?v=1"></script>
 <script defer src="/static/offline-entry.js?v=50"></script>
-<script defer src="/static/offline.js?v=69"></script>
+<script defer src="/static/offline.js?v=70"></script>
 </head>
 <body class="offline-workspace offline-content-hidden">
 <script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"light";</script>
@@ -181,7 +181,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
               <button type="button" id="knowledgeGraphDesktopZoomOut" title="缩小" aria-label="缩小图谱">−</button>
               <span id="knowledgeGraphDesktopZoomLabel" aria-live="off">100%</span>
               <button type="button" id="knowledgeGraphDesktopZoomIn" title="放大" aria-label="放大图谱">+</button>
-              <button type="button" id="knowledgeGraphDesktopZoomFit" title="智能适应：大图优先保证文字可读，可滚动查看全部节点">适应</button>
+              <button type="button" id="knowledgeGraphDesktopZoomFit" title="调整到可读大小">适应</button>
             </div>
           </div>
           <div class="knowledge-graph-layout">

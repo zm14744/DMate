@@ -1,4 +1,4 @@
-/* Delegated, accessible tooltips for titled interface controls. */
+/* Shared hover and keyboard hints for interface controls. */
 (function (root) {
     'use strict';
     const conversationLabels = '#desktopConversationTitle,#sessions [data-session-name]';
@@ -19,18 +19,36 @@
         const pickerInput = fileInput && !fileInput.closest(content)
             && !fileInput.closest('[data-i18n-content],[translate="no"]');
         if (pickerInput) fileInput.setAttribute('title', '');
-        const control = pickerInput ? fileInput.parentElement.querySelector(':scope > #imageBtn') : element?.closest?.(controls);
-        if (!control || control.closest(excluded)) return null;
+        let control = pickerInput ? fileInput.parentElement.querySelector(':scope > #imageBtn') : element?.closest?.(controls);
+        if (control?.matches('#sessions .conversation-tab-link')) control = control.querySelector('[data-session-name]');
+        if (!(control instanceof HTMLElement) || control.closest(excluded)) return null;
         const zone = control.closest('[data-i18n-content],[translate="no"],[data-i18n-ui]');
         // App-owned conversation labels keep user text protected from UI
         // translation while sharing the same tooltip as interface controls.
         if (!control.matches(conversationLabels)
             && (zone ? !zone.hasAttribute('data-i18n-ui') : control.closest(content))) return null;
-        return held.has(control) || control.getAttribute('title')?.trim() ? control : null;
+        return held.has(control) || control.getAttribute('title')?.trim() || iconHint(control) ? control : null;
+    }
+
+    function iconHint(control) {
+        const label = control.getAttribute('aria-label')?.trim();
+        if (!label) return '';
+        return !/[\p{L}\p{N}]/u.test(control.innerText) || getComputedStyle(control).fontSize === '0px' ? label : '';
+    }
+
+    function hintText(control) {
+        const title = held.get(control)?.title;
+        if (title == null) return iconHint(control);
+        const words = value => value.replace(/\s+/g, ' ').trim();
+        if (words(title) === words(control.innerText) && getComputedStyle(control).fontSize !== '0px'
+            && control.scrollWidth <= control.clientWidth
+            && control.scrollHeight <= control.clientHeight) return '';
+        return title.trim();
     }
 
     function connectObserver() {
-        for (const control of held.keys()) observer.observe(control, {attributes:true, attributeFilter:['title']});
+        for (const control of held.keys()) observer.observe(control, {attributes:true, attributeFilter:['title','aria-label'],
+            childList:true, characterData:true, subtree:true});
     }
 
     function updateLabel(control, record) {
@@ -49,20 +67,19 @@
     }
 
     function receiveTitles(mutations) {
-        const changed = new Set(mutations.map(mutation => mutation.target));
         observer.disconnect();
-        for (const control of changed) {
-            const record = held.get(control);
-            if (!record) continue;
-            record.title = control.getAttribute('title');
-            control.setAttribute('title', '');
+        for (const [control, record] of held) {
+            if (mutations.some(mutation => mutation.target === control && mutation.attributeName === 'title')) {
+                record.title = control.getAttribute('title');
+                control.setAttribute('title', '');
+            }
             updateLabel(control, record);
         }
         connectObserver();
-        if (visible && changed.has(visible)) {
-            const title = held.get(visible)?.title;
-            if (title?.trim()) {
-                tooltip.textContent = title;
+        if (visible) {
+            const hint = hintText(visible);
+            if (hint) {
+                tooltip.textContent = hint;
                 place(visible);
             } else hide();
         }
@@ -173,8 +190,8 @@
         timer = null;
         flushTitles();
         if (intent !== control || dismissed === control || !held.has(control)) return;
-        const title = held.get(control).title;
-        if (!title?.trim()) return;
+        const title = hintText(control);
+        if (!title) return;
         const popup = getTooltip();
         // A body overlay cannot appear above a native modal's top layer.
         const host = control.closest('dialog[open]') || document.body;
@@ -184,6 +201,8 @@
         popup.hidden = false;
         if (!place(control)) return;
         visible = control;
+        // An aria-label-only icon already announces this exact hint as its name.
+        if (held.get(control).title == null) return;
         const descriptions = (control.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
         if (!descriptions.includes(popup.id)) descriptions.push(popup.id);
         control.setAttribute('aria-describedby', descriptions.join(' '));

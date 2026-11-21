@@ -201,7 +201,10 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
                 if (colors[edge.color]) stroke.style.stroke = colors[edge.color];
                 group.append(svgElement('path', { d: path, class: 'dge-edge-hit', fill: 'none' }), stroke);
                 const label = [edge.edge_label, edge.weight === null || edge.weight === undefined ? '' : text(edge.weight)].filter(value => value !== null && value !== undefined && value !== '').join(' · ');
-                if (label) { group.append(svgElement('title', {}, label)); group.append(svgElement('text', { x: tx, y: ty, class: 'dge-edge-label', 'text-anchor': 'middle' }, label.length > 24 ? label.slice(0, 23) + '…' : label)); }
+                if (label) {
+                    if (label.length > 24) group.append(svgElement('title', {}, label));
+                    group.append(svgElement('text', { x: tx, y: ty, class: 'dge-edge-label', 'text-anchor': 'middle' }, label.length > 24 ? label.slice(0, 23) + '…' : label));
+                }
                 const choose = () => { propertiesVisible = true; selectedEdge = edge.id; render(); };
                 if (!options.previewOnly) { group.addEventListener('click', choose); group.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(); } }); }
                 else { group.removeAttribute('tabindex'); group.removeAttribute('role'); }
@@ -210,7 +213,8 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
             graph.vertices.forEach((vertex, index) => {
                 const [x, y] = points.get(vertex.id), label = vertex.label ?? vertex.display_label ?? '未命名 ' + (index + 1);
                 const group = svgElement('g', { class: 'dge-visual-node' + (selectedNodes.has(vertex.id) ? ' is-selected' : ''), tabindex: 0, role: 'button', 'aria-label': '选择节点 ' + label });
-                group.append(svgElement('title', {}, label), svgElement('circle', { cx: x, cy: y, r: 18 }),
+                if (label.length > 12) group.append(svgElement('title', {}, label));
+                group.append(svgElement('circle', { cx: x, cy: y, r: 18 }),
                     svgElement('text', { x, y: y + 5, 'text-anchor': 'middle' }, label.length > 12 ? label.slice(0, 11) + '…' : label));
                 const choose = () => { selectedNodes.has(vertex.id) ? selectedNodes.delete(vertex.id) : selectedNodes.add(vertex.id); render(); };
                 if (!options.previewOnly) { group.addEventListener('click', choose); group.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(); } }); }

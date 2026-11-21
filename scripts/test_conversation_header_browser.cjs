@@ -92,8 +92,8 @@ async function headerIcons(page, expanded) {
   assert.notEqual(iconColors.actual, iconColors.adjacent, 'New-conversation icon is visibly quieter than the sidebar icon');
   assert.equal(await icon.locator('svg[data-icon="square-pen"]').count(), 1, 'Use the local Lucide square-pen icon');
   assert.equal((await icon.innerText()).trim(), '', 'Topbar button has no visible text');
-  assert.equal(await icon.getAttribute('title'), '＋ 新对话');
-  assert.equal(await icon.getAttribute('aria-label'), '＋ 新对话');
+  assert.equal(await icon.getAttribute('title'), '新建对话');
+  assert.equal(await icon.getAttribute('aria-label'), '新建对话');
   const positions = await icon.evaluate(node => {
     const prior = node.previousElementSibling.getBoundingClientRect(), current = node.getBoundingClientRect();
     return { gap: current.left - prior.right, center: current.y + current.height / 2,
@@ -142,8 +142,8 @@ async function conversationLifecycle(page, width, theme) {
   await headerTitle(page, '新对话');
   await language(page, 'en');
   await headerTitle(page, 'New conversation');
-  assert.equal(await create.getAttribute('title'), '＋ New chat');
-  assert.equal(await create.getAttribute('aria-label'), '＋ New chat');
+  assert.equal(await create.getAttribute('title'), 'Start a new chat');
+  assert.equal(await create.getAttribute('aria-label'), 'Start a new chat');
   await language(page, 'zh-CN');
   const derivedName = await page.evaluate(() => {
     getCurrent().messages = [{ role: 'user', text: '集合的包含关系与幂集' }];
@@ -188,10 +188,19 @@ async function conversationLifecycle(page, width, theme) {
   await sidebar(page, false);
   await headerIcons(page, false); await headerTitle(page, longName);
   if (!mobile(page)) {
-    assert.deepEqual(await sharedTooltip(page, page.locator('#desktopNewChatBtn'), '＋ 新对话'), conversationTooltipStyle,
+    assert.deepEqual(await sharedTooltip(page, page.locator('#desktopNewChatBtn'), '新建对话'), conversationTooltipStyle,
       'Conversation labels use the existing interface tooltip styling');
     await language(page, 'en');
-    await sharedTooltip(page, page.locator('#desktopConversationTitle'), longName);
+    const header = page.locator('#desktopConversationTitle');
+    if (await header.evaluate(node => node.scrollWidth > node.clientWidth)) {
+      await sharedTooltip(page, header, longName);
+    } else {
+      await header.hover();
+      await page.waitForTimeout(450);
+      assert.equal(await page.locator('.dm-ui-tooltip:visible').count(), 0, 'A fully visible header needs no duplicate hint');
+      assert.ok(!(await header.getAttribute('title')), 'The browser also suppresses its native duplicate');
+      await page.mouse.move(0, 0);
+    }
     await language(page, 'zh-CN');
   }
   if (screenshotDir && theme === 'dark' && [390, 1440].includes(width)) {

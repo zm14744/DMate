@@ -107,7 +107,7 @@ function mount(container,options){
    const card=el('div','dgs-source-card');card.dataset.sourceId=String(row.id);
    const name=label(row,kind).replace('框 ','框');
    card.append(check(name,row.selected!==false,value=>{row.selected=value;emit();refresh();}));
-   const removeButton=button('',()=>{void requestRemove(row,kind);});removeButton.className='dgs-source-delete dmate-close-dot';removeButton.setAttribute('aria-label',uiText('删除'+(kind==='graph'?'图形框'+String(row.id).replace(/^g/,''):'文字框'+row.id),'Delete '+(kind==='graph'?'graph region '+String(row.id).replace(/^g/,''):'text region '+row.id)));removeButton.title='删除';card.append(removeButton);
+   const removeButton=button('',()=>{void requestRemove(row,kind);});removeButton.className='dgs-source-delete dmate-close-dot';removeButton.setAttribute('aria-label',uiText('删除'+(kind==='graph'?'图形框'+String(row.id).replace(/^g/,''):'文字框'+row.id),'Delete '+(kind==='graph'?'graph region '+String(row.id).replace(/^g/,''):'text region '+row.id)));removeButton.title=uiText(kind==='graph'?'删除图形框':'删除文字框');card.append(removeButton);
    card.draggable=!saving;card.addEventListener('dragstart',event=>{draggedSource={kind,id:String(row.id)};event.dataTransfer?.setData('text/plain',String(row.id));});
    card.addEventListener('dragover',event=>{if(draggedSource?.kind===kind)event.preventDefault();});
    card.addEventListener('drop',event=>{event.preventDefault();if(draggedSource?.kind===kind)reorder(kind,draggedSource.id,String(row.id));draggedSource=null;});card.addEventListener('dragend',()=>{draggedSource=null;});

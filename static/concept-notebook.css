@@ -11,10 +11,21 @@
 .dcn-dialog .dcn-primary{background:var(--accent,#2563eb);border-color:var(--accent,#2563eb);color:#fff}
 /* Both creation actions keep the same floor when normal font metrics differ. */
 #newChatBtn,.dcn-dialog button.dcn-new{min-height:44px}
-.dcn-dialog button.dcn-new{display:inline-flex;align-items:center;justify-content:center;width:100%;padding:10px;border:1px solid var(--border-strong,#cbd5e1);border-radius:10px;background:var(--surface-3,#f1f5f9);color:var(--text-primary,#334155);font-size:var(--font-base,16px);font-weight:400;line-height:normal;text-align:center;box-shadow:none}
+.dcn-dialog button.dcn-new{display:inline-flex;align-items:center;justify-content:center;width:100%;padding:10px;border:1px solid var(--border-strong,#cbd5e1);border-radius:var(--dcn-control-radius);background:var(--surface-3,#f1f5f9);color:var(--text-primary,#334155);font-size:var(--font-base,16px);font-weight:400;line-height:normal;text-align:center;box-shadow:none}
 @media(max-width:1100px){.dcn-dialog button.dcn-new{padding:10px 12px;font-size:14px}}
-.dcn-content{display:grid;grid-template-columns:minmax(180px,260px) minmax(0,1fr);gap:20px;flex:1 1 auto;min-height:0;overflow:hidden}
-.dcn-sidebar{display:flex;flex-direction:column;gap:10px;min-height:0;min-width:0;overflow:hidden}
+.dcn-content{display:grid;grid-template-columns:minmax(180px,var(--dcn-sidebar-width,260px)) minmax(0,1fr);gap:20px;flex:1 1 auto;min-height:0;overflow:hidden}
+.dcn-content:lang(en) { --dcn-sidebar-width:19em; }
+.dcn-sidebar {
+    --dcn-control-radius:10px;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    grid-template-rows:auto auto minmax(0,1fr);
+    gap:8px;
+    min-height:0;
+    min-width:0;
+    overflow:hidden;
+}
+.dcn-selection,.dcn-list { grid-column:1 / -1; }
 .dcn-dialog input:not([type=checkbox]),.dcn-dialog textarea{display:block;width:100%;min-width:0;max-width:100%;margin:6px 0 0;padding:10px;border:1px solid var(--border-strong,#cbd5e1);border-radius:9px;background:var(--surface-2,#f8fafc);color:var(--text-primary,#1e293b);font:inherit;font-size:14px;line-height:1.6;box-shadow:none}
 .dcn-dialog :is(textarea.dcn-title,textarea.dcn-original,textarea.dcn-question){font:400 var(--font-base,16px) var(--dmate-font-ui,system-ui);line-height:1.5}
 .dcn-dialog input.dcn-search{margin:0}
@@ -54,12 +65,20 @@
 .dcn-summary,.dcn-results>p{margin:0}
 .dcn-explanation,.dcn-relation{padding:12px;border:1px solid var(--border-strong,#cbd5e1);border-radius:10px;background:var(--surface-2,#f8fafc)}
 .dcn-ai-text:not(.dmate-ai-answer){white-space:pre-wrap}
-@media(max-width:680px){.dcn-dialog{width:calc(100vw - 16px);max-width:calc(100vw - 16px);height:calc(100dvh - 16px);max-height:calc(100dvh - 16px);padding:14px;border-radius:14px}.dcn-content{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(150px,25dvh) minmax(0,1fr);gap:14px}.dcn-sidebar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);gap:8px}.dcn-selection,.dcn-list{grid-column:1/-1}.dcn-list{display:block}.dcn-note{padding:4px 7px}.dcn-main{padding-right:3px}.dcn-heading h2{font-size:18px}.dcn-dialog button{min-height:36px}}
+@media(max-width:680px){.dcn-dialog{width:calc(100vw - 16px);max-width:calc(100vw - 16px);height:calc(100dvh - 16px);max-height:calc(100dvh - 16px);padding:14px;border-radius:14px}.dcn-content{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(150px,25dvh) minmax(0,1fr);gap:14px}.dcn-list{display:block}.dcn-note{padding:4px 7px}.dcn-main{padding-right:3px}.dcn-heading h2{font-size:18px}.dcn-dialog button{min-height:36px}}
 .dcn-dialog.is-empty{height:min(52dvh,440px);min-height:min(320px,calc(100dvh - 24px))}
 .dcn-dialog.is-empty .dcn-content{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);flex:1 1 auto;gap:0}
-.dcn-dialog.is-empty .dcn-sidebar{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:10px;align-content:stretch}
+.dcn-dialog.is-empty .dcn-sidebar,.offline-notebook .dcn-sidebar{grid-template-rows:auto minmax(0,1fr)}
 .dcn-dialog.is-empty .dcn-list{grid-column:1/-1;display:grid;place-items:center;overflow:auto}
 .dcn-dialog.is-empty .dcn-list-empty{margin:0}
+
+/* Stretch the input itself to the create button's height, not just its wrapper. */
+.dcn-dialog input.dcn-search { height:100%; }
+@layer dmate-search-controls {
+    body[data-appearance-theme] .dcn-sidebar .dcn-search-wrap > input {
+        border-radius:var(--dcn-control-radius)!important;
+    }
+}
 
 /* The close control stays in the fixed header; only content scrolls. */
 .dcn-dialog button.dcn-close,.dcn-confirm button.dcn-close{display:block;flex:0 0 20px;width:20px;min-width:20px;max-width:20px;height:20px;min-height:20px;max-height:20px;padding:0;border:0;border-radius:50%;background:#ef4444;color:transparent;font-size:0;line-height:0;cursor:pointer}
