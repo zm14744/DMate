@@ -71,9 +71,9 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     const sharedAssets = await Promise.all(['/static/dmate-main.css?v=68', '/static/graph-editor.css?v=26', '/static/button-themes.css?v=65', '/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
       '/static/select-controls.css?v=43', '/static/mobile-select.js?v=26', '/static/offline.css?v=66',
       '/static/concept-notebook.css?v=4', '/static/textarea-autosize.css?v=1', '/static/textarea-autosize.js?v=1',
-      '/static/drawing-workspace.css?v=52', '/static/graph-editor.js?v=54', '/static/graph-editor-overlay.js?v=40', '/static/drawing-workspace.js?v=58', '/static/drawing-export.js?v=39',
+      '/static/drawing-workspace.css?v=52', '/static/graph-editor.js?v=54', '/static/graph-editor-overlay.js?v=40', '/static/drawing-workspace.js?v=59', '/static/drawing-export.js?v=39',
       '/static/modal-chrome.css', '/static/modal-text.js?v=53', '/static/delete-confirm.js', '/static/guest-session.js?v=53', '/static/offline-interface-state.js?v=1', '/static/language.js?v=59',
-      '/static/graph-editor-format.js?v=32', '/static/language-catalog.js?v=66', '/static/offline-privacy-motion.js?v=4', '/static/offline-shell.js?v=41',
+      '/static/graph-editor-format.js?v=32', '/static/language-catalog.js?v=67', '/static/offline-privacy-motion.js?v=4', '/static/offline-shell.js?v=41',
       '/static/offline-vault.js?v=2', '/static/offline-handoff.js?v=1', '/static/offline-storage.js?v=4',
       '/static/vendor/fflate-0.8.2/fflate.min.js', '/static/offline-backup.js?v=3',
       '/static/backup-download.js?v=1', '/static/appearance-bootstrap.js?v=1',
@@ -100,12 +100,12 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     // changed versions and unversioned application code still come fresh.
     await page.goto(new URL('/health', baseURL).href);
     await page.evaluate(async packs => {
-      const cache = await caches.open('dmate-offline-shell-v99');
-      await cache.put('/static/offline.js?v=69',new Response('/* previous offline workspace */'));
+      const cache = await caches.open('dmate-offline-shell-v100');
+      await cache.put('/static/drawing-workspace.js?v=58',new Response('/* previous drawing workspace */'));
       await cache.put('/static/button-themes.css?v=54', new Response('/* obsolete graph navigation button styles */'));
       await cache.put('/static/graph-editor-model.js',new Response('/* obsolete unversioned editor model */'));
       for(const asset of packs) await cache.put(asset.path,new Response(asset.text,{headers:{'Content-Type':'application/json'}}));
-      await cache.put('/__dmate_offline_ready__/dmate-offline-shell-v99',new Response('ready'));
+      await cache.put('/__dmate_offline_ready__/dmate-offline-shell-v100',new Response('ready'));
     },reusablePacks);
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });
     await page.evaluate(async () => {
@@ -122,7 +122,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       if (canonical.length !== 1) throw new Error('Expected exactly one precached shared stylesheet');
       return { name: names[0], canonical: canonical[0].url };
     }, assetPath);
-    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 100, 'The updated offline controls require the refreshed shell cache');
+    assert.ok(Number(current.name.match(/v(\d+)$/)[1]) >= 101, 'The updated offline controls require the refreshed shell cache');
     assert.equal((await fetchAsset(page, current.canonical)).text, networkCSS,
       'The refreshed shell loads current frameless controls instead of the obsolete stylesheet');
     for (const asset of sharedAssets) {
@@ -135,7 +135,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     assert.ok(workerRequests.length > 0,'The browser exposes actual service-worker network requests');
     for(const asset of reusablePacks) assert.ok(!workerRequests.includes(new URL(asset.path,baseURL).href),
       'Upgrade reuses the complete prior immutable study pack without downloading it again: '+asset.path);
-    assert.ok(workerRequests.includes(new URL('/static/offline.js?v=70',baseURL).href),'The updated offline workspace is fetched');
+    assert.ok(workerRequests.includes(new URL('/static/drawing-workspace.js?v=59',baseURL).href),'The updated drawing workspace is fetched');
     assert.ok(workerRequests.includes(new URL('/static/graph-editor-model.js',baseURL).href),'Unversioned application code is fetched');
     assert.notEqual(await page.evaluate(async name => (await(await caches.open(name)).match('/static/graph-editor-model.js')).text(),current.name),
       '/* obsolete unversioned editor model */');

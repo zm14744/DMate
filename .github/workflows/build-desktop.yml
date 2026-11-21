@@ -39,6 +39,8 @@ jobs:
           ) }}
 
     runs-on: ${{ matrix.os }}
+    env:
+      ICON_PILLOW_VERSION: "11.3.0"
 
     steps:
       - name: Checkout source
@@ -56,9 +58,20 @@ jobs:
             patchelf \
             xdg-utils
 
+      - name: Cache desktop and bundled web icons
+        id: icons
+        uses: actions/cache@v4
+        with:
+          path: |
+            desktop/src-tauri/icons
+            static/icons
+          # Preserve historical web icons from this checkout as well as generated artwork.
+          key: desktop-icons-v1-${{ runner.os }}-${{ runner.arch }}-pillow-${{ env.ICON_PILLOW_VERSION }}-${{ hashFiles('scripts/generate_icons.py', 'desktop/src-tauri/icons/**', 'static/icons/**') }}
+
       - name: Generate platform-specific icons
+        if: steps.icons.outputs.cache-hit != 'true'
         run: |
-          python -m pip install --disable-pip-version-check Pillow==11.3.0
+          python -m pip install --disable-pip-version-check "Pillow==${{ env.ICON_PILLOW_VERSION }}"
           python scripts/generate_icons.py
 
       - name: Install Rust

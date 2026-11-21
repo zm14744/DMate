@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   browser-regression:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
       - name: Checkout
@@ -31,6 +31,6 @@ jobs:
       - name: Install browser test engines
         run: |
           npm install --no-save --no-audit --no-fund playwright@1.56.1
-          npx playwright install --with-deps chromium webkit
+          npx playwright install --with-deps --only-shell chromium webkit
       - name: Exercise Mac Safari and iPad click/layout paths
         run: node scripts/test_symbol_picker_browser.cjs

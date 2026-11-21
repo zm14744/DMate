@@ -616,6 +616,9 @@ async function deleteAllOnline(page) {
   await history(page);
   for (let remaining = count; remaining > 0; remaining--) {
     await page.locator('.ddw-history-delete').first().click();
+    const warning = page.locator('.dmate-delete-confirm[open] .dmate-delete-confirm-body');
+    await warning.waitFor({state:'visible'});
+    assert.equal(await warning.innerText(), '删除后，绘画内容将不可恢复');
     await page.locator('.dmate-delete-confirm-delete').click();
     await page.waitForFunction(expected => ocrEditorController.getPages().length === expected, remaining - 1);
   }

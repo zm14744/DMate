@@ -167,6 +167,9 @@ async function drawingSnapshot(page, selector) {
     host.style.setProperty('flex', 'none', 'important');
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await Promise.all(host.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
+    // Resizing preserves the zoom from the original modal or panel. Fit the blank
+    // canvas at the common dimensions before comparing the zoom label and tools.
+    host.querySelector('[data-overlay-tool="zoom-fit"]').click();
     const origin = host.getBoundingClientRect();
     const selectors = ['.dmate-drawing-workspace', '.ddw-header', '.ddw-name', '.ddw-page-actions',
       ...[1, 2].map(index => '.ddw-page-actions>button:nth-child(' + index + ')'),
@@ -183,8 +186,9 @@ async function drawingSnapshot(page, selector) {
           'backgroundColor', 'borderTopWidth', 'borderTopStyle', 'borderTopColor', 'borderRadius',
           'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'gap', 'boxShadow'].map(key => [key, style[key]])) };
     }
+    const zoomLabel = host.querySelector('.dge-overlay-zoom').textContent;
     if (original === null) host.removeAttribute('style'); else host.setAttribute('style', original);
-    return result;
+    return { controls: result, zoomLabel };
   });
 }
 
@@ -677,10 +681,12 @@ async function drawing(page, reference) {
   assert.ok(frame.canvasHeight > 200, 'The native embedded layout provides a usable canvas: ' + JSON.stringify(frame));
   await workspace.getByRole('button', { name: '新建空白页', exact: true }).click();
   const actual = await drawingSnapshot(page, '#offlineDrawingHost');
-  for (const [selector, expected] of Object.entries(reference.inner)) {
-    assert.deepEqual(actual[selector].style, expected.style, 'Online/offline drawing styles: ' + selector);
-    actual[selector].rect.forEach((value, index) => assert.ok(Math.abs(value - expected.rect[index]) <= 1.5,
-      'Online/offline drawing relative geometry: ' + selector + ': ' + JSON.stringify({ actual: actual[selector].rect, expected: expected.rect })));
+  assert.equal(actual.zoomLabel, reference.inner.zoomLabel, 'Online/offline geometry is compared at the same fitted zoom');
+  for (const [selector, expected] of Object.entries(reference.inner.controls)) {
+    const control = actual.controls[selector];
+    assert.deepEqual(control.style, expected.style, 'Online/offline drawing styles: ' + selector);
+    control.rect.forEach((value, index) => assert.ok(Math.abs(value - expected.rect[index]) <= 1.5,
+      'Online/offline drawing relative geometry: ' + selector + ': ' + JSON.stringify({ actual: control.rect, expected: expected.rect })));
   }
   await workspace.locator('.ddw-name').fill('离线保存画板');
   const tool = async mode => {
@@ -746,6 +752,9 @@ async function drawing(page, reference) {
   assert.deepEqual(await historyNames(), [...previousNames, '离线保存画板', '待删除画板'], 'Selecting history does not change creation order');
   await workspace.locator('.ddw-history-item').filter({ hasText: '待删除画板' })
     .locator('.ddw-history-delete').click();
+  const warning = page.locator('.dmate-delete-confirm[open] .dmate-delete-confirm-body');
+  await warning.waitFor({state:'visible'});
+  assert.equal(await warning.innerText(), '删除后，绘画内容将不可恢复');
   await page.locator('.dmate-delete-confirm-delete').click();
   await page.waitForFunction(count => document.querySelectorAll('.ddw-history-open').length === count, previousNames.length + 1);
   assert.deepEqual(await historyNames(), [...previousNames, '离线保存画板']);

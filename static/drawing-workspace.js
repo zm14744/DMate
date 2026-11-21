@@ -352,7 +352,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   async function requestRemovePage(pageId,trigger){
    const page=pages.find(item=>item.id===pageId);if(!page||deletePending||destroyed)return;
    const op={id:pageId,page,activeId,snapshot:deletionSnapshot(page),trigger};deletePending=op;
-   const settings={title:'删除这个绘图？',body:'删除后无法恢复。\n'+page.name,content:page.name,confirmText:'删除绘图',confirmTone:'danger'};
+   const settings={title:'删除这个绘图？',body:'删除后，绘画内容将不可恢复',confirmText:'删除绘图',confirmTone:'danger'};
    try{
     if(typeof options.confirmDelete!=='function'&&typeof root.DMateDeleteConfirm?.request!=='function')throw new Error(uiText('删除确认界面未加载，请刷新后重试。'));
     const confirmation=typeof options.confirmDelete==='function'?options.confirmDelete(settings):root.DMateDeleteConfirm?.request(shell,settings);

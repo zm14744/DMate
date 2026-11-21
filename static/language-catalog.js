@@ -774,6 +774,7 @@
         "请求 AI 指导": "Request AI guidance",
         "请求 AI 生成": "Request AI generation",
         "删除这个绘图？": "Delete this drawing?",
+        "删除后，绘画内容将不可恢复": "Once deleted, the drawing cannot be recovered",
         "删除绘图": "Delete drawing",
         "删除确认界面未加载，请刷新后重试。": "The delete confirmation interface did not load. Refresh and try again.",
         "AI 返回内容无效，请重试。": "The AI response is invalid. Please try again.",
