@@ -229,6 +229,15 @@ jobs:
     # Playwright 1.56.1's pinned Linux browser dependencies support this image.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        suite: [workspace, libraries]
+    env:
+      DMATE_TEST_BASE_URL: http://127.0.0.1:5000
+      OFFLINE_SCREENSHOT_DIR: artifacts/offline-workspace
+      KG_SCREENSHOT_DIR: artifacts/offline-workspace
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -242,8 +251,10 @@ jobs:
             requirements.txt
             requirements-agents.txt
       - name: Validate Python syntax
+        if: matrix.suite == 'workspace'
         run: python -m py_compile app.py conversation_titles.py scripts/test_conversation_titles.py scripts/migrate_concept_examples.py scripts/offline_question_classification.py
       - name: Validate offline JavaScript syntax
+        if: matrix.suite == 'workspace'
         run: |
           node --check static/offline.js
           node --check static/offline-entry.js
@@ -344,21 +355,27 @@ jobs:
           node --check scripts/test_overlay_zoom_browser.cjs
           node --check scripts/test_math_diagram_browser.cjs
       - name: Test math startup, rendering queue and proof endings
+        if: matrix.suite == 'workspace'
         run: node --test scripts/test_math_markdown.cjs
       - name: Test focused question knowledge relations
+        if: matrix.suite == 'workspace'
         run: node --test scripts/test_question_knowledge_graph.cjs
       - name: Test local conversation title summaries
+        if: matrix.suite == 'workspace'
         run: node --test scripts/test_conversation_titles.cjs
       - name: Verify offline styles match the online workspace
+        if: matrix.suite == 'workspace'
         run: |
           python scripts/sync_offline_styles.py --check
           python scripts/sync_offline_shell.py --check
       - name: Validate JSON content packs
+        if: matrix.suite == 'workspace'
         run: |
           python -m json.tool static/offline-content/concepts.zh-CN.json > /dev/null
           python -m json.tool static/offline-content/questions.zh-CN.json > /dev/null
           python -m json.tool static/offline-content/knowledge_graph.json > /dev/null
       - name: Validate content references
+        if: matrix.suite == 'workspace'
         run: |
           python scripts/sync_offline_content.py --check
           python scripts/migrate_concept_examples.py --check
@@ -367,6 +384,7 @@ jobs:
           python scripts/test_offline_content_math.py
           python scripts/test_offline_translations.py
       - name: Verify service worker precache files exist
+        if: matrix.suite == 'workspace'
         run: |
           python - <<'PY'
           import re
@@ -385,12 +403,16 @@ jobs:
           npx playwright install --with-deps --only-shell chromium
           wait "$pip_pid"
       - name: Verify semantic conversation title summaries without model requests
+        if: matrix.suite == 'workspace'
         run: python -m unittest discover -s scripts -p 'test_conversation_titles.py' -v
       - name: Verify selected concept explanation and relationship counts
+        if: matrix.suite == 'workspace'
         run: python -m unittest discover -s scripts -p 'test_concept_notebook_selection.py' -v
       - name: Verify first-paint appearance uses only the verified current owner
+        if: matrix.suite == 'workspace'
         run: python -m unittest discover -s scripts -p 'test_appearance_bootstrap.py' -v
       - name: Verify the original favicon variants on each platform
+        if: matrix.suite == 'workspace'
         env:
           OMP_NUM_THREADS: '1'
           MKL_NUM_THREADS: '1'
@@ -413,24 +435,19 @@ jobs:
           cat /tmp/dmate-offline-browser-server.log
           exit 1
       - name: Verify chat finalization survives first-render failures
-        env:
-          DMATE_TEST_BASE_URL: 'http://127.0.0.1:5000'
+        if: matrix.suite == 'workspace'
         run: node scripts/test_chat_finalization_browser.cjs
       - name: Verify packaged offline assets start without browser cache or network
+        if: matrix.suite == 'workspace'
         run: node scripts/test_native_offline_bundle_browser.cjs
       - name: Verify assistant transcript and floating composer
-        env:
-          DMATE_TEST_BASE_URL: 'http://127.0.0.1:5000'
+        if: matrix.suite == 'workspace'
         run: node scripts/test_chat_surface_browser.cjs
       - name: Verify multi-turn context reaches the chat request
-        env:
-          DMATE_TEST_BASE_URL: 'http://127.0.0.1:5000'
+        if: matrix.suite == 'workspace'
         run: node scripts/test_conversation_context_browser.cjs
-      - name: Exercise the offline workspace and knowledge graph
-        env:
-          DMATE_TEST_BASE_URL: http://127.0.0.1:5000
-          OFFLINE_SCREENSHOT_DIR: artifacts/offline-workspace
-          KG_SCREENSHOT_DIR: artifacts/offline-workspace
+      - name: Exercise the offline workspace and account controls
+        if: matrix.suite == 'workspace'
         run: |
           mkdir -p artifacts/offline-workspace
           node scripts/test_offline_workspace_browser.cjs
@@ -476,6 +493,10 @@ jobs:
           node scripts/test_wrong_question_previews_browser.cjs
           node scripts/test_scrollbar_visibility_browser.cjs
           node scripts/test_select_controls_browser.cjs
+      - name: Exercise the libraries, knowledge graph and drawing controls
+        if: matrix.suite == 'libraries'
+        run: |
+          mkdir -p artifacts/offline-workspace
           node scripts/test_search_controls_browser.cjs
           node scripts/test_library_panels_browser.cjs
           node scripts/test_drawing_controls_browser.cjs
@@ -504,7 +525,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: offline-workspace-screenshots
+          name: offline-${{ matrix.suite }}-screenshots
           path: artifacts/offline-workspace
           if-no-files-found: ignore
       - name: Print server failures
