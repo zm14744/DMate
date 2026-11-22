@@ -17,6 +17,8 @@ function context(doc=root.document){
 function fontScale(doc=root.document){return parseFloat(doc.defaultView.getComputedStyle(doc.documentElement).getPropertyValue('--font-scale'))||1;}
 function fontFamily(doc=root.document){return doc.defaultView.getComputedStyle(doc.body).fontFamily||'system-ui, sans-serif';}
 function fontStyle(element,font){
+ // The probe is measured at 1x; preserve the same glyph advances in a zoomed SVG.
+ if(element.namespaceURI==='http://www.w3.org/2000/svg')element.style.textRendering='geometricPrecision';
  for(const [key,value] of Object.entries({'font-family':font.family,'font-size':font.size+'px','font-weight':String(font.weight),'font-style':'normal','font-kerning':'normal','letter-spacing':'0px','line-height':font.lineHeight+'px','text-transform':'none'}))element.style.setProperty(key,value,'important');
 }
 function measure(value,font,doc){
