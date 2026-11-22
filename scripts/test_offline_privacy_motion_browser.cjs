@@ -19,9 +19,12 @@ async function installSamples(context) {
       if (!svg) return null;
       const lines = [...svg.querySelectorAll('line')];
       const visible = lines.filter(line => getComputedStyle(line).display !== 'none');
-      const drawn = visible.map(line => {
+      const segments = visible.map(line => {
+        // The last samples include the closed dialog, where Chromium cannot measure rendered SVG paths.
+        const length = Math.hypot(line.x2.baseVal.value - line.x1.baseVal.value,
+          line.y2.baseVal.value - line.y1.baseVal.value);
         const dash = Number.parseFloat(line.getAttribute('stroke-dasharray'));
-        return Math.min(Number.isFinite(dash) ? dash : line.getTotalLength(), line.getTotalLength());
+        return {length, drawn: Number.isFinite(dash) ? Math.min(dash, length) : length};
       });
       const style = getComputedStyle(svg);
       const shown = node => node && node.getClientRects().length && getComputedStyle(node).visibility === 'visible'
@@ -32,8 +35,8 @@ async function installSamples(context) {
         pending:document.documentElement.hasAttribute('data-offline-interface-pending'),
         workspaceVisible:!cover.open && Boolean(shown(document.querySelector('.offline-layout'))),
         panels:[...document.querySelectorAll('.offline-panel')].filter(shown).map(node => node.id),
-        partial:visible.filter((line,i) => drawn[i] < line.getTotalLength() - 0.05).length,
-        length:drawn.reduce((sum,n) => sum+n,0),
+        partial:segments.filter(segment => segment.drawn < segment.length - 0.05).length,
+        length:segments.reduce((sum,segment) => sum + segment.drawn,0),
         painted:cover.open && style.visibility === 'visible' && style.display !== 'none'
           && svg.getBoundingClientRect().width > 0,
         signature:svg.innerHTML};

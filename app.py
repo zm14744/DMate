@@ -21,6 +21,7 @@ import ipaddress
 from flask import Flask, jsonify, render_template, request, session, make_response, has_request_context, send_file
 from ios_webclip import build_ios_webclip_profile
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import safe_join
 
 from ai import ask_ai, analyze_image_structure, verify_graph_image_independently, _trim_messages
 from chat_limits import (
@@ -200,34 +201,40 @@ from server_i18n import (normalize_language, localized, request_language,
 _RUNTIME_SOURCE, _ = compute_runtime_source(os.path.dirname(os.path.abspath(__file__)))
 
 
-# Compress the largest public offline files at the origin. The browser
-# decodes them before the service worker stores or runs the same resources.
-_COMPRESSED_OFFLINE_ASSETS = {
+# The HTML varies by client and signed session. Only public static files
+# share compressed bytes across requests.
+_OFFLINE_CONTENT_PACKS = {
     '/static/offline-content/concepts.zh-CN.json',
     '/static/offline-content/questions.zh-CN.json',
     '/static/offline-content/translations.en.json',
     '/static/offline-content/knowledge_graph.json',
-    '/static/vendor/mathjax-3.2.2/es5/tex-svg.js',
 }
 
 
-@lru_cache(maxsize=len(_COMPRESSED_OFFLINE_ASSETS))
-def _compressed_offline_asset(filename, modified_ns, size):
+def _compressible_static_request():
+    return request.endpoint == 'static' and (
+        request.path.endswith(('.js', '.css')) or request.path in _OFFLINE_CONTENT_PACKS)
+
+
+@lru_cache(maxsize=192)
+def _compressed_static_asset(filename, modified_ns, size):
     with open(filename, 'rb') as source:
         encoded = gzip.compress(source.read(), compresslevel=5, mtime=0)
     return encoded, hashlib.sha256(encoded).hexdigest()
 
 
 @app.before_request
-def serve_compressed_offline_asset():
-    if (request.endpoint != 'static' or request.path not in _COMPRESSED_OFFLINE_ASSETS
+def serve_compressed_static_asset():
+    if (not _compressible_static_request()
             or request.method not in ('GET', 'HEAD') or 'Range' in request.headers
-            or request.accept_encodings['gzip'] <= 0):
+            or request.accept_encodings.best_match(('gzip', 'identity')) != 'gzip'):
         return None
-    filename = os.path.join(app.root_path, request.path.lstrip('/'))
+    filename = safe_join(app.static_folder, request.view_args['filename'])
+    if filename is None:
+        return None
     try:
         stat = os.stat(filename)
-        encoded, etag = _compressed_offline_asset(filename, stat.st_mtime_ns, stat.st_size)
+        encoded, etag = _compressed_static_asset(filename, stat.st_mtime_ns, stat.st_size)
     except OSError:
         return None
     response = send_file(BytesIO(encoded), download_name=os.path.basename(filename),
@@ -238,7 +245,7 @@ def serve_compressed_offline_asset():
 
 @app.after_request
 def localize_application_errors(response):
-    if (request.path not in _COMPRESSED_OFFLINE_ASSETS and response.is_json
+    if (request.path not in _OFFLINE_CONTENT_PACKS and response.is_json
             and request_language(request) == "en"):
         payload = response.get_json(silent=True)
         translated = localize_error_payload(payload, "en")
@@ -257,12 +264,18 @@ def attach_runtime_source(response):
 # The native Android/WebView and desktop/Tauri shells open the remote site.
 # Revalidate application code; pinned upstream assets use immutable versions.
 @app.after_request
-def no_stale_web_application_assets(response):
+def prepare_web_response(response):
     path = request.path
-    if path in _COMPRESSED_OFFLINE_ASSETS:
+    if _compressible_static_request():
         response.vary.add('Accept-Encoding')
+    elif (request.endpoint in ('home', 'offline_learning_workspace')
+          and request.method in ('GET', 'HEAD') and response.status_code == 200):
+        response.vary.add('Accept-Encoding')
+        if request.accept_encodings.best_match(('gzip', 'identity')) == 'gzip':
+            response.set_data(gzip.compress(response.get_data(), compresslevel=3, mtime=0))
+            response.headers['Content-Encoding'] = 'gzip'
     if (response.status_code in (200, 206, 304) and re.match(
-            r'^/static/vendor/(?:mathjax|marked|dompurify|html2canvas|jspdf)-[0-9]+\.[0-9]+\.[0-9]+/', path)):
+            r'^/static/vendor/(?:mathjax|marked|dompurify|html2canvas|jspdf|fflate)-[0-9]+\.[0-9]+\.[0-9]+/', path)):
         response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
     elif (response.status_code in (200, 206, 304)
           and path.startswith('/static/') and path.endswith(('.js', '.css'))

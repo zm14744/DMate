@@ -102,6 +102,44 @@ async function pngDownload(download) {
   assert.equal(await download.failure(), null);
 }
 
+async function firstExport(browser) {
+  const context = await browser.newContext({serviceWorkers:'block',acceptDownloads:true});
+  const page = await context.newPage();
+  const requests = [];
+  page.on('request', request => requests.push(new URL(request.url()).pathname));
+  const canvas = '/static/vendor/html2canvas-1.4.1/html2canvas.min.js';
+  const pdf = '/static/vendor/jspdf-2.5.2/jspdf.umd.min.js';
+  const math = '/static/vendor/mathjax-3.2.2/es5/tex-svg.js';
+  const count = path => requests.filter(url => url === path).length;
+  try {
+    await page.goto(baseURL, {waitUntil:'networkidle'});
+    assert.deepEqual([count(canvas),count(pdf),count(math)], [0,0,0], 'An empty workspace does not fetch export or math libraries');
+    await page.route('**/html2canvas.min.js', route => route.abort(), {times:1});
+    await page.evaluate(async () => {
+      learningState = normalizeLearningState({wrongQuestions:[{id:'on-demand',question:'Find $x=2$.',corrected:false}]});
+      await exportWrongBookPdf();
+    });
+    await page.locator('#appConfirmClose').click();
+    assert.equal(await page.locator('#wrongPdfBtn').isEnabled(), true);
+    const downloading = page.waitForEvent('download');
+    const pngSize = await page.evaluate(async () => {
+      const [image] = await Promise.all([renderContentAsPngBlob(() => {
+        const source = document.createElement('div');
+        source.textContent = 'Test $x=2$';
+        return source;
+      }), exportWrongBookPdf()]);
+      return image.size;
+    });
+    assert.ok(pngSize > 100, 'A concurrent copy renders a PNG');
+    const download = await downloading;
+    const chunks = [];
+    for await (const chunk of await download.createReadStream()) chunks.push(chunk);
+    assert.equal(Buffer.concat(chunks).subarray(0,5).toString(), '%PDF-');
+    assert.deepEqual([count(canvas),count(pdf),count(math)], [2,1,1], 'The failed script retries once and concurrent consumers share each load');
+    console.log('PASS first export: cold math and export libraries, shared downloads and retry produce a real PDF and PNG');
+  } finally { await context.close(); }
+}
+
 async function desktop(browser, offline, width) {
   const { page, context, errors, downloads } = await fixture(browser, { offline, width });
   try {
@@ -232,6 +270,7 @@ async function disconnectedExport(browser) {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
+    await firstExport(browser);
     for (const offline of [false, true]) for (const width of [1440, 390]) await desktop(browser, offline, width);
     await mobileWeb(browser, false, android, 'Android browser');
     await mobileWeb(browser, true, iphone, 'iPhone browser');

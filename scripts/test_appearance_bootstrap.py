@@ -26,7 +26,8 @@ class AppearanceBootstrapTests(unittest.TestCase):
         html = self.render_home({"username": '甲"<appearance>', "email": "private-owner-817@example.test"})
         self.assertIn('data-owner="甲&#34;&lt;appearance&gt;"', html)
         self.assertNotIn("private-owner-817@example.test", html)
-        self.assertLess(html.index('id="dmateAppearanceBootstrap"'), html.index("<style>"))
+        self.assertLess(html.index('id="dmateAppearanceBootstrap"'),
+                        html.index('<link rel="stylesheet" href="/static/dmate-main.css?'))
 
     def test_logged_out_page_has_no_account_hint(self):
         self.assertIn('data-scope="online" data-owner=""', self.render_home())

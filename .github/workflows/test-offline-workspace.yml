@@ -56,6 +56,7 @@ on:
       - 'scripts/test_offline_appearance_browser.cjs'
       - 'scripts/test_appearance_bootstrap_browser.cjs'
       - 'scripts/test_appearance_bootstrap.py'
+      - 'scripts/test_web_compression.py'
       - 'scripts/test_offline_data_migration_browser.cjs'
       - 'scripts/test_offline_storage_browser.cjs'
       - 'scripts/test_offline_device_storage_browser.cjs'
@@ -165,6 +166,7 @@ on:
       - 'scripts/test_offline_appearance_browser.cjs'
       - 'scripts/test_appearance_bootstrap_browser.cjs'
       - 'scripts/test_appearance_bootstrap.py'
+      - 'scripts/test_web_compression.py'
       - 'scripts/test_offline_data_migration_browser.cjs'
       - 'scripts/test_offline_storage_browser.cjs'
       - 'scripts/test_offline_device_storage_browser.cjs'
@@ -411,6 +413,9 @@ jobs:
       - name: Verify first-paint appearance uses only the verified current owner
         if: matrix.suite == 'workspace'
         run: python -m unittest discover -s scripts -p 'test_appearance_bootstrap.py' -v
+      - name: Verify navigation compression and static cache validators
+        if: matrix.suite == 'workspace'
+        run: python scripts/test_web_compression.py -v
       - name: Verify the original favicon variants on each platform
         if: matrix.suite == 'workspace'
         env:
@@ -469,7 +474,8 @@ jobs:
           node scripts/test_textarea_autogrow_browser.cjs
           node scripts/test_drawing_async_persistence_browser.cjs
           node scripts/test_service_worker_cache_browser.cjs
-          node scripts/test_offline_auto_entry_browser.cjs
+          # Apply offline network emulation to the service worker as well as its page.
+          CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome node scripts/test_offline_auto_entry_browser.cjs
           node scripts/test_offline_startup_network_browser.cjs
           node scripts/test_image_export_browser.cjs
           node scripts/test_mistake_action_chrome_browser.cjs

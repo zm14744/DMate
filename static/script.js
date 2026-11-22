@@ -7101,9 +7101,8 @@ async function prepareTypesetQuestionCopy(question) {
     document.body.appendChild(holder);
     try {
         // Copy-only isolated node: never re-typeset or replace the live chat DOM.
-        if (window.MathJax?.typesetPromise) {
-            await window.MathJax.typesetPromise([root]);
-        }
+        const engine = await mathEngineFor(root);
+        if (engine) await engine.typesetPromise([root]);
         return buildClipboardPayload(root);
     } finally {
         holder.remove();
@@ -9352,15 +9351,11 @@ function buildWrongBookPdfExportElement(items) {
 }
 
 async function typesetWrongBookPdfElement(container) {
-    if (
-        window.MathJax
-        && MathJax.typesetPromise
-    ) {
-        try {
-            await MathJax.typesetPromise([container]);
-        } catch (error) {
-            console.warn("导出 PDF 时公式渲染失败：", error);
-        }
+    try {
+        const engine = await mathEngineFor(container);
+        if (engine) await engine.typesetPromise([container]);
+    } catch (error) {
+        console.warn("导出 PDF 时公式渲染失败：", error);
     }
 
     if (document.fonts?.ready) {
@@ -9646,16 +9641,6 @@ async function exportWrongBookPdf() {
         return;
     }
 
-    if (
-        typeof window.html2canvas !== "function"
-        || !window.jspdf?.jsPDF
-    ) {
-        void showWrongBookPdfNotice(
-            "PDF 组件加载失败，请刷新页面后重试"
-        );
-        return;
-    }
-
     const button = document.getElementById(
         "wrongPdfBtn"
     );
@@ -9663,12 +9648,16 @@ async function exportWrongBookPdf() {
 
     if (button) {
         button.disabled = true;
-        button.textContent = "正在生成 PDF…";
+        button.textContent = dmateUiText("正在生成 PDF…", "Generating PDF…");
     }
 
     let exportElement = null;
 
     try {
+        const [html2canvas, jsPDF] = await Promise.all([
+            loadExportCanvas(),
+            loadClientLibrary("/static/vendor/jspdf-2.5.2/jspdf.umd.min.js", () => window.jspdf?.jsPDF)
+        ]);
         exportElement = buildWrongBookPdfExportElement(
             items
         );
@@ -9679,10 +9668,6 @@ async function exportWrongBookPdf() {
         await rasterizeMathJaxSvgForPdf(
             exportElement
         );
-
-        const {
-            jsPDF
-        } = window.jspdf;
 
         const pdf = new jsPDF({
             orientation: "portrait",
@@ -9706,7 +9691,7 @@ async function exportWrongBookPdf() {
         let hasContent = false;
 
         for (const section of sections) {
-            const canvas = await window.html2canvas(
+            const canvas = await html2canvas(
                 section,
                 {
                     scale: 2,
@@ -9840,7 +9825,8 @@ async function exportWrongBookPdf() {
         console.error("错题本 PDF 导出失败：", error);
 
         void showWrongBookPdfNotice(
-            "PDF 生成失败，请刷新页面后重试"
+            window.html2canvas && window.jspdf?.jsPDF
+                ? "PDF 生成失败，请刷新页面后重试" : "PDF 组件加载失败，请刷新页面后重试"
         );
     } finally {
         exportElement?.remove();
@@ -11226,8 +11212,52 @@ function markdownToHtml(text) {
     return window.DMateMathMarkdown?.markdownToHtml(text) ?? escapeRawHtml(text).replace(/\n/g, "<br>");
 }
 
-function renderMath(target) {
-    return window.DMateMathMarkdown?.renderMath(target) ?? Promise.resolve();
+const clientLibraryLoads = new Map();
+function loadClientLibrary(url, readLibrary) {
+    const ready = readLibrary();
+    if (ready) return Promise.resolve(ready);
+    if (!clientLibraryLoads.has(url)) {
+        const script = document.createElement("script");
+        script.src = url;
+        const loading = new Promise((resolve, reject) => {
+            script.onload = () => {
+                const library = readLibrary();
+                if (library) resolve(library);
+                else reject(new Error("Library did not initialize: " + url));
+            };
+            script.onerror = () => reject(new Error("Could not load " + url));
+        }).catch(error => {
+            script.remove();
+            clientLibraryLoads.delete(url);
+            throw error;
+        });
+        clientLibraryLoads.set(url, loading);
+        document.head.appendChild(script);
+    }
+    return clientLibraryLoads.get(url);
+}
+
+function loadExportCanvas() {
+    return loadClientLibrary("/static/vendor/html2canvas-1.4.1/html2canvas.min.js", () => window.html2canvas);
+}
+
+async function mathEngineFor(target) {
+    // TeX delimiters, environments and references contain a dollar sign or backslash.
+    if (!window.MathJax?.typesetPromise && target && !/[$\\]/.test(target.textContent)) return null;
+    const engine = await loadClientLibrary("/static/vendor/mathjax-3.2.2/es5/tex-svg.js",
+        () => window.MathJax?.startup?.promise && window.MathJax);
+    await engine.startup?.promise;
+    return engine;
+}
+
+async function renderMath(target) {
+    try {
+        if (!await mathEngineFor(target)) return;
+    } catch (error) {
+        console.warn("MathJax 渲染失败：", error);
+        return;
+    }
+    return window.DMateMathMarkdown?.renderMath(target);
 }
 
 
@@ -11737,17 +11767,16 @@ function createRenderedCopyStage(content) {
 }
 
 async function renderContentAsPngBlob(makeContent) {
-    if (typeof window.html2canvas !== "function") {
-        throw new Error("图片渲染组件未加载");
-    }
     const content = makeContent();
     if (!content) throw new Error("没有可复制的内容");
+    const html2canvas = await loadExportCanvas().catch(() => {
+        throw new Error(dmateUiText("图片渲染组件未加载", "The image rendering component did not load."));
+    });
     const stage = createRenderedCopyStage(content);
     try {
-        if (window.MathJax?.typesetPromise) {
-            // A clone can contain unrendered LaTeX from a generated question.
-            await window.MathJax.typesetPromise([stage]);
-        }
+        // A clone can contain unrendered LaTeX from a generated question.
+        const engine = await mathEngineFor(stage);
+        if (engine) await engine.typesetPromise([stage]);
         if (document.fonts?.ready) await document.fonts.ready.catch(() => {});
         // Reuse the tested PDF-only rasterizer, avoiding clipped SVG glyphs
         // and duplicate assistive MathML when html2canvas takes a snapshot.
@@ -11755,7 +11784,7 @@ async function renderContentAsPngBlob(makeContent) {
         const width = Math.ceil(stage.getBoundingClientRect().width);
         const height = Math.ceil(stage.scrollHeight);
         const scale = Math.max(0.6, Math.min(2, 4096 / width, 12000 / height));
-        const canvas = await window.html2canvas(stage, {
+        const canvas = await html2canvas(stage, {
             backgroundColor: "#ffffff",
             scale,
             width,
@@ -12348,9 +12377,9 @@ async function renderKnowledgeGraphPngBlob() {
     }
 
     try {
-        if (typeof window.html2canvas !== "function") {
-            throw new Error("html2canvas 不可用");
-        }
+        const html2canvas = await loadExportCanvas().catch(() => {
+            throw new Error(dmateUiText("html2canvas 不可用", "html2canvas is unavailable."));
+        });
 
         if (document.fonts?.ready) {
             await document.fonts.ready.catch(() => {});
@@ -12375,7 +12404,7 @@ async function renderKnowledgeGraphPngBlob() {
             window.devicePixelRatio || 1.5,
             Math.sqrt(pixelBudget / Math.max(1, exportWidth * exportHeight))
         );
-        const renderedCanvas = await window.html2canvas(target, {
+        const renderedCanvas = await html2canvas(target, {
             backgroundColor: effectiveElementBackground(target),
             scale: exportScale,
             useCORS: true,

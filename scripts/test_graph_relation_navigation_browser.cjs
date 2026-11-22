@@ -4,6 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const { expect } = require('playwright/test');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const historyCards = '#knowledgeGraphModal .kg-history-item';
 
@@ -94,7 +95,6 @@ async function checkDecoration(page, focus, label) {
 async function expectDestination(page, id, category, label) {
   await page.waitForFunction(({ id, category }) => knowledgeGraphViewMode === 'full'
     && knowledgeGraphFilter === category && knowledgeGraphSelectedNodeId === id, { id, category });
-  await settle(page);
   assert.equal(await page.locator('#knowledgeGraphCategory').inputValue(), category, label + ': module selector follows the target');
   assert.equal(await page.locator('#knowledgeGraphDetailTitle').innerText(), await nodeLabel(page, id),
     label + ': target details are selected');
@@ -111,16 +111,17 @@ async function expectDestination(page, id, category, label) {
     label + ': all-knowledge mode activates node details');
   assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),!fullscreen,
     label + ': node details remain visible outside the full graph canvas');
-  const visible = await page.evaluate(id => {
-    const canvas = document.getElementById('knowledgeGraphCanvas');
-    const node = canvas.querySelector('.selected[data-knowledge-node-id="' + id + '"]');
-    const viewport = canvas.querySelector('.kg-mobile-viewport,.kg-desktop-viewport');
-    if (!node || !viewport) return false;
+  // Selection updates before the navigation frame scrolls and focuses the node.
+  const destination = page.locator('#knowledgeGraphCanvas .selected[data-knowledge-node-id="' + id + '"]');
+  await expect(destination, label + ': relation destination receives focus').toBeFocused();
+  await expect.poll(() => destination.evaluate(node => {
+    const viewport = node.closest('.kg-mobile-viewport,.kg-desktop-viewport');
+    if (!viewport) return Infinity;
     const bounds = node.getBoundingClientRect(), frame = viewport.getBoundingClientRect();
-    return bounds.width > 0 && bounds.height > 0 && bounds.left >= frame.left - 2 && bounds.right <= frame.right + 2
-      && bounds.top >= frame.top - 2 && bounds.bottom <= frame.bottom + 2;
-  }, id);
-  assert.equal(visible, true, label + ': selected target is revealed in the graph viewport');
+    if (!bounds.width || !bounds.height) return Infinity;
+    return Math.max(frame.left - bounds.left, bounds.right - frame.right,
+      frame.top - bounds.top, bounds.bottom - frame.bottom);
+  }), { message: label + ': selected node overflow in CSS pixels' }).toBeLessThanOrEqual(2);
   await checkSelectedFrame(page, id, label);
 }
 

@@ -796,16 +796,18 @@ function mount(host,o){
  }
  function syncDrawingCamera(){
   if(!viewState||!loaded)return false;
-  if(scroll.clientWidth<=0||scroll.clientHeight<=0){cameraSize=null;return false;}
+  if(scroll.clientWidth<=0||scroll.clientHeight<=0){cameraSize=null;return true;}
   const mode=mobileView.matches?'mobile':'desktop',size={width:scroll.clientWidth,height:scroll.clientHeight};
   if(autoFitted&&!cameraFitPending&&mode===cameraMode&&cameraSize?.width===size.width&&cameraSize?.height===size.height){layoutWorld();draw();syncGeometryReady();return true;}
-  const restoring=!cameraFitPending&&validCamera(viewState[mode]);cameraFitPending=false;
+  const requestedFit=cameraFitPending,restoring=!requestedFit&&validCamera(viewState[mode]);cameraFitPending=false;
   cameraRestoring=true;cameraMode=mode;
   if(restoring)restoreCamera(viewState[mode]);
   else{autoFitted=false;fitImage();}
   cameraSize={width:scroll.clientWidth,height:scroll.clientHeight};
   draw();syncGeometryReady();
-  if(!restoring){cameraRestoring=false;rememberCamera();cameraRestoring=true;}
+  // An automatic fit follows the panel as it resizes. Only persist a fit
+  // here when the user requested it while the drawing was hidden.
+  if(requestedFit){cameraRestoring=false;rememberCamera();cameraRestoring=true;}
   d.defaultView.cancelAnimationFrame(cameraFrame);
   cameraFrame=d.defaultView.requestAnimationFrame(()=>{cameraRestoring=false;});
   return true;

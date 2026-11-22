@@ -98,9 +98,8 @@
 - 自定义背景图保存到离线工作区的加密设置记录；旧本机外观来源仅作兼容迁移，登录切换不替换离线设置。
 - 离线工作区只增加必要的布局和内容样式，不重绘原有 Logo、图标或背景。
 
-公共页面样式由 `scripts/sync_offline_styles.py` 从在线模板导出为
-`static/dmate-main.css` 与 `static/dmate-shared-overrides.css`。在线模板的内联样式
-调整后，运行 `python scripts/sync_offline_styles.py` 同步；CI 使用 `--check`
+在线和离线页面直接引用公共样式 `static/dmate-main.css`。调整在线模板中的内联覆盖样式后，
+运行 `python scripts/sync_offline_styles.py` 更新 `static/dmate-shared-overrides.css`。CI 使用 `--check`
 检查两端是否一致。离线布局保留在 `offline.css`，按钮、绘图、弹窗、
 公式排版及图标复用在线组件。知识图谱以同样的节点、连线和选中描边显示，
 离线题库与概念库沿用相同的列表和详情样式。

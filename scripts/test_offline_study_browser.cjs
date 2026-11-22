@@ -94,7 +94,7 @@ async function onlineReference(browser, width) {
   const result = {};
   try {
     await page.goto(baseURL + '/', { waitUntil: 'networkidle' });
-    await page.waitForFunction(() => typeof renderChat === 'function' && window.DMateMathMarkdown && window.MathJax?.startup?.promise);
+    await page.waitForFunction(() => typeof renderChat === 'function' && window.DMateMathMarkdown);
     for (const language of ['zh-CN', 'en']) for (const theme of themes) {
       await page.evaluate(({ language, source }) => {
         stopCloudLivePolling(); DMateI18n.setLanguage(language, false);

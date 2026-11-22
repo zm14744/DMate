@@ -431,14 +431,12 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile, onReady)
         viewport.dataset.kgReady = 'true';
         viewport.style.visibility = '';
         onReady?.();
-        // Scroll events produced by restoring/clamping arrive asynchronously.
-        // Keep the saved graph point until actual user input changes the view.
+        // Ignore scroll events from the fit/restore itself. Leaving an initial
+        // fit out of memory lets it follow the sidebar animation until the
+        // user chooses a camera by panning, zooming or clicking Fit.
         cancelAnimationFrame(releaseFrame);
         releaseFrame = requestAnimationFrame(() => {
-            releaseFrame = requestAnimationFrame(() => {
-                applying = false;
-                if (!saved) remember();
-            });
+            releaseFrame = requestAnimationFrame(() => { applying = false; });
         });
     };
     const beginInteraction = () => {
