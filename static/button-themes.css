@@ -316,7 +316,6 @@ body[data-appearance-theme] #accountBtn.is-syncing .account-entry-icon {
         .dge-review-relation.is-selected,
         .dge-tabs [aria-selected="true"],
         .dgs-modes [aria-selected="true"],
-        .kg-history-item.active,
         .graph-summary-item.focus,
         .dcn-note.is-current,
         .ddw-history-item.is-current
@@ -399,7 +398,6 @@ body[data-appearance-theme] #accountBtn.is-syncing .account-entry-icon {
         .dge-review-relation:not(.is-selected),
         .dge-tool-palette .dge-overlay-tools button[data-overlay-tool]:not(.is-active),
         .graph-summary-item:not(.focus),
-        .kg-history-item:not(.active),
         .ddw-history-item:not(.is-current)
     ) {
         --dm-control-bg:transparent;
@@ -425,7 +423,6 @@ body[data-appearance-theme] #accountBtn.is-syncing .account-entry-icon {
         .dge-review-relation:not(.is-selected),
         .dge-tool-palette .dge-overlay-tools button[data-overlay-tool]:not(.is-active),
         .graph-summary-item:not(.focus),
-        .kg-history-item:not(.active),
         .ddw-history-item:not(.is-current)
     ):not(:disabled):not([aria-disabled="true"]):hover {
             background-color:var(--dm-nav-hover,var(--dm-selected-hover))!important;
@@ -447,7 +444,6 @@ body[data-appearance-theme] #accountBtn.is-syncing .account-entry-icon {
         .dge-review-relation:not(.is-selected),
         .dge-tool-palette .dge-overlay-tools button[data-overlay-tool]:not(.is-active),
         .graph-summary-item:not(.focus),
-        .kg-history-item:not(.active),
         .ddw-history-item:not(.is-current)
     ):focus-visible {
         outline:2px solid var(--dm-selected-ring)!important;

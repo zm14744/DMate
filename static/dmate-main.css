@@ -1451,18 +1451,6 @@ input[type="search"]::-webkit-search-cancel-button {
     line-height:1.6;
 }
 
-.learning-review-section {
-    margin-bottom:10px;
-    padding:13px 14px;
-    border-radius:10px;
-    background:var(--surface-0);
-    border:1px solid var(--surface-3);
-}
-
-.learning-review-section:last-child {
-    margin-bottom:0;
-}
-
 .learning-review-section-title {
     margin-bottom:7px;
     color:var(--text-primary);
@@ -1517,6 +1505,10 @@ input[type="search"]::-webkit-search-cancel-button {
     padding:10px 14px;
     border-bottom:1px solid var(--surface-3);
     background:var(--surface-1);
+}
+
+#knowledgeGraphModal[data-graph-view="history"] .graph-toolbar {
+    border-bottom:0;
 }
 
 .graph-toolbar-left {
@@ -1712,6 +1704,12 @@ input[type="search"]::-webkit-search-cancel-button {
     #knowledgeGraphModal:not(.graph-fullscreen-view) .knowledge-graph-main:has(> #knowledgeGraphCanvas > .kg-empty:only-child) {
         flex:1 1 0 !important;
     }
+    #knowledgeGraphModal[data-graph-view="history"]:not(.graph-fullscreen-view) .knowledge-graph-main {
+        border-bottom:0 !important;
+    }
+    #knowledgeGraphModal[data-graph-view="history"] .knowledge-graph-main:has(> #knowledgeGraphCanvas > .kg-empty:only-child) {
+        min-height:min-content !important;
+    }
 }
 
 .knowledge-graph-side {
@@ -1768,7 +1766,6 @@ input[type="search"]::-webkit-search-cancel-button {
     align-items:stretch;
     gap:8px;
     padding:10px 10px 8px;
-    border-bottom:1px solid var(--surface-3);
 }
 
 #knowledgeGraphSideTabs[hidden],
@@ -1861,17 +1858,8 @@ input[type="search"]::-webkit-search-cancel-button {
     cursor:pointer;
 }
 
-.kg-history-item {
-    margin-bottom:10px;
-    padding:11px;
-    border:1px solid var(--surface-4);
-    border-radius:10px;
-    background:var(--surface-0);
-}
-
-.kg-history-item.active {
-    border-color:var(--accent);
-    box-shadow:0 0 0 1px rgba(59,130,246,.18);
+.kg-history-item + .kg-history-item {
+    margin-top:22px;
 }
 
 .kg-history-item-top {
@@ -1938,13 +1926,6 @@ input[type="search"]::-webkit-search-cancel-button {
     margin:.7em 0 !important;
 }
 
-.kg-history-points {
-    margin-top:7px;
-    color:var(--text-subtle);
-    font-size:var(--font-xxs);
-    line-height:1.45;
-}
-
 .kg-history-actions {
     display:flex;
     gap:7px;
@@ -2003,7 +1984,6 @@ input[type="search"]::-webkit-search-cancel-button {
 
 .graph-detail-field {
     padding:10px 0;
-    border-top:1px solid var(--surface-3);
 }
 
 .graph-detail-field-label {
@@ -3297,11 +3277,6 @@ body[data-appearance-theme="light"] .msg-actions button {
 
     .wrong-edit-body textarea {
         min-height:100px;
-    }
-
-    /* 学习回顾 */
-    .learning-review-section {
-        padding:11px 12px;
     }
 
     /* 外观 */
@@ -7123,6 +7098,9 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         align-items:stretch;
         gap:6px !important;
     }
+    #knowledgeGraphModal .graph-toolbar-left:has(> #knowledgeGraphScopeBtn[hidden]) {
+        grid-template-columns:repeat(2, minmax(0, 1fr)) !important;
+    }
     #knowledgeGraphModal .graph-toolbar-left label { display:none !important; }
     #knowledgeGraphModal .graph-toolbar-left select {
         grid-column:1 / -1;
@@ -8223,7 +8201,6 @@ body[data-appearance-theme] #wrongBookModal .wrong-toolbar,
 body[data-appearance-theme] #wrongBookModal .wrong-tools {
     border-bottom:1px solid var(--dm-frost-border) !important;
 }
-body[data-appearance-theme] #learningReviewModal .learning-review-section,
 body[data-appearance-theme] #wrongBookModal .wrong-card,
 body[data-appearance-theme] #wrongBookModal .wrong-empty {
     background:var(--dm-frost-panel) !important;
@@ -8231,11 +8208,7 @@ body[data-appearance-theme] #wrongBookModal .wrong-empty {
 }
 
 
-/* 2026-10-12 小幅加深浅色主题卡片和错题本控件底色；不改字体颜色。 */
-body[data-appearance-theme="light"] #learningReviewModal .learning-review-section {
-    background-color:#edf2f7 !important;
-    background-image:none !important;
-}
+/* 2026-10-12 小幅加深浅色主题错题本控件底色；不改字体颜色。 */
 body[data-appearance-theme="light"] #wrongBookModal .wrong-filters button:not(.active),
 body[data-appearance-theme="light"] #wrongBookModal .wrong-tools input,
 body[data-appearance-theme="light"] #wrongBookModal .wrong-tools select,

@@ -191,9 +191,9 @@ body.offline-workspace #questionDetail :is(.wrong-answer-details,.wrong-analysis
     outline-offset:2px!important;
   }
 }
-/* New library relations use the concept detail's section separators. Long
+/* Question details use the concept detail's section separators. Long
    exercise titles wrap inside a narrow graph sidebar without shrinking rows. */
-body.offline-workspace :is(.question-parent-concepts,.question-graph-modules,.offline-graph-learning-links > .detail-section) { min-width:0; margin-top:18px; padding-top:14px; border-top:1px solid var(--surface-3); }
+body.offline-workspace :is(.question-parent-concepts,.question-graph-modules) { min-width:0; margin-top:18px; padding-top:14px; border-top:1px solid var(--surface-3); }
 body.offline-workspace .offline-graph-learning-links { flex:0 0 auto; min-width:0; }
 body.offline-workspace :is(.question-parent-concepts,.question-graph-modules,.offline-graph-learning-links) .prereq-list button { box-sizing:border-box; flex:none; min-width:0; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
 /* Tablet-width landscape keeps the two graph columns inside the short page.

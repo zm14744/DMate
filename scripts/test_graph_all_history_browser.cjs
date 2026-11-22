@@ -138,6 +138,14 @@ async function checkCase(browser,width,language) {
     await openHistory(page);
     await assertModeControls(page,'history',label+'/history list');
     assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),true,label+': only history mode exposes detail/history tabs');
+    if (mobile) {
+      const positions=await page.evaluate(()=>({
+        emptyBottom:document.querySelector('#knowledgeGraphCanvas > .kg-empty').getBoundingClientRect().bottom,
+        tabsTop:document.getElementById('knowledgeGraphSideTabs').getBoundingClientRect().top
+      }));
+      assert.ok(positions.emptyBottom <= positions.tabsTop,label+': the graph empty state does not cover the tabs');
+    }
+    assert.equal(await page.locator(cards+' .kg-history-points').count(),0,label+': history previews omit topic subtitles');
     assert.equal(await page.locator('#knowledgeGraphCanvas').innerText(),language==='en'?'None':'无',
       label+': history without a selected question uses the empty label instead of showing the course graph');
     await page.locator('#knowledgeGraphDetailTab').click();

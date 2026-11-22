@@ -22416,10 +22416,6 @@ function renderKnowledgeGraphHistory(items) {
         preview.className = "kg-history-preview ai-content";
         preview.setAttribute("data-i18n-content", "");
         preview.innerHTML = markdownToHtml(prepareAiDisplayText(item.text));
-        const points = document.createElement("div");
-        points.className = "kg-history-points";
-        points.textContent = item.knowledgePoints.length ? dmateKnowledgeList(item.knowledgePoints)
-            : dmateUiText("知识点暂未识别");
         const actions = document.createElement("div");
         actions.className = "kg-history-actions";
         const graph = document.createElement("button");
@@ -22435,7 +22431,7 @@ function renderKnowledgeGraphHistory(items) {
         locate.textContent = dmateUiText("定位原题");
         locate.addEventListener("click", () => locateKnowledgeGraphHistoryQuestion(item, context));
         actions.append(graph, locate);
-        card.append(preview, points, actions);
+        card.append(preview, actions);
         list.append(card);
     }
     renderMath(list);

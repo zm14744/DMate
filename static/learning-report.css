@@ -1,4 +1,4 @@
-/* Records use three summary cards; the empty view only says 无. */
+/* Space and headings separate the three sections of the learning review. */
 #learningReviewModal .learning-review-card {
     width:min(980px,94vw);
     max-height:90dvh;
@@ -16,19 +16,16 @@
 .lr-review {
     display:flex;
     flex-direction:column;
-    gap:14px;
+    gap:24px;
     min-width:0;
 }
 .lr-review * { box-sizing:border-box; }
 #learningReviewModal .learning-review-section {
     min-width:0;
     margin:0;
-    padding:20px;
-    border:1px solid var(--border-strong);
-    border-radius:16px;
 }
 #learningReviewModal .learning-review-section-title {
-    margin:0 0 10px;
+    margin:0 0 6px;
     color:var(--text-muted);
     font-size:14px;
     font-weight:600;
@@ -56,6 +53,5 @@
         border-radius:18px;
     }
     #learningReviewModal .learning-review-body { padding:14px; }
-    .lr-review { gap:12px; }
-    #learningReviewModal .learning-review-section { padding:16px; border-radius:14px; }
+    .lr-review { gap:20px; }
 }

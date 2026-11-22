@@ -39,8 +39,8 @@ body[data-appearance-theme] {
         .ocr-task-list,.ocr-task-card,.ocr-review-rendered,.ocr-review-preview,
         .appearance-background-preview:not([data-has-background="true"]),
         .wrong-card,.wrong-feedback,.wrong-empty,.wrong-answer-body,.wrong-analysis-body,.wrong-solution-body,
-        .learning-review-intro,.learning-review-section,
-        .kg-section,.kg-mobile-section,.kg-mobile-viewport,.kg-history-item:not(.active),.kg-history-preview,
+        .learning-review-intro,
+        .kg-section,.kg-mobile-section,.kg-mobile-viewport,.kg-history-preview,
         .graph-metric,.graph-detail-tip,.graph-detail-empty,.graph-summary-item:not(.focus),
         .dge-original,.dge-visual,.dge-toolbar,.dge-view-controls,.dge-review-summary,.dge-node-panel,.dge-edge-panel,
         .dgs-information-card,.dgs-source-card,
@@ -148,7 +148,7 @@ body[data-appearance-theme] {
     /* The panel-surface layer also clears historical fills; reapply neutral
        selection on the active list rows after that transparent reset. */
     body[data-appearance-theme] :is(
-        .kg-history-item.active,.graph-summary-item.focus,
+        .graph-summary-item.focus,
         .dcn-note.is-current,.ddw-history-item.is-current
     ) {
         background-color:var(--dm-selected-bg)!important;
@@ -165,7 +165,7 @@ body[data-appearance-theme] {
 
     @media(min-width:1101px) {
         body[data-appearance-theme="light"] #learningReviewModal :is(
-            .modal-head,.learning-review-section,.learning-review-actions
+            .modal-head,.learning-review-actions
         ) {
             border-color:#94a3b8!important;
         }
@@ -191,8 +191,6 @@ body[data-appearance-theme] {
 /* Knowledge graph node-level teaching video resources. */
 #knowledgeGraphModal .kg-video-section {
     margin-top:14px;
-    padding-top:12px;
-    border-top:1px solid var(--surface-3);
 }
 #knowledgeGraphModal .kg-video-section-title {
     margin-bottom:5px;
