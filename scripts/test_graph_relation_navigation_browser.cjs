@@ -169,8 +169,25 @@ async function checkCase(browser, width, language) {
     await predecessor.waitFor({ state: 'visible' });
     assert.equal(await predecessor.evaluate(node => node.tagName), 'BUTTON', label + ': predecessor is keyboard-accessible');
     await predecessor.focus();
+    const wrapToolbar = !mobile && language === 'en';
+    if (wrapToolbar) {
+      await predecessor.evaluate(button => button.addEventListener('click', () => {
+        // Make the English controls wrap after the first fit on any system font.
+        const controls = document.querySelector('#knowledgeGraphModal .graph-toolbar-left');
+        controls.style.maxWidth = (controls.clientWidth - controls.lastElementChild.offsetWidth / 2) + 'px';
+      }, { once: true }));
+    }
     await page.keyboard.press('Enter');
     await expectDestination(page, 'logic_reasoning', '命题逻辑', label + '/predecessor Enter');
+    if (wrapToolbar) {
+      const wrapped = await page.locator('#knowledgeGraphModal .graph-toolbar-left').evaluate(controls => {
+        const first = controls.querySelector('#knowledgeGraphFocusBtn').getBoundingClientRect();
+        const last = controls.lastElementChild.getBoundingClientRect();
+        controls.style.removeProperty('max-width');
+        return last.top >= first.bottom;
+      });
+      assert.equal(wrapped, true, label + ': relation navigation resized the graph through a toolbar wrap');
+    }
     await checkDecoration(page, false, label + '/navigated full');
 
     await page.evaluate(() => {

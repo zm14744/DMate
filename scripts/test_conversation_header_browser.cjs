@@ -159,6 +159,10 @@ async function conversationLifecycle(page, width, theme) {
   await headerIcons(page, true);
   await page.locator('#newChatBtn').click();
   await page.waitForFunction(() => sessions.length === 2);
+  if (mobile(page)) {
+    // Creating the chat schedules the drawer to close after the click handler.
+    await page.waitForFunction(() => !document.body.classList.contains('mobile-left-open'));
+  }
   await headerTitle(page, '新对话');
   await sidebar(page, true);
   await page.locator('#sessions .session[data-session-id="' + firstId + '"] [data-session-name]').click();

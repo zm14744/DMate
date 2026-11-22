@@ -147,6 +147,32 @@ async function manualReturn(page) {
     await network(false);await manualReturn(page);
     console.log('PASS an evicted cache containing only HTML shows a truthful notice, repairs on reconnection and supports the next automatic entry');
 
+    // During a rollout the previous worker has a complete offline shell but
+    // the new online scripts may still be in flight when the connection drops.
+    const bundlePattern=/\/static\/online\/(workspace|controls)\.js\?/;
+    const heldRoutes=[];
+    await page.route(bundlePattern,route=>{heldRoutes.push(route);});
+    try {
+      await Promise.all([
+        ...['workspace','controls'].map(group=>page.waitForRequest(request=>
+          new URL(request.url()).pathname===`/static/online/${group}.js`)),
+        page.reload({waitUntil:'commit'})
+      ]);
+      await network(true);
+      await page.waitForURL('**/offline',{waitUntil:'commit',timeout:10000});
+      await offline(page);
+      assert.equal(heldRoutes.length,2,'Both online bundles were held throughout entry');
+      assert.equal(await worker.probe(),true,'The worker cannot fetch from the server');
+      await page.locator('.offline-nav-item[data-panel="notes"]').click();
+      await page.locator('#notesPanel').waitFor({state:'visible'});
+    } finally {
+      await page.unroute(bundlePattern);
+      await Promise.all(heldRoutes.map(route=>route.abort().catch(()=>{})));
+      await network(false);
+    }
+    await manualReturn(page);
+    console.log('PASS pending online bundles do not block automatic entry into working offline notes');
+
     // A restored/cached online document may start its scripts only after the
     // connection vanished. Run the real entry module from its cached URL in
     // an already same-origin document, without dispatching fake network events.

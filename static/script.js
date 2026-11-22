@@ -20579,12 +20579,12 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile) {
     let outerWidth = 0, outerHeight = 0;
     const active = () => window.matchMedia('(max-width:760px)').matches === mobile;
     const scale = () => Number(mobile ? viewport._kgScale : surface.dataset.scale) || 1;
+    const atCurrentSize = () => initialized && viewport.offsetWidth === outerWidth && viewport.offsetHeight === outerHeight;
     const remember = () => {
         // A real resize can clamp scroll before its callback runs. Scrollbars
         // created by zoom only change client dimensions, so they must still
         // commit the new camera instead of restoring an older fitted scale.
-        if (!initialized || applying || disposed || !active()
-            || !viewport.isConnected || viewport.offsetWidth !== outerWidth || viewport.offsetHeight !== outerHeight) return;
+        if (applying || disposed || !active() || !viewport.isConnected || !atCurrentSize()) return;
         const view = viewport.getBoundingClientRect(), bounds = stage.getBoundingClientRect(), zoom = scale();
         memory.set(key, {scale:zoom,
             x:(view.left + viewport.clientLeft + viewport.clientWidth / 2 - bounds.left) / zoom,
@@ -20628,13 +20628,16 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile) {
         return true;
     };
     const beginInteraction = () => {
-        if (!initialized) initialize();
+        // A toolbar wrap can resize the viewport before its observer's next
+        // frame. Settle the camera now so that fit cannot undo this input.
+        cancelAnimationFrame(frame);
+        if (!atCurrentSize()) initialize();
         cancelAnimationFrame(releaseFrame);
         applying = false;
     };
     const resize = () => {
         if (disposed || !active() || !viewport.clientWidth || !viewport.clientHeight) return;
-        if (initialized && viewport.offsetWidth === outerWidth && viewport.offsetHeight === outerHeight) return;
+        if (atCurrentSize()) return;
         cancelAnimationFrame(frame);
         frame = requestAnimationFrame(initialize);
     };

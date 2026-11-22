@@ -29,7 +29,7 @@ async function fixture(run) {
   const profile=fs.mkdtempSync(path.join(os.tmpdir(),'dmate-ocr-reopen-'));
   const state={owner:ownerA,accounts:new Map([ownerA,ownerB].map(owner=>[owner,{revision:2,data:snapshot()}])),
     jobs:new Map(),posts:[],reads:[],sources:[],bindings:new Set(),held:[],holdStatus:new Set(),
-    mode:'processing',modelStarts:0,chats:0,errors:[],unexpected:[],unauthorizedStatus:new Set()};
+    mode:'processing',modelStarts:0,chats:0,errors:[],unexpected:[],expiredStatusOwners:new Set()};
   let context;
   const key=(owner,id)=>owner+'|'+id;
   const result=id=>({request_id:id,source_sha256:hash(image(id)),text:'恢复后的完整识别内容 '+id,
@@ -66,7 +66,8 @@ async function fixture(run) {
         assert.equal(decodeURIComponent(request.headers()['x-dmate-draft-owner']),owner,'Recovery status is bound to the verified account');
         assert.equal(url.searchParams.get('source_sha256'),hash(image(id)),'Recovery asks about the exact original pixels');
         state.reads.push({id,owner});
-        if(state.unauthorizedStatus.delete(id))return route.fulfill({status:401,...json({error:'登录状态已变化，请重新登录后继续图片识别'})});
+        // Restored and newly opened tabs share the same account session.
+        if(state.expiredStatusOwners.has(owner))return route.fulfill({status:401,...json({error:'登录状态已变化，请重新登录后继续图片识别'})});
         if(state.holdStatus.has(id)){state.held.push({id,owner,route});return;}
         return fulfillStatus(route,id,owner);
       }
@@ -236,12 +237,13 @@ async function groupedRecoveryRace(api){
 }
 async function reverifiedRecovery(api){
   const {state,open,reopen,upload,completed,key,result}=api;const id='reverified-recovery';
-  let page=await open();await upload(page,id);page=await reopen(()=>state.unauthorizedStatus.add(id));
+  let page=await open();await upload(page,id);page=await reopen(()=>state.expiredStatusOwners.add(ownerA));
   await page.waitForFunction(id=>ocrTasks.get(id)?.state==='failed'&&ocrTasks.get(id)?.recoveryPending,id,{timeout:5000}).catch(async error=>{
     console.error('Revalidation fixture',await page.evaluate(id=>ocrTasks.get(id),id),state.reads,state.errors);throw error;
   });
   await page.evaluate(()=>DMateAccountOcrDrafts.flush());
-  state.jobs.set(key(ownerA,id),{status:'completed',result:result(id)});page=await reopen();await completed(page,id);
+  state.jobs.set(key(ownerA,id),{status:'completed',result:result(id)});
+  page=await reopen(()=>state.expiredStatusOwners.delete(ownerA));await completed(page,id);
   assert.equal(await page.evaluate(id=>ocrTasks.get(id).draft.body_text,id),result(id).document.body_text);
   assert.equal(state.posts.length,1);assert.equal(state.modelStarts,1);
   console.log('PASS account revalidation resumes a paused recognition without starting it as a guest or repeating OCR');

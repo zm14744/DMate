@@ -18,7 +18,7 @@ from datetime import timedelta
 from collections import defaultdict, deque, OrderedDict
 import ipaddress
 
-from flask import Flask, jsonify, render_template, request, session, make_response, has_request_context, send_file
+from flask import Flask, abort, jsonify, render_template, request, session, make_response, has_request_context, send_file
 from ios_webclip import build_ios_webclip_profile
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import safe_join
@@ -210,6 +210,54 @@ _OFFLINE_CONTENT_PACKS = {
     '/static/offline-content/knowledge_graph.json',
 }
 
+# Each group contains adjacent, self-contained classic scripts from the online
+# page, in their original execution order. The offline shell uses individual files.
+_ONLINE_SCRIPT_GROUPS = {
+    'workspace': (
+        'offline-interface-state.js', 'language-catalog.js', 'language-knowledge.js', 'language.js',
+        'modal-text.js', 'knowledge-graph-labels.js', 'question-knowledge-graph.js', 'exercise-intent.js',
+        'graph-editor-model.js', 'graph-editor-format.js', 'graph-editor-overlay.js', 'graph-editor.js',
+        'math-diagram.js', 'math-markdown.js', 'ai-answer-renderer.js', 'delete-confirm.js',
+        'drawing-export.js', 'drawing-workspace.js', 'graph-scan-workspace.js', 'voice-input.js',
+        'concept-notebook-model.js', 'concept-notebook.js', 'chat-composer.js', 'learning-review-guidance.js',
+        'learning-report.js', 'chat-stream.js', 'conversation-titles.js', 'chat-message-edit.js',
+        'conversation-image-drafts.js', 'ocr-task-client.js', 'learning-panel.js',
+    ),
+    'controls': (
+        'conversation-tabs.js', 'desktop-shell.js', 'ui-tooltip.js', 'search-controls.js',
+        'textarea-autosize.js', 'scrollbars.js', 'mobile-select.js',
+    ),
+}
+
+
+@lru_cache(maxsize=len(_ONLINE_SCRIPT_GROUPS))
+def _online_script_representations(group, revision):
+    parts = []
+    last_modified = 0
+    for filename in _ONLINE_SCRIPT_GROUPS[group]:
+        with open(os.path.join(app.static_folder, filename), 'rb') as source:
+            parts.append(source.read())
+            last_modified = max(last_modified, os.fstat(source.fileno()).st_mtime)
+    # End any trailing line comment and separate IIFEs even without a final semicolon.
+    source = b'\n;\n'.join(parts)
+    encoded = gzip.compress(source, compresslevel=5, mtime=0)
+    return ((source, hashlib.sha256(source).hexdigest()),
+            (encoded, hashlib.sha256(encoded).hexdigest()), last_modified)
+
+
+@app.route('/static/online/<group>.js')
+def online_script_group(group):
+    if group not in _ONLINE_SCRIPT_GROUPS:
+        abort(404)
+    plain, encoded, modified = _online_script_representations(group, _RUNTIME_SOURCE.get('manifest_sha256'))
+    use_gzip = ('Range' not in request.headers
+                and request.accept_encodings.best_match(('gzip', 'identity')) == 'gzip')
+    data, etag = encoded if use_gzip else plain
+    response = send_file(BytesIO(data), download_name=group + '.js', etag=etag, last_modified=modified)
+    if use_gzip:
+        response.headers['Content-Encoding'] = 'gzip'
+    return response
+
 
 def _compressible_static_request():
     return request.endpoint == 'static' and (
@@ -266,7 +314,7 @@ def attach_runtime_source(response):
 @app.after_request
 def prepare_web_response(response):
     path = request.path
-    if _compressible_static_request():
+    if _compressible_static_request() or request.endpoint == 'online_script_group':
         response.vary.add('Accept-Encoding')
     elif (request.endpoint in ('home', 'offline_learning_workspace')
           and request.method in ('GET', 'HEAD') and response.status_code == 200):
