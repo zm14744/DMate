@@ -13577,7 +13577,40 @@ function installChatJumpControls() {
     };
     topButton.addEventListener("click", () => navigate(false));
     bottomButton.addEventListener("click", () => navigate(true));
-    chat.addEventListener("scroll", queueChatJumpControlsUpdate, { passive:true });
+    // Only user-initiated scrolling reveals the controls; background rendering
+    // and automatic follow-to-bottom scrolls must not wake them up.
+    const controls = topButton.closest(".chat-jump-controls");
+    let lastScrollIntentAt = -Infinity;
+    let userScrolling = false;
+    let scrollIdleTimer = 0;
+    const markScrollIntent = () => { lastScrollIntentAt = performance.now(); };
+    const onChatScroll = () => {
+        if (controls && (userScrolling || performance.now() - lastScrollIntentAt < 650)) {
+            userScrolling = true;
+            controls.classList.add("is-scrolling");
+            clearTimeout(scrollIdleTimer);
+            scrollIdleTimer = setTimeout(() => {
+                userScrolling = false;
+                controls.classList.remove("is-scrolling");
+            }, 1000);
+        }
+        queueChatJumpControlsUpdate();
+    };
+    chat.addEventListener("wheel", markScrollIntent, { passive:true });
+    chat.addEventListener("touchmove", markScrollIntent, { passive:true });
+    chat.addEventListener("pointerdown", event => {
+        if (event.pointerType === "mouse" || event.pointerType === "pen") markScrollIntent();
+    }, { passive:true });
+    chat.addEventListener("pointermove", event => {
+        if (event.buttons & 1) markScrollIntent();
+    }, { passive:true });
+    document.addEventListener("keydown", event => {
+        if (!["ArrowUp","ArrowDown","PageUp","PageDown","Home","End"," "].includes(event.key)) return;
+        if (event.target instanceof Element
+            && event.target.closest("input,textarea,select,[contenteditable]")) return;
+        markScrollIntent();
+    });
+    chat.addEventListener("scroll", onChatScroll, { passive:true });
     window.addEventListener("resize", queueChatJumpControlsUpdate, { passive:true });
     window.visualViewport?.addEventListener("resize", queueChatJumpControlsUpdate, { passive:true });
     if (typeof ResizeObserver !== "undefined") {

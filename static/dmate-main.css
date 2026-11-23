@@ -32,6 +32,16 @@
     align-items:center;
     gap:10px;
     pointer-events:none;
+    opacity:0;
+    visibility:hidden;
+    transition:opacity .18s ease, visibility .18s ease;
+}
+.chat-jump-controls.is-scrolling {
+    opacity:1;
+    visibility:visible;
+}
+@media (prefers-reduced-motion:reduce) {
+    .chat-jump-controls { transition:none; }
 }
 .chat-jump-button {
     pointer-events:auto;
@@ -67,6 +77,10 @@
         bottom:calc(var(--dmate-chat-input-height, 80px) + 12px);
     }
     .chat-jump-button { width:42px; height:42px; }
+}
+@media (max-width:680px) {
+    .chat-jump-button { width:38px; height:38px; }
+    .chat-jump-button svg { width:20px; height:20px; }
 }
 
 /* 统一使用低存在感滚动条，避免浏览器默认白色轨道/箭头。 */
