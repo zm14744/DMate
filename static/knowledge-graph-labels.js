@@ -143,18 +143,13 @@ function routeConnection(fromId,toId,start,end,positions,nodeWidth,nodeHeight,cr
  const width=vertical?nodeHeight:nodeWidth,height=vertical?nodeWidth:nodeHeight;
  const first=point(start),last=point(end),limit=Math.max(24,Number(crossSize)||24);
  const rectangles=[];
- let source=null,target=null;
  for(const [id,pos] of positions){
   const axis=vertical?pos.y:pos.x,cross=vertical?pos.x:pos.y;
   const left=sign>0?axis:-(axis+width);
   const own=id===fromId||id===toId,padding=own?0:5;
   const rect={left:left-padding,right:left+width+padding,top:cross-padding,bottom:cross+height+padding};
   rectangles.push(rect);
-  if(id===fromId)source=rect;
-  if(id===toId)target=rect;
  }
- const startDirection=source&&Math.abs(first[0]-source.left)<Math.abs(first[0]-source.right)?-1:1;
- const endDirection=target&&Math.abs(last[0]-target.right)<Math.abs(last[0]-target.left)?1:-1;
  const between=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
  const split=(a,b,c,d)=>{
   const ab=between(a,b,.5),bc=between(b,c,.5),cd=between(c,d,.5);
@@ -179,8 +174,8 @@ function routeConnection(fromId,toId,start,end,positions,nodeWidth,nodeHeight,cr
   return Math.min(...ys)>=0&&Math.max(...ys)<=limit
    &&!rectangles.some(rect=>hits(curve,rect));
  };
- const clearRoute=segments=>{
-  let previous=first;
+ const clearRoute=(segments,origin=first)=>{
+  let previous=origin;
   for(const segment of segments){
    const curve=[previous,segment.slice(0,2),segment.slice(2,4),segment.slice(4,6)];
    if(!clearCurve(curve))return false;
@@ -191,135 +186,81 @@ function routeConnection(fromId,toId,start,end,positions,nodeWidth,nodeHeight,cr
  const finish=segments=>({type:'curves',x1:start.x,y1:start.y,segments:segments.map(segment=>[
   ...restore(segment.slice(0,2)),...restore(segment.slice(2,4)),...restore(segment.slice(4,6))
  ])});
- const bow=(a,b,amount)=>{
-  const dx=b[0]-a[0],dy=b[1]-a[1],length=Math.hypot(dx,dy);
-  if(length<.0001)return [];
-  const along=[dx/length,dy/length],normal=[-along[1],along[0]];
-  const mid=[(a[0]+b[0])/2+normal[0]*amount,(a[1]+b[1])/2+normal[1]*amount];
-  const handle=length*.25;
-  return [[a[0]+along[0]*handle,a[1]+along[1]*handle,mid[0]-along[0]*handle,mid[1]-along[1]*handle,...mid],
-   [mid[0]+along[0]*handle,mid[1]+along[1]*handle,b[0]-along[0]*handle,b[1]-along[1]*handle,...b]];
+ // Short relations follow one bend. Keep the control points in order on
+ // the main axis so a connection always advances toward the next level.
+ const connect=(a,b,arc=0)=>{
+  const reach=(b[0]-a[0])/3;
+  return [a[0]+reach,a[1]+arc,b[0]-reach,b[1]+arc,...b];
  };
- const dx=last[0]-first[0],dy=last[1]-first[1],bend=Math.max(16,Math.abs(dx)*.42);
- if(Math.abs(dy)>=10){
-  const direct=[[first[0]+startDirection*bend,first[1],last[0]+endDirection*bend,last[1],...last]];
-  if(clearRoute(direct))return finish(direct);
- }
- if(startDirection===1&&endDirection===-1&&dx>0){
-  const amplitude=Math.min(22,Math.max(8,dx*.1));
-  for(const direction of [1,-1]){
-   const direct=bow(first,last,amplitude*direction);
-   if(clearRoute(direct))return finish(direct);
-  }
+ const shallow=Math.abs(last[1]-first[1])<5;
+ const direct=[connect(first,last,shallow?2.5:0)];
+ if(clearRoute(direct))return finish(direct);
+ if(shallow){
+  const opposite=[connect(first,last,-2.5)];
+  if(clearRoute(opposite))return finish(opposite);
  }
 
- // Search clear orthogonal corridors, then round every corner and bow every
- // corridor span. The orthogonal scaffold never reaches SVG or Canvas.
- const stub=Math.min(12,Math.max(4,Math.abs(dx)*.2));
- const from=[first[0]+startDirection*stub,first[1]],to=[last[0]+endDirection*stub,last[1]];
- const xs=[from[0],to[0]],ys=[from[1],to[1],6,limit-6];
- for(const rect of rectangles){
-  xs.push(rect.left-10,rect.right+10);
-  for(const y of [rect.top-10,rect.bottom+10])if(y>1&&y<limit-1)ys.push(y);
- }
- const unique=values=>[...new Set(values)].sort((a,b)=>a-b);
- const xx=unique(xs),yy=unique(ys),nx=xx.length,ny=yy.length;
- const sourceIndex=yy.indexOf(from[1])*nx+xx.indexOf(from[0]);
- const targetIndex=yy.indexOf(to[1])*nx+xx.indexOf(to[0]);
- const distances=new Float64Array(nx*ny*3).fill(Infinity),prior=new Int32Array(nx*ny*3).fill(-1),heap=[];
- const push=(cost,id)=>{
-  let index=heap.length;
-  const entry={cost,id};
-  heap.push(entry);
-  while(index){
-   const parent=(index-1)>>1;
-   if(heap[parent].cost<=cost)break;
-   heap[index]=heap[parent];
-   index=parent;
-  }
-  heap[index]=entry;
+ // A blocked relation changes lanes in the two rank gaps next to its
+ // endpoints. Between them it follows one clear channel, past any number
+ // of ranks, without weaving around their individual cards.
+ const distance=last[0]-first[0];
+ const entryLimit=Math.max(first[0],...rectangles.map(rect=>rect.right)
+  .filter(x=>x>first[0]&&x<last[0]));
+ const exitLimit=Math.min(last[0],...rectangles.map(rect=>rect.left)
+  .filter(x=>x>first[0]&&x<last[0]));
+ const depart=first[0]+Math.min(distance*.4,exitLimit-first[0]);
+ const arrive=last[0]-Math.min(distance*.4,last[0]-entryLimit);
+ const center=(first[1]+last[1])/2;
+ const lanes=[...new Set([6,limit-6,center,...rectangles.flatMap(rect=>[rect.top-6,rect.bottom+6])])]
+  .filter(y=>y>=4&&y<=limit-4)
+  .sort((a,b)=>Math.abs(a-first[1])+Math.abs(a-last[1])-Math.abs(b-first[1])-Math.abs(b-last[1])
+   ||Math.abs(a-center)-Math.abs(b-center));
+ const join=(a,b)=>a[0]<b[0]?[connect(a,b,a[1]===b[1]?.5:0)]:[];
+ const through=lane=>{
+  const startLane=lane===first[1]?first:[depart,lane];
+  const endLane=lane===last[1]?last:[arrive,lane];
+  return [...join(first,startLane),...join(startLane,endLane),...join(endLane,last)];
  };
- const pop=()=>{
-  const firstEntry=heap[0],lastEntry=heap.pop();
-  if(!heap.length)return firstEntry;
-  let index=0;
-  while(index*2+1<heap.length){
-   let child=index*2+1;
-   if(child+1<heap.length&&heap[child+1].cost<heap[child].cost)child++;
-   if(lastEntry.cost<=heap[child].cost)break;
-   heap[index]=heap[child];
-   index=child;
-  }
-  heap[index]=lastEntry;
-  return firstEntry;
- };
- const clearLine=(a,b)=>!rectangles.some(rect=>a[0]===b[0]
-  ?a[0]>rect.left+.001&&a[0]<rect.right-.001&&Math.max(a[1],b[1])>rect.top+.001&&Math.min(a[1],b[1])<rect.bottom-.001
-  :a[1]>rect.top+.001&&a[1]<rect.bottom-.001&&Math.max(a[0],b[0])>rect.left+.001&&Math.min(a[0],b[0])<rect.right-.001);
- distances[sourceIndex*3]=0;push(0,sourceIndex*3);
- let found=-1;
- while(heap.length){
-  const entry=pop(),id=entry.id;if(entry.cost>distances[id]+.001)continue;
-  const group=Math.floor(id/3),direction=id%3,x=group%nx,y=Math.floor(group/nx);
-  if(group===targetIndex){found=id;break;}
-  for(const [sx,sy,nextDirection] of [[-1,0,1],[1,0,1],[0,-1,2],[0,1,2]]){
-   const ax=x+sx,ay=y+sy;if(ax<0||ay<0||ax>=nx||ay>=ny)continue;
-   const nextGroup=ay*nx+ax;
-   if((group===sourceIndex&&sx*startDirection<0)||(nextGroup===targetIndex&&sx*endDirection>0))continue;
-   const a=[xx[x],yy[y]],b=[xx[ax],yy[ay]];
-   if(!clearLine(a,b))continue;
-   const next=nextGroup*3+nextDirection,distance=Math.abs(b[0]-a[0])+Math.abs(b[1]-a[1]);
-   const cost=entry.cost+distance+(direction&&direction!==nextDirection?22:0)+(sx<0?distance*.15:0);
-   if(cost>=distances[next]-.001)continue;
-   distances[next]=cost;prior[next]=id;push(cost,next);
-  }
- }
- let points=[];
- if(found>=0){
-  for(let id=found;id>=0;id=prior[id]){const group=Math.floor(id/3);points.push([xx[group%nx],yy[Math.floor(group/nx)]]);}
-  points.reverse();
- }else{
-  points=[from,[from[0],6],[to[0],6],to];
- }
- points=[first,...points,last];
- const simplified=[];
- for(const current of points){
-  const count=simplified.length,previous=simplified[count-1];
-  if(previous&&Math.hypot(current[0]-previous[0],current[1]-previous[1])<.0001)continue;
-  if(count>=2){const a=simplified[count-2],b=simplified[count-1];
-   const collinear=(a[0]===b[0]&&b[0]===current[0])||(a[1]===b[1]&&b[1]===current[1]);
-   if(collinear&&(b[0]-a[0])*(current[0]-b[0])+(b[1]-a[1])*(current[1]-b[1])>0){simplified[count-1]=current;continue;}
-  }
-  simplified.push(current);
- }
- const unit=(a,b)=>{const length=Math.hypot(b[0]-a[0],b[1]-a[1]);return [(b[0]-a[0])/length,(b[1]-a[1])/length,length];};
- for(const radius of [8,5,2,1,.25]){
-  const segments=[];let previous=simplified[0],valid=true;
-  const span=(a,b)=>{
-   const length=Math.hypot(b[0]-a[0],b[1]-a[1]);
-   if(length<.0001)return true;
-   for(const amount of [Math.min(4,length*.16),Math.min(1,length*.08)])for(const side of [1,-1]){
-    const curved=bow(a,b,side*amount);let p=a;
-    if(curved.every(segment=>{const clear=clearCurve([p,segment.slice(0,2),segment.slice(2,4),segment.slice(4,6)]);p=segment.slice(4,6);return clear;})){
-     segments.push(...curved);return true;
-    }
+ const channel=lanes.find(lane=>clearRoute(through(lane)));
+ const minCross=Math.min(first[1],last[1]),maxCross=Math.max(first[1],last[1]);
+ const excursion=lane=>Math.max(minCross-lane,lane-maxCross,0);
+ if(channel!==undefined&&excursion(channel)<=height)return finish(through(channel));
+
+ // A staggered row can close an interior channel. Allow one lane change
+ // between ranks if that avoids sending the whole relation around the rim.
+ const maxExcursion=channel===undefined?Infinity:excursion(channel);
+ const openings=lanes.filter(lane=>excursion(lane)+height/4<maxExcursion);
+ let furthest=depart;
+ let best=null,bestShift=2*maxExcursion+maxCross-minCross;
+ for(const rect of rectangles.slice().sort((a,b)=>a.left-b.left)){
+  const gapEnd=Math.min(rect.left,arrive);
+  if(gapEnd-furthest>=16){
+   const before=openings.map(lane=>{
+    const enter=[furthest,lane];
+    const segments=[...join(first,[depart,lane]),...join([depart,lane],enter)];
+    return {enter,segments};
+   }).filter(({segments})=>clearRoute(segments));
+   const after=openings.map(lane=>{
+    const leave=[gapEnd,lane];
+    const segments=[...join(leave,[arrive,lane]),...join([arrive,lane],last)];
+    return {leave,segments};
+   }).filter(({leave,segments})=>clearRoute(segments,leave));
+   for(const left of before)for(const right of after){
+    const shift=Math.abs(left.enter[1]-first[1])+Math.abs(right.leave[1]-left.enter[1])+Math.abs(last[1]-right.leave[1]);
+    if(shift>=bestShift)continue;
+    const middle=join(left.enter,right.leave);
+    if(!clearRoute(middle,left.enter))continue;
+    best=[...left.segments,...middle,...right.segments];
+    bestShift=shift;
    }
-   return false;
-  };
-  for(let index=1;index<simplified.length-1;index++){
-   const center=simplified[index],before=unit(simplified[index-1],center),after=unit(center,simplified[index+1]);
-   const size=Math.min(radius,before[2]/3,after[2]/3),k=.5522847498;
-   const enter=[center[0]-before[0]*size,center[1]-before[1]*size],leave=[center[0]+after[0]*size,center[1]+after[1]*size];
-   if(!span(previous,enter)){valid=false;break;}
-   const turn=[enter[0]+before[0]*size*k,enter[1]+before[1]*size*k,leave[0]-after[0]*size*k,leave[1]-after[1]*size*k,...leave];
-   if(!clearCurve([enter,turn.slice(0,2),turn.slice(2,4),leave])){valid=false;break;}
-   segments.push(turn);previous=leave;
   }
-  if(valid&&span(previous,simplified[simplified.length-1])&&clearRoute(segments))return finish(segments);
+  furthest=Math.max(furthest,rect.right);
+  if(furthest>=arrive)break;
  }
- // An overlapping/invalid node layout has no guaranteed clear passage. Keep a
- // genuinely curved edge visible rather than changing or omitting graph data.
- return finish(bow(first,last,Math.max(1,Math.min(8,limit/20))));
+ if(best)return finish(best);
+ if(channel!==undefined)return finish(through(channel));
+ // Preserve the relation even if a custom layout has no usable rank gap.
+ return finish(direct);
 }
 function routeSvgD(route){
  return `M ${route.x1} ${route.y1} `+route.segments.map(segment=>`C ${segment.slice(0,2).join(' ')} ${segment.slice(2,4).join(' ')} ${segment.slice(4,6).join(' ')}`).join(' ');

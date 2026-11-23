@@ -112,6 +112,7 @@ async function checkCourseGeometry(page, mobile) {
       if (!parent || !child) continue; // The relationship list is checked below.
       const d = path.getAttribute('d');
       if (!/[cqsta]/i.test(d) || /[lhvz]/i.test(d)) issues.push(key + ': straight path command');
+      if ((d.match(/C/g)?.length || 0) > 5) issues.push(key + ': too many bends');
       const length = path.getTotalLength(), start = path.getPointAtLength(0), end = path.getPointAtLength(length);
       const direction = mobile ? end.y - start.y : end.x - start.x;
       const portErrors = mobile ? [start.y - parent.bottom, end.y - child.top]
@@ -122,9 +123,12 @@ async function checkCourseGeometry(page, mobile) {
         || !withinPort(start, parent) || !withinPort(end, child)) issues.push(key + ': port direction');
       const dx = end.x - start.x, dy = end.y - start.y;
       const otherNodes = [...boxes].filter(([id]) => id !== from && id !== to);
-      let bend = 0;
+      let bend = 0, lastProgress = mobile ? start.y : start.x;
       for (let distance = 3; distance < length; distance += 6) {
         const point = path.getPointAtLength(distance);
+        const progress = mobile ? point.y : point.x;
+        if (progress < lastProgress - .1) { issues.push(key + ': doubles back'); break; }
+        lastProgress = progress;
         bend = Math.max(bend, Math.abs(dx * (point.y - start.y) - dy * (point.x - start.x)) / Math.hypot(dx, dy));
         const crossing = otherNodes.find(([, r]) => point.x > r.left && point.x < r.right
           && point.y > r.top && point.y < r.bottom);

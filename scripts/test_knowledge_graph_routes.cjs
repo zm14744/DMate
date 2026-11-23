@@ -14,11 +14,17 @@ function check(name, positions, start, end, width, height, crossSize, vertical =
   const route = routes.routeConnection('from', 'to', start, end, positions, width, height, crossSize, vertical);
   assert.equal(route.type, 'curves', name);
   assert.ok(route.segments.length > 0, name + ': an edge is retained');
+  assert.ok(route.segments.length <= 5, name + ': the route uses a limited number of bends');
+  const axis = vertical ? 1 : 0;
+  const direction = Math.sign(vertical ? end.y - start.y : end.x - start.x);
   const commands = routes.routeSvgD(route).match(/[MLCQAHVSTZ]/g);
   assert.deepEqual(commands, ['M', ...route.segments.map(() => 'C')], name + ': no straight SVG commands');
   let previous = [start.x, start.y];
   for (const segment of route.segments) {
     assert.equal(segment.length, 6); assert.ok(segment.every(Number.isFinite));
+    const advance = [previous[axis], segment[axis], segment[axis + 2], segment[axis + 4]];
+    assert.ok(advance.slice(1).every((position, i) => (position - advance[i]) * direction >= 0),
+      name + ': the edge moves forward along its principal axis');
     const chord = [segment[4] - previous[0], segment[5] - previous[1]];
     const cross = index => chord[0] * (segment[index + 1] - previous[1]) - chord[1] * (segment[index] - previous[0]);
     assert.ok(Math.max(Math.abs(cross(0)), Math.abs(cross(2))) > 1e-6,
