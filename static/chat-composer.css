@@ -740,6 +740,26 @@ body[data-appearance-theme] > .dmate-symbol-panel button:focus-visible {
     }
 }
 
+/* Desktop keeps its composer reminder; phones show it only after the latest completed AI reply. */
+@media(max-width:680px) {
+    body[data-appearance-theme] .center > .input-wrap > .dmate-disclaimer {
+        display:none !important;
+    }
+    body[data-appearance-theme] #chat > .dmate-disclaimer.dmate-latest-reply-disclaimer {
+        box-sizing:border-box;
+        width:100%;
+        max-width:100%;
+        margin:10px 0 4px;
+        padding:0 4px;
+        text-align:left;
+        font-size:11px;
+        line-height:1.5;
+    }
+}
+@media(min-width:681px) {
+    #chat > .dmate-latest-reply-disclaimer { display:none !important; }
+}
+
 /* The empty welcome state keeps the composer visually quiet. */
 body[data-appearance-theme] .center.chat-empty > .input-wrap:not([hidden]) > .dmate-disclaimer {
     display:none !important;

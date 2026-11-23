@@ -18694,6 +18694,19 @@ function renderChat(preparedReply = null) {
         chat.appendChild(div);
     }
 
+    // Only the latest completed AI answer carries the mobile disclaimer.
+    // The persistent composer disclaimer remains untouched on desktop.
+    const latestMessage = session.messages[session.messages.length - 1];
+    if (latestMessage?.role === "ai" && !latestMessage.isError && !latestMessage.isNotice) {
+        const template = document.querySelector(".input-wrap > .dmate-disclaimer");
+        if (template) {
+            const disclaimer = template.cloneNode(true);
+            disclaimer.classList.add("dmate-latest-reply-disclaimer");
+            chat.appendChild(disclaimer);
+            window.DMateI18n?.translate?.(disclaimer);
+        }
+    }
+
     // A late teaching classification can refresh history during typing.
     // Reattach the same bubble so its timer keeps updating visible content.
     if (typingTimer && typingDiv && String(typingSessionId) === String(session.id)) {
