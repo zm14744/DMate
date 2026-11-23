@@ -510,17 +510,18 @@ async function practice(page) {
 
 async function concepts(page) {
   await navigate(page, 'concepts');
-  await page.locator('#conceptSearch').fill('等价关系');
+  assert.equal(await page.locator('#conceptSearch,#questionSearch').count(), 0,
+    'Concept and exercise libraries have no search controls');
   assert.ok(await page.locator('#conceptList .concept-item').count() > 0);
-  await page.locator('#conceptList .concept-item').first().click();
+  await page.locator('#conceptList .concept-item').filter({hasText:'等价关系'}).first().click();
   await openLibraryDetail(page, 'concepts');
   assert.match(await page.locator('#conceptDetail').textContent(), /等价关系/);
   assert.match(await page.locator('#conceptDetail').textContent(), /基本定义/);
   await closeLibraryDetail(page);
-  await page.locator('#conceptSearch').fill('不存在的概念 xyzzy');
+  await page.locator('#conceptSelection').selectOption('selected');
   assert.equal(await page.locator('#conceptList .concept-item').count(), 0);
   assert.equal((await page.locator('#conceptDetail .offline-empty').innerText()).trim(), '无');
-  await page.locator('#conceptSearch').fill('');
+  await page.locator('#conceptSelection').selectOption('');
 }
 
 async function curriculum(page) {

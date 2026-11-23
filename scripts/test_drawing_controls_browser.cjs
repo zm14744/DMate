@@ -164,10 +164,11 @@ async function filterMetrics(page) {
   for (const [panel, prefix] of [['concepts', 'concept'], ['questions', 'question']]) {
     await navigate(page, panel);
     metrics[prefix] = await page.locator('#' + prefix + 'Category').evaluate(select => {
-      const search = document.getElementById(select.id.replace('Category', 'Search'));
+      const selection = document.getElementById(select.id.replace('Category', 'Selection'));
       const box = node => { const rect = node.getBoundingClientRect(); return { width: rect.width, height: rect.height }; };
-      return { category: box(select), search: box(search) };
+      return { category: box(select), selection: box(selection) };
     });
+    assert.equal(await page.locator('#' + panel + 'Panel input[type="search"]').count(), 0, 'Library filtering no longer includes a search field');
     const before = await page.locator('#' + panel + 'Panel').evaluate(panel => ({ panel: panel.scrollTop,
       body: document.body.scrollTop, root: document.scrollingElement.scrollTop,
       toolbarTop: panel.querySelector('.offline-toolbar').getBoundingClientRect().top }));
@@ -181,7 +182,7 @@ async function filterMetrics(page) {
       toolbarTop: panel.querySelector('.offline-toolbar').getBoundingClientRect().top })), before, 'Library controls keep independent scrolling');
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   }
-  for (const field of ['category', 'search']) for (const axis of ['width', 'height']) {
+  for (const field of ['category', 'selection']) for (const axis of ['width', 'height']) {
     assert.ok(Math.abs(metrics.concept[field][axis] - metrics.question[field][axis]) <= 1,
       'Concept/practice ' + field + ' ' + axis + ' match: ' + JSON.stringify(metrics));
   }
@@ -233,8 +234,9 @@ async function runCase(browser, width, theme, offline) {
       await revealInterface(page);
       await page.evaluate(mode => window.DMateOfflineAppearance.apply({ mode }, null), theme);
       await filterMetrics(page);
+      await navigate(page, 'notes');
     } else await page.evaluate(mode => { appearanceSettings.mode = mode; applyAppearanceSettings({ save: false }); }, theme);
-    const searchBackground = await page.locator(offline ? '#conceptSearch' : '#wrongBookSearch').evaluate(input => getComputedStyle(input).backgroundColor);
+    const searchBackground = await page.locator(offline ? '#notesPanel .dcn-search' : '#wrongBookSearch').evaluate(input => getComputedStyle(input).backgroundColor);
     // Capture the public controller while preserving the real mounted app.
     await page.evaluate(() => {
       const mount = window.DMateDrawingWorkspace.mount;

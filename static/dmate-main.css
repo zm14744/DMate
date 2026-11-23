@@ -6093,39 +6093,16 @@ body[data-appearance-theme="light"] #accountDeleteOpen.account-delete:hover {
 .dmate-brand {
     display:flex;
     align-items:center;
-    gap:10px;
     min-width:0;
     margin:0 0 12px;
     padding:4px 4px 8px;
 }
 
-.dmate-brand-mark,
 .mobile-dmate-mark {
     display:block;
     flex:0 0 auto;
     object-fit:cover;
     background:#000;
-}
-
-.dmate-brand-mark {
-    width:38px;
-    height:38px;
-    border-radius:10px;
-}
-
-/* Subpixel strokes look gray on low-density desktop displays. Lift their
-   coverage brightness without changing the SVG paths, line width or layout.
-   Resolution queries also follow browser zoom and movement between monitors. */
-@media (min-width:1101px) and (max-resolution:1.75dppx) {
-    .dmate-brand-mark { filter:brightness(1.35); }
-}
-
-@media (min-width:1101px) and (max-resolution:1.4dppx) {
-    .dmate-brand-mark { filter:brightness(1.6); }
-}
-
-@media (min-width:1101px) and (max-resolution:1.1dppx) {
-    .dmate-brand-mark { filter:brightness(1.9); }
 }
 
 .dmate-brand-copy {

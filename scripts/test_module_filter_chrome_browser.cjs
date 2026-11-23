@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { revealInterface } = require('./offline-vault-browser-fixtures.cjs');
 const { chromium } = require('playwright');
 const nodes = require('../static/offline-content/knowledge_graph.json').nodes;
+const concepts = require('../static/offline-content/concepts.zh-CN.json').concepts;
 const questions = require('../static/offline-content/questions.zh-CN.json').questions;
 const translations = require('../static/offline-content/translations.en.json');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
@@ -239,6 +240,22 @@ async function sidebarAppearance(page) {
   await page.locator('#appearanceModal').waitFor({ state: 'hidden' });
 }
 
+async function chooseStudyChapter(page, kind, category) {
+  const select = page.locator('#' + kind + 'Category');
+  if (await select.inputValue() !== category) {
+    if (mobile(page)) {
+      const label = await select.evaluate((node, value) => [...node.options].find(option => option.value === value).label, category);
+      await select.tap();
+      const dialog = page.locator('#mobileChoiceModal');
+      await dialog.waitFor({state:'visible'});
+      await dialog.getByRole('radio', {name:label, exact:true}).tap();
+      await dialog.waitFor({state:'hidden'});
+    } else await select.selectOption(category);
+    await settle(page);
+  }
+  assert.equal(await select.inputValue(), category, 'The content fixture uses its actual chapter filter');
+}
+
 async function studyMetadata(page) {
   await page.evaluate(() => {
     window.DMateI18n.setLanguage('zh-CN', false);
@@ -250,7 +267,7 @@ async function studyMetadata(page) {
   });
   await navigate(page, 'questions');
   const question = questions.find(question => question.id === 'q01');
-  await page.locator('#questionSearch').fill(question.title);
+  await chooseStudyChapter(page, 'question', question.category);
   const entry = page.locator('#questionList .question-item[data-question-id="' + question.id + '"]');
   await entry.click();
   await openLibraryDetail(page, 'questions');
@@ -261,7 +278,7 @@ async function studyMetadata(page) {
     questions.find(question => /[·⋅]/.test(question.statement))]) {
     assert.ok(mathematical, 'The source pack includes authored division and multiplication examples');
     await closeLibraryDetail(page);
-    await page.locator('#questionSearch').fill(mathematical.title);
+    await chooseStudyChapter(page, 'question', mathematical.category);
     await page.locator('#questionList .question-item[data-question-id="' + mathematical.id + '"]').click();
     await openLibraryDetail(page, 'questions');
     const source = await page.locator('#questionDetail .wrong-question').evaluate((node, authored) => ({
@@ -270,7 +287,7 @@ async function studyMetadata(page) {
     assert.equal(source.actual, source.expected, 'Removing UI separators preserves the complete authored mathematical statement');
   }
   await navigate(page, 'concepts');
-  await page.locator('#conceptSearch').fill('命题与真值');
+  await chooseStudyChapter(page, 'concept', concepts.find(concept => concept.id === 'logic_truth').category);
   await page.locator('#conceptList .concept-item[data-concept-id="logic_truth"]').click();
   await openLibraryDetail(page, 'concepts');
   assert.equal(await page.locator('#conceptDetail .concept-related-exercises').count(), 0,

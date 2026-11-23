@@ -53,7 +53,7 @@ body.offline-workspace .offline-main.center { position:relative; display:flex !i
 .offline-card-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(235px,1fr)); gap:12px; }
 .offline-card { display:block; width:100%; padding:16px; text-align:left; cursor:pointer; }
 .offline-card .card-meta { margin-top:10px; color:var(--text-muted); font-size:12px; }
-.offline-search,.offline-filters select { min-width:180px; min-height:38px; padding:9px 10px; border:1px solid var(--border-strong); border-radius:9px; background:var(--surface-1); color:var(--text-primary); font:inherit; font-size:14px; }
+.offline-filters select { min-width:180px; min-height:38px; padding:9px 10px; border:1px solid var(--border-strong); border-radius:9px; background:var(--surface-1); color:var(--text-primary); font:inherit; font-size:14px; }
 .offline-chip-row { display:flex; gap:7px; overflow:auto; padding:1px 0 16px; scrollbar-width:var(--dmate-scrollbar-width,thin); }
 .offline-chip { flex:none; min-height:34px; padding:7px 11px; border:1px solid var(--border-strong); border-radius:9px; background:var(--surface-3); color:var(--text-secondary); font:inherit; font-size:13px; }
 .offline-chip.active { background:var(--dm-selected-bg,var(--surface-3)); color:var(--text-primary); }
@@ -64,10 +64,8 @@ body.offline-workspace .offline-main.center { position:relative; display:flex !i
 .offline-library-toolbar { align-items:flex-start; }
 /* Shared control widths keep both libraries identical without letting headings
    or the concept library's missing difficulty control stretch their fields. */
-.offline-filters { --offline-filter-select-width:153px; --offline-filter-search-width:218px; --offline-filter-control-height:41px; display:flex; align-items:stretch; flex-wrap:wrap; gap:8px; flex:none; min-width:0; max-width:100%; }
+.offline-filters { --offline-filter-select-width:153px; --offline-filter-control-height:41px; display:flex; align-items:stretch; flex-wrap:wrap; gap:8px; flex:none; min-width:0; max-width:100%; }
 .offline-filters select { box-sizing:border-box; flex:0 0 var(--offline-filter-select-width); width:var(--offline-filter-select-width); height:var(--offline-filter-control-height); min-width:0; max-width:100%; }
-.offline-filters > :is(.offline-search,.dmate-search-wrap) { box-sizing:border-box; flex:0 0 var(--offline-filter-search-width); width:var(--offline-filter-search-width); height:var(--offline-filter-control-height); min-width:0; max-width:100%; }
-.offline-filters .dmate-search-wrap > .offline-search { width:100%; height:var(--offline-filter-control-height); min-width:0; max-width:100%; }
 .question-layout,.concept-layout { display:grid; grid-template-columns:minmax(220px,280px) minmax(0,1fr); gap:20px; align-items:start; }
 .question-list,.concept-list { display:flex; flex-direction:column; gap:7px; max-height:calc(100dvh - 260px); overflow:auto; padding-right:3px; }
 .question-item,.concept-item { display:block; width:100%; min-height:58px; padding:11px 12px; border:1px solid transparent; border-radius:9px; background:transparent; color:var(--text-primary); text-align:left; cursor:pointer; }
@@ -331,8 +329,7 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
   .offline-toolbar .offline-primary { font-size:13px; }
   .offline-library-toolbar { flex-direction:column; }
   .offline-filters { display:grid; width:100%; grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .offline-filters select,.offline-filters > :is(.offline-search,.dmate-search-wrap) { width:100%; }
-  .offline-filters > :is(.offline-search,.dmate-search-wrap) { grid-column:1 / -1; }
+  .offline-filters select { width:100%; }
   .question-layout,.concept-layout { grid-template-columns:1fr; gap:14px; }
   .question-list,.concept-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr)); max-height:190px; }
   .question-detail,.concept-detail { min-height:280px; padding:16px; }
@@ -341,11 +338,9 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
 @media(min-width:680px) and (max-width:1100px) {
   .offline-filters { display:flex; }
   .offline-filters select { width:var(--offline-filter-select-width); }
-  .offline-filters > :is(.offline-search,.dmate-search-wrap) { width:var(--offline-filter-search-width); }
 }
 @media(max-width:760px) { #drawingPanel.graph-editor-dialog { padding:12px; } }
 @media(max-width:680px) {
-  .offline-search { width:100%; min-width:0; }
   .offline-card-grid { grid-template-columns:1fr; }
 }
 @media(prefers-reduced-motion:reduce) {

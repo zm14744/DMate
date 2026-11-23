@@ -17,11 +17,12 @@ const multipleQuestion = questions.find(question => question.type === '多项选
 const writtenQuestion = questions.find(question => question.type === '证明' && /\$/.test(question.answer_text || '')
   && /\$/.test(translations.questions[question.id]?.answer_text || ''));
 const linkedChild = concepts.find(concept => concept.id !== concept.graph_node_id && concept.related_questions?.length >= 3);
-const selectedConcepts = concepts.filter(concept => ![linkedChild.id, linkedChild.graph_node_id].includes(concept.id)).slice(0, 2);
-const selectedQuestions = [letterQuestion, questions.find(question => question.id !== letterQuestion.id)];
+const selectableConcepts = concepts.filter(concept => ![linkedChild.id, linkedChild.graph_node_id].includes(concept.id));
+const selectedConcepts = [selectableConcepts[0], selectableConcepts.find(concept => concept.category !== selectableConcepts[0].category)];
+const selectedQuestions = [letterQuestion, multipleQuestion];
 const linkedQuestion = (linkedChild.related_questions || []).map(id => questionMap.get(id))
   .find(question => question && !selectedQuestions.some(selected => selected.id === question.id));
-assert.ok(letterQuestion && multipleQuestion && writtenQuestion && linkedQuestion && selectedConcepts.length === 2);
+assert.ok(letterQuestion && multipleQuestion && writtenQuestion && linkedQuestion && selectedConcepts.every(Boolean));
 assert.deepEqual(new Set(questions.map(question => question.type)), new Set(types), 'The curriculum supplies all six question types');
 const mobile = page => page.viewportSize().width <= 1100;
 const level = value => value === '基础' ? '简单' : ['进阶', '提高'].includes(value) ? '困难' : value;
@@ -98,13 +99,11 @@ async function clearFilters(page, kind) {
     await choose(page, '#questionType', '');
   }
   await choose(page, '#' + prefix + 'Selection', '');
-  await page.locator('#' + prefix + 'Search').fill('');
   await settle(page);
 }
 
 async function openQuestion(page, question) {
   await clearFilters(page, 'questions');
-  await page.locator('#questionSearch').fill(question.title);
   await item(page, 'questions', question.id).click();
   await openLibraryDetail(page, 'questions');
 }
@@ -147,8 +146,7 @@ async function shapeAndIndependentSelection(page, kind, selected) {
 async function conceptCombinedFilters(page) {
   const target = selectedConcepts[0];
   await choose(page, '#conceptCategory', target.category);
-  await page.locator('#conceptSearch').fill(target.title);
-  await assertRows(page, 'concepts', [target], 'Concept chapter, selection and search filters combine');
+  await assertRows(page, 'concepts', [target], 'Concept chapter and selection filters combine');
   await choose(page, '#conceptSelection', 'unselected');
   assert.equal(await item(page, 'concepts', target.id).count(), 0);
   await choose(page, '#conceptSelection', 'selected');
@@ -175,8 +173,7 @@ async function questionCombinedFilters(page) {
   await choose(page, '#questionCategory', letterQuestion.category);
   await choose(page, '#questionDifficulty', level(letterQuestion.difficulty));
   await choose(page, '#questionSelection', 'selected');
-  await page.locator('#questionSearch').fill(letterQuestion.title);
-  await assertRows(page, 'questions', [letterQuestion], 'Type, chapter, difficulty, selection and search combine');
+  await assertRows(page, 'questions', [letterQuestion], 'Type, chapter, difficulty and selection combine');
   await choose(page, '#questionSelection', 'unselected');
   assert.equal(await item(page, 'questions', letterQuestion.id).count(), 0);
   await choose(page, '#questionSelection', 'selected');
@@ -194,7 +191,6 @@ async function answers(page, english = false) {
     assert.equal(await answer.evaluate(element => getComputedStyle(element).fontStyle), 'normal');
     if (question === letterQuestion) {
       await closeLibraryDetail(page);
-      await page.locator('#questionSearch').fill('');
       const other = questions.find(value => !selectedQuestions.some(selected => selected.id === value.id));
       const control = checkbox(page, 'questions', other.id);
       await control.check(); await settle(page);
@@ -247,12 +243,12 @@ async function conflictPracticeFilters(page) {
   await choose(page, '#questionSelection', 'selected');
   await choose(page, '#questionCategory', questions.find(question => question.category !== linkedQuestion.category).category);
   await choose(page, '#questionDifficulty', ['简单', '中等', '困难'].find(value => value !== level(linkedQuestion.difficulty)));
-  await page.locator('#questionSearch').fill('no matching linked exercise');
+  assert.equal(await item(page, 'questions', linkedQuestion.id).count(), 0);
 }
 
 async function assertLinkedQuestion(page) {
   await page.locator('#questionsPanel').waitFor({ state: 'visible' });
-  for (const selector of ['#questionCategory', '#questionDifficulty', '#questionType', '#questionSelection', '#questionSearch']) {
+  for (const selector of ['#questionCategory', '#questionDifficulty', '#questionType', '#questionSelection']) {
     assert.equal(await page.locator(selector).inputValue(), '', 'Linked exercises clear conflicting filter: ' + selector);
   }
   assert.equal(await page.locator('#questionList .question-item.active').getAttribute('data-question-id'), linkedQuestion.id);
@@ -264,13 +260,13 @@ async function linksClearConflicts(page) {
   await clearFilters(page, 'concepts');
   await choose(page, '#conceptSelection', 'selected');
   await choose(page, '#conceptCategory', concepts.find(concept => concept.category !== linkedChild.category).category);
-  await page.locator('#conceptSearch').fill('no matching linked concept');
+  assert.equal(await item(page, 'concepts', linkedChild.id).count(), 0);
   await openQuestion(page, linkedQuestion);
   await page.locator('#questionDetail .question-parent-concepts [data-concept-id="' + linkedChild.id + '"]').click();
   await page.locator('#conceptsPanel').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#conceptCategory').inputValue(), linkedChild.category,
     'A linked concept moves a conflicting chapter filter to the target chapter');
-  for (const selector of ['#conceptSelection', '#conceptSearch']) assert.equal(await page.locator(selector).inputValue(), '');
+  assert.equal(await page.locator('#conceptSelection').inputValue(), '');
   assert.equal(await page.locator('#conceptList .concept-item.active').getAttribute('data-concept-id'), linkedChild.id);
   assert.equal(await checkbox(page, 'concepts', linkedChild.id).isChecked(), false);
   await conflictPracticeFilters(page);

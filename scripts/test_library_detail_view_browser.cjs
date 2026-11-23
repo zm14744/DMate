@@ -1,4 +1,4 @@
-/* Real mobile library browsing: title-only search, long lists, and full detail.
+/* Real mobile library browsing: filters, long lists, and full detail.
  * Start Flask first. The final case reloads the installed shell without a network.
  */
 'use strict';
@@ -10,7 +10,6 @@ const questions = require('../static/offline-content/questions.zh-CN.json').ques
 const translations = require('../static/offline-content/translations.en.json');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const mobile = page => page.viewportSize().width <= 1100;
-const normalize = value => String(value || '').normalize('NFKC').trim().toLocaleLowerCase();
 const prefix = kind => kind === 'concepts' ? 'concept' : 'question';
 const records = kind => kind === 'concepts' ? concepts : questions;
 const dialog = page => page.locator('#libraryDetailDialog');
@@ -65,7 +64,6 @@ async function clearFilters(page, kind) {
   if (kind === 'questions') {
     await choose(page, 'questionDifficulty', ''); await choose(page, 'questionType', '');
   }
-  await page.locator('#' + p + 'Search').fill('');
   await settle(page);
 }
 
@@ -77,9 +75,7 @@ async function ids(page, kind) {
 async function openRecord(page, kind, record) {
   await clearFilters(page, kind);
   const p = prefix(kind);
-  await page.locator('#' + p + 'Search').fill(record.title);
   await page.locator('#' + p + 'List [data-' + p + '-id="' + record.id + '"]').click();
-  await page.locator('#' + p + 'Search').fill('');
   await settle(page);
   assert.equal(await dialog(page).evaluate(node => node.open), false, 'Choosing a list title does not open a detail overlay');
 }
@@ -140,32 +136,30 @@ async function rowPaint(page, kind) {
   }
 }
 
-async function titleSearch(page, kind) {
+async function selectionFilters(page, kind) {
   await clearFilters(page, kind);
   const p = prefix(kind), record = kind === 'concepts' ? child : linkedQuestion;
-  const search = page.locator('#' + p + 'Search');
-  for (const value of [record.title, translations[kind][record.id].title]) {
-    await search.fill(value);
-    const expected = records(kind).filter(row => [row.title, translations[kind][row.id].title]
-      .some(text => normalize(text).includes(normalize(value)))).map(row => row.id);
-    assert.deepEqual(await ids(page, kind), expected, 'Search returns only matching bilingual titles');
+  assert.equal(await page.locator('#' + p + 'Search').count(), 0, 'The removed library search stays absent');
+  await choose(page, p + 'Category', record.category);
+  const expected = records(kind).filter(row => row.category === record.category).map(row => row.id);
+  for (const language of ['en', 'zh-CN']) {
+    await page.evaluate(value => window.DMateI18n.setLanguage(value, false), language); await settle(page);
+    assert.deepEqual(await ids(page, kind), expected, 'Chapter filtering preserves the same bilingual records');
+    assert.equal((await page.locator('#' + p + 'List [data-' + p + '-id="' + record.id + '"] strong').innerText()).trim(),
+      title(record, kind, language), 'Filtered title rows use the current language');
   }
-  const body = kind === 'concepts' ? record.definition : record.statement;
-  for (const value of [record.id, body]) {
-    await search.fill(value);
-    assert.deepEqual(await ids(page, kind), [], 'IDs and descriptive content do not match white-title search');
-    if (mobile(page)) assert.equal(await page.locator('#' + p + 'FullView').isDisabled(), true, 'No stale full view can open after empty results');
-  }
-  await search.fill(record.title);
   const check = page.locator('.offline-library-checkbox[data-selection-kind="' + kind + '"][data-selection-id="' + record.id + '"]');
   await check.check();
   assert.equal(await dialog(page).evaluate(node => node.open), false, 'Checking a record leaves the list in view');
   await choose(page, p + 'Selection', 'selected');
-  assert.deepEqual(await ids(page, kind), [record.id], 'Title and selected-state filters intersect');
+  assert.deepEqual(await ids(page, kind), [record.id], 'Chapter and selected-state filters intersect');
   if (kind === 'questions') {
     await choose(page, 'questionType', record.type);
-    assert.deepEqual(await ids(page, kind), [record.id], 'Question type combines with title and selection');
+    assert.deepEqual(await ids(page, kind), [record.id], 'Question type combines with chapter and selection');
   }
+  await choose(page, p + 'Category', records(kind).find(row => row.category !== record.category).category);
+  assert.deepEqual(await ids(page, kind), [], 'A conflicting chapter excludes the selected record');
+  if (mobile(page)) assert.equal(await page.locator('#' + p + 'FullView').isDisabled(), true, 'Empty filters cannot open a stale full view');
   await clearFilters(page, kind);
 }
 
@@ -205,12 +199,12 @@ async function fullDetails(page, kind, record) {
 async function links(page) {
   await clearFilters(page, 'questions');
   await choose(page, 'questionType', questions.find(question => question.type !== linkedQuestion.type).type);
-  await page.locator('#questionSearch').fill('__conflicting_title__');
+  await choose(page, 'questionCategory', questions.find(question => question.category !== linkedQuestion.category).category);
   await openRecord(page, 'concepts', child); await expand(page, 'concepts');
   await page.locator('#conceptDetail .concept-related-exercises [data-question-id="' + linkedQuestion.id + '"]').click();
   await page.locator('#questionDetail').waitFor({ state: 'visible' }); await settle(page);
   if (mobile(page)) assert.equal(await dialog(page).evaluate(node => node.open), true, 'Related exercises open a complete mobile detail');
-  assert.equal(await page.locator('#questionSearch').inputValue(), ''); assert.equal(await page.locator('#questionType').inputValue(), '');
+  assert.equal(await page.locator('#questionCategory').inputValue(), ''); assert.equal(await page.locator('#questionType').inputValue(), '');
   await page.locator('#questionDetail .question-parent-concepts [data-concept-id="' + child.id + '"]').click();
   await page.locator('#conceptDetail').waitFor({ state: 'visible' });
   await page.locator('#conceptDetail .concept-graph-module-link').click();
@@ -248,10 +242,10 @@ async function runCase(browser, width, height, full) {
     await revealInterface(page);
     await fullDetails(page, 'concepts', longConcept);
     await fullDetails(page, 'questions', longQuestion);
-    if (full) { await titleSearch(page, 'concepts'); await titleSearch(page, 'questions'); await links(page); }
+    if (full) { await selectionFilters(page, 'concepts'); await selectionFilters(page, 'questions'); await links(page); }
     await responsive(page, { width, height });
     assert.deepEqual(errors, [], 'List, portal and responsive transitions have no page errors');
-    console.log('PASS ' + width + 'x' + height + ': extended list, quiet title rows, complete detail/focus/state' + (full ? ', title-only search and linked navigation' : ''));
+    console.log('PASS ' + width + 'x' + height + ': extended list, quiet title rows, complete detail/focus/state' + (full ? ', chapter/selection filters and linked navigation' : ''));
   } finally { await context.close(); }
 }
 
@@ -262,7 +256,7 @@ async function disconnectedCase(browser) {
     await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
     await revealInterface(page);
-    await titleSearch(page, 'questions');
+    await selectionFilters(page, 'questions');
     await page.evaluate(async () => { await navigator.serviceWorker.register('/offline-service-worker.js', { scope: '/' }); await navigator.serviceWorker.ready; });
     await page.waitForFunction(() => navigator.serviceWorker.controller?.state === 'activated');
     await context.setOffline(true); await page.reload({ waitUntil: 'load' });
@@ -270,14 +264,14 @@ async function disconnectedCase(browser) {
     await revealInterface(page);
     assert.equal(await page.evaluate(() => navigator.onLine), false);
     await clearFilters(page, 'questions'); await choose(page, 'questionSelection', 'selected');
-    await page.locator('#questionSearch').fill(translations.questions[linkedQuestion.id].title);
-    assert.deepEqual(await ids(page, 'questions'), [linkedQuestion.id], 'Saved selection and title search remain usable offline');
+    await choose(page, 'questionCategory', linkedQuestion.category);
+    assert.deepEqual(await ids(page, 'questions'), [linkedQuestion.id], 'Saved selection and chapter filters remain usable offline');
     await page.locator('#questionList [data-question-id="' + linkedQuestion.id + '"]').click(); await expand(page, 'questions');
     if (!await page.locator('#questionDetail .wrong-answer-details').evaluate(node => node.open))
       await page.locator('#questionDetail .wrong-answer-summary').click();
     assert.equal(await page.locator('#questionDetail .wrong-answer-details[open] .wrong-answer-inner').count(), 1);
     await closeDetail(page);
-    console.log('PASS disconnected reload: title-only search, selected records and complete exercise/answer view');
+    console.log('PASS disconnected reload: chapter filters, selected records and complete exercise/answer view');
   } finally { await context.close(); }
 }
 

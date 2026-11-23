@@ -81,9 +81,8 @@ async function choose(page, selector, value) {
 
 async function openQuestion(page, question) {
   await navigate(page, 'questions');
-  await choose(page, '#questionCategory', '');
+  await choose(page, '#questionCategory', question.category);
   await choose(page, '#questionDifficulty', '');
-  await page.locator('#questionSearch').fill(question.title);
   await page.locator('#questionList [data-question-id="' + question.id + '"]').click();
   await page.waitForFunction(id => document.querySelector('#questionList .question-item.active')?.dataset.questionId === id, question.id);
   await openLibraryDetail(page, 'questions');
@@ -91,10 +90,8 @@ async function openQuestion(page, question) {
 
 async function openConcept(page, concept) {
   await navigate(page, 'concepts');
-  await choose(page, '#conceptCategory', '');
-  await page.locator('#conceptSearch').fill(concept.title);
+  await choose(page, '#conceptCategory', concept.category);
   await page.locator('#conceptList [data-concept-id="' + concept.id + '"]').click();
-  await page.locator('#conceptSearch').fill('');
   await openLibraryDetail(page, 'concepts');
 }
 
@@ -188,7 +185,6 @@ async function checkChild(page, lang) {
 async function allOverviewSections(page) {
   await navigate(page, 'concepts');
   await choose(page, '#conceptCategory', '');
-  await page.locator('#conceptSearch').fill('');
   for (const concept of overview) {
     assert.ok(concept.related_questions.length, 'Source overview exercise links remain present: ' + concept.id);
     await page.locator('#conceptList [data-concept-id="' + concept.id + '"]').click();
@@ -237,7 +233,7 @@ async function graphPracticeRoundTrip(page, lang) {
     modal.closest('#graphPanel') !== null && !modal.classList.contains('graph-fullscreen-view')), true,
   'Leaving a full mobile graph restores its inline host');
 
-  // Keep deliberately conflicting practice filters/query while visiting graph.
+  // Keep deliberately conflicting practice filters while visiting graph.
   await openQuestion(page, sameParent);
   const otherCategory = nodes.find(node => node.category !== next.category).category;
   await choose(page, '#questionCategory', otherCategory);
@@ -250,7 +246,6 @@ async function graphPracticeRoundTrip(page, lang) {
   await page.locator('#questionsPanel').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#questionCategory').inputValue(), '');
   assert.equal(await page.locator('#questionDifficulty').inputValue(), '');
-  assert.equal(await page.locator('#questionSearch').inputValue(), '', 'Conflicting search is cleared when opening the linked exercise');
   assert.equal(await page.locator('#questionList .question-item.active').getAttribute('data-question-id'), target.id);
   await page.locator('#questionDetail .wrong-answer-summary').click();
   await page.locator('#questionDetail .wrong-answer-details[open]').waitFor({ state: 'visible' });
@@ -271,13 +266,13 @@ async function graphPracticeRoundTrip(page, lang) {
   await exitFullGraph(page);
   await checkGraphLinks(page, module, lang);
 
-  // A matching query survives the same graph -> practice navigation.
+  // Returning from the graph opens the same exercise and its localized detail.
   const matched = questionMap.get(conceptMap.get(module.id).related_questions[0]);
   await openQuestion(page, matched);
   await clickModule(page, '#questionDetail .question-graph-modules ', module);
   await exitFullGraph(page);
   await page.locator('.graph-related-exercises [data-question-id="' + matched.id + '"]').click();
-  assert.equal(await page.locator('#questionSearch').inputValue(), matched.title);
+  assert.equal((await page.locator('#questionDetail .detail-title').innerText()).trim(), title(matched, 'questions', lang));
   assert.equal(await page.locator('#questionList .question-item.active').getAttribute('data-question-id'), matched.id);
 }
 

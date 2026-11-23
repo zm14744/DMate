@@ -9,7 +9,7 @@
     panel: "graph", selectedQuestion: null, selectedConcept: null,
     revealed: false, analysisRevealed: false,
     drawingController: null, backgroundUrl: "", graphCategory: "", graphSelectedNodeId: "", questionCategory: "",
-    questionDifficulty: "", questionType: "", questionSelection: "", questionQuery: "", conceptCategory: "", conceptSelection: "", conceptQuery: "", graphQuery: "", graphController: null,
+    questionDifficulty: "", questionType: "", questionSelection: "", conceptCategory: "", conceptSelection: "", graphQuery: "", graphController: null,
     librarySelections: {concepts:new Set(), questions:new Set()}, selectionQueue: Promise.resolve(),
     selectedNoteId:null, noteQuery:"", noteRows:[], noteSaveQueue:Promise.resolve(),
     noteDrafts:new Map(), noteDeletePending:null,
@@ -696,14 +696,12 @@
   }
 
   function openConcept(concept) {
-    // A graph/related/question link may point outside the current search or
-    // chapter. Move all filters and selection together before rebuilding.
+    // A graph/related/question link may point outside the current chapter.
+    // Move all filters and selection together before rebuilding.
     state.selectedConcept = concept;
     if (state.conceptCategory && state.conceptCategory !== concept.category) {
       state.conceptCategory = concept.category;
     }
-    state.conceptQuery = "";
-    $("conceptSearch").value = "";
     if (!matchesLibrarySelection("concepts", concept.id, state.conceptSelection)) {
       state.conceptSelection = ""; $("conceptSelection").value = "";
     }
@@ -732,7 +730,6 @@
     if (!matchesLibrarySelection("questions", question.id, state.questionSelection)) {
       state.questionSelection = ""; $("questionSelection").value = "";
     }
-    if (!questionMatchesSearch(question, normalizedSearch($("questionSearch").value))) $("questionSearch").value = "";
     state.selectedQuestion = question;
     state.revealed = false;
     state.analysisRevealed = false;
@@ -809,31 +806,13 @@
     return wrapper;
   }
 
-  function normalizedSearch(value) {
-    return String(value ?? "").normalize("NFKC").trim().toLocaleLowerCase();
-  }
-
-  function titleMatchesSearch(record, collection, query) {
-    if (!query) return true;
-    const translated = state.translations[collection][record.id];
-    return [record.title, translated?.title].some(title => normalizedSearch(title).includes(query));
-  }
-
-  function questionMatchesSearch(question, query) {
-    return titleMatchesSearch(question, "questions", query);
-  }
-
   function renderQuestions() {
     fillQuestionFilters();
-    state.questionQuery = $("questionSearch").value;
-    window.DMateSearchControls?.refresh?.($("questionSearch"));
-    const query = normalizedSearch(state.questionQuery);
     const filtered = state.questions.filter(q =>
       (!state.questionCategory || q.category === state.questionCategory) &&
       (!state.questionDifficulty || difficultyName(q.difficulty) === state.questionDifficulty) &&
       (!state.questionType || q.type === state.questionType) &&
-      matchesLibrarySelection("questions", q.id, state.questionSelection) &&
-      questionMatchesSearch(q, query)
+      matchesLibrarySelection("questions", q.id, state.questionSelection)
     );
     $("questionCount").textContent = tr(filtered.length + " 道题目", filtered.length + (filtered.length === 1 ? " exercise" : " exercises"));
     const list = $("questionList");
@@ -986,13 +965,9 @@
   function renderConcepts() {
     state.conceptCategory = fillChapterFilter($("conceptCategory"), state.conceptCategory);
     state.conceptSelection = fillSelectionFilter($("conceptSelection"), state.conceptSelection);
-    const query = normalizedSearch($("conceptSearch").value);
-    state.conceptQuery = $("conceptSearch").value;
-    window.DMateSearchControls?.refresh?.($("conceptSearch"));
     const rows = state.concepts.filter(c => {
       return (!state.conceptCategory || c.category === state.conceptCategory)
-        && matchesLibrarySelection("concepts", c.id, state.conceptSelection)
-        && titleMatchesSearch(c, "concepts", query);
+        && matchesLibrarySelection("concepts", c.id, state.conceptSelection);
     });
     $("conceptCount").textContent = tr(rows.length + " 个概念", rows.length + (rows.length === 1 ? " concept" : " concepts"));
     const list = $("conceptList"); list.replaceChildren();
@@ -1269,7 +1244,7 @@
     const checkpoint = () => {
       if (!state.ready || !workspaceCurrent() || !state.storage) return;
       const snapshot = {};
-      for (const key of ["panel", "revealed", "analysisRevealed", "graphCategory", "graphSelectedNodeId", "questionCategory", "questionDifficulty", "questionType", "questionSelection", "questionQuery", "conceptCategory", "conceptSelection", "conceptQuery", "graphQuery", "selectedNoteId", "noteQuery"]) snapshot[key] = state[key];
+      for (const key of ["panel", "revealed", "analysisRevealed", "graphCategory", "graphSelectedNodeId", "questionCategory", "questionDifficulty", "questionType", "questionSelection", "conceptCategory", "conceptSelection", "graphQuery", "selectedNoteId", "noteQuery"]) snapshot[key] = state[key];
       snapshot.selectedQuestion = state.selectedQuestion?.id || "";
       snapshot.selectedConcept = state.selectedConcept?.id || "";
       const encoded = JSON.stringify(snapshot);
@@ -1298,7 +1273,7 @@
       "定义、解释与易错点":"Definitions, explanations and common mistakes",
       "查看定义、解释、公式和易错点。":"View definitions, explanations, formulas and common mistakes.",
       "查看定义、解释、公式和易错点，支持中英文切换。":"View definitions, explanations, formulas and common mistakes in Chinese or English.",
-      "搜索":"Search", "搜索概念":"Search concepts", "无":"None",
+      "搜索":"Search", "无":"None",
       "错题本":"Mistake book", "笔记本":"Notebook", "添加错题":"Add mistake", "编辑错题":"Edit mistake",
       "题目名称":"Question name", "题目内容":"Question content", "保存到本机":"Save on this device",
       "完成订正":"Mark corrected", "编辑/笔记":"Edit / notes", "移出错题本":"Remove from mistake book",
@@ -1322,10 +1297,8 @@
     $("questionDifficulty").addEventListener("change", event => { state.questionDifficulty=event.target.value; renderQuestions(); });
     $("questionType").addEventListener("change", event => { state.questionType=event.target.value; renderQuestions(); });
     $("questionSelection").addEventListener("change", event => { state.questionSelection=event.target.value; renderQuestions(); });
-    $("questionSearch").addEventListener("input", renderQuestions);
     $("conceptCategory").addEventListener("change", event => { state.conceptCategory=event.target.value; renderConcepts(); });
     $("conceptSelection").addEventListener("change", event => { state.conceptSelection=event.target.value; renderConcepts(); });
-    $("conceptSearch").addEventListener("input", renderConcepts);
     $("questionFullView").addEventListener("click", event => openLibraryDetail("questions", event.currentTarget));
     $("conceptFullView").addEventListener("click", event => openLibraryDetail("concepts", event.currentTarget));
     $("libraryDetailClose").addEventListener("click", () => closeLibraryDetail());
@@ -1384,14 +1357,12 @@
       bind();
       window.DMateI18n?.translate?.(document.body);
       if (view) {
-        for (const key of ["graphCategory", "graphSelectedNodeId", "questionCategory", "questionDifficulty", "questionType", "questionSelection", "questionQuery", "conceptCategory", "conceptSelection", "conceptQuery", "graphQuery", "selectedNoteId", "noteQuery"])
+        for (const key of ["graphCategory", "graphSelectedNodeId", "questionCategory", "questionDifficulty", "questionType", "questionSelection", "conceptCategory", "conceptSelection", "graphQuery", "selectedNoteId", "noteQuery"])
           if (typeof view[key] === "string") state[key] = view[key];
         state.revealed = view.revealed === true;
         state.analysisRevealed = view.analysisRevealed === true;
         state.selectedQuestion = state.questions.find(item => item.id === view.selectedQuestion) || null;
         state.selectedConcept = state.concepts.find(item => item.id === view.selectedConcept) || null;
-        $("questionSearch").value = state.questionQuery;
-        $("conceptSearch").value = state.conceptQuery;
       }
       await switchPanel(Object.hasOwn(panelMeta,view?.panel) ? view.panel : "graph");
       requireWorkspace();

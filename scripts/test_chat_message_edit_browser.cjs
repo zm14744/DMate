@@ -43,6 +43,15 @@ async function checkPhoneComposer(browser) {
   assert.equal(await bar.locator('svg').evaluate(node=>node.outerHTML),icon,'The editor reuses the exact message edit icon');
   assert.equal(await bar.innerText(),'','The strip has no visible heading or button text');
   assert.equal(await bar.locator('.modal-close-dot').getAttribute('id'),'chatComposerEditCancel');
+  const [cancel,inputBox,keyboard,mic,send]=await page.evaluate(()=>[
+   '#chatComposerEditCancel','#text','.dmate-symbol-keyboard','#voiceInputBtn','#sendBtn'
+  ].map(selector=>document.querySelector(selector).getBoundingClientRect().toJSON()));
+  assert.ok(cancel.bottom<inputBox.top && inputBox.bottom+6<=send.top,
+   'The input has its own row with space between the cancel and send controls');
+  assert.ok(Math.abs(keyboard.y+keyboard.height/2-mic.y-mic.height/2)<=2
+   && Math.abs(mic.y+mic.height/2-send.y-send.height/2)<=2
+   && keyboard.right<=mic.left && mic.right<=send.left,
+   'The symbol, microphone and send buttons share a bottom row');
   assert.equal(await page.locator('#imagePickerWrap').isHidden(),true);
   assert.equal(await page.locator('.chat-message-edit-input').count(),0);
   await page.evaluate(()=>enqueueOcrFiles([new File(['test'],'test.png',{type:'image/png'})]));

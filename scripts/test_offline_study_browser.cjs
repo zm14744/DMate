@@ -227,7 +227,7 @@ async function packs(page) {
     const proof = questions.questions.find(row => row.type === '证明' && math(row.explanation) && math(en.questions[row.id].explanation));
     require(concept && choice && proof, 'Actual packs must provide mathematical concept, options, and proof examples');
     const example = migrated.find(row => row.source.migrated_from.concept_id === concept.id);
-    return { concept: { id: concept.id, graphNodeId: concept.graph_node_id, query: en.concepts[concept.id].title }, example: {id:example.id, conceptId:concept.id},
+    return { concept: { id: concept.id, graphNodeId: concept.graph_node_id, category: concept.category }, example: {id:example.id, conceptId:concept.id},
       counts: {concepts:concepts.concepts.length, questions:questions.questions.length, examples:migrated.length},
       questions: [choice, proof].map(row => ({ id: row.id, category: row.category,
         difficulty: row.difficulty === '基础' ? '简单' : ['进阶', '提高'].includes(row.difficulty) ? '困难' : row.difficulty })) };
@@ -375,7 +375,9 @@ async function run(browser, width) {
     await hookRenderer(page); const data = await packs(page);
     for (const url of [conceptsURL, questionsURL, translationsURL]) assert.ok(cachedResponses.has(url), 'Actual deployed pack is served by the offline worker: ' + url);
     await languageChoice(page, 'zh-CN'); await setTheme(page, 'light'); await navigation(page, 'concepts');
-    await page.locator('#conceptSearch').fill(data.concept.query);
+    assert.equal(await page.locator('#conceptSearch,#questionSearch').count(), 0,
+      'Concept and exercise libraries have no search controls offline');
+    await page.locator('#conceptCategory').selectOption(data.concept.category);
     await page.locator('#conceptList [data-concept-id="' + data.concept.id + '"]').click();
     await openLibraryDetail(page, 'concepts');
     assert.equal(await page.locator('#conceptDetail').getByRole('heading', {name:/^(典型例题|Worked example)$/}).count(), 0,
@@ -383,7 +385,7 @@ async function run(browser, width) {
     let checkedChineseProbe = false;
     for (const language of ['zh-CN', 'en', 'zh-CN']) {
       await languageChoice(page, language); await setTheme(page, 'light');
-      assert.equal(await page.locator('#conceptSearch').inputValue(), data.concept.query, 'Language change preserves bilingual search');
+      assert.equal(await page.locator('#conceptCategory').inputValue(), data.concept.category, 'Language change preserves the concept chapter filter');
       assert.equal(await page.locator('#conceptList .concept-item.active').getAttribute('data-concept-id'), data.concept.id, 'Language change preserves the selected concept');
       await assertContent(page, 'concepts', data.concept.id, language, references[language + '/light']);
       if (language === 'en') {
@@ -466,7 +468,7 @@ async function run(browser, width) {
     if (width === 1440) { await packs(page); await corpusPreflight(page); }
     assert.equal(page.modelCalls, 0); assert.deepEqual(page.studyErrors, []);
     console.log('PASS offline study ' + width + ': ' + data.counts.concepts + ' concepts/' + data.counts.questions
-      + ' exercises including ' + data.counts.examples + ' migrated examples; complete bilingual source/Markdown/MathJax; plain options; preserved selection/search/filters/open answers; fresh ' + cache.name + ' offline reload and language persistence');
+      + ' exercises including ' + data.counts.examples + ' migrated examples; complete bilingual source/Markdown/MathJax; plain options; preserved selection, filters and open answers; fresh ' + cache.name + ' offline reload and language persistence');
   } finally { await context.close(); if (workerProtocol) await workerProtocol.detach().catch(() => {}); }
 }
 

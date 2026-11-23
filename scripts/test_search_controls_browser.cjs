@@ -7,12 +7,11 @@ const { revealInterface } = require('./offline-vault-browser-fixtures.cjs');
 const { chromium } = require('playwright');
 const concepts = require('../static/offline-content/concepts.zh-CN.json').concepts;
 const questions = require('../static/offline-content/questions.zh-CN.json').questions;
-const translations = require('../static/offline-content/translations.en.json');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const isMobile = page => page.viewportSize().width <= 1100;
 const difficulty = value => value === '基础' ? '简单' : ['进阶', '提高'].includes(value) ? '困难' : value;
 const target = questions.find(question => question.id === 'q01');
-assert.ok(target && translations.questions[target.id].title, 'Use a real bilingual exercise from the pack');
+assert.ok(target, 'Use a real exercise from the pack');
 
 async function settle(page) {
   await page.evaluate(async () => {
@@ -55,7 +54,7 @@ async function checkSearch(input, expectedStyle, placeholder = '搜索') {
   assert.equal(actual.image, 'none');
   assert.equal(actual.shadow, 'none');
   assert.deepEqual(actual.wrapperBorder, ['0px', '0px', '0px', '0px'], 'Only the input paints a border');
-  if (expectedStyle) assert.deepEqual(actual, expectedStyle, 'All searches use the concept-search surface');
+  if (expectedStyle) assert.deepEqual(actual, expectedStyle, 'Remaining searches use the shared surface');
   return actual;
 }
 
@@ -107,14 +106,9 @@ async function choose(page, id, value) {
   assert.equal(await select.inputValue(), value);
 }
 
-async function checkQuestionResults(page, base, language = 'zh-CN', exact = false) {
+async function checkQuestionResults(page, expected, language = 'zh-CN') {
   const ids = await page.locator('#questionList .question-item').evaluateAll(items => items.map(item => item.dataset.questionId));
-  assert.ok(ids.every(id => base.some(question => question.id === id)), 'Search results stay inside chapter and difficulty');
-  const query = await page.locator('#questionSearch').inputValue();
-  const normalized = text => String(text || '').normalize('NFKC').trim().toLocaleLowerCase();
-  const expected = exact ? base : base.filter(question => !normalized(query)
-    || [question.title, translations.questions[question.id].title].some(title => normalized(title).includes(normalized(query))));
-  assert.deepEqual(ids, expected.map(question => question.id), 'Only bilingual white titles participate in exercise search');
+  assert.deepEqual(ids, expected.map(question => question.id), 'Chapter, difficulty, type and status yield the exact exercises');
   assert.equal(await page.locator('#questionCount').innerText(), language === 'en'
     ? ids.length + (ids.length === 1 ? ' exercise' : ' exercises') : ids.length + ' 道题目');
   if (ids.length) {
@@ -131,88 +125,51 @@ async function checkQuestionResults(page, base, language = 'zh-CN', exact = fals
 }
 
 async function offlineSearches(page) {
+  assert.equal(await page.locator('#conceptSearch,#questionSearch').count(), 0,
+    'Concept and exercise libraries have no search controls');
   assert.equal(await page.locator('#knowledgeGraphDetailTab,#knowledgeGraphModal .graph-side-tabs').count(), 0,
     'Offline graph has no redundant single tab row');
   assert.equal(await page.locator('#knowledgeGraphDetailTitle,#knowledgeGraphDetail').count(), 2,
     'Graph concept details remain');
   assert.ok((await page.locator('#knowledgeGraphDetail').innerText()).trim());
   await navigate(page, 'concepts');
-  const concept = page.locator('#conceptSearch');
-  const reference = await checkSearch(concept);
-  await expectClear(concept, false);
-  await concept.fill('欧拉');
-  await expectClear(concept, true);
-  const ids = await page.locator('#conceptList .concept-item').evaluateAll(items => items.map(item => item.dataset.conceptId));
-  assert.ok(ids.includes('graph_euler') && ids.length < concepts.length, 'Existing concept filtering still works');
-  await clearSearch(concept);
+  await choose(page, 'conceptCategory', '图论');
+  const graphConcepts = concepts.filter(concept => concept.category === '图论');
+  assert.deepEqual(await page.locator('#conceptList .concept-item').evaluateAll(items => items.map(item => item.dataset.conceptId)),
+    graphConcepts.map(concept => concept.id), 'Concept chapters still filter the full library');
+  await choose(page, 'conceptSelection', 'selected');
+  assert.equal(await page.locator('#conceptList .concept-item').count(), 0);
+  assert.equal((await page.locator('#conceptDetail .offline-empty').innerText()).trim(), '无');
+  await choose(page, 'conceptSelection', '');
+  await choose(page, 'conceptCategory', '');
   assert.equal(await page.locator('#conceptList .concept-item').count(), concepts.length);
-  const definitionOnly = concepts.find(item => item.definition.length > 70 && !item.definition.includes('\n'));
-  await concept.fill(definitionOnly.definition);
-  assert.equal(await page.locator('#conceptList .concept-item').count(), 0, 'Definitions are excluded from concept title search');
-  assert.equal((await page.locator('#conceptDetail .offline-empty').innerText()).trim(), '无',
-    'An empty concept search uses the shared None label');
-  await clearSearch(concept);
-  await concept.fill(definitionOnly.id);
-  assert.equal(await page.locator('#conceptList .concept-item').count(), 0, 'Concept IDs are excluded from title search');
-  await clearSearch(concept);
 
   await navigate(page, 'questions');
-  const search = page.locator('#questionSearch');
-  await checkSearch(search, reference);
-  await expectClear(search, false);
   await choose(page, 'questionCategory', target.category);
   await choose(page, 'questionDifficulty', difficulty(target.difficulty));
+  await choose(page, 'questionType', target.type);
   const base = questions.filter(question => question.category === target.category
-    && difficulty(question.difficulty) === difficulty(target.difficulty));
-  await checkQuestionResults(page, base, 'zh-CN', true);
-  await search.fill(target.title);
-  let result = await checkQuestionResults(page, base);
-  assert.ok(result.includes(target.id) && result.length < base.length, 'Chinese exercise titles are searchable');
-  await expectClear(search, true);
-  await clearSearch(search);
-  await checkQuestionResults(page, base, 'zh-CN', true);
-  const englishTitle = translations.questions[target.id].title;
-  await search.fill(englishTitle);
-  result = await checkQuestionResults(page, base);
-  assert.ok(result.includes(target.id), 'English titles remain searchable before changing UI language');
+    && difficulty(question.difficulty) === difficulty(target.difficulty) && question.type === target.type);
+  assert.ok((await checkQuestionResults(page, base)).includes(target.id));
   await page.evaluate(() => window.DMateI18n.setLanguage('en', false));
-  await page.waitForFunction(() => document.getElementById('questionSearch').placeholder === 'Search');
-  assert.equal(await search.inputValue(), englishTitle, 'Live language change retains the search');
   assert.equal(await page.locator('#questionCategory').inputValue(), target.category);
   assert.equal(await page.locator('#questionDifficulty').inputValue(), difficulty(target.difficulty));
-  result = await checkQuestionResults(page, base, 'en');
-  assert.ok(result.includes(target.id));
-  await clearSearch(search);
-  await checkQuestionResults(page, base, 'en', true);
-  await search.fill(target.id);
-  assert.deepEqual(await checkQuestionResults(page, base, 'en'), [], 'Exercise IDs are not visible titles and are not searched');
-  await search.fill(target.statement);
-  assert.deepEqual(await checkQuestionResults(page, base, 'en'), [], 'Question body text cannot produce title-search matches');
-  await search.fill(englishTitle);
-  await choose(page, 'questionDifficulty', '困难');
-  await checkQuestionResults(page, [], 'en', true);
-  await clearSearch(search);
-  const hard = questions.filter(question => question.category === target.category && difficulty(question.difficulty) === '困难');
-  await checkQuestionResults(page, hard, 'en', true);
-  await choose(page, 'questionDifficulty', difficulty(target.difficulty));
-  await search.fill(englishTitle);
-  await choose(page, 'questionCategory', '图论');
-  await checkQuestionResults(page, [], 'en', true);
-  await clearSearch(search);
-  const graph = questions.filter(question => question.category === '图论'
-    && difficulty(question.difficulty) === difficulty(target.difficulty));
-  await checkQuestionResults(page, graph, 'en', true);
-  await search.fill('__dmate_no_matching_exercise__');
-  await checkQuestionResults(page, [], 'en', true);
-  await navigate(page, 'concepts');
-  await concept.fill('__dmate_no_matching_concept__');
-  assert.equal((await page.locator('#conceptDetail .offline-empty').innerText()).trim(), 'None',
-    'An English empty concept search uses the shared None label');
-  await clearSearch(concept);
-  await navigate(page, 'questions');
-  await clearSearch(search);
-  await checkQuestionResults(page, graph, 'en', true);
-  await noOverflow(page, 'Offline search toolbar');
+  assert.equal(await page.locator('#questionType').inputValue(), target.type);
+  await checkQuestionResults(page, base, 'en');
+  await choose(page, 'questionSelection', 'selected');
+  await checkQuestionResults(page, [], 'en');
+  await choose(page, 'questionSelection', '');
+  await checkQuestionResults(page, base, 'en');
+  await noOverflow(page, 'Library filter toolbar without search');
+
+  await page.evaluate(() => window.DMateI18n.setLanguage('zh-CN', false));
+  await navigate(page, 'notes');
+  const notebook = page.locator('#noteList .dcn-search');
+  const reference = await checkSearch(notebook);
+  await expectClear(notebook, false);
+  await notebook.fill('__missing_local_note__');
+  await clearSearch(notebook);
+  await noOverflow(page, 'Offline notebook search');
   return reference;
 }
 
@@ -228,7 +185,10 @@ async function toolsEntry(page, id) {
 async function onlineSearches(page, reference) {
   await toolsEntry(page, 'wrongBookBtn');
   const wrong = page.locator('#wrongBookSearch');
-  await checkSearch(wrong, reference);
+  // Notebook radii follow its create button; the shared paint is independent.
+  const { radius: notebookRadiusReference, ...referenceSurface } = reference;
+  const { radius: wrongRadius, ...wrongSurface } = await checkSearch(wrong);
+  assert.deepEqual(wrongSurface, referenceSurface, 'Notebook and wrong-book searches share the same paint');
   await expectClear(wrong, false);
   assert.equal(await clearButton(wrong).getAttribute('id'), 'wrongBookSearchClear', 'Reuse the original wrong-book clear control');
   await wrong.fill('No matching saved exercise');
@@ -286,7 +246,7 @@ async function runCase(browser, width, theme) {
         await onlineSearches(page, reference);
       }
       assert.deepEqual(errors, [], 'No search script errors');
-      console.log('PASS ' + (offline ? 'offline ' : 'online ') + width + '/' + theme + ': shared search paint, one red clear, focus and bilingual filtering');
+      console.log('PASS ' + (offline ? 'offline ' : 'online ') + width + '/' + theme + ': search-free libraries, filters and remaining shared search controls');
     } finally { await context.close(); }
   }
 }
@@ -311,15 +271,11 @@ async function disconnectedCase(browser) {
     await navigate(page, 'questions');
     await choose(page, 'questionCategory', target.category);
     await choose(page, 'questionDifficulty', difficulty(target.difficulty));
-    const search = page.locator('#questionSearch');
-    await checkSearch(search);
-    await search.fill(translations.questions[target.id].title);
+    assert.equal(await page.locator('#conceptSearch,#questionSearch').count(), 0);
     const base = questions.filter(question => question.category === target.category
       && difficulty(question.difficulty) === difficulty(target.difficulty));
     assert.ok((await checkQuestionResults(page, base)).includes(target.id));
-    await clearSearch(search);
-    await checkQuestionResults(page, base, 'zh-CN', true);
-    console.log('PASS disconnected reload: question search, filter intersection and red clear remain available');
+    console.log('PASS disconnected reload: libraries stay search-free and chapter/difficulty filters remain available');
   } finally { await context.close(); }
 }
 

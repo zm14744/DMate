@@ -144,7 +144,7 @@ async function cancellationAndDisabled(page) {
 
 async function expectConceptRows(page, expected, language = 'zh-CN') {
   assert.deepEqual(await page.locator('#conceptList .concept-item').evaluateAll(items => items.map(item => item.dataset.conceptId)),
-    expected.map(item => item.id), 'Chapter and search yield the expected real concepts');
+    expected.map(item => item.id), 'Chapter and selection filters yield the expected real concepts');
   assert.equal(await page.locator('#conceptCount').innerText(), language === 'en'
     ? expected.length + (expected.length === 1 ? ' concept' : ' concepts') : expected.length + ' 个概念');
   if (!expected.length) {
@@ -174,32 +174,26 @@ async function conceptFilters(page) {
   const graph = concepts.filter(item => item.category === '图论');
   await expectConceptRows(page, graph);
   await page.locator('#conceptList .concept-item[data-concept-id="graph_basic__simple_graph"]').click();
-  await page.locator('#conceptSearch').fill('简单图');
-  const simple = graph.filter(item => [item.title, translations.concepts[item.id].title].some(title => title.includes('简单图')));
-  await expectConceptRows(page, simple);
+  assert.equal(await page.locator('#conceptSearch,#questionSearch').count(), 0,
+    'Libraries have no search controls');
+  await expectConceptRows(page, graph);
   assert.equal(await page.locator('#conceptList .concept-item.active').getAttribute('data-concept-id'), 'graph_basic__simple_graph',
-    'Search preserves the selected concept while it remains a match');
-  await page.locator('#conceptSearch').fill('欧拉');
-  const euler = graph.filter(item => [item.title, translations.concepts[item.id].title].some(title => title.includes('欧拉')));
-  assert.ok(euler.length > 0 && euler.length < graph.length);
-  await expectConceptRows(page, euler);
+    'Selecting a concept retains the complete chapter list');
   await page.evaluate(() => window.DMateI18n.setLanguage('en', false));
   await page.waitForFunction(() => document.documentElement.dataset.uiLanguage === 'en');
-  await expectConceptRows(page, euler, 'en');
+  await expectConceptRows(page, graph, 'en');
+  assert.equal(await page.locator('#conceptList .concept-item.active').getAttribute('data-concept-id'), 'graph_basic__simple_graph',
+    'Language changes preserve the selected concept');
   assert.equal(await page.locator('#conceptCategory').inputValue(), '图论', 'Language changes keep the canonical category');
   assert.equal(await page.locator('#conceptCategory').evaluate(select => select.selectedOptions[0].label), 'Graph Theory');
   await choose(page, 'conceptCategory', '命题逻辑');
-  await expectConceptRows(page, [], 'en');
-  assert.equal(await page.locator('#conceptSearch').inputValue(), '欧拉', 'Chapter changes preserve the search query');
-  await page.locator('#conceptSearch').fill('');
   await expectConceptRows(page, concepts.filter(item => item.category === '命题逻辑'), 'en');
+  await choose(page, 'conceptSelection', 'selected');
+  await expectConceptRows(page, [], 'en');
+  await choose(page, 'conceptSelection', '');
   await choose(page, 'conceptCategory', '');
   await expectConceptRows(page, concepts, 'en');
-  await page.locator('#conceptSearch').fill('__dmate_no_matching_concept__');
-  await expectConceptRows(page, [], 'en');
-  await page.locator('#conceptSearch').fill('');
-  await expectConceptRows(page, concepts, 'en');
-  await noOverflow(page, 'Concept chapter/search');
+  await noOverflow(page, 'Concept chapter/selection filters');
 }
 
 async function offlineCase(browser, width, theme) {
@@ -229,7 +223,7 @@ async function offlineCase(browser, width, theme) {
     await cancellationAndDisabled(page);
     await conceptFilters(page);
     assert.deepEqual(errors, [], 'No offline selection script errors');
-    console.log('PASS offline ' + width + '/' + theme + ': graph/practice/concept choices, chapter-search intersection, selection and live English');
+    console.log('PASS offline ' + width + '/' + theme + ': graph/practice/concept choices, library filters, selection and live English');
   } finally { await context.close(); }
 }
 
@@ -335,11 +329,12 @@ async function disconnectedCase(browser) {
     await navigate(page, 'concepts');
     await choose(page, 'conceptCategory', '图论');
     await expectConceptRows(page, concepts.filter(item => item.category === '图论'));
-    await page.locator('#conceptSearch').fill('欧拉');
-    const expected = concepts.filter(item => item.category === '图论'
-      && [item.title, translations.concepts[item.id].title].some(title => title.includes('欧拉')));
-    await expectConceptRows(page, expected);
-    console.log('PASS disconnected reload: cached mobile chooser and concept chapter-search filter work');
+    assert.equal(await page.locator('#conceptSearch,#questionSearch').count(), 0);
+    await choose(page, 'conceptSelection', 'selected');
+    await expectConceptRows(page, []);
+    await choose(page, 'conceptSelection', '');
+    await expectConceptRows(page, concepts.filter(item => item.category === '图论'));
+    console.log('PASS disconnected reload: cached mobile chooser and concept chapter/selection filters work');
   } finally { await context.close(); }
 }
 

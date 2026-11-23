@@ -76,17 +76,15 @@ async function noOverflow(page, panel) {
   assert.equal(result.page, true, panel + ': page has no horizontal overflow');
   assert.ok(result.left >= -1 && result.right <= result.width + 1, panel + ': toolbar remains in viewport');
   assert.ok(result.controls.every(control => control.left >= result.left - 1 && control.right <= result.right + 1),
-    panel + ': filters and search fit their toolbar');
+    panel + ': filters fit their toolbar');
 }
 
 async function openConcept(page, concept) {
   await closeLibraryDetail(page);
   if (!await page.locator('#conceptsPanel').isVisible()) await navigate(page, 'concepts');
-  await page.locator('#conceptSearch').fill(concept.title);
   const entry = page.locator('#conceptList .concept-item[data-concept-id="' + concept.id + '"]');
   await entry.click();
   await page.waitForFunction(id => document.querySelector('#conceptList .concept-item.active')?.dataset.conceptId === id, concept.id);
-  await page.locator('#conceptSearch').fill('');
   await openLibraryDetail(page, 'concepts');
   await page.waitForFunction(() => !document.querySelector('#conceptDetail [data-dmate-render-state="pending"]'));
   await settle(page);
@@ -284,9 +282,7 @@ async function runCase(browser, width, height) {
     await independentScroll(page, 'concepts', 'list');
     await noOverflow(page, 'concepts');
     await navigate(page, 'questions');
-    await page.locator('#questionSearch').fill(longQuestion.title);
     await page.locator('#questionList .question-item[data-question-id="' + longQuestion.id + '"]').click();
-    await page.locator('#questionSearch').fill('');
     await openLibraryDetail(page, 'questions');
     for (const kind of ['answer', 'analysis']) {
       const details = page.locator('#questionDetail .wrong-' + kind + '-details');

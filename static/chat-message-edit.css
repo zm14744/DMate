@@ -60,9 +60,36 @@ body[data-appearance-theme] .msg.user:has(> .msg-bubble > .chat-message-edit) > 
     }
     body[data-appearance-theme] .center > .input-wrap.is-editing-message:not([hidden]) > .input {
         flex-wrap:wrap !important;
+        justify-content:flex-end;
+        row-gap:8px !important;
+    }
+    .input-wrap.is-editing-message > .input > .manual-question-composer {
+        display:contents;
+    }
+    body[data-appearance-theme] .center > .input-wrap.is-editing-message:not([hidden]) .manual-question-composer > textarea#text {
+        order:0;
+        flex:0 0 100%;
+        padding-inline:2px !important;
     }
     .input-wrap.is-editing-message > .input > #imagePickerWrap:not([data-voice-active="true"]) {
         display:none !important;
+    }
+    .input-wrap.is-editing-message > .input > #imagePickerWrap[data-voice-active="true"] {
+        order:1;
+        margin-inline-end:auto;
+    }
+    body[data-appearance-theme] .center > .input-wrap.is-editing-message:not([hidden]) .manual-question-composer > :is(.dmate-symbol-keyboard,#voiceInputBtn) {
+        position:static !important;
+        transform:none !important;
+    }
+    .input-wrap.is-editing-message .manual-question-composer > .dmate-symbol-keyboard {
+        order:2;
+    }
+    .input-wrap.is-editing-message .manual-question-composer > #voiceInputBtn {
+        order:3;
+    }
+    body[data-appearance-theme] .center > .input-wrap.is-editing-message:not([hidden]) > .input > #sendBtn {
+        order:4;
     }
     .input-wrap.is-editing-message > .input > #chatComposerEditBar:not([hidden]) {
         display:flex;
