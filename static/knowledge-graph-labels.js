@@ -1,4 +1,4 @@
-/* Shared measured labels for the online/offline graph and PNG painter. */
+/* Shared label measurement and edge geometry for the online/offline graph and PNG painter. */
 (function(root){
 "use strict";
 const documents=new WeakMap();
@@ -132,5 +132,202 @@ function paint(ctx,value,x,y,options={}){
  }
  ctx.restore();
 }
-root.DMateKnowledgeGraphLabels={layout,prepare,applySvg,applyHtml,paint,fontScale,fontFamily};
+// Route in a horizontal coordinate system. For a vertical graph crossSize is
+// the stage width; the normal nodeWidth/nodeHeight arguments remain unchanged.
+// Reflecting the main axis also supports both top-to-bottom and bottom-to-top.
+function routeConnection(fromId,toId,start,end,positions,nodeWidth,nodeHeight,crossSize,vertical=false){
+ const main=point=>vertical?point.y:point.x;
+ const sign=main(end)<main(start)?-1:1;
+ const point=point=>[sign*main(point),vertical?point.x:point.y];
+ const restore=([x,y])=>vertical?[y,sign*x]:[sign*x,y];
+ const width=vertical?nodeHeight:nodeWidth,height=vertical?nodeWidth:nodeHeight;
+ const first=point(start),last=point(end),limit=Math.max(24,Number(crossSize)||24);
+ const rectangles=[];
+ let source=null,target=null;
+ for(const [id,pos] of positions){
+  const axis=vertical?pos.y:pos.x,cross=vertical?pos.x:pos.y;
+  const left=sign>0?axis:-(axis+width);
+  const own=id===fromId||id===toId,padding=own?0:5;
+  const rect={left:left-padding,right:left+width+padding,top:cross-padding,bottom:cross+height+padding};
+  rectangles.push(rect);
+  if(id===fromId)source=rect;
+  if(id===toId)target=rect;
+ }
+ const startDirection=source&&Math.abs(first[0]-source.left)<Math.abs(first[0]-source.right)?-1:1;
+ const endDirection=target&&Math.abs(last[0]-target.right)<Math.abs(last[0]-target.left)?1:-1;
+ const between=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
+ const split=(a,b,c,d)=>{
+  const ab=between(a,b,.5),bc=between(b,c,.5),cd=between(c,d,.5);
+  const abc=between(ab,bc,.5),bcd=between(bc,cd,.5),mid=between(abc,bcd,.5);
+  return [[a,ab,abc,mid],[mid,bcd,cd,d]];
+ };
+ const overlaps=(a,b,c,d,rect)=>{
+  const xs=[a[0],b[0],c[0],d[0]],ys=[a[1],b[1],c[1],d[1]];
+  return Math.max(...xs)>rect.left+.001&&Math.min(...xs)<rect.right-.001
+   &&Math.max(...ys)>rect.top+.001&&Math.min(...ys)<rect.bottom-.001;
+ };
+ // Recursive control-hull bounds conservatively certify the entire curve,
+ // rather than missing a narrow obstacle between a handful of samples.
+ const hits=(curve,rect,depth=0)=>{
+  if(!overlaps(...curve,rect))return false;
+  if(depth>=12)return true;
+  const halves=split(...curve);
+  return hits(halves[0],rect,depth+1)||hits(halves[1],rect,depth+1);
+ };
+ const clearCurve=curve=>{
+  const ys=curve.map(point=>point[1]);
+  return Math.min(...ys)>=0&&Math.max(...ys)<=limit
+   &&!rectangles.some(rect=>hits(curve,rect));
+ };
+ const clearRoute=segments=>{
+  let previous=first;
+  for(const segment of segments){
+   const curve=[previous,segment.slice(0,2),segment.slice(2,4),segment.slice(4,6)];
+   if(!clearCurve(curve))return false;
+   previous=curve[3];
+  }
+  return true;
+ };
+ const finish=segments=>({type:'curves',x1:start.x,y1:start.y,segments:segments.map(segment=>[
+  ...restore(segment.slice(0,2)),...restore(segment.slice(2,4)),...restore(segment.slice(4,6))
+ ])});
+ const bow=(a,b,amount)=>{
+  const dx=b[0]-a[0],dy=b[1]-a[1],length=Math.hypot(dx,dy);
+  if(length<.0001)return [];
+  const along=[dx/length,dy/length],normal=[-along[1],along[0]];
+  const mid=[(a[0]+b[0])/2+normal[0]*amount,(a[1]+b[1])/2+normal[1]*amount];
+  const handle=length*.25;
+  return [[a[0]+along[0]*handle,a[1]+along[1]*handle,mid[0]-along[0]*handle,mid[1]-along[1]*handle,...mid],
+   [mid[0]+along[0]*handle,mid[1]+along[1]*handle,b[0]-along[0]*handle,b[1]-along[1]*handle,...b]];
+ };
+ const dx=last[0]-first[0],dy=last[1]-first[1],bend=Math.max(16,Math.abs(dx)*.42);
+ if(Math.abs(dy)>=10){
+  const direct=[[first[0]+startDirection*bend,first[1],last[0]+endDirection*bend,last[1],...last]];
+  if(clearRoute(direct))return finish(direct);
+ }
+ if(startDirection===1&&endDirection===-1&&dx>0){
+  const amplitude=Math.min(22,Math.max(8,dx*.1));
+  for(const direction of [1,-1]){
+   const direct=bow(first,last,amplitude*direction);
+   if(clearRoute(direct))return finish(direct);
+  }
+ }
+
+ // Search clear orthogonal corridors, then round every corner and bow every
+ // corridor span. The orthogonal scaffold never reaches SVG or Canvas.
+ const stub=Math.min(12,Math.max(4,Math.abs(dx)*.2));
+ const from=[first[0]+startDirection*stub,first[1]],to=[last[0]+endDirection*stub,last[1]];
+ const xs=[from[0],to[0]],ys=[from[1],to[1],6,limit-6];
+ for(const rect of rectangles){
+  xs.push(rect.left-10,rect.right+10);
+  for(const y of [rect.top-10,rect.bottom+10])if(y>1&&y<limit-1)ys.push(y);
+ }
+ const unique=values=>[...new Set(values)].sort((a,b)=>a-b);
+ const xx=unique(xs),yy=unique(ys),nx=xx.length,ny=yy.length;
+ const sourceIndex=yy.indexOf(from[1])*nx+xx.indexOf(from[0]);
+ const targetIndex=yy.indexOf(to[1])*nx+xx.indexOf(to[0]);
+ const distances=new Float64Array(nx*ny*3).fill(Infinity),prior=new Int32Array(nx*ny*3).fill(-1),heap=[];
+ const push=(cost,id)=>{
+  let index=heap.length;
+  const entry={cost,id};
+  heap.push(entry);
+  while(index){
+   const parent=(index-1)>>1;
+   if(heap[parent].cost<=cost)break;
+   heap[index]=heap[parent];
+   index=parent;
+  }
+  heap[index]=entry;
+ };
+ const pop=()=>{
+  const firstEntry=heap[0],lastEntry=heap.pop();
+  if(!heap.length)return firstEntry;
+  let index=0;
+  while(index*2+1<heap.length){
+   let child=index*2+1;
+   if(child+1<heap.length&&heap[child+1].cost<heap[child].cost)child++;
+   if(lastEntry.cost<=heap[child].cost)break;
+   heap[index]=heap[child];
+   index=child;
+  }
+  heap[index]=lastEntry;
+  return firstEntry;
+ };
+ const clearLine=(a,b)=>!rectangles.some(rect=>a[0]===b[0]
+  ?a[0]>rect.left+.001&&a[0]<rect.right-.001&&Math.max(a[1],b[1])>rect.top+.001&&Math.min(a[1],b[1])<rect.bottom-.001
+  :a[1]>rect.top+.001&&a[1]<rect.bottom-.001&&Math.max(a[0],b[0])>rect.left+.001&&Math.min(a[0],b[0])<rect.right-.001);
+ distances[sourceIndex*3]=0;push(0,sourceIndex*3);
+ let found=-1;
+ while(heap.length){
+  const entry=pop(),id=entry.id;if(entry.cost>distances[id]+.001)continue;
+  const group=Math.floor(id/3),direction=id%3,x=group%nx,y=Math.floor(group/nx);
+  if(group===targetIndex){found=id;break;}
+  for(const [sx,sy,nextDirection] of [[-1,0,1],[1,0,1],[0,-1,2],[0,1,2]]){
+   const ax=x+sx,ay=y+sy;if(ax<0||ay<0||ax>=nx||ay>=ny)continue;
+   const nextGroup=ay*nx+ax;
+   if((group===sourceIndex&&sx*startDirection<0)||(nextGroup===targetIndex&&sx*endDirection>0))continue;
+   const a=[xx[x],yy[y]],b=[xx[ax],yy[ay]];
+   if(!clearLine(a,b))continue;
+   const next=nextGroup*3+nextDirection,distance=Math.abs(b[0]-a[0])+Math.abs(b[1]-a[1]);
+   const cost=entry.cost+distance+(direction&&direction!==nextDirection?22:0)+(sx<0?distance*.15:0);
+   if(cost>=distances[next]-.001)continue;
+   distances[next]=cost;prior[next]=id;push(cost,next);
+  }
+ }
+ let points=[];
+ if(found>=0){
+  for(let id=found;id>=0;id=prior[id]){const group=Math.floor(id/3);points.push([xx[group%nx],yy[Math.floor(group/nx)]]);}
+  points.reverse();
+ }else{
+  points=[from,[from[0],6],[to[0],6],to];
+ }
+ points=[first,...points,last];
+ const simplified=[];
+ for(const current of points){
+  const count=simplified.length,previous=simplified[count-1];
+  if(previous&&Math.hypot(current[0]-previous[0],current[1]-previous[1])<.0001)continue;
+  if(count>=2){const a=simplified[count-2],b=simplified[count-1];
+   const collinear=(a[0]===b[0]&&b[0]===current[0])||(a[1]===b[1]&&b[1]===current[1]);
+   if(collinear&&(b[0]-a[0])*(current[0]-b[0])+(b[1]-a[1])*(current[1]-b[1])>0){simplified[count-1]=current;continue;}
+  }
+  simplified.push(current);
+ }
+ const unit=(a,b)=>{const length=Math.hypot(b[0]-a[0],b[1]-a[1]);return [(b[0]-a[0])/length,(b[1]-a[1])/length,length];};
+ for(const radius of [8,5,2,1,.25]){
+  const segments=[];let previous=simplified[0],valid=true;
+  const span=(a,b)=>{
+   const length=Math.hypot(b[0]-a[0],b[1]-a[1]);
+   if(length<.0001)return true;
+   for(const amount of [Math.min(4,length*.16),Math.min(1,length*.08)])for(const side of [1,-1]){
+    const curved=bow(a,b,side*amount);let p=a;
+    if(curved.every(segment=>{const clear=clearCurve([p,segment.slice(0,2),segment.slice(2,4),segment.slice(4,6)]);p=segment.slice(4,6);return clear;})){
+     segments.push(...curved);return true;
+    }
+   }
+   return false;
+  };
+  for(let index=1;index<simplified.length-1;index++){
+   const center=simplified[index],before=unit(simplified[index-1],center),after=unit(center,simplified[index+1]);
+   const size=Math.min(radius,before[2]/3,after[2]/3),k=.5522847498;
+   const enter=[center[0]-before[0]*size,center[1]-before[1]*size],leave=[center[0]+after[0]*size,center[1]+after[1]*size];
+   if(!span(previous,enter)){valid=false;break;}
+   const turn=[enter[0]+before[0]*size*k,enter[1]+before[1]*size*k,leave[0]-after[0]*size*k,leave[1]-after[1]*size*k,...leave];
+   if(!clearCurve([enter,turn.slice(0,2),turn.slice(2,4),leave])){valid=false;break;}
+   segments.push(turn);previous=leave;
+  }
+  if(valid&&span(previous,simplified[simplified.length-1])&&clearRoute(segments))return finish(segments);
+ }
+ // An overlapping/invalid node layout has no guaranteed clear passage. Keep a
+ // genuinely curved edge visible rather than changing or omitting graph data.
+ return finish(bow(first,last,Math.max(1,Math.min(8,limit/20))));
+}
+function routeSvgD(route){
+ return `M ${route.x1} ${route.y1} `+route.segments.map(segment=>`C ${segment.slice(0,2).join(' ')} ${segment.slice(2,4).join(' ')} ${segment.slice(4,6).join(' ')}`).join(' ');
+}
+function strokeCanvasRoute(ctx,route){
+ ctx.beginPath();ctx.moveTo(route.x1,route.y1);
+ for(const segment of route.segments)ctx.bezierCurveTo(...segment);
+ ctx.stroke();
+}
+root.DMateKnowledgeGraphLabels={layout,prepare,applySvg,applyHtml,paint,fontScale,fontFamily,routeConnection,routeSvgD,strokeCanvasRoute};
 })(typeof window!=='undefined'?window:globalThis);

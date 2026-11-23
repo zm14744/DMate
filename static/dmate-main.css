@@ -2123,13 +2123,6 @@ input[type="search"]::-webkit-search-cancel-button {
     pointer-events:none;
 }
 
-.kg-edge {
-    fill:none;
-    stroke:var(--border-strong);
-    stroke-width:1.4;
-    opacity:.95;
-}
-
 .kg-node-group.selected rect {
     stroke-width:3.2 !important;
 }
@@ -5095,20 +5088,14 @@ body[data-appearance-theme="light"] .input input {
 
     :root,
     body {
-        --kg-mobile-edge-color:rgba(148,163,184,.92);
-        --kg-mobile-edge-shadow:rgba(15,23,42,.88);
         --kg-mobile-viewport-bg:rgba(var(--surface-0-rgb), .96);
     }
 
     body[data-appearance-theme="light"] {
-        --kg-mobile-edge-color:rgba(71,85,105,.92);
-        --kg-mobile-edge-shadow:rgba(255,255,255,.98);
         --kg-mobile-viewport-bg:rgba(255,255,255,.98);
     }
 
     body.has-custom-background {
-        --kg-mobile-edge-color:rgba(226,232,240,.96);
-        --kg-mobile-edge-shadow:rgba(15,23,42,.96);
         --kg-mobile-viewport-bg:rgba(var(--surface-0-rgb), .94);
     }
 
@@ -5150,26 +5137,6 @@ body[data-appearance-theme="light"] .input input {
         z-index:0;
         overflow:visible;
         pointer-events:none;
-    }
-
-    .kg-mobile-edge {
-        fill:none;
-        stroke:var(--kg-mobile-edge-color);
-        stroke-width:1.8;
-        stroke-linecap:round;
-        stroke-linejoin:round;
-        opacity:.62;
-        /* 大图缩放时 SVG filter 会触发昂贵的重绘；完全去掉。 */
-        filter:none !important;
-    }
-    .kg-mobile-edge.is-secondary {
-        display:none;
-    }
-    .kg-mobile-edge.is-related {
-        display:inline;
-        opacity:1;
-        stroke-width:2.75;
-        stroke:var(--kg-mobile-edge-color);
     }
 
     .kg-mobile-node {
@@ -7028,16 +6995,6 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
     color:var(--text-primary) !important;
     font-weight:700;
 }
-.kg-mobile-edge,
-.kg-mobile-edge.is-secondary {
-    display:inline !important;
-    opacity:.74;
-    stroke-width:2.05;
-}
-.kg-mobile-edge.is-related {
-    opacity:1 !important;
-    stroke-width:3;
-}
 @media (max-width:760px) {
     #knowledgeGraphModal:not(.hidden) { overflow:hidden !important; }
     #knowledgeGraphModal .graph-modal-card {
@@ -7576,23 +7533,18 @@ body[data-appearance-theme="light"] #knowledgeGraphModal,
 :root[data-appearance-theme="light"] #knowledgeGraphModal {
     --kg-link-stroke:#788ca8;
 }
-#knowledgeGraphModal .kg-svg .kg-edge {
-    stroke:var(--kg-link-stroke) !important;
-    stroke-width:1.8;
+#knowledgeGraphModal :is(.kg-edge,.kg-mobile-edge) {
+    fill:none;
+    stroke:var(--kg-link-stroke);
+    stroke-width:1.2;
     stroke-linecap:round;
     stroke-linejoin:round;
+    vector-effect:non-scaling-stroke;
     opacity:.88;
 }
-#knowledgeGraphModal .kg-mobile-edge,
-#knowledgeGraphModal .kg-mobile-edge.is-secondary {
-    display:inline !important;
-    stroke:var(--kg-link-stroke) !important;
-    stroke-width:2.1;
-    opacity:.83;
-}
-#knowledgeGraphModal .kg-mobile-edge.is-related {
-    stroke:var(--kg-link-stroke) !important;
-    stroke-width:3;
+#knowledgeGraphModal :is(.kg-edge,.kg-mobile-edge).is-related {
+    stroke:var(--accent);
+    stroke-width:1.6;
     opacity:1;
 }
 

@@ -39,6 +39,7 @@ on:
       - 'scripts/test_offline_startup_network_browser.cjs'
       - 'scripts/test_offline_records_browser.cjs'
       - 'scripts/test_knowledge_graph_browser.cjs'
+      - 'scripts/test_knowledge_graph_routes.cjs'
       - 'scripts/test_graph_empty_recent_browser.cjs'
       - 'scripts/test_graph_relation_navigation_browser.cjs'
       - 'scripts/test_graph_all_history_browser.cjs'
@@ -149,6 +150,7 @@ on:
       - 'scripts/test_offline_startup_network_browser.cjs'
       - 'scripts/test_offline_records_browser.cjs'
       - 'scripts/test_knowledge_graph_browser.cjs'
+      - 'scripts/test_knowledge_graph_routes.cjs'
       - 'scripts/test_graph_empty_recent_browser.cjs'
       - 'scripts/test_graph_relation_navigation_browser.cjs'
       - 'scripts/test_graph_all_history_browser.cjs'
@@ -287,6 +289,7 @@ jobs:
           node --check scripts/test_offline_workspace_browser.cjs
           node --check scripts/test_offline_records_browser.cjs
           node --check scripts/test_knowledge_graph_browser.cjs
+          node --check scripts/test_knowledge_graph_routes.cjs
           node --check scripts/test_graph_empty_recent_browser.cjs
           node --check scripts/test_graph_relation_navigation_browser.cjs
           node --check scripts/test_graph_all_history_browser.cjs
@@ -359,9 +362,9 @@ jobs:
       - name: Test math startup, rendering queue and proof endings
         if: matrix.suite == 'workspace'
         run: node --test scripts/test_math_markdown.cjs
-      - name: Test focused question knowledge relations
+      - name: Test question knowledge relations and graph edge geometry
         if: matrix.suite == 'workspace'
-        run: node --test scripts/test_question_knowledge_graph.cjs
+        run: node --test scripts/test_question_knowledge_graph.cjs scripts/test_knowledge_graph_routes.cjs
       - name: Test local conversation title summaries
         if: matrix.suite == 'workspace'
         run: node --test scripts/test_conversation_titles.cjs

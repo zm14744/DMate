@@ -377,6 +377,8 @@ async function checkClampedZoom(page) {
       observer.disconnect();
       return {before,samples,mutations};
     });
+    const limit = action === 'out' ? (mobile(page) ? .65 : .8) : (mobile(page) ? 3 : 2.5);
+    near(result.before.scale, limit, 'Offline '+action+' reaches its zoom clamp', .000001);
     assert.equal(result.mutations,0,'Offline '+action+' at its clamp causes no graph or label rewrites');
     assert.equal(result.before.visible,'visible','The disconnected graph remains visible at its limit');
     for (const sample of result.samples) assert.deepEqual(sample,result.before,

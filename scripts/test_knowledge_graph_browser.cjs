@@ -83,6 +83,63 @@ async function fit(page) {
   return snapshot(page);
 }
 
+async function checkCourseGeometry(page, mobile) {
+  const result = await page.locator('#knowledgeGraphCanvas').evaluate((canvas, mobile) => {
+    const model = JSON.parse(document.getElementById('knowledgeGraphData').textContent).nodes;
+    const byName = new Map(model.map(node => [node.name, node.id]));
+    const relation = (from, to) => from + ' → ' + to;
+    const expectedEdges = model.flatMap(node => node.prerequisites
+      .filter(name => byName.has(name)).map(name => relation(byName.get(name), node.id)));
+    const paths = [...canvas.querySelectorAll(mobile ? '.kg-mobile-edge' : '.kg-edge')];
+    const nodes = [...canvas.querySelectorAll(mobile ? '.kg-mobile-node' : '.kg-node-group')];
+    const toGraph = paths[0].ownerSVGElement.getScreenCTM().inverse();
+    const boxes = new Map();
+    const issues = [];
+    for (const node of nodes) {
+      const id = node.dataset.knowledgeNodeId;
+      const rect = (mobile ? node : node.querySelector('rect')).getBoundingClientRect();
+      const start = new DOMPoint(rect.left, rect.top).matrixTransform(toGraph);
+      const end = new DOMPoint(rect.right, rect.bottom).matrixTransform(toGraph);
+      boxes.set(id, { left: start.x, top: start.y, right: end.x, bottom: end.y });
+      const label = node.querySelector(mobile ? '.kg-mobile-node-name' : '.kg-node-label');
+      if (getComputedStyle(label).writingMode !== 'horizontal-tb') issues.push(id + ': label direction');
+    }
+    const edges = [];
+    for (const path of paths) {
+      const { from, to } = path.dataset, key = relation(from, to);
+      edges.push(key);
+      const parent = boxes.get(from), child = boxes.get(to);
+      if (!parent || !child) continue; // The relationship list is checked below.
+      const d = path.getAttribute('d');
+      if (!/[cqsta]/i.test(d) || /[lhvz]/i.test(d)) issues.push(key + ': straight path command');
+      const length = path.getTotalLength(), start = path.getPointAtLength(0), end = path.getPointAtLength(length);
+      const direction = mobile ? end.y - start.y : end.x - start.x;
+      const portErrors = mobile ? [start.y - parent.bottom, end.y - child.top]
+        : [start.x - parent.right, end.x - child.left];
+      const withinPort = (point, box) => mobile ? point.x >= box.left && point.x <= box.right
+        : point.y >= box.top && point.y <= box.bottom;
+      if (direction <= 0 || portErrors.some(error => Math.abs(error) > .1)
+        || !withinPort(start, parent) || !withinPort(end, child)) issues.push(key + ': port direction');
+      const dx = end.x - start.x, dy = end.y - start.y;
+      const otherNodes = [...boxes].filter(([id]) => id !== from && id !== to);
+      let bend = 0;
+      for (let distance = 3; distance < length; distance += 6) {
+        const point = path.getPointAtLength(distance);
+        bend = Math.max(bend, Math.abs(dx * (point.y - start.y) - dy * (point.x - start.x)) / Math.hypot(dx, dy));
+        const crossing = otherNodes.find(([, r]) => point.x > r.left && point.x < r.right
+          && point.y > r.top && point.y < r.bottom);
+        if (crossing) { issues.push(key + ': crosses ' + crossing[0]); break; }
+      }
+      if (bend < 1) issues.push(key + ': no visible curvature');
+    }
+    return { ids: nodes.map(node => node.dataset.knowledgeNodeId).sort(), expectedIds: model.map(node => node.id).sort(),
+      edges: edges.sort(), expectedEdges: expectedEdges.sort(), issues };
+  }, mobile);
+  assert.deepEqual(result.ids, result.expectedIds, 'The full graph displays each course node once');
+  assert.deepEqual(result.edges, result.expectedEdges, 'The full graph displays each course relationship once');
+  assert.deepEqual(result.issues, [], 'Every course edge curves between the correct ports and clears other nodes');
+}
+
 async function checkZoomLimits(browser, width) {
   const mobile = width <= 760;
   const page = await browser.newPage({viewport:{width,height:900},
@@ -97,6 +154,7 @@ async function checkZoomLimits(browser, width) {
       await page.evaluate(value => setKnowledgeGraphFilter(value), category);
       if (mobile && !await page.locator('.kg-mobile-viewport').count()) await page.locator('.kg-mobile-expand').click();
       await page.locator(mobile ? '.kg-mobile-viewport' : '.kg-desktop-viewport').waitFor();
+      if (category === '全部') await checkCourseGeometry(page, mobile);
       const result = await page.evaluate(async ({mobile, extendedIdle}) => {
         const view = document.querySelector(mobile ? '.kg-mobile-viewport' : '.kg-desktop-viewport');
         const surface = view.querySelector(mobile ? '.kg-mobile-zoom-surface' : '.kg-desktop-zoom-surface');
@@ -118,7 +176,7 @@ async function checkZoomLimits(browser, width) {
             nodes:stage.querySelectorAll('.kg-mobile-node,.kg-node-group').length};
         };
         const traces = [];
-        for (const [kind,button,limit] of [['maximum',plus,mobile ? 3 : 2.5],['minimum',minus,.4]]) {
+        for (const [kind,button,limit] of [['maximum',plus,mobile ? 3 : 2.5],['minimum',minus,mobile ? .65 : .8]]) {
           // Reach the clamp through the actual control, including scrollbar
           // transitions; never assign a scale directly for this regression.
           let previous = null;
@@ -476,6 +534,15 @@ async function checkSelectionBorder(browser, theme) {
     await desktop.locator('.kg-node-group:not(.selected)').first().click();
     const desktopStroke = await desktop.locator('.kg-node-group.selected rect').evaluate(rect => getComputedStyle(rect).stroke);
     assert.equal(border.color, desktopStroke, theme + ': mobile border matches desktop selection stroke');
+    for (const [page, selector] of [[mobile, '.kg-mobile-edge'], [desktop, '.kg-edge']]) {
+      const edge = page.locator('#knowledgeGraphCanvas ' + selector).first();
+      const source = await edge.getAttribute('data-from');
+      const stroke = () => edge.evaluate(path => getComputedStyle(path).stroke);
+      await page.locator('#knowledgeGraphCanvas [data-knowledge-node-id="' + source + '"]').click();
+      assert.equal(await stroke(), accent, theme + ': the selected concept highlights its relationship');
+      await page.locator('#knowledgeGraphCanvas [data-knowledge-node-id="proof_direct_contradiction"]').click();
+      assert.notEqual(await stroke(), accent, theme + ': an unrelated selection clears the highlight');
+    }
     if (process.env.KG_SCREENSHOT_DIR) {
       await mobile.screenshot({ path: process.env.KG_SCREENSHOT_DIR + '/graph-selection-after-390-' + theme + '.png' });
     }

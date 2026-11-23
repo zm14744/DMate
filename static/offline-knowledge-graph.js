@@ -73,105 +73,23 @@ function computeKnowledgeGraphLevels(nodes) {
 // Graph connections use a collision-free corridor when a direct curve would
 // cross an intermediate knowledge node. Shared by SVG, mobile view and PNG.
 
-function routeKnowledgeGraphConnection(fromId, toId, start, end, positions, nodeWidth, nodeHeight, stageHeight) {
-    const x1 = start.x, y1 = start.y, x2 = end.x, y2 = end.y;
-    const bend = Math.max(16, Math.abs(x2 - x1) * 0.42);
-    const obstacles = [];
-    for (const [id, pos] of positions) {
-        if (id === fromId || id === toId) continue;
-        obstacles.push({
-            left:pos.x - 5, right:pos.x + nodeWidth + 5,
-            top:pos.y - 5, bottom:pos.y + nodeHeight + 5
-        });
-    }
-    const inside = (x, y) => obstacles.some(r => x > r.left && x < r.right && y > r.top && y < r.bottom);
-    // Preserve the original smooth appearance for edges entirely in clear gaps.
-    let curveSafe = true;
-    for (let i = 1; i < 32; i++) {
-        const t = i / 32, u = 1 - t;
-        const cx = u*u*u*x1 + 3*u*u*t*(x1+bend) + 3*u*t*t*(x2-bend) + t*t*t*x2;
-        const cy = u*u*u*y1 + 3*u*u*t*y1 + 3*u*t*t*y2 + t*t*t*y2;
-        if (inside(cx, cy)) { curveSafe = false; break; }
-    }
-    if (curveSafe) return {type:'curve', x1,y1,x2,y2,bend};
-
-    // Search the orthogonal passages between rows and columns. Travel inside
-    // inter-column gaps for vertical movement; pass a column only in row gaps.
-    const startX = Math.min(x1, x2), endX = Math.max(x1, x2);
-    const xs = [x1, x2];
-    const ys = [y1, y2, 11, Math.max(11, stageHeight - 11)];
-    for (const r of obstacles) {
-        for (const value of [r.left - 7, r.right + 7]) {
-            if (value > startX && value < endX) xs.push(value);
-        }
-        for (const value of [r.top - 7, r.bottom + 7]) {
-            if (value > 7 && value < stageHeight - 7) ys.push(value);
-        }
-    }
-    const sortedUnique = values => [...new Set(values.map(x => Math.round(x * 100) / 100))].sort((a,b)=>a-b);
-    const xx = sortedUnique(xs), yy = sortedUnique(ys);
-    const sx=xx.indexOf(x1), tx=xx.indexOf(x2), sy=yy.indexOf(y1), ty=yy.indexOf(y2);
-    const nx=xx.length, ny=yy.length;
-    const startNode=(sy*nx+sx)*3, targetNode=(ty*nx+tx);
-    const distances = new Float64Array(nx*ny*3).fill(Infinity);
-    const prior = new Int32Array(nx*ny*3).fill(-1);
-    const heap=[];
-    const push=(cost,id)=>{ let p=heap.length; heap.push({cost,id}); while(p){const q=(p-1)>>1;if(heap[q].cost<=cost)break;heap[p]=heap[q];p=q;}heap[p]={cost,id};};
-    const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){let p=0;while(2*p+1<heap.length){let q=2*p+1;if(q+1<heap.length&&heap[q+1].cost<heap[q].cost)q++;if(last.cost<=heap[q].cost)break;heap[p]=heap[q];p=q;}heap[p]=last;}return top;};
-    const isClear=(a,b,c,d)=>{
-        if (a===c) {const lo=Math.min(b,d),hi=Math.max(b,d);return !obstacles.some(r => a>r.left && a<r.right && hi>r.top && lo<r.bottom);}
-        const lo=Math.min(a,c),hi=Math.max(a,c);return !obstacles.some(r => b>r.top && b<r.bottom && hi>r.left && lo<r.right);
-    };
-    distances[startNode]=0;push(0,startNode);
-    let found=-1,expanded=0;
-    while(heap.length && expanded<50000){
-        const entry=pop(),id=entry.id;if(entry.cost>distances[id]+.001)continue;
-        expanded++;
-        const group=Math.floor(id/3),dir=id%3, xi=group%nx,yi=Math.floor(group/nx);
-        if(group===targetNode){found=id;break;}
-        for(const [dx,dy,nd] of [[-1,0,1],[1,0,1],[0,-1,2],[0,1,2]]){
-            const a=xi+dx,b=yi+dy;if(a<0||a>=nx||b<0||b>=ny)continue;
-            const ox=xx[xi],oy=yy[yi],ex=xx[a],ey=yy[b];
-            if(!isClear(ox,oy,ex,ey))continue;
-            const next=(b*nx+a)*3+nd;
-            const delta=Math.abs(ex-ox)+Math.abs(ey-oy);
-            // Penalise extra bends and backtracking, not the node count.
-            const cost=entry.cost+delta+(dir&&dir!==nd?22:0)+(dx<0?delta*.4:0);
-            if(cost>=distances[next]-.001)continue;
-            distances[next]=cost;prior[next]=id;push(cost,next);
-        }
-    }
-    let points=[];
-    if(found>=0){
-        for(let id=found;id>=0;id=prior[id]){const group=Math.floor(id/3);points.push([xx[group%nx],yy[Math.floor(group/nx)]]);}
-        points.reverse();
-        // Drop points which lie on the same straight corridor.
-        const simplified=[];
-        for(const p of points){const n=simplified.length;if(n>=2){const a=simplified[n-2],b=simplified[n-1];if((a[0]===b[0]&&b[0]===p[0])||(a[1]===b[1]&&b[1]===p[1])){simplified[n-1]=p;continue;}}simplified.push(p);}
-        points=simplified;
-    } else {
-        // Guaranteed escape corridor, beyond all nodes, but inside SVG height.
-        const topY=11, leftGap=Math.min(x2-8,x1+Math.max(10,(x2-x1)*.16));
-        const rightGap=Math.max(x1+8,x2-Math.max(10,(x2-x1)*.16));
-        points=[[x1,y1],[leftGap,y1],[leftGap,topY],[rightGap,topY],[rightGap,y2],[x2,y2]];
-    }
-    return {type:'polyline',points};
+function routeKnowledgeGraphConnection(fromId, toId, start, end, positions, nodeWidth, nodeHeight, crossSize, vertical = false) {
+    return root.DMateKnowledgeGraphLabels.routeConnection(fromId, toId, start, end, positions, nodeWidth, nodeHeight, crossSize, vertical);
 }
 
 function knowledgeGraphRouteSvgD(route) {
-    if(route.type==='curve')return `M ${route.x1} ${route.y1} C ${route.x1+route.bend} ${route.y1}, ${route.x2-route.bend} ${route.y2}, ${route.x2} ${route.y2}`;
-    return route.points.map(([x,y],i)=>`${i?'L':'M'} ${x} ${y}`).join(' ');
+    return root.DMateKnowledgeGraphLabels.routeSvgD(route);
 }
 
-function clampMobileGraphScale(value, minimum = 0.4) {
+function clampMobileGraphScale(value) {
     const number = Number(value);
     if (!Number.isFinite(number)) return 1;
-    return Math.max(minimum, Math.min(3, number));
+    return Math.max(0.65, Math.min(3, number));
 }
 
-function updateMobileGraphEdgeEmphasis(canvas, selectedNodeId) {
+function updateKnowledgeGraphEdgeEmphasis(canvas, selectedNodeId) {
     if (!canvas) return;
-    canvas.querySelectorAll(".kg-mobile-edge").forEach(edge => {
+    canvas.querySelectorAll(".kg-edge,.kg-mobile-edge").forEach(edge => {
         const related = Boolean(selectedNodeId) && (
             edge.dataset.from === selectedNodeId
             || edge.dataset.to === selectedNodeId
@@ -255,7 +173,7 @@ function mount(host,options={}) {
    const selected=node.dataset.nodeId===knowledgeGraphSelectedNodeId;node.classList.toggle('selected',selected);node.setAttribute('aria-pressed',String(selected));
    const rect=node.querySelector('rect');if(rect)rect.setAttribute('stroke-width',selected?'3':'2');
   }
-  updateMobileGraphEdgeEmphasis(canvas,knowledgeGraphSelectedNodeId);renderDetail();
+  updateKnowledgeGraphEdgeEmphasis(canvas,knowledgeGraphSelectedNodeId);renderDetail();
   options.onSelectionChange?.(allNodes.find(node=>String(node.id)===knowledgeGraphSelectedNodeId));
  }
  function navigateRelation(record){
@@ -313,6 +231,7 @@ function mount(host,options={}) {
   if(isMobileAppShell())renderMobileKnowledgeGraphSection(fragment,visibleNodes,categoryLabel(),countLabel(),{});
   else renderKnowledgeGraphSection(fragment,visibleNodes,categoryLabel(),countLabel(),{});
   canvas.replaceChildren(fragment);
+  updateKnowledgeGraphEdgeEmphasis(canvas,knowledgeGraphSelectedNodeId);
   canvas.querySelectorAll('.kg-node-group,.kg-mobile-node').forEach((node,i)=>{
    node.dataset.nodeId=String(visibleNodes[i].id);node.setAttribute('role','button');node.setAttribute('aria-label',dmateKnowledgeLabel(visibleNodes[i].name));node.setAttribute('aria-pressed',String(node.classList.contains('selected')));
    if(node.localName==='g'){node.setAttribute('tabindex','0');node.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();selectKnowledgeGraphNode(node.dataset.nodeId,node);}},{signal});}
@@ -489,13 +408,12 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     let pendingPinch = null;
     let suppressClickUntil = 0;
     const dragSlop = 8;
-    const minimumScale = 0.4;
     let fitted = true;
     let resizeFrame = 0;
     let lastCenterAnchor = null;
 
     const currentScale = () => (
-        clampMobileGraphScale(viewport._kgScale || 1, minimumScale)
+        clampMobileGraphScale(viewport._kgScale || 1)
     );
 
     const updateLabel = scale => {
@@ -535,7 +453,7 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     };
 
     const applyScale = (nextScale, anchor = null) => {
-        const scale = clampMobileGraphScale(nextScale, minimumScale);
+        const scale = clampMobileGraphScale(nextScale);
         // A clamped button/wheel zoom has no new camera to apply. Avoid
         // reanchoring it or repainting the same graph at either limit.
         if (anchor && viewport._kgScale === scale) return scale;
@@ -724,10 +642,7 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
             }
 
             const center = pointerCenter(a, b);
-            const scale = clampMobileGraphScale(
-                pinch.scale * pointerDistance(a, b) / pinch.distance,
-                minimumScale
-            );
+            const scale = clampMobileGraphScale(pinch.scale * pointerDistance(a, b) / pinch.distance);
             // 合并高频 pointermove：一帧只布局、缩放和定位一次。
             pendingPinch = { scale, center, point:pinch.point };
             if (!pinchFrame) {
@@ -921,6 +836,7 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     const orderMap = new Map(
         orderedNodes.map((node, index) => [node.id, index])
     );
+    const columnsPerRow = 3;
     const columns = new Map();
 
     for (const node of orderedNodes) {
@@ -950,15 +866,20 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
                 || average(a) - average(b)
                 || orderMap.get(a.id) - orderMap.get(b.id);
         });
-        group.forEach((node, index) => previousOrder.set(node.name, index));
+        group.forEach((node, index) => {
+            const rowStart = Math.floor(index / columnsPerRow) * columnsPerRow;
+            const rowLength = Math.min(columnsPerRow, group.length - rowStart);
+            previousOrder.set(node.name, index % columnsPerRow - (rowLength - 1) / 2);
+        });
     }
 
-    // 距离解决密集问题：左右预留足够走线通道，上下给弯曲关系留空间。
-    const columnCount = Math.max(columnKeys.length, 1);
+    // 每层最多三卡一行，避免横向撑宽；层间为上下分支保留走线空间。
+    const levelCount = Math.max(columnKeys.length, 1);
     const marginX = 38;
     const marginY = 48;
-    const gapX = 116;
-    const gapY = 60;
+    const gapX = 40;
+    const gapY = 96;
+    const subrowGap = 72;
     const nodeWidth = dmateUiLanguage() === "en" ? 190 : 144;
     const labelPack = window.DMateKnowledgeGraphLabels.prepare(nodes, {
         label: node => dmateKnowledgeLabel(node.name),
@@ -967,9 +888,12 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
         badgeSize: 10, badgeWeight: 600, paddingX: 12, paddingY: 10, gap: 5
     });
     const nodeHeight = labelPack.height;
-    const maxRows = Math.max(...columnKeys.map(key => columns.get(key).length), 1);
-    const stageWidth = marginX * 2 + columnCount * nodeWidth + (columnCount - 1) * gapX;
-    const stageHeight = marginY * 2 + maxRows * nodeHeight + (maxRows - 1) * gapY;
+    const maxColumns = Math.min(columnsPerRow, Math.max(...columnKeys.map(key => columns.get(key).length), 1));
+    const rowCounts = columnKeys.map(key => Math.ceil(columns.get(key).length / columnsPerRow));
+    const totalRows = rowCounts.reduce((sum, count) => sum + count, 0);
+    const stageWidth = marginX * 2 + maxColumns * nodeWidth + (maxColumns - 1) * gapX;
+    const stageHeight = marginY * 2 + totalRows * nodeHeight
+        + (totalRows - levelCount) * subrowGap + (levelCount - 1) * gapY;
 
     const viewport = document.createElement("div");
     viewport.className = "kg-mobile-viewport offline-graph-canvas";
@@ -997,21 +921,22 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     stage.appendChild(edgeSvg);
 
     const positions = new Map();
-    for (let columnIndex = 0; columnIndex < columnKeys.length; columnIndex += 1) {
-        const level = columnKeys[columnIndex];
+    let levelTop = marginY;
+    for (let levelIndex = 0; levelIndex < columnKeys.length; levelIndex += 1) {
+        const level = columnKeys[levelIndex];
         const group = columns.get(level);
-        const x = marginX + columnIndex * (nodeWidth + gapX);
-        const totalHeight = (
-            group.length * nodeHeight
-            + Math.max(group.length - 1, 0) * gapY
-        );
-        const startY = marginY + (stageHeight - marginY * 2 - totalHeight) / 2;
-
-        for (let rowIndex = 0; rowIndex < group.length; rowIndex += 1) {
-            const node = group[rowIndex];
-            const y = startY + rowIndex * (nodeHeight + gapY);
+        for (let index = 0; index < group.length; index += 1) {
+            const subrow = Math.floor(index / columnsPerRow);
+            const rowLength = Math.min(columnsPerRow, group.length - subrow * columnsPerRow);
+            const totalWidth = rowLength * nodeWidth + (rowLength - 1) * gapX;
+            const startX = (stageWidth - totalWidth) / 2;
+            const node = group[index];
+            const x = startX + (index % columnsPerRow) * (nodeWidth + gapX);
+            const y = levelTop + subrow * (nodeHeight + subrowGap);
             positions.set(node.id, { x, y });
         }
+        const rowCount = rowCounts[levelIndex];
+        levelTop += rowCount * nodeHeight + (rowCount - 1) * subrowGap + gapY;
     }
 
     const byName = new Map(nodes.map(node => [node.name, node]));
@@ -1032,25 +957,25 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     }
     // 每条线分配自己的节点连接端口：全部保留，不再隐藏“次级关系”。
     const distributePort = (index, count) => (index - (count - 1) / 2) *
-        Math.min(11, (nodeHeight - 18) / Math.max(count, 1));
+        Math.min(11, (nodeWidth - 24) / Math.max(count, 1));
     for (const group of outgoing.values()) {
-        group.sort((a, b) => positions.get(a.to).y - positions.get(b.to).y);
+        group.sort((a, b) => positions.get(a.to).x - positions.get(b.to).x);
     }
     for (const group of incoming.values()) {
-        group.sort((a, b) => positions.get(a.from).y - positions.get(b.from).y);
+        group.sort((a, b) => positions.get(a.from).x - positions.get(b.from).x);
     }
     for (const edge of edges) {
         const from = positions.get(edge.from);
         const to = positions.get(edge.to);
         const outGroup = outgoing.get(edge.from);
         const inGroup = incoming.get(edge.to);
-        const x1 = from.x + nodeWidth;
-        const x2 = to.x;
-        const y1 = from.y + nodeHeight / 2 + distributePort(outGroup.indexOf(edge), outGroup.length);
-        const y2 = to.y + nodeHeight / 2 + distributePort(inGroup.indexOf(edge), inGroup.length);
+        const x1 = from.x + nodeWidth / 2 + distributePort(outGroup.indexOf(edge), outGroup.length);
+        const x2 = to.x + nodeWidth / 2 + distributePort(inGroup.indexOf(edge), inGroup.length);
+        const y1 = from.y + nodeHeight;
+        const y2 = to.y;
         const route = routeKnowledgeGraphConnection(
             edge.from, edge.to, {x:x1,y:y1}, {x:x2,y:y2},
-            positions, nodeWidth, nodeHeight, stageHeight
+            positions, nodeWidth, nodeHeight, stageWidth, true
         );
         const path = createSvgElement("path", {
             class:"kg-mobile-edge",
@@ -1093,7 +1018,6 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     viewport.appendChild(zoomSurface);
     section.appendChild(viewport);
     container.appendChild(section);
-    updateMobileGraphEdgeEmphasis(section, knowledgeGraphSelectedNodeId);
 
     if (options.forCopy) return;
 
@@ -1153,7 +1077,7 @@ function setKnowledgeGraphDesktopScale(value, keepCenter = true) {
     const baseWidth = Number(stage.dataset.baseWidth) || 1;
     const baseHeight = Number(stage.dataset.baseHeight) || 1;
     const previous = Number(surface.dataset.scale) || 1;
-    const next = Math.max(0.4, Math.min(2.5, Number(value) || 1));
+    const next = Math.max(0.8, Math.min(2.5, Number(value) || 1));
     // Only real zoom changes should touch the viewport. Reapplying a clamped
     // scale resets its label and anchor and can restart resize/paint work.
     if (keepCenter && previous === next) return;
@@ -1211,8 +1135,7 @@ function fitKnowledgeGraphDesktop() {
         ? Math.min(1.15, widthScale)
         : Math.min(1.15, widthScale, heightScale);
     // 极宽的图谱宁可局部横向滚动，也不能把节点文字缩至不可阅读。
-    const fitted = Math.max(0.65, preferred);
-    setKnowledgeGraphDesktopScale(fitted, false);
+    setKnowledgeGraphDesktopScale(preferred, false);
     viewport.scrollLeft = 0;
     viewport.scrollTop = 0;
     desktopFitted = true;
