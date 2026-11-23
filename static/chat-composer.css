@@ -387,6 +387,15 @@ body[data-appearance-theme] .center > .input-wrap > :is(.input,.manual-question-
     body[data-appearance-theme] .center.chat-empty > .input-wrap:not([hidden]) > .manual-question-mode { left:0; }
     body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) > .manual-question-mode { left:clamp(8px,1vw,18px); }
 }
+/* Phone-only compact chat/question mode switch. */
+@media(max-width:680px) {
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]) {
+        --dmate-mode-height:28px;
+    }
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]) > #manualQuestionMode {
+        width:min(168px,100%);
+    }
+}
 /* Activation does not add an outer ring, including the real file picker
    layered over its visible plus button. */
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) button,
