@@ -436,23 +436,41 @@ async function headerExportChecks(page, label, offline = false) {
       centered:!close || Math.abs(box.y + box.height / 2 - close.y - close.height / 2) < 1};
   });
   assert.deepEqual(geometry, {width:32, height:32, icon:20, border:'0px', leftOfClose:true, gap:offline ? null : 10, centered:true});
-  await page.evaluate(() => {
+  const originalTheme = await page.evaluate(() => {
+    const theme = document.body.dataset.appearanceTheme;
     window.headerExportRecords = [];
     window.headerOriginalPng = DMateDrawingExport.pngBlob;
     window.headerOriginalSave = DMateDrawingExport.save;
     DMateDrawingExport.pngBlob = async (svg, ...args) => {
-      const labels = svg.textContent;
+      window.headerExportSvg = {
+        labels: svg.textContent,
+        paper: svg.querySelector(':scope > rect')?.getAttribute('fill'),
+        dot: svg.querySelector('.dge-overlay-dot')?.style.fill,
+        edge: svg.querySelector('.dge-overlay-stroke')?.style.stroke
+      };
       const blob = await window.headerOriginalPng(svg, ...args);
-      window.headerExportSvg = labels;
       return blob;
     };
     DMateDrawingExport.save = async (blob, name) => {
-      window.headerExportRecords.push({name, labels:window.headerExportSvg, type:blob.type, bytes:blob.size});
+      window.headerExportRecords.push({name, ...window.headerExportSvg, type:blob.type, bytes:blob.size});
       await new Promise(resolve => { window.finishHeaderExport = resolve; });
       return {destination:'download'};
     };
+    document.body.dataset.appearanceTheme = 'light';
+    return theme;
   });
   try {
+    const canvasPaint = await page.locator('.ddw-editor').evaluate(editor => {
+      const read = (selector, property) => getComputedStyle(editor.querySelector(selector))[property];
+      return [
+        read('.ddw-canvas-frame', 'backgroundColor'), read('.dge-overlay-stage', 'backgroundColor'),
+        read('.dge-overlay-image', 'visibility'), read('.dge-overlay-dot', 'fill'),
+        read('.dge-overlay-stroke', 'stroke'), read('.dge-overlay-stroke', 'opacity'),
+        read('.dge-overlay-svg marker path', 'fill'), read('.dge-overlay-label', 'fill')
+      ];
+    });
+    assert.deepEqual(canvasPaint, ['rgb(0, 0, 0)', 'rgb(0, 0, 0)', 'hidden',
+      'rgb(255, 255, 255)', 'rgb(255, 255, 255)', '1', 'rgb(255, 255, 255)', 'rgb(255, 255, 255)']);
     for (const index of [0, 1]) {
       if (index) {
         await (await history(page)).getByText(names[index], {exact:true}).click();
@@ -469,6 +487,8 @@ async function headerExportChecks(page, label, offline = false) {
       const record = records[index];
       assert.equal(record.name, names[index], 'The export filename is the current drawing name');
       assert.equal(record.type, 'image/png'); assert.ok(record.bytes > 1000, 'The current drawing produces a real PNG');
+      assert.deepEqual([record.paper, record.dot, record.edge], ['#ffffff', 'rgb(17, 24, 39)', 'rgb(17, 24, 39)'],
+        'The export keeps dark drawing ink on white paper');
       assert.match(record.labels, new RegExp('ABC'[index] + '1'));
       for (const other of [0, 1, 2].filter(other => other !== index)) assert.doesNotMatch(record.labels, new RegExp('ABC'[other] + '1'), 'Other gallery drawings do not enter the exported image');
       await page.evaluate(() => finishHeaderExport());
@@ -479,7 +499,11 @@ async function headerExportChecks(page, label, offline = false) {
     const toggle = page.locator('.ddw-page-actions>button[aria-expanded="true"]');
     if (await toggle.count()) await toggle.click();
   } finally {
-    await page.evaluate(() => { DMateDrawingExport.pngBlob = window.headerOriginalPng; DMateDrawingExport.save = window.headerOriginalSave; });
+    await page.evaluate(theme => {
+      DMateDrawingExport.pngBlob = window.headerOriginalPng;
+      DMateDrawingExport.save = window.headerOriginalSave;
+      document.body.dataset.appearanceTheme = theme;
+    }, originalTheme);
   }
   console.log('PASS ' + label + ': header image icon exports only the selected drawing, with real PNG and busy guards');
 }

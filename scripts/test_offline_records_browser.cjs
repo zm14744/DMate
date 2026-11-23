@@ -43,13 +43,24 @@ async function checkNoteControlRow(panel) {
         return {left:box.left,right:box.right,top:box.top,width:box.width,height:box.height,
           radius:css.borderRadius,border:css.borderTopWidth,style:css.borderTopStyle};
       };
-      return {create:shape('.dcn-new'),search:shape('.dcn-search')};
+      return {create:shape('.dcn-new'),search:shape('.dcn-search'),empty:panel.classList.contains('is-empty')};
     });
-    for (const key of ['top','width','height']) assert.ok(Math.abs(row.create[key]-row.search[key]) < 1,
-      width+': new concept and search share their '+key);
     for (const key of ['radius','border','style']) assert.equal(row.create[key],row.search[key]);
-    assert.ok(row.create.left >= 0 && row.create.right < row.search.left && row.search.right <= width,
-      'Both notebook controls fit side by side');
+    if (row.empty || width <= 680) {
+      for (const key of ['top','height']) assert.ok(Math.abs(row.create[key]-row.search[key]) < 1,
+        width+': the notebook control row shares its '+key);
+      assert.ok(row.create.left >= 0 && row.create.right < row.search.left && row.search.right <= width,
+        'Both notebook controls fit side by side');
+      if (row.empty) assert.ok(row.create.width < row.search.width,
+        width+': empty notebook keeps a compact create action and a wider search');
+      else assert.ok(Math.abs(row.create.width-row.search.width) < 1,
+        width+': populated mobile notebook preserves its original two columns');
+    } else {
+      assert.ok(row.search.top >= row.create.top+row.create.height+9,
+        width+': populated desktop notebook stacks create and search');
+      for (const key of ['left','width']) assert.ok(Math.abs(row.create[key]-row.search[key]) < 1,
+        width+': stacked notebook controls share their '+key);
+    }
   }
   await page.setViewportSize(viewport);
 }

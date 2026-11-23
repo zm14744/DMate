@@ -70,10 +70,10 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     assert.match(compressedPack.headers().vary, /Accept-Encoding/i);
     assert.ok(Number(compressedPack.headers()['content-length']) < Number(plainPack.headers()['content-length']));
     assert.deepEqual(await compressedPack.body(), await plainPack.body(), 'Compressed study content decodes to the original bytes');
-    const sharedAssets = await Promise.all(['/static/dmate-main.css?v=69', '/static/graph-editor.css?v=26', '/static/button-themes.css?v=66', '/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
+    const sharedAssets = await Promise.all(['/static/dmate-main.css?v=69', '/static/graph-editor.css?v=27', '/static/button-themes.css?v=66', '/static/scrollbars.css?v=25', '/static/scrollbars.js?v=25',
       '/static/select-controls.css?v=43', '/static/mobile-select.js?v=26', '/static/offline.css?v=67',
-      '/static/concept-notebook.css?v=4', '/static/textarea-autosize.css?v=1', '/static/textarea-autosize.js?v=1',
-      '/static/drawing-workspace.css?v=52', '/static/graph-editor.js?v=54', '/static/graph-editor-overlay.js?v=41', '/static/drawing-workspace.js?v=60', '/static/drawing-export.js?v=39',
+      '/static/concept-notebook.css?v=5', '/static/textarea-autosize.css?v=1', '/static/textarea-autosize.js?v=1',
+      '/static/drawing-workspace.css?v=53', '/static/graph-editor.js?v=54', '/static/graph-editor-overlay.js?v=42', '/static/drawing-workspace.js?v=60', '/static/drawing-export.js?v=39',
       '/static/modal-chrome.css', '/static/modal-text.js?v=53', '/static/delete-confirm.js', '/static/guest-session.js?v=53', '/static/offline-interface-state.js?v=1', '/static/language.js?v=59',
       '/static/graph-editor-format.js?v=32', '/static/language-catalog.js?v=68', '/static/offline-privacy-motion.js?v=4', '/static/offline-shell.js?v=41',
       '/static/offline-vault.js?v=2', '/static/offline-handoff.js?v=1', '/static/offline-storage.js?v=4',
@@ -102,12 +102,12 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     // changed versions and unversioned application code still come fresh.
     await page.goto(new URL('/health', baseURL).href);
     await page.evaluate(async packs => {
-      const cache = await caches.open('dmate-offline-shell-v104');
-      await cache.put('/static/offline.js?v=70',new Response('/* previous offline messages */'));
+      const cache = await caches.open('dmate-offline-shell-v105');
+      await cache.put('/static/drawing-workspace.css?v=52',new Response('/* previous drawing styles */'));
       await cache.put('/static/button-themes.css?v=65', new Response('/* obsolete graph navigation button styles */'));
       await cache.put('/static/graph-editor-model.js',new Response('/* obsolete unversioned editor model */'));
       for(const asset of packs) await cache.put(asset.path,new Response(asset.text,{headers:{'Content-Type':'application/json'}}));
-      await cache.put('/__dmate_offline_ready__/dmate-offline-shell-v104',new Response('ready'));
+      await cache.put('/__dmate_offline_ready__/dmate-offline-shell-v105',new Response('ready'));
     },reusablePacks);
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });
     await page.evaluate(async () => {
@@ -124,7 +124,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       if (canonical.length !== 1) throw new Error('Expected exactly one precached shared stylesheet');
       return { name: names[0], canonical: canonical[0].url };
     }, assetPath);
-    assert.equal(current.name, 'dmate-offline-shell-v105', 'The offline workspace uses the refreshed shell cache');
+    assert.equal(current.name, 'dmate-offline-shell-v106', 'The offline workspace uses the refreshed shell cache');
     assert.equal((await fetchAsset(page, current.canonical)).text, networkCSS,
       'The refreshed shell loads current frameless controls instead of the obsolete stylesheet');
     for (const asset of sharedAssets) {
@@ -137,7 +137,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     assert.ok(workerRequests.length > 0,'The browser exposes actual service-worker network requests');
     for(const asset of reusablePacks) assert.ok(!workerRequests.includes(new URL(asset.path,baseURL).href),
       'Upgrade reuses the complete prior immutable study pack without downloading it again: '+asset.path);
-    assert.ok(workerRequests.includes(new URL('/static/offline.js?v=71',baseURL).href),'The updated offline workspace is fetched');
+    assert.ok(workerRequests.includes(new URL('/static/drawing-workspace.css?v=53',baseURL).href),'The updated drawing styles are fetched');
     assert.ok(workerRequests.includes(new URL('/static/graph-editor-model.js',baseURL).href),'Unversioned application code is fetched');
     assert.notEqual(await page.evaluate(async name => (await(await caches.open(name)).match('/static/graph-editor-model.js')).text(),current.name),
       '/* obsolete unversioned editor model */');

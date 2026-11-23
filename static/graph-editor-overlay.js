@@ -480,6 +480,7 @@ function mount(host,o){
     const stroke=E(d,'path',att);
     stroke.dataset.ink=ink;stroke.style.stroke=ink;
     stroke.style.strokeWidth=(chosen?3.6:2.1)/scale+'px';
+    if(o.drawingOnly)stroke.style.opacity=chosen||e.direction==='unknown'?'1':'.8';
     // A uniform stretch is one joined path, rather than translucent little
     // segments whose overlapping caps leave seams and change arrow thickness.
     paintDash(stroke,run.offset);
@@ -834,18 +835,26 @@ function mount(host,o){
  svg.addEventListener('keydown',e=>{if(e.key==='Escape')resetInteraction();});
  function getDrawingSvg(){
   // Serialize only the drawing, independently from the source photo, camera,
-  // selection hit areas and editor controls. Inline computed SVG paint so the
-  // exported image does not depend on this page's styles or theme.
+  // selection hit areas and editor controls. Keep the authored drawing ink
+  // on the export's white paper and inline the other computed SVG properties.
   const output=E(d,'svg',{xmlns:NS,role:'img','aria-label':'绘图','data-source-width':w,'data-source-height':h}),defs=svg.querySelector('defs');
   const graph=o.graph?.();output.exportVertexPositions=graph?{[graph.id]:Object.fromEntries(graph.vertices.map((vertex,index)=>[vertex.id,pos(vertex,index,graph)]))}:{};
   if(defs)output.append(defs.cloneNode(true));
   const shapes=svg.querySelectorAll('.dge-overlay-edge,.dge-overlay-node');
   const bounds=[];
-  const properties=['fill','stroke','stroke-width','stroke-dasharray','stroke-linecap','stroke-linejoin','paint-order','font-family','font-size','font-weight','text-anchor','opacity'];
+  const authoredPaint=['fill','stroke','opacity'];
+  const properties=[...authoredPaint,'stroke-width','stroke-dasharray','stroke-linecap','stroke-linejoin','paint-order','font-family','font-size','font-weight','text-anchor'];
   for(const original of shapes){
    try{const b=original.getBBox();if(b.width||b.height)bounds.push(b);}catch(_){}
    const clone=original.cloneNode(true),source=[original,...original.querySelectorAll('*')],copies=[clone,...clone.querySelectorAll('*')];
-   copies.forEach((node,index)=>{const style=d.defaultView.getComputedStyle(source[index]);for(const name of properties)node.style.setProperty(name,style.getPropertyValue(name));node.removeAttribute('tabindex');node.removeAttribute('data-vertex-id');node.removeAttribute('data-edge-id');});
+   copies.forEach((node,index)=>{
+    const sourceNode=source[index],style=d.defaultView.getComputedStyle(sourceNode);
+    for(const name of properties){
+     const authored=o.drawingOnly&&authoredPaint.includes(name)?sourceNode.style.getPropertyValue(name):'';
+     node.style.setProperty(name,authored||style.getPropertyValue(name));
+    }
+    node.removeAttribute('tabindex');node.removeAttribute('data-vertex-id');node.removeAttribute('data-edge-id');
+   });
    clone.querySelectorAll('.dge-overlay-hit,.dge-overlay-node-hit,.dge-overlay-handle').forEach(node=>node.remove());
    output.append(clone);
   }

@@ -43,6 +43,12 @@
 .ddw-canvas-frame{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden;border:1px solid var(--dge-border,#cbd5e1);border-radius:12px}
 .ddw-editor .dge-overlay-viewport{height:auto;flex:1;min-width:0;min-height:0;max-height:none;border:0;border-radius:11px;scrollbar-gutter:auto;scrollbar-width:none}
 .ddw-editor .dge-overlay-viewport::-webkit-scrollbar{display:none;width:0;height:0}
+/* The drawing surface has its own contrast in the light workspace. */
+body[data-appearance-theme="light"] .ddw-editor :is(.ddw-canvas-frame,.dge-overlay-stage){background:#000}
+body[data-appearance-theme="light"] .ddw-editor .dge-overlay-image{visibility:hidden!important}
+body[data-appearance-theme="light"] .ddw-editor :is(.dge-overlay-dot,.dge-overlay-label,.dge-overlay-svg marker path){fill:#fff!important}
+body[data-appearance-theme="light"] .ddw-editor .dge-overlay-stroke{stroke:#fff!important;opacity:1!important}
+body[data-appearance-theme="light"] .ddw-editor :is(.dge-overlay-label,.dge-overlay-contrast-halo){stroke:#000!important}
 .ddw-side-actions{position:absolute;z-index:16;right:var(--ddw-controls-right,18px);top:var(--ddw-controls-top,76px);display:flex;gap:6px;flex-direction:row;flex-wrap:wrap;justify-content:flex-end;width:max-content;max-width:calc(100% - 36px)}
 .ddw-side-actions[hidden]{display:none}
 .ddw-side-actions>button{flex-shrink:0;min-width:0;padding:8px 10px;white-space:nowrap;font-size:13px;box-shadow:0 3px 12px #0000000f;background:var(--surface-1,#fff)}
@@ -58,6 +64,16 @@
 .ddw-side-panel,.ddw-editor .dge-float-content,.ddw-editor .dge-tool-palette>.dge-overlay-tools{max-height:var(--ddw-panel-space,50dvh);overflow:auto;overscroll-behavior:contain;padding:12px;box-sizing:border-box;border:1px solid var(--border-strong,#cbd5e1);border-radius:12px;background:var(--surface-1,#fff);box-shadow:0 6px 22px #0002}
 .ddw-editor .dge-tool-palette{left:var(--ddw-tools-left,18px)!important;top:var(--ddw-tools-top,76px)!important;width:max-content;max-width:calc(100% - 20px);margin:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;z-index:15}
 .ddw-editor .dge-tool-palette>summary,.ddw-editor .dge-tool-palette[open]>summary{padding:8px 10px;margin:0;border:1px solid var(--border-strong,#cbd5e1);border-radius:9px;background:var(--surface-1,#fff);color:inherit;font-size:13px;font-weight:400;line-height:1.4;box-shadow:0 3px 12px #0000000f}
+body[data-appearance-theme="light"] .ddw-editor .dge-tool-palette>summary:not([aria-disabled=true]){
+    background:var(--dm-control-bg,var(--surface-1,#fff));
+    border-color:var(--dm-control-border,var(--border-strong,#cbd5e1));
+    color:var(--dm-control-text,var(--text-primary,#172033));
+    transition:var(--dm-control-transition);
+}
+body[data-appearance-theme="light"] .ddw-editor .dge-tool-palette>summary:not([aria-disabled=true]):hover{
+    background:var(--dm-control-hover-bg,var(--surface-2,#f8fafc));
+    border-color:var(--dm-control-hover-border,var(--border-strong,#cbd5e1));
+}
 .ddw-editor .dge-tool-palette>.dge-overlay-tools{position:fixed;visibility:hidden;width:160px;gap:8px;flex-wrap:nowrap;z-index:20}
 .ddw-editor .dge-tool-palette>summary[aria-disabled=true]{opacity:1;color:color-mix(in srgb,var(--text-primary,#172033) 55%,transparent);cursor:default}
 .ddw-side-actions>button:disabled{cursor:default}

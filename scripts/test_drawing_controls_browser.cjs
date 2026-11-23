@@ -50,7 +50,23 @@ async function checkIcon(button, name, size) {
   assert.ok(rect && Math.abs(rect.width - size) <= 1 && Math.abs(rect.height - size) <= 1, name + ': glyph remains visible at its intended size');
 }
 
-async function drawingPaint(page, searchBackground) {
+async function drawingPaint(page, searchBackground, theme) {
+  if (theme === 'light') {
+    const paletteControls = [page.locator('.dge-tool-palette > summary'),
+      page.locator('.ddw-side-actions > button').nth(0), page.locator('.ddw-side-actions > button').nth(1)];
+    const palettePaint = control => control.evaluate(node => Object.fromEntries(
+      ['backgroundColor','backgroundImage','borderTopColor','color'].map(key => [key,getComputedStyle(node)[key]])));
+    await page.mouse.move(0,0); await settle(page);
+    const expectedPalette = await palettePaint(paletteControls[1]);
+    for (const control of paletteControls) assert.deepEqual(await palettePaint(control),expectedPalette,
+      'Drawing tools, drawing settings and graph information share the same light-theme palette');
+    if (!mobile(page)) {
+      const hovered = [];
+      for (const control of paletteControls) { await control.hover(); await settle(page); hovered.push(await palettePaint(control)); }
+      for (const paint of hovered) assert.deepEqual(paint,hovered[0], 'All three drawing controls share hover colors');
+      await page.mouse.move(0,0); await settle(page);
+    }
+  }
   const controls = await page.locator('.dge-view-controls').evaluate(node => {
     const css = getComputedStyle(node), minus = node.querySelector('[data-overlay-tool="zoom-out"]').getBoundingClientRect();
     const undo = document.querySelector('[data-editor-undo]').getBoundingClientRect(), clear = document.querySelector('[data-editor-clear]').getBoundingClientRect(), row=node.parentElement.getBoundingClientRect();
@@ -232,7 +248,7 @@ async function runCase(browser, width, theme, offline) {
     const name = 'Drawing controls ' + width + (offline ? ' offline' : ' online');
     await page.locator('.ddw-name').fill(name);
     await settle(page);
-    await drawingPaint(page, searchBackground);
+    await drawingPaint(page, searchBackground, theme);
     await undoRedo(page);
     await safeHistoryDelete(page, name, offline);
     if (!offline) {
