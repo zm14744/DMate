@@ -55,6 +55,12 @@ async function appearance(page) {
   });
 }
 async function appearanceControls(page) {
+  const separators = await page.locator('#appearanceModal').evaluate(dialog => [
+    ...[...dialog.querySelectorAll('.modal-head, .appearance-section')].map(node => getComputedStyle(node).borderBottomWidth),
+    ...[...dialog.querySelectorAll('.appearance-apply-hint, .appearance-footer')].map(node => getComputedStyle(node).borderTopWidth)
+  ]);
+  assert.ok(separators.length > 0 && separators.every(width => width === '0px'),
+    'Appearance groups and dialog chrome have no internal divider lines');
   return page.locator('#appearanceModal').evaluate(dialog => {
     const selectors = ['.appearance-card', '.modal-head', '.appearance-section-title',
       '[data-appearance-mode="dark"]', '[data-appearance-accent="purple"]', '[data-appearance-font="large"]',

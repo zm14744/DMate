@@ -2392,11 +2392,6 @@ body[data-appearance-theme="light"] .msg-actions button {
 
 .appearance-section {
     padding:15px 0;
-    border-bottom:1px solid var(--surface-3);
-}
-
-.appearance-section:last-child {
-    border-bottom:none;
 }
 
 .appearance-section-title {
@@ -2552,7 +2547,6 @@ body[data-appearance-theme="light"] .msg-actions button {
     justify-content:space-between;
     gap:10px;
     padding:14px 16px;
-    border-top:1px solid var(--surface-3);
 }
 
 @media (max-width: 720px) {
@@ -6503,9 +6497,6 @@ body[data-appearance-theme="dark"] .ocr-review-dialog {
 body[data-appearance-theme="dark"] .modal-head {
     border-bottom-color:#343434 !important;
 }
-body[data-appearance-theme="dark"] .appearance-section {
-    border-bottom-color:#343434 !important;
-}
 body[data-appearance-theme="dark"] .appearance-segmented button,
 body[data-appearance-theme="dark"] .appearance-background-actions button:not(.primary),
 body[data-appearance-theme="dark"] .appearance-footer button:not(.primary) {
@@ -8130,12 +8121,7 @@ body[data-appearance-theme] .appearance-footer {
     background-image:none !important;
 }
 body[data-appearance-theme] .appearance-apply-hint {
-    border-top:1px solid var(--dm-frost-border) !important;
-    border-bottom:0 !important;
     margin:0 !important;
-}
-body[data-appearance-theme] .appearance-footer {
-    border-top:0 !important;
 }
 body[data-appearance-theme] .appearance-background-preview[data-has-background="true"] {
     color:transparent !important;
@@ -8162,9 +8148,8 @@ body[data-appearance-theme] #appearanceModal .appearance-footer {
     background:var(--dm-frost-panel-strong) !important;
     background-image:none !important;
 }
-body[data-appearance-theme] #appearanceModal .appearance-apply-hint,
-body[data-appearance-theme] #appearanceModal .appearance-footer {
-    border-top:0 !important;
+body[data-appearance-theme] #appearanceModal .modal-head {
+    border-bottom:0 !important;
 }
 body[data-appearance-theme] #appearanceModal .appearance-apply-hint {
     box-shadow:none !important;
