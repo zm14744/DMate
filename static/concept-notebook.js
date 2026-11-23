@@ -4,6 +4,12 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
 const contentNode=node=>{node.setAttribute('data-i18n-content','');return node;};
 const copy=value=>JSON.parse(JSON.stringify(value));
 const LIMITS={notes:100,title:160,content:6000,total:180000,selected:12,analysis:24000};
+function squarePenIcon(doc){
+ const icon=doc.createElementNS('http://www.w3.org/2000/svg','svg');
+ for(const [name,value] of Object.entries({class:'dmate-lucide-icon',viewBox:'0 0 24 24',width:20,height:20,fill:'none',stroke:'currentColor','stroke-width':1.8,'stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true',focusable:'false','data-icon':'square-pen'}))icon.setAttribute(name,value);
+ icon.innerHTML='<path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M16 3a2.121 2.121 0 0 1 3 3l-9 9-4 1 1-4Z"/>';
+ return icon;
+}
 function mount(options){
  const button=options.button,dialog=options.dialog;
  if(!button||!dialog)throw new Error(uiText('笔记本入口未加载。'));
@@ -23,7 +29,7 @@ function mount(options){
  const closeButton=action('',close,'dcn-close');closeButton.title='关闭笔记本';closeButton.setAttribute('aria-label','关闭笔记本');heading.append(headingText,closeButton);
  const content=el('div','dcn-content'),sidebar=el('aside','dcn-sidebar'),main=el('section','dcn-main');
  sidebar.setAttribute('aria-label','概念笔记列表');
- const newButton=action('＋ 新概念',create,'dcn-new'),search=el('input','dcn-search');search.type='search';search.placeholder='搜索';search.setAttribute('aria-label','搜索');
+ const newButton=action('',create,'dcn-new'),search=el('input','dcn-search');newButton.append(squarePenIcon(d),el('span','dmate-ui-label','新概念'));search.type='search';search.placeholder='搜索';search.setAttribute('aria-label','搜索');
  const searchWrap=el('div','dcn-search-wrap'),searchClear=action('',()=>{search.value='';renderList();search.focus({preventScroll:true});},'dcn-search-clear');
  searchClear.setAttribute('aria-label','清空搜索');searchClear.title='清空搜索';searchClear.hidden=true;searchWrap.append(search,searchClear);
  const list=el('div','dcn-list'),selection=el('div','dcn-selection'),count=el('span');

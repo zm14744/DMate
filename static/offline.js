@@ -569,7 +569,10 @@
     host.replaceChildren();
     const sidebar = el("aside", "dcn-sidebar"), main = el("section", "dcn-main");
     sidebar.setAttribute("aria-label", tr("概念笔记列表", "Concept note list"));
-    const create = button(tr("＋ 新概念", "＋ New concept"), "dcn-new", createNote);
+    const create = action(tr("新概念", "New concept"), "dcn-new", createNote, "square-pen");
+    const createIcon = create.querySelector("svg");
+    if (createIcon) for (const [name, value] of Object.entries({width:20,height:20,fill:"none",stroke:"currentColor","stroke-width":1.8,
+      "stroke-linecap":"round","stroke-linejoin":"round","data-icon":"square-pen"})) createIcon.setAttribute(name, value);
     create.id = "addNote";
     const search = el("input", "dcn-search");
     search.type = "search"; search.placeholder = tr("搜索", "Search"); search.setAttribute("aria-label", tr("搜索", "Search")); search.value = state.noteQuery;

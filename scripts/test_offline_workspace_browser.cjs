@@ -55,13 +55,16 @@ async function ready(page, expectedPanel = 'graph') {
   assert.equal(await page.locator('#addMistake,#recordDialog,#recordForm,#recordTitle,#recordContent,#cancelRecord').count(),0,
     'Removed manual mistake controls are absent');
   assert.deepEqual(await page.locator('.offline-nav-item[data-panel]').evaluateAll(items => items.map(item => item.dataset.panel)), panels);
+  assert.deepEqual(await page.locator('.offline-sidebar-bottom > button').evaluateAll(items => items.map(item => item.id)),
+    ['offlineImportDataBtn', 'offlineExportDataBtn', 'offlineAppearanceBtn', 'returnOnline'],
+    'Data actions keep their order, followed by appearance and the online entry');
   const entries = await page.evaluate(() => {
     const online = document.getElementById('returnOnline'), appearance = document.getElementById('offlineAppearanceBtn');
-    return { order: Boolean(online.compareDocumentPosition(appearance) & Node.DOCUMENT_POSITION_FOLLOWING),
-      onlineBottom: online.getBoundingClientRect().bottom, appearanceTop: appearance.getBoundingClientRect().top };
+    return { order: Boolean(appearance.compareDocumentPosition(online) & Node.DOCUMENT_POSITION_FOLLOWING),
+      appearanceBottom: appearance.getBoundingClientRect().bottom, onlineTop: online.getBoundingClientRect().top };
   });
-  assert.equal(entries.order, true, 'The online entry precedes appearance in sidebar reading order');
-  assert.ok(entries.onlineBottom <= entries.appearanceTop + 1, 'The online button is displayed above appearance');
+  assert.equal(entries.order, true, 'Appearance precedes the online entry in sidebar reading order');
+  assert.ok(entries.appearanceBottom <= entries.onlineTop + 1, 'Appearance is displayed above the online button');
   await page.locator('.offline-panel:not([hidden])').waitFor({ state: 'visible' });
   assert.equal(await page.locator('.offline-nav-item.active').getAttribute('data-panel'), expectedPanel, 'The default or restored module is selected');
   assert.equal(await page.locator('.offline-topbar .mobile-topbar-brand,.offline-topbar .mobile-dmate-mark,#offlineMobileTitle').count(), 0,
@@ -128,12 +131,15 @@ async function onlineOfflineEntry(page) {
     };
     const icon = offline.querySelector('svg').getBoundingClientRect();
     const text = offline.querySelector('span').getBoundingClientRect();
-    return { followsAccount: Boolean(account.compareDocumentPosition(offline) & Node.DOCUMENT_POSITION_FOLLOWING),
-      precedesAppearance: Boolean(offline.compareDocumentPosition(appearance) & Node.DOCUMENT_POSITION_FOLLOWING),
+    return { order: [...document.querySelectorAll('#conversationSidebar > .btn:not(#newChatBtn)')].map(node => node.id),
+      followsAppearance: Boolean(appearance.compareDocumentPosition(offline) & Node.DOCUMENT_POSITION_FOLLOWING),
+      precedesAccount: Boolean(offline.compareDocumentPosition(account) & Node.DOCUMENT_POSITION_FOLLOWING),
       offline: style(offline), appearance: style(appearance), iconRight: icon.right, textLeft: text.left,
       centerDifference: Math.abs(icon.y + icon.height / 2 - text.y - text.height / 2) };
   });
-  assert.ok(entry.followsAccount && entry.precedesAppearance, 'Offline entry sits below account and above appearance');
+  assert.deepEqual(entry.order, ['downloadAppBtn', 'exportDataBtn', 'appearanceBtn', 'offlineWorkspaceBtn', 'accountBtn'],
+    'Online sidebar keeps upper actions, followed by appearance, offline and account');
+  assert.ok(entry.followsAppearance && entry.precedesAccount, 'Offline entry sits below appearance and above account');
   assert.deepEqual(entry.offline, entry.appearance, 'Offline entry uses the neighboring sidebar button style');
   assert.equal(entry.offline.backgroundColor, 'rgba(0, 0, 0, 0)', 'Offline entry has no card background');
   assert.equal(entry.offline.boxShadow, 'none');

@@ -91,7 +91,7 @@ async function onlineStyles(page,theme) {
   await notebook.waitFor({state:'visible'});
   await checkNoteControlRow(notebook);
   result.create=await style(notebook.locator('.dcn-new'));
-  assert.equal(await notebook.locator('.dcn-new').innerText(),'＋ 新概念');
+  assert.equal(await notebook.locator('.dcn-new').innerText(),'新概念');
   assert.equal(await notebook.locator('.dcn-original').getAttribute('aria-label'),'概念内容');
   assert.equal((await notebook.locator('.dcn-editor label').last().innerText()).trim(),'概念内容');
   result.remove=await circle(notebook.locator('.dcn-note-delete'));
@@ -185,7 +185,7 @@ async function exercise(page,reference,width) {
 
   await navigate(page,'notes');
   assert.equal(await page.locator('#notesPanel .dcn-ai,#notesPanel .dcn-ai-actions,#notesPanel .dcn-question').count(),0,'The restored notebook has its original local controls and no AI panel');
-  assert.equal((await page.locator('#addNote').innerText()).trim(),'＋ 新概念');
+  assert.equal((await page.locator('#addNote').innerText()).trim(),'新概念');
   await checkNoteControlRow(page.locator('#notesPanel'));
   await page.locator('#addNote').click();
   await checkNoteControlRow(page.locator('#notesPanel'));

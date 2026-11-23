@@ -14773,7 +14773,7 @@ async function requestAiReply(session, options = {}) {
 
     try {
         // 导航到历史 AI 生成题时，旧记录可能还没有教学快照。先用
-        // 规则分类补齐，这样右侧“学习内容 / 本题难点”会和目标题同步。
+        // 规则分类补齐，这样右侧对话信息里的难点会和目标题同步。
         if (
             requestTargetCandidate
             && !supportingImagesOnly
@@ -23026,7 +23026,7 @@ function renderInfo() {
             // 后台仍使用 teaching.category；右侧概览只展示具体学习要点。
             if (teaching.focus_points.length) {
                 lines.push(
-                    dmateUiText("本题难点：", "Focus: ") + teaching.focus_points.map(dmateKnowledgeLabel).join(dmateUiLanguage() === "en" ? ", " : "、")
+                    dmateUiText("最近一题难点：", "Latest question focus: ") + teaching.focus_points.map(dmateKnowledgeLabel).join(dmateUiLanguage() === "en" ? ", " : "、")
                 );
             }
             if (teaching.knowledge_path.length >= 2) {
@@ -23644,7 +23644,7 @@ function initMobileAppShell() {
     const toolsClose = document.getElementById("mobileToolsClose");
     const backdrop = document.getElementById("mobileShellBackdrop");
     const sessionsBox = document.getElementById("sessions");
-    const newChatBtn = document.querySelector(".left > .btn:not(.appearance-entry)");
+    const newChatBtn = document.getElementById("newChatBtn");
 
     navBtn?.addEventListener("click", () => openMobileShellDrawer("left"));
     toolsBtn?.addEventListener("click", () => openMobileShellDrawer("tools"));

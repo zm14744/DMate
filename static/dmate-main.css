@@ -168,6 +168,16 @@ option {
     margin-bottom:10px;
 }
 
+#conversationSidebar > #newChatBtn {
+    display:flex;
+    align-items:center;
+    justify-content:flex-start;
+    gap:8px;
+    text-align:left;
+}
+
+#newChatBtn > svg { flex:none; }
+
 #sessions { flex:1; overflow-y:auto; overflow-anchor:none; }
 
 .session {
@@ -3887,13 +3897,6 @@ body[data-appearance-theme="light"] .msg-actions button {
 
     .mobile-drawer-head.mobile-drawer-close-row {
         justify-content:flex-end;
-    }
-
-    #conversationSidebar > #newChatBtn {
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        text-align:center !important;
     }
 
     .mobile-drawer-close {

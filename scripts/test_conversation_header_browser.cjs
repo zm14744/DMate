@@ -291,7 +291,12 @@ async function notebookButton(page) {
   await page.locator('#conceptNotebookBtn').click();
   await page.locator('#conceptNotebookDialog').waitFor({ state: 'visible' });
   const button = page.locator('#conceptNotebookDialog .dcn-sidebar > .dcn-new');
-  assert.equal(await button.innerText(), '＋ 新概念');
+  assert.equal(await button.innerText(), '新概念');
+  const paths = locator => locator.locator('svg[data-icon="square-pen"] > path').evaluateAll(nodes => nodes.map(node => node.getAttribute('d')));
+  const matchedPaths = await paths(source);
+  assert.equal(matchedPaths.length, 2);
+  assert.deepEqual(await paths(button), matchedPaths, 'Both creation buttons use the same square-pen icon');
+  assert.equal(await button.evaluate(node => getComputedStyle(node).justifyContent), 'flex-start');
   await page.mouse.move(0, 0); await page.locator('#conceptNotebookTitle').focus(); await settle(page);
   assert.deepEqual(await notebookStyle(button), idle, 'New concept matches the new-conversation button surface and typography');
   if (!mobile(page)) { await button.hover(); await settle(page);
@@ -303,7 +308,7 @@ async function notebookButton(page) {
   await notebookAiActions(page, button);
   const savedTitle = await page.locator('#conceptNotebookDialog .dcn-title').inputValue();
   await language(page, 'en');
-  assert.equal(await button.innerText(), '＋ New concept');
+  assert.equal(await button.innerText(), 'New concept');
   assert.equal(await page.locator('#conceptNotebookDialog .dcn-title').inputValue(), savedTitle, 'Language changes preserve concept content');
   await language(page, 'zh-CN');
   await page.locator('#conceptNotebookDialog .dcn-close').first().click();

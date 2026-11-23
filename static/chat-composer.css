@@ -532,9 +532,7 @@ body[data-appearance-theme] > .dmate-symbol-panel:not([hidden]) {
 }
 .dmate-symbol-panel-title {
     color:var(--text-strong,#0f172a);
-    font-size:14px;
-    line-height:1.4;
-    font-weight:600;
+    font:inherit;
 }
 
 /* Six focused categories: three evenly spaced tabs per row. */
@@ -677,7 +675,6 @@ body[data-appearance-theme] > .dmate-symbol-panel button:focus-visible {
         min-height:24px;
         margin-bottom:5px;
     }
-    .dmate-symbol-panel-title { font-size:13px; }
     .dmate-symbol-tabs {
         gap:3px;
         padding:0 0 5px;

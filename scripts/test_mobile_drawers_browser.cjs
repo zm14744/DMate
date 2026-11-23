@@ -198,12 +198,15 @@ async function runCase(browser, width, theme) {
     await checkHeader(page, '#conversationSidebar');
     const button = page.locator('#newChatBtn');
     const label = await button.evaluate(node => {
-      const rect = node.getBoundingClientRect(), range = document.createRange();
-      range.selectNodeContents(node); const text = range.getBoundingClientRect();
-      return { center: rect.x + rect.width / 2, textCenter: text.x + text.width / 2, text: node.textContent.trim() };
+      const icon = node.querySelector('svg'), text = node.querySelector('.dmate-ui-label');
+      const bounds = node.getBoundingClientRect(), style = getComputedStyle(node);
+      return { icon: icon.dataset.icon, text: text.textContent,
+        inset: icon.getBoundingClientRect().left - bounds.left,
+        padding: parseFloat(style.paddingLeft) + parseFloat(style.borderLeftWidth) };
     });
-    assert.equal(label.text, '＋ 新对话');
-    near(label.textCenter, label.center, 'New conversation label is centered');
+    assert.equal(label.text, '新对话');
+    assert.equal(label.icon, 'square-pen');
+    near(label.inset, label.padding, 'New conversation icon and label start at the left inset');
     const oldCount = await page.locator('#sessions .session').count();
     await button.tap();
     await page.waitForFunction(count => document.querySelectorAll('#sessions .session').length === count + 1, oldCount);

@@ -131,7 +131,7 @@ async function run(browser,width) {
       const drawn=await page.locator('#knowledgeGraphCanvas .kg-mobile-node,#knowledgeGraphCanvas .kg-node-group')
         .evaluateAll(nodes=>nodes.map(node=>node.dataset.knowledgeNodeId).sort());
       assert.deepEqual(drawn,expected.ids,source+': actual renderer uses fixed scope');
-      assert.match(await page.locator('#info').textContent(),/本题难点：集合运算/);
+      assert.match(await page.locator('#info').textContent(),/最近一题难点：集合运算/);
     }
     assert.deepEqual(errors,[]);assert.deepEqual(calls,[],'Viewing, saving and restoring fixed results needs no inference');
     console.log('PASS '+width+': manual/OCR/generated recognition, differing answers, history, wrong-book persistence, source binding and explicit exercise settings remain consistent');
