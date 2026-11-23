@@ -394,6 +394,18 @@ body[data-appearance-theme] .center > .input-wrap > :is(.input,.manual-question-
     }
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) > #manualQuestionMode {
         width:min(168px,100%);
+        opacity:0;
+        visibility:hidden;
+        pointer-events:none;
+        transition:opacity .16s ease, visibility .16s ease;
+    }
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]):not(.dmate-mode-switch-open) {
+        --dmate-mode-row-height:0px;
+    }
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]).dmate-mode-switch-open > #manualQuestionMode {
+        opacity:1;
+        visibility:visible;
+        pointer-events:auto;
     }
 }
 /* Activation does not add an outer ring, including the real file picker

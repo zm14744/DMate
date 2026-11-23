@@ -48,6 +48,31 @@ function initManualQuestionMode() {
             checkpointGuestDrafts();
         });
     }
+    // On phones, tapping the message field toggles the compact mode switch.
+    // Keep tablet/desktop controls always available.
+    const input = document.getElementById("text");
+    const wrap = container.closest(".input-wrap");
+    if (input && wrap && window.matchMedia) {
+        const phone = window.matchMedia("(max-width:680px)");
+        const syncVisibility = () => {
+            const hidden = phone.matches && !wrap.classList.contains("dmate-mode-switch-open");
+            container.inert = hidden;
+            if (hidden) container.setAttribute("aria-hidden", "true");
+            else container.removeAttribute("aria-hidden");
+        };
+        input.addEventListener("click", () => {
+            if (!phone.matches) return;
+            wrap.classList.toggle("dmate-mode-switch-open");
+            syncVisibility();
+        });
+        const onBreakpointChange = () => {
+            wrap.classList.remove("dmate-mode-switch-open");
+            syncVisibility();
+        };
+        if (phone.addEventListener) phone.addEventListener("change", onBreakpointChange);
+        else if (phone.addListener) phone.addListener(onBreakpointChange);
+        syncVisibility();
+    }
     refreshManualQuestionModeUi();
 }
 
