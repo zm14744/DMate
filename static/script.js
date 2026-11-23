@@ -29,6 +29,30 @@ function limitQuestionText(value) {
     return Array.from(String(value || "")).slice(0, MAX_QUESTION_TEXT_CHARS).join("");
 }
 
+function initMobileUserMessageActions() {
+    const chat = document.getElementById("chat");
+    if (!chat || !window.matchMedia) return;
+    const phone = window.matchMedia("(max-width:680px)");
+    const closeOpened = () => {
+        chat.querySelectorAll(".msg.user.dmate-message-actions-open").forEach(message => {
+            message.classList.remove("dmate-message-actions-open");
+        });
+    };
+    chat.addEventListener("click", event => {
+        if (!phone.matches || !(event.target instanceof Element)) return;
+        const bubble = event.target.closest(".msg.user > .msg-bubble");
+        if (!bubble || !chat.contains(bubble) || bubble.querySelector(".chat-message-edit")) return;
+        if (event.target.closest("button, a, input, textarea, select, [contenteditable], [role='button']")) return;
+        if (String(window.getSelection?.() || "").trim()) return;
+        const message = bubble.parentElement;
+        const wasOpen = message.classList.contains("dmate-message-actions-open");
+        closeOpened();
+        if (!wasOpen) message.classList.add("dmate-message-actions-open");
+    });
+    if (phone.addEventListener) phone.addEventListener("change", closeOpened);
+    else if (phone.addListener) phone.addListener(closeOpened);
+}
+
 function initManualQuestionMode() {
     // 仅保存当前浏览器标签页的输入偏好，不混入账号或 AI 回复数据。
     try { manualQuestionMode = sessionStorage.getItem(MANUAL_QUESTION_MODE_KEY) === "question"; }
@@ -47,31 +71,6 @@ function initManualQuestionMode() {
             refreshManualQuestionModeUi();
             checkpointGuestDrafts();
         });
-    }
-    // On phones, tapping the message field toggles the compact mode switch.
-    // Keep tablet/desktop controls always available.
-    const input = document.getElementById("text");
-    const wrap = container.closest(".input-wrap");
-    if (input && wrap && window.matchMedia) {
-        const phone = window.matchMedia("(max-width:680px)");
-        const syncVisibility = () => {
-            const hidden = phone.matches && !wrap.classList.contains("dmate-mode-switch-open");
-            container.inert = hidden;
-            if (hidden) container.setAttribute("aria-hidden", "true");
-            else container.removeAttribute("aria-hidden");
-        };
-        input.addEventListener("click", () => {
-            if (!phone.matches) return;
-            wrap.classList.toggle("dmate-mode-switch-open");
-            syncVisibility();
-        });
-        const onBreakpointChange = () => {
-            wrap.classList.remove("dmate-mode-switch-open");
-            syncVisibility();
-        };
-        if (phone.addEventListener) phone.addEventListener("change", onBreakpointChange);
-        else if (phone.addListener) phone.addListener(onBreakpointChange);
-        syncVisibility();
     }
     refreshManualQuestionModeUi();
 }
@@ -23951,6 +23950,7 @@ document.addEventListener(
         initAppearanceSystem();
         initDmateDownloadDialog();
         initManualQuestionMode();
+        initMobileUserMessageActions();
         installRichSelectionCopy();
         initMobileAppShell();
         installMobileVisualViewportFix();

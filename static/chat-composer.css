@@ -206,6 +206,16 @@ body[data-appearance-theme] .msg.user > .msg-actions > button.danger:hover {
         pointer-events:auto;
     }
 }
+/* Phone-only, tap user message to show its own action icons. AI actions remain visible. */
+@media(max-width:680px) {
+    body[data-appearance-theme] #chat .msg.user:not(.dmate-message-actions-open) > .msg-actions {
+        display:none;
+    }
+    body[data-appearance-theme] #chat .msg.user.dmate-message-actions-open > .msg-actions {
+        opacity:1;
+        pointer-events:auto;
+    }
+}
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > .manual-question-composer {
     order:1; position:relative; flex:1 1 0 !important; align-self:stretch !important;
     box-sizing:border-box; width:0 !important; min-width:0 !important;
@@ -394,18 +404,6 @@ body[data-appearance-theme] .center > .input-wrap > :is(.input,.manual-question-
     }
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) > #manualQuestionMode {
         width:min(168px,100%);
-        opacity:0;
-        visibility:hidden;
-        pointer-events:none;
-        transition:opacity .16s ease, visibility .16s ease;
-    }
-    body[data-appearance-theme] .center > .input-wrap:not([hidden]):not(.dmate-mode-switch-open) {
-        --dmate-mode-row-height:0px;
-    }
-    body[data-appearance-theme] .center > .input-wrap:not([hidden]).dmate-mode-switch-open > #manualQuestionMode {
-        opacity:1;
-        visibility:visible;
-        pointer-events:auto;
     }
 }
 /* Activation does not add an outer ring, including the real file picker
