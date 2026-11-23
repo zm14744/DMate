@@ -93,7 +93,7 @@ async function undoRedo(page) {
   assert.deepEqual(await read(), added, 'Redo restores the actual added vertex');
 }
 
-async function safeHistoryDelete(page, name) {
+async function safeHistoryDelete(page, name, offline) {
   await page.locator('.ddw-page-actions > button').filter({ hasText: /^历史绘图$/ }).click();
   const row = page.locator('.ddw-history-item').filter({ hasText: name });
   const remove = row.locator('.ddw-history-delete');
@@ -131,7 +131,7 @@ async function safeHistoryDelete(page, name) {
     'Drawing confirmation heading shares ordinary modal typography');
   assert.deepEqual(await paint(prompt.locator('.dmate-delete-confirm-close')), await paint(reference),
     'Drawing confirmation also uses the shared red close dot');
-  assert.equal(await prompt.locator('.dmate-delete-confirm-body').innerText(), '删除后，绘画内容将不可恢复');
+  assert.equal(await prompt.locator('.dmate-delete-confirm-body').innerText(), offline ? '删除操作不可逆' : '删除后，绘画内容将不可恢复');
   assert.ok(!(await prompt.innerText()).includes(name), 'The confirmation omits the drawing name');
   await prompt.locator('.dmate-delete-confirm-close').click();
   assert.deepEqual(await page.evaluate(() => window.__drawingControlsController.getPages().map(page => ({ id: page.id, name: page.name }))), before,
@@ -234,7 +234,7 @@ async function runCase(browser, width, theme, offline) {
     await settle(page);
     await drawingPaint(page, searchBackground);
     await undoRedo(page);
-    await safeHistoryDelete(page, name);
+    await safeHistoryDelete(page, name, offline);
     if (!offline) {
       await page.locator('#graphEditorClose').click();
       await pdfPaint(page);

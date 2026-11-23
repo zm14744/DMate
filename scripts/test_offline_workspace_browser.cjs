@@ -754,7 +754,7 @@ async function drawing(page, reference) {
     .locator('.ddw-history-delete').click();
   const warning = page.locator('.dmate-delete-confirm[open] .dmate-delete-confirm-body');
   await warning.waitFor({state:'visible'});
-  assert.equal(await warning.innerText(), '删除后，绘画内容将不可恢复');
+  assert.equal(await warning.innerText(), '删除操作不可逆');
   await page.locator('.dmate-delete-confirm-delete').click();
   await page.waitForFunction(count => document.querySelectorAll('.ddw-history-open').length === count, previousNames.length + 1);
   assert.deepEqual(await historyNames(), [...previousNames, '离线保存画板']);

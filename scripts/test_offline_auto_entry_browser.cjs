@@ -77,9 +77,9 @@ async function warm(page) {
   const deadline=Date.now()+30000;
   while(Date.now()<deadline) {
     if(await page.evaluate(async()=>{
-      const cache=await caches.open('dmate-offline-shell-v104');
+      const cache=await caches.open('dmate-offline-shell-v105');
       return !!await cache.match('/offline')
-        && !!await cache.match('/__dmate_offline_ready__/dmate-offline-shell-v104');
+        && !!await cache.match('/__dmate_offline_ready__/dmate-offline-shell-v105');
     }))return;
     await page.waitForTimeout(50);
   }

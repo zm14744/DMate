@@ -481,7 +481,7 @@
       card.append(answerDetails("查看答案", answer));
       const actions = el("div", "wrong-actions record-actions");
       const deletion = action(tr("移出错题本"), "secondary danger", async () => {
-        if (await confirmDelete($("mistakesPanel"), {title:"移出错题本", body:"确定要把这道题移出错题本吗？", confirmText:"移出"})) {
+        if (await confirmDelete($("mistakesPanel"), {title:"移除这个错题吗？", body:"移除操作不可逆", confirmText:"移出"})) {
           for (let index=0;index<records.length;index+=window.DMateOfflineVault.limits.batchRecords-1) {
             const batch = records.slice(index,index+window.DMateOfflineVault.limits.batchRecords-1);
             const previous = await transaction("settings","readonly",os => os.get("mistake-deletions"));
@@ -619,7 +619,7 @@
           if (state.noteDeletePending) return;
           state.noteDeletePending = row.id; renderActions();
           try {
-            if (!await confirmDelete($("notesPanel"), {title:"删除这个概念？", body:"删除后，笔记内容将不可恢复"})) return;
+            if (!await confirmDelete($("notesPanel"), {title:"删除这个概念？", body:"删除操作不可逆"})) return;
             if (!await flushNoteDrafts()) { toast("笔记尚未保存，请保留当前页面后重试。"); return; }
             await deleteNote(state.noteRows.find(note => note.id === row.id) || row); await renderNotes();
           } finally {
@@ -1055,6 +1055,7 @@
           requireWorkspace();
         }},
       features:{ai:false,upload:false},
+      deleteConfirmationBody:"删除操作不可逆",
       legacyDocument:{body_text:"",graphs:[{id:"G1",name:"我的图形",directed:false,weighted:false,vertices:[],edges:[]}]},
       onChange:() => {}
     });

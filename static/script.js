@@ -8711,8 +8711,8 @@ async function removeWrongQuestion(id) {
     let confirmed = false;
     try {
         confirmed = await showAppConfirm({
-            title: "移出错题本",
-            body: "确定要把这道题移出错题本吗？",
+            title: "移除这个错题吗？",
+            body: "移除后，复测统计将不可恢复",
             confirmText: "移出",
             confirmTone: "danger"
         });
