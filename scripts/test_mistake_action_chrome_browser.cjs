@@ -178,6 +178,7 @@ async function checkChatActions(page, exports) {
     renderChat();
   }, question);
   const actions = page.locator('.msg.user .msg-actions');
+  if (page.viewportSize().width <= 680) await page.locator('.msg.user > .msg-bubble').click();
   await actions.waitFor();
   assert.deepEqual(await actions.locator('svg[data-icon]').evaluateAll(icons => icons.map(icon => icon.dataset.icon)),
     ['copy', 'image', 'book-plus', 'pencil-line', 'trash'], 'Text copy comes before image export, then record, edit and delete');
@@ -196,6 +197,73 @@ async function checkChatActions(page, exports) {
     assert.equal(await page.locator('#knowledgeGraphCopyBtn').getAttribute('title'), label);
   }
   if (exports) await exportImage(page, image);
+}
+
+async function checkRetestLifecycle(page) {
+  const before = await page.evaluate(question => {
+    closeWrongBook();
+    const item = learningState.wrongQuestions[0];
+    Object.assign(item, { corrected: true, retestCount: 3, retestPassCount: 2, retestFailCount: 1,
+      manualRetestPassCount: 1, passedRetestSessionIds: ['lifecycle-delete'], retestPassed: true });
+    const retest = { wrongQuestionId: item.id, stage: 'finished', generatedQuestion: question,
+      generatedAnswer: '设 n=2k+1，展开平方即得。', referenceQuestion: question,
+      targetPoints: ['直接证明与反证法'], result: 'correct', startedAt: 100 };
+    sessions = ['lifecycle-delete', 'lifecycle-keep'].map(id => ({ id, name: id, createdAt: 100,
+      messages: [{ role: 'user', text: question }, { role: 'ai', text: retest.generatedAnswer }],
+      retest: { ...retest }, teaching: null, learningQuestion: null }));
+    currentId = sessions[0].id;
+    saveState(); saveLearningState(); renderSessions(); renderChat();
+    return JSON.parse(JSON.stringify(item));
+  }, question);
+  if (page.viewportSize().width <= 1100) {
+    if (!await page.evaluate(() => document.body.classList.contains('mobile-left-open'))) await page.locator('#mobileNavBtn').click();
+  } else if (await page.evaluate(() => document.documentElement.dataset.desktopSidebar !== 'expanded')) {
+    await page.locator('#desktopSidebarOpen').click();
+  }
+  const row = page.locator('.session[data-session-id="lifecycle-delete"]');
+  await row.hover(); await row.locator('.del').click();
+  await page.locator('#appConfirmConfirm').click();
+  await page.waitForFunction(() => !sessions.some(item => item.id === 'lifecycle-delete'));
+  const after = await page.evaluate(() => learningState.wrongQuestions[0]);
+  for (const key of ['retestCount', 'retestPassCount', 'retestFailCount', 'manualRetestPassCount', 'passedRetestSessionIds', 'retestPassed']) {
+    assert.deepEqual(after[key], before[key], 'Deleting a conversation preserves wrong-book ' + key);
+  }
+  assert.deepEqual(after.retestRecords.slice(0, before.retestRecords.length), before.retestRecords,
+    'Deleting a conversation preserves previously saved retest details');
+  const saved = after.retestRecords.find(item => item.id === 'lifecycle-delete');
+  assert.equal(saved?.question, question, 'Deletion saves the retest independently of its conversation');
+  assert.equal(saved.answer, '设 n=2k+1，展开平方即得。');
+  await page.evaluate(() => closeMobileShellDrawers());
+  await toolsEntry(page, 'wrongBookBtn');
+  await page.locator('#wrongBookList').getByRole('button', { name: '查看复测', exact: true }).click();
+  const savedRow = page.locator('.wrong-retest-review-row').filter({ has: page.locator('.wrong-retest-review-check:checked') });
+  assert.ok((await savedRow.innerText()).includes(question), 'The saved retest remains viewable after its conversation is deleted');
+  await page.evaluate(() => closeWrongRetestReview());
+  await page.locator('#wrongBookList').getByRole('button', { name: '移出错题本', exact: true }).click();
+  await page.locator('#appConfirmConfirm').click();
+  await page.waitForFunction(() => learningState.wrongQuestions.length === 0);
+  const result = await page.evaluate(({ question, oldId }) => {
+    const originalSession = sessions.find(item => item.id === 'lifecycle-keep');
+    const originalMessages = JSON.stringify(originalSession.messages);
+    const added = addWrongQuestion({ text: question, safeConfirmed: true,
+      referenceAnswer: '奇数的平方仍为奇数。' }, '', 'manual').entry;
+    const before = JSON.stringify(added);
+    const history = getWrongRetestSessions(added);
+    originalSession.retest.stage = 'checking';
+    const handled = processWrongQuestionRetestReply(originalSession, '回答正确。');
+    return { id: added.id, oldId, history, handled, unchanged: JSON.stringify(added) === before,
+      retest: originalSession.retest, messagesKept: JSON.stringify(originalSession.messages) === originalMessages,
+      tombstoned: Boolean(learningState.deletedWrongQuestionIds[oldId]),
+      stats: [added.retestCount, added.retestPassCount, added.retestFailCount, added.manualRetestPassCount],
+      records: added.retestRecords, passed: added.passedRetestSessionIds };
+  }, { question, oldId: before.id });
+  assert.equal(result.messagesKept, true, 'Removing a wrong-book entry preserves the original retest conversation');
+  assert.equal(result.tombstoned, true, 'The removed wrong-book ID stays deleted');
+  assert.notEqual(result.id, result.oldId, 'Re-adding the same question creates an independent wrong-book record');
+  assert.deepEqual(result.stats, [0, 0, 0, 0]);
+  assert.deepEqual([result.records, result.passed, result.history], [[], [], []]);
+  assert.equal(result.handled, false, 'An old conversation cannot update the replacement wrong-book record');
+  assert.equal(result.retest, null); assert.equal(result.unchanged, true);
 }
 
 async function runCase(browser, width, theme) {
@@ -218,9 +286,10 @@ async function runCase(browser, width, theme) {
     await checkWrongActions(page, reference, theme === 'dark');
     await checkHeadingLabels(page, reference.heading);
     await checkChatActions(page, theme === 'dark');
+    if (theme === 'dark') await checkRetestLifecycle(page);
     assert.deepEqual(modelRequests, [], 'The suite must not invoke AI endpoints');
     assert.deepEqual(errors, [], 'No browser script errors');
-    console.log('PASS ' + width + '/' + theme + ': graph-matched labels/sort, quiet actions, correction gate, ordered copy/export' + (theme === 'dark' ? ' and real PNG downloads' : ''));
+    console.log('PASS ' + width + '/' + theme + ': graph-matched labels/sort, quiet actions, correction gate, ordered copy/export' + (theme === 'dark' ? ', real PNG downloads and independent retest lifecycles' : ''));
   } finally { await context.close(); }
 }
 
