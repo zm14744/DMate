@@ -94,6 +94,7 @@ async function checkCourseGeometry(page, mobile) {
     const nodes = [...canvas.querySelectorAll(mobile ? '.kg-mobile-node' : '.kg-node-group')];
     const toGraph = paths[0].ownerSVGElement.getScreenCTM().inverse();
     const boxes = new Map();
+    const ranks = new Map();
     const issues = [];
     for (const node of nodes) {
       const id = node.dataset.knowledgeNodeId;
@@ -101,10 +102,13 @@ async function checkCourseGeometry(page, mobile) {
       const start = new DOMPoint(rect.left, rect.top).matrixTransform(toGraph);
       const end = new DOMPoint(rect.right, rect.bottom).matrixTransform(toGraph);
       boxes.set(id, { left: start.x, top: start.y, right: end.x, bottom: end.y });
+      const depth = Math.round(mobile ? start.y : start.x);
+      if (!ranks.has(depth)) ranks.set(depth, []);
+      ranks.get(depth).push({id, position: mobile ? start.x : start.y});
       const label = node.querySelector(mobile ? '.kg-mobile-node-name' : '.kg-node-label');
       if (getComputedStyle(label).writingMode !== 'horizontal-tb') issues.push(id + ': label direction');
     }
-    const edges = [];
+    const edges = [], traces = [];
     for (const path of paths) {
       const { from, to } = path.dataset, key = relation(from, to);
       edges.push(key);
@@ -123,9 +127,11 @@ async function checkCourseGeometry(page, mobile) {
         || !withinPort(start, parent) || !withinPort(end, child)) issues.push(key + ': port direction');
       const dx = end.x - start.x, dy = end.y - start.y;
       const otherNodes = [...boxes].filter(([id]) => id !== from && id !== to);
+      const samples = [];
       let bend = 0, lastProgress = mobile ? start.y : start.x;
       for (let distance = 3; distance < length; distance += 6) {
         const point = path.getPointAtLength(distance);
+        if (distance > 12 && length - distance > 12) samples.push(point);
         const progress = mobile ? point.y : point.x;
         if (progress < lastProgress - .1) { issues.push(key + ': doubles back'); break; }
         lastProgress = progress;
@@ -135,13 +141,34 @@ async function checkCourseGeometry(page, mobile) {
         if (crossing) { issues.push(key + ': crosses ' + crossing[0]); break; }
       }
       if (bend < 1) issues.push(key + ': no visible curvature');
+      traces.push({key, samples, stroke: new Path2D(d), box: path.getBBox(), start, end});
+    }
+    // Probe six consecutive points along one centreline against a narrow stroke of
+    // the other. A single crossing or a shared connection at a node is allowed.
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.lineWidth = .7;
+    for (let i = 0; i < traces.length; i++) {
+      for (const other of traces.slice(i + 1)) {
+        let run = 0;
+        for (const {x, y} of traces[i].samples) {
+          const r = other.box;
+          const inside = x >= r.x - 1 && x <= r.x + r.width + 1 && y >= r.y - 1 && y <= r.y + r.height + 1;
+          if (inside && Math.hypot(x - other.start.x, y - other.start.y) > 12
+            && Math.hypot(x - other.end.x, y - other.end.y) > 12 && ctx.isPointInStroke(other.stroke, x, y)) {
+            if (++run === 6) { issues.push(traces[i].key + ': overlaps ' + other.key); break; }
+          } else run = 0;
+        }
+      }
     }
     return { ids: nodes.map(node => node.dataset.knowledgeNodeId).sort(), expectedIds: model.map(node => node.id).sort(),
-      edges: edges.sort(), expectedEdges: expectedEdges.sort(), issues };
+      edges: edges.sort(), expectedEdges: expectedEdges.sort(), issues,
+      ranks: [...ranks].sort(([a], [b]) => a - b).map(([, nodes]) =>
+        nodes.sort((a, b) => a.position - b.position).map(node => node.id)) };
   }, mobile);
   assert.deepEqual(result.ids, result.expectedIds, 'The full graph displays each course node once');
   assert.deepEqual(result.edges, result.expectedEdges, 'The full graph displays each course relationship once');
   assert.deepEqual(result.issues, [], 'Every course edge curves between the correct ports and clears other nodes');
+  return result.ranks;
 }
 
 async function checkZoomLimits(browser, width) {
@@ -149,6 +176,7 @@ async function checkZoomLimits(browser, width) {
   const page = await browser.newPage({viewport:{width,height:900},
     ...(mobile ? {isMobile:true,hasTouch:true} : {})});
   const errors = [];
+  let courseRanks;
   page.on('pageerror', error => errors.push(error.message));
   try {
     await page.goto(baseURL, {waitUntil:'networkidle'});
@@ -158,7 +186,7 @@ async function checkZoomLimits(browser, width) {
       await page.evaluate(value => setKnowledgeGraphFilter(value), category);
       if (mobile && !await page.locator('.kg-mobile-viewport').count()) await page.locator('.kg-mobile-expand').click();
       await page.locator(mobile ? '.kg-mobile-viewport' : '.kg-desktop-viewport').waitFor();
-      if (category === '全部') await checkCourseGeometry(page, mobile);
+      if (category === '全部') courseRanks = await checkCourseGeometry(page, mobile);
       const result = await page.evaluate(async ({mobile, extendedIdle}) => {
         const view = document.querySelector(mobile ? '.kg-mobile-viewport' : '.kg-desktop-viewport');
         const surface = view.querySelector(mobile ? '.kg-mobile-zoom-surface' : '.kg-desktop-zoom-surface');
@@ -221,6 +249,7 @@ async function checkZoomLimits(browser, width) {
     }
     assert.deepEqual(errors, [], width + ': zoom-limit browser errors');
     console.log('PASS ' + width + ': every module keeps all frames and graph/label DOM stable at both zoom limits');
+    return courseRanks;
   } finally { await page.close(); }
 }
 
@@ -659,7 +688,10 @@ async function checkNodeGestures(browser, width) {
     ignoreDefaultArgs:['--hide-scrollbars'],
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
-    for (const width of [1440, 390]) await checkZoomLimits(browser, width);
+    const desktopRanks = await checkZoomLimits(browser, 1440);
+    const mobileRanks = await checkZoomLimits(browser, 390);
+    assert.ok(desktopRanks?.length > 1, 'The reference graph contains multiple prerequisite levels');
+    assert.deepEqual(mobileRanks, desktopRanks, 'Mobile rows preserve the nodes and order of each desktop column');
     for (const width of [1440, 390]) await checkReturnPreservesView(browser, width);
     for (const width of [1440, 820, 390]) await checkPanelPresentation(browser, width);
     for (const width of [390, 620]) await checkNodeGestures(browser, width);

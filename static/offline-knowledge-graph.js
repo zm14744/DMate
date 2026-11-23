@@ -70,17 +70,6 @@ function computeKnowledgeGraphLevels(nodes) {
     return memo;
 }
 
-// Graph connections use a collision-free corridor when a direct curve would
-// cross an intermediate knowledge node. Shared by SVG, mobile view and PNG.
-
-function routeKnowledgeGraphConnection(fromId, toId, start, end, positions, nodeWidth, nodeHeight, crossSize, vertical = false) {
-    return root.DMateKnowledgeGraphLabels.routeConnection(fromId, toId, start, end, positions, nodeWidth, nodeHeight, crossSize, vertical);
-}
-
-function knowledgeGraphRouteSvgD(route) {
-    return root.DMateKnowledgeGraphLabels.routeSvgD(route);
-}
-
 function clampMobileGraphScale(value) {
     const number = Number(value);
     if (!Number.isFinite(number)) return 1;
@@ -831,55 +820,16 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
         return;
     }
 
-    const levels = computeKnowledgeGraphLevels(nodes);
-    const orderedNodes = nodes.slice();
-    const orderMap = new Map(
-        orderedNodes.map((node, index) => [node.id, index])
+    const { orderedNodes, columns, columnKeys } = window.DMateKnowledgeGraphLabels.groupRanks(
+        nodes, computeKnowledgeGraphLevels(nodes)
     );
-    const columnsPerRow = 3;
-    const columns = new Map();
 
-    for (const node of orderedNodes) {
-        const level = levels.get(node.id) || 0;
-        if (!columns.has(level)) columns.set(level, []);
-        columns.get(level).push(node);
-    }
-
-    const columnKeys = [...columns.keys()].sort((a, b) => a - b);
-    // 按前一层前置节点的重心排列同层知识点，减少线条在层间交叉。
-    const previousOrder = new Map();
-    const categoryOrder = new Map();
-    nodes.forEach(node => {
-        if (!categoryOrder.has(node.category)) categoryOrder.set(node.category, categoryOrder.size);
-    });
-    for (const key of columnKeys) {
-        const group = columns.get(key);
-        group.sort((a, b) => {
-            const average = node => {
-                const indexes = (node.prerequisites || [])
-                    .map(name => previousOrder.get(name)).filter(Number.isFinite);
-                return indexes.length
-                    ? indexes.reduce((sum, value) => sum + value, 0) / indexes.length
-                    : Number.POSITIVE_INFINITY;
-            };
-            return (categoryOrder.get(a.category) - categoryOrder.get(b.category))
-                || average(a) - average(b)
-                || orderMap.get(a.id) - orderMap.get(b.id);
-        });
-        group.forEach((node, index) => {
-            const rowStart = Math.floor(index / columnsPerRow) * columnsPerRow;
-            const rowLength = Math.min(columnsPerRow, group.length - rowStart);
-            previousOrder.set(node.name, index % columnsPerRow - (rowLength - 1) / 2);
-        });
-    }
-
-    // 每层最多三卡一行，避免横向撑宽；层间为上下分支保留走线空间。
+    // 复用桌面分层与同层顺序，只把阅读方向改为从上到下。
     const levelCount = Math.max(columnKeys.length, 1);
     const marginX = 38;
     const marginY = 48;
     const gapX = 40;
     const gapY = 96;
-    const subrowGap = 72;
     const nodeWidth = dmateUiLanguage() === "en" ? 190 : 144;
     const labelPack = window.DMateKnowledgeGraphLabels.prepare(nodes, {
         label: node => dmateKnowledgeLabel(node.name),
@@ -888,12 +838,9 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
         badgeSize: 10, badgeWeight: 600, paddingX: 12, paddingY: 10, gap: 5
     });
     const nodeHeight = labelPack.height;
-    const maxColumns = Math.min(columnsPerRow, Math.max(...columnKeys.map(key => columns.get(key).length), 1));
-    const rowCounts = columnKeys.map(key => Math.ceil(columns.get(key).length / columnsPerRow));
-    const totalRows = rowCounts.reduce((sum, count) => sum + count, 0);
+    const maxColumns = Math.max(...columnKeys.map(key => columns.get(key).length), 1);
     const stageWidth = marginX * 2 + maxColumns * nodeWidth + (maxColumns - 1) * gapX;
-    const stageHeight = marginY * 2 + totalRows * nodeHeight
-        + (totalRows - levelCount) * subrowGap + (levelCount - 1) * gapY;
+    const stageHeight = marginY * 2 + levelCount * nodeHeight + (levelCount - 1) * gapY;
 
     const viewport = document.createElement("div");
     viewport.className = "kg-mobile-viewport offline-graph-canvas";
@@ -921,70 +868,20 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     stage.appendChild(edgeSvg);
 
     const positions = new Map();
-    let levelTop = marginY;
     for (let levelIndex = 0; levelIndex < columnKeys.length; levelIndex += 1) {
         const level = columnKeys[levelIndex];
         const group = columns.get(level);
+        const totalWidth = group.length * nodeWidth + Math.max(group.length - 1, 0) * gapX;
+        const startX = (stageWidth - totalWidth) / 2;
+        const y = marginY + levelIndex * (nodeHeight + gapY);
         for (let index = 0; index < group.length; index += 1) {
-            const subrow = Math.floor(index / columnsPerRow);
-            const rowLength = Math.min(columnsPerRow, group.length - subrow * columnsPerRow);
-            const totalWidth = rowLength * nodeWidth + (rowLength - 1) * gapX;
-            const startX = (stageWidth - totalWidth) / 2;
             const node = group[index];
-            const x = startX + (index % columnsPerRow) * (nodeWidth + gapX);
-            const y = levelTop + subrow * (nodeHeight + subrowGap);
+            const x = startX + index * (nodeWidth + gapX);
             positions.set(node.id, { x, y });
         }
-        const rowCount = rowCounts[levelIndex];
-        levelTop += rowCount * nodeHeight + (rowCount - 1) * subrowGap + gapY;
     }
 
-    const byName = new Map(nodes.map(node => [node.name, node]));
-    const edges = [];
-    const outgoing = new Map();
-    const incoming = new Map();
-    for (const node of orderedNodes) {
-        for (const prerequisiteName of node.prerequisites || []) {
-            const parent = byName.get(prerequisiteName);
-            if (!parent || !positions.has(parent.id) || !positions.has(node.id)) continue;
-            const edge = {from:parent.id, to:node.id};
-            edges.push(edge);
-            if (!outgoing.has(edge.from)) outgoing.set(edge.from, []);
-            if (!incoming.has(edge.to)) incoming.set(edge.to, []);
-            outgoing.get(edge.from).push(edge);
-            incoming.get(edge.to).push(edge);
-        }
-    }
-    // 每条线分配自己的节点连接端口：全部保留，不再隐藏“次级关系”。
-    const distributePort = (index, count) => (index - (count - 1) / 2) *
-        Math.min(11, (nodeWidth - 24) / Math.max(count, 1));
-    for (const group of outgoing.values()) {
-        group.sort((a, b) => positions.get(a.to).x - positions.get(b.to).x);
-    }
-    for (const group of incoming.values()) {
-        group.sort((a, b) => positions.get(a.from).x - positions.get(b.from).x);
-    }
-    for (const edge of edges) {
-        const from = positions.get(edge.from);
-        const to = positions.get(edge.to);
-        const outGroup = outgoing.get(edge.from);
-        const inGroup = incoming.get(edge.to);
-        const x1 = from.x + nodeWidth / 2 + distributePort(outGroup.indexOf(edge), outGroup.length);
-        const x2 = to.x + nodeWidth / 2 + distributePort(inGroup.indexOf(edge), inGroup.length);
-        const y1 = from.y + nodeHeight;
-        const y2 = to.y;
-        const route = routeKnowledgeGraphConnection(
-            edge.from, edge.to, {x:x1,y:y1}, {x:x2,y:y2},
-            positions, nodeWidth, nodeHeight, stageWidth, true
-        );
-        const path = createSvgElement("path", {
-            class:"kg-mobile-edge",
-            d:knowledgeGraphRouteSvgD(route),
-            "data-from":edge.from,
-            "data-to":edge.to
-        });
-        edgeSvg.appendChild(path);
-    }
+    root.DMateKnowledgeGraphLabels.appendGraphConnections(edgeSvg, orderedNodes, positions, nodeWidth, nodeHeight, stageWidth, true);
 
     for (const node of orderedNodes) {
         const position = positions.get(node.id);
@@ -1167,34 +1064,9 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
         return;
     }
 
-    const levels = computeKnowledgeGraphLevels(nodes);
-    const orderedNodes = nodes.slice();
-    const orderMap = new Map(
-        orderedNodes.map(
-            (node, index) => [node.id, index]
-        )
+    const { orderedNodes, columns, columnKeys } = window.DMateKnowledgeGraphLabels.groupRanks(
+        nodes, computeKnowledgeGraphLevels(nodes)
     );
-
-    const columns = new Map();
-
-    for (const node of orderedNodes) {
-        const level = levels.get(node.id) || 0;
-        if (!columns.has(level)) {
-            columns.set(level, []);
-        }
-        columns.get(level).push(node);
-    }
-
-    const columnKeys = [...columns.keys()].sort((a, b) => a - b);
-
-    for (const key of columnKeys) {
-        columns.get(key).sort(
-            (a, b) => (
-                orderMap.get(a.id)
-                - orderMap.get(b.id)
-            )
-        );
-    }
 
     const mobileGraphLayout = !options.forCopy && isMobileAppShell();
     let nodeWidth = dmateUiLanguage() === "en" ? 190 : 132;
@@ -1285,42 +1157,7 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
         }
     }
 
-    const byName = new Map(
-        nodes.map(node => [node.name, node])
-    );
-
-    for (const node of orderedNodes) {
-        const current = positions.get(node.id);
-
-        if (!current) continue;
-
-        for (const prerequisiteName of node.prerequisites) {
-            const previousNode = byName.get(prerequisiteName);
-
-            if (!previousNode) continue;
-
-            const previous = positions.get(previousNode.id);
-
-            if (!previous) continue;
-
-            const x1 = previous.x + nodeWidth;
-            const y1 = previous.y + nodeHeight / 2;
-            const x2 = current.x;
-            const y2 = current.y + nodeHeight / 2;
-            const route = routeKnowledgeGraphConnection(
-                previousNode.id, node.id, {x:x1,y:y1}, {x:x2,y:y2},
-                positions, nodeWidth, nodeHeight, svgHeight
-            );
-            const path = createSvgElement("path", {
-                class: "kg-edge",
-                "data-from": previousNode.id,
-                "data-to": node.id,
-                d: knowledgeGraphRouteSvgD(route)
-            });
-
-            svg.appendChild(path);
-        }
-    }
+    root.DMateKnowledgeGraphLabels.appendGraphConnections(svg, orderedNodes, positions, nodeWidth, nodeHeight, svgHeight);
 
     for (const node of orderedNodes) {
         const position = positions.get(node.id);

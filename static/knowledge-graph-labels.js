@@ -132,10 +132,22 @@ function paint(ctx,value,x,y,options={}){
  }
  ctx.restore();
 }
+// Keep the desktop rank membership and original in-rank data order in every
+// orientation. Mobile changes the reading direction, not the graph structure.
+function groupRanks(nodes,levels){
+ const orderedNodes=nodes.slice(),columns=new Map();
+ for(const node of orderedNodes){
+  const level=levels.get(node.id)||0;
+  if(!columns.has(level))columns.set(level,[]);
+  columns.get(level).push(node);
+ }
+ return {orderedNodes,columns,columnKeys:[...columns.keys()].sort((a,b)=>a-b)};
+}
 // Route in a horizontal coordinate system. For a vertical graph crossSize is
 // the stage width; the normal nodeWidth/nodeHeight arguments remain unchanged.
 // Reflecting the main axis also supports both top-to-bottom and bottom-to-top.
-function routeConnection(fromId,toId,start,end,positions,nodeWidth,nodeHeight,crossSize,vertical=false){
+function createRoutingSession(){return {cells:new Map()};}
+function routeConnection(fromId,toId,start,end,positions,nodeWidth,nodeHeight,crossSize,vertical=false,session=null){
  const main=point=>vertical?point.y:point.x;
  const sign=main(end)<main(start)?-1:1;
  const point=point=>[sign*main(point),vertical?point.x:point.y];
@@ -183,22 +195,96 @@ function routeConnection(fromId,toId,start,end,positions,nodeWidth,nodeHeight,cr
   }
   return true;
  };
- const finish=segments=>({type:'curves',x1:start.x,y1:start.y,segments:segments.map(segment=>[
-  ...restore(segment.slice(0,2)),...restore(segment.slice(2,4)),...restore(segment.slice(4,6))
- ])});
+ const sampleRoute=segments=>{
+  const samples=[];let previous=first,total=0;
+  for(const segment of segments){
+   const b=segment.slice(0,2),c=segment.slice(2,4),d=segment.slice(4,6);
+   const length=Math.hypot(b[0]-previous[0],b[1]-previous[1])+Math.hypot(c[0]-b[0],c[1]-b[1])+Math.hypot(d[0]-c[0],d[1]-c[1]);
+   const steps=Math.max(2,Math.ceil(length/8));
+   for(let index=samples.length?1:0;index<=steps;index++){
+    const t=index/steps,u=1-t;
+    const p=[u*u*u*previous[0]+3*u*u*t*b[0]+3*u*t*t*c[0]+t*t*t*d[0],u*u*u*previous[1]+3*u*u*t*b[1]+3*u*t*t*c[1]+t*t*t*d[1]];
+    const derivative=[3*u*u*(b[0]-previous[0])+6*u*t*(c[0]-b[0])+3*t*t*(d[0]-c[0]),3*u*u*(b[1]-previous[1])+6*u*t*(c[1]-b[1])+3*t*t*(d[1]-c[1])];
+    const size=Math.hypot(...derivative)||1,world=restore(p);
+    const tangent=vertical?[derivative[1]/size,sign*derivative[0]/size]:[sign*derivative[0]/size,derivative[1]/size];
+    const prior=samples.at(-1),px=prior?.x??world[0],py=prior?.y??world[1];
+    const step=Math.hypot(world[0]-px,world[1]-py);
+    total+=step;samples.push({x:world[0],y:world[1],px,py,tx:tangent[0],ty:tangent[1],distance:total,step});
+   }
+   previous=d;
+  }
+  // Short, unavoidable port fan-out is not a shared routing corridor.
+  return samples.filter(sample=>sample.distance>12&&sample.distance<total-12);
+ };
+ const key=(x,y)=>Math.floor(x/8)+','+Math.floor(y/8);
+ const occupied=samples=>{
+  if(!session?.cells?.size)return 0;
+  let score=0;const runs=[0,0,0],limits=[6,1,.4],weights=[1,20,1000];
+  for(const sample of samples){
+   let nearest=Infinity;
+   const x=Math.floor(sample.x/8),y=Math.floor(sample.y/8);
+   for(let dx=-2;dx<=2;dx++)for(let dy=-2;dy<=2;dy++){
+    for(const previous of session.cells.get((x+dx)+','+(y+dy))||[]){
+     if(Math.abs(sample.tx*previous.tx+sample.ty*previous.ty)<.99756||!previous.step)continue;
+     const vx=previous.x-previous.px,vy=previous.y-previous.py;
+     const t=Math.max(0,Math.min(1,((sample.x-previous.px)*vx+(sample.y-previous.py)*vy)/(previous.step*previous.step)));
+     nearest=Math.min(nearest,Math.hypot(sample.x-previous.px-t*vx,sample.y-previous.py-t*vy));
+    }
+   }
+   // A shared centerline costs much more than a brief crossing or two
+   // distinguishable nearby curves. Use segment distances, not sample phase.
+   if(nearest<6)score+=sample.step*.12;
+   for(let i=0;i<limits.length;i++){
+    runs[i]=nearest<limits[i]?runs[i]+sample.step:0;
+    if(runs[i]>24)score+=sample.step*weights[i];
+   }
+  }
+  return score;
+ };
+ const finish=(segments,samples)=>{
+  if(session?.cells){
+   for(const sample of samples||sampleRoute(segments)){
+    const cell=key((sample.x+sample.px)/2,(sample.y+sample.py)/2),list=session.cells.get(cell)||[];
+    list.push(sample);session.cells.set(cell,list);
+   }
+  }
+  return {type:'curves',x1:start.x,y1:start.y,segments:segments.map(segment=>[
+   ...restore(segment.slice(0,2)),...restore(segment.slice(2,4)),...restore(segment.slice(4,6))
+  ])};
+ };
+ let bestRoute=null,bestScore=Infinity,bestSamples=null;
+ const consider=(segments,shapeCost=0)=>{
+  if(!segments.length||!clearRoute(segments))return false;
+  const samples=session?.cells?.size?sampleRoute(segments):null;
+  const score=shapeCost+occupied(samples||[]);
+  if(score<bestScore){bestRoute=segments;bestScore=score;bestSamples=samples;}
+  return score<.001;
+ };
  // Short relations follow one bend. Keep the control points in order on
  // the main axis so a connection always advances toward the next level.
- const connect=(a,b,arc=0)=>{
-  const reach=(b[0]-a[0])/3;
-  return [a[0]+reach,a[1]+arc,b[0]-reach,b[1]+arc,...b];
+ const connect=(a,b,arc=0,curvature=.42,skew=0)=>{
+  const distance=b[0]-a[0],reach=distance*curvature,shift=distance*skew;
+  return [a[0]+reach+shift,a[1]+arc,b[0]-reach+shift,b[1]+arc,...b];
  };
- const shallow=Math.abs(last[1]-first[1])<5;
+ const shallow=Math.abs(last[1]-first[1])<12;
  const direct=[connect(first,last,shallow?2.5:0)];
- if(clearRoute(direct))return finish(direct);
- if(shallow){
-  const opposite=[connect(first,last,-2.5)];
-  if(clearRoute(opposite))return finish(opposite);
+ if(consider(direct))return finish(bestRoute,bestSamples);
+ // Only crowded direct paths need a different handle length or one shallow
+ // arch. All controls stay ordered; no local bows or backwards twists appear.
+ if(session?.cells?.size){
+  for(const [index,curvature] of [.32,.5,.24].entries())consider([connect(first,last,shallow?2.5:0,curvature)],1+index);
+  // Moving both handles along the main axis separates broad sideways sweeps
+  // without adding a bend or reversing the relation's reading direction.
+  for(const [index,skew] of [.12,-.12,.22,-.22,.32,-.32].entries())
+   consider([connect(first,last,shallow?2.5:0,.42,skew)],1+index*.25);
  }
+ if(shallow){
+  const arcs=session?.cells?.size?[-2.5,10.5,-10.5,18.5,-18.5,26.5,-26.5]:[-2.5];
+  for(const arc of arcs)consider([connect(first,last,arc)],Math.abs(arc)*.15);
+ }
+ // A clear single curve stays a single curve. A brief acute crossing must
+ // never send a relation out to a distant corridor and back again.
+ if(bestRoute)return finish(bestRoute,bestSamples);
 
  // A blocked relation changes lanes in the two rank gaps next to its
  // endpoints. Between them it follows one clear channel, past any number
@@ -211,7 +297,9 @@ function routeConnection(fromId,toId,start,end,positions,nodeWidth,nodeHeight,cr
  const depart=first[0]+Math.min(distance*.4,exitLimit-first[0]);
  const arrive=last[0]-Math.min(distance*.4,last[0]-entryLimit);
  const center=(first[1]+last[1])/2;
- const lanes=[...new Set([6,limit-6,center,...rectangles.flatMap(rect=>[rect.top-6,rect.bottom+6])])]
+ const baseLanes=[6,limit-6,center,...rectangles.flatMap(rect=>[rect.top-6,rect.bottom+6])];
+ const offsets=session?.cells?.size?[0,-8,8,-16,16,-24,24]:[0];
+ const lanes=[...new Set(baseLanes.flatMap(lane=>offsets.map(offset=>lane+offset)))]
   .filter(y=>y>=4&&y<=limit-4)
   .sort((a,b)=>Math.abs(a-first[1])+Math.abs(a-last[1])-Math.abs(b-first[1])-Math.abs(b-last[1])
    ||Math.abs(a-center)-Math.abs(b-center));
@@ -221,10 +309,16 @@ function routeConnection(fromId,toId,start,end,positions,nodeWidth,nodeHeight,cr
   const endLane=lane===last[1]?last:[arrive,lane];
   return [...join(first,startLane),...join(startLane,endLane),...join(endLane,last)];
  };
- const channel=lanes.find(lane=>clearRoute(through(lane)));
  const minCross=Math.min(first[1],last[1]),maxCross=Math.max(first[1],last[1]);
  const excursion=lane=>Math.max(minCross-lane,lane-maxCross,0);
- if(channel!==undefined&&excursion(channel)<=height)return finish(through(channel));
+ let channel;
+ for(const lane of lanes){
+  const candidate=through(lane);
+  if(!clearRoute(candidate))continue;
+  if(channel===undefined)channel=lane;
+  consider(candidate,8+excursion(lane)*.1+Math.abs(lane-center)*.002);
+  if(!session?.cells?.size&&excursion(lane)<=height)return finish(candidate);
+ }
 
  // A staggered row can close an interior channel. Allow one lane change
  // between ranks if that avoids sending the whole relation around the rim.
@@ -257,8 +351,8 @@ function routeConnection(fromId,toId,start,end,positions,nodeWidth,nodeHeight,cr
   furthest=Math.max(furthest,rect.right);
   if(furthest>=arrive)break;
  }
- if(best)return finish(best);
- if(channel!==undefined)return finish(through(channel));
+ if(best)consider(best,10+bestShift*.1);
+ if(bestRoute)return finish(bestRoute,bestSamples);
  // Preserve the relation even if a custom layout has no usable rank gap.
  return finish(direct);
 }
@@ -270,5 +364,58 @@ function strokeCanvasRoute(ctx,route){
  for(const segment of route.segments)ctx.bezierCurveTo(...segment);
  ctx.stroke();
 }
-root.DMateKnowledgeGraphLabels={layout,prepare,applySvg,applyHtml,paint,fontScale,fontFamily,routeConnection,routeSvgD,strokeCanvasRoute};
+
+function routeGraphConnections(nodes,positions,nodeWidth,nodeHeight,crossSize,vertical=false){
+ const byName=new Map(nodes.map(node=>[node.name,node.id]));
+ const edges=[],outgoing=new Map(),incoming=new Map();
+ for(const node of nodes){
+  if(!positions.has(node.id))continue;
+  for(const name of new Set(node.prerequisites||[])){
+   const from=byName.get(name);
+   if(!positions.has(from))continue;
+   const edge={from,to:node.id};
+   edges.push(edge);
+   if(!outgoing.has(from))outgoing.set(from,[]);
+   if(!incoming.has(node.id))incoming.set(node.id,[]);
+   outgoing.get(from).push(edge);
+   incoming.get(node.id).push(edge);
+  }
+ }
+ const cross=vertical?'x':'y',main=vertical?'y':'x';
+ const crossSizeOfNode=vertical?nodeWidth:nodeHeight;
+ const inset=Math.min(12,crossSizeOfNode/4);
+ const assignPorts=(groups,other,side)=>{
+  const depth=side==='start'?(vertical?nodeHeight:nodeWidth):0;
+  for(const [id,group] of groups){
+   group.sort((a,b)=>{
+    const first=positions.get(a[other]),second=positions.get(b[other]);
+    return first[cross]-second[cross]||first[main]-second[main];
+   });
+   const pos=positions.get(id);
+   const step=Math.min(12,(crossSizeOfNode-2*inset)/Math.max(1,group.length-1));
+   group.forEach((edge,index)=>{
+    const offset=crossSizeOfNode/2+(index-(group.length-1)/2)*step;
+    edge[side]=vertical?{x:pos.x+offset,y:pos.y+depth}:{x:pos.x+depth,y:pos.y+offset};
+   });
+  }
+ };
+ assignPorts(outgoing,'to','start');
+ assignPorts(incoming,'from','end');
+ const session=createRoutingSession();
+ return edges.map(({from,to,start,end})=>({
+  from,to,route:routeConnection(from,to,start,end,positions,nodeWidth,nodeHeight,crossSize,vertical,session)
+ }));
+}
+function appendGraphConnections(svg,nodes,positions,nodeWidth,nodeHeight,crossSize,vertical=false){
+ const className=vertical?'kg-mobile-edge':'kg-edge';
+ for(const {from,to,route} of routeGraphConnections(nodes,positions,nodeWidth,nodeHeight,crossSize,vertical)){
+  const path=svg.ownerDocument.createElementNS(svg.namespaceURI,'path');
+  path.setAttribute('class',className);
+  path.setAttribute('data-from',from);
+  path.setAttribute('data-to',to);
+  path.setAttribute('d',routeSvgD(route));
+  svg.appendChild(path);
+ }
+}
+root.DMateKnowledgeGraphLabels={layout,prepare,applySvg,applyHtml,paint,fontScale,fontFamily,groupRanks,createRoutingSession,routeConnection,routeSvgD,strokeCanvasRoute,routeGraphConnections,appendGraphConnections};
 })(typeof window!=='undefined'?window:globalThis);
