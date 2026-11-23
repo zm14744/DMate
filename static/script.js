@@ -1198,6 +1198,7 @@ function ensureConversationComposerWorkspace() {
 
 function captureConversationComposerDraft() {
     ensureConversationComposerWorkspace();
+    if (composerMessageEdit) return;
     const input = document.getElementById("text");
     if (!input || conversationComposerOwner == null) return;
     const id = conversationComposerOwner.startsWith("session:") ? conversationComposerOwner.slice(8) : null;
@@ -1276,7 +1277,7 @@ function clearConversationComposerDraft(sessionId, expectedText) {
     draft.text = "";
     conversationComposerDrafts[key] = draft;
     conversationComposerDirty.add(key);
-    if (conversationComposerOwner === key) applyConversationComposerDraft(draft);
+    if (conversationComposerOwner === key && !composerMessageEdit) applyConversationComposerDraft(draft);
     persistConversationComposerDrafts();
     return true;
 }
@@ -4369,6 +4370,15 @@ function stopCurrentAiReply() {
 }
 
 function handleSendOrStop() {
+    if (composerMessageEdit) {
+        const input = document.getElementById("text");
+        if (input && !input.disabled && input.value.trim()
+            && window.dmateChatComposer?.canSubmit?.() !== false
+            && (!window.dmateVoiceInput || window.dmateVoiceInput.state === "idle")) {
+            void submitChatMessageEdit(composerMessageEdit, input.value);
+        }
+        return;
+    }
     if (isSessionBusy(currentId) || isSessionPendingAiStart(currentId) || isCurrentSessionTyping()
         || ocrBatchRuns.has(sessionBusyKey(currentId))) {
         stopCurrentAiReply();
@@ -4442,6 +4452,7 @@ function isCurrentSessionTyping() {
 }
 
 function refreshInputAvailability() {
+    const editing = Boolean(composerMessageEdit);
     const pendingStart = isSessionPendingAiStart(currentId);
     const typingNow = isCurrentSessionTyping()
         || Boolean(currentRequestStreamPreview()?.element?.isConnected);
@@ -4464,21 +4475,25 @@ function refreshInputAvailability() {
     // The graph editor is a modal: composer status text sits behind it and
     // is unreadable. Do not render an OCR-specific lock banner or placeholder.
     // Keep the real input lock while the editor is open.
-    if (!ocrReviewInProgress && typingNow) {
+    if (!editing && !ocrReviewInProgress && typingNow) {
         statusText = "AI 正在回答";
-    } else if (!ocrReviewInProgress && waitingReply) {
+    } else if (!editing && !ocrReviewInProgress && waitingReply) {
         statusText = "AI 正在思考";
     }
 
+    const editLimit = editing ? chatMessageEditLimit(composerMessageEdit.message) : 0;
+    const editOverLimit = editing && Array.from(input?.value || "").length > editLimit;
+    if (editOverLimit) statusText = dmateUiText(`单条文字消息最多 ${editLimit} 字符`, `A message can contain at most ${editLimit} characters`);
     if (input) {
-        input.disabled = hardBlocked || ocrReviewInProgress;
+        input.disabled = (!editing && hardBlocked) || ocrReviewInProgress;
         input.placeholder = ocrReviewInProgress ? "" : placeholder;
+        if (editing) input.setAttribute("aria-invalid", String(editOverLimit));
     }
     window.dmateChatComposer?.refresh?.();
     // Recognition requests have their own cards and cancellation controls.
     // Only an open editor locks the composer; other originals keep running.
     const recognizing = Boolean(ocrReviewInProgress);
-    const stoppingAllowed = !recognizing && Boolean(waitingReply || typingNow);
+    const stoppingAllowed = !editing && !recognizing && Boolean(waitingReply || typingNow);
     const visibleMode = recognizing ? "ocr" : stoppingAllowed ? "ai" : "idle";
     const voiceActive = visibleMode === "idle" && Boolean(window.dmateVoiceInput?.state && window.dmateVoiceInput.state !== "idle");
 
@@ -4492,8 +4507,8 @@ function refreshInputAvailability() {
 
     if (sendBtn) {
         const sendVisible = visibleMode !== "ocr";
-        const hasContent = Boolean(input?.value.trim()) || getSessionOcrTasks().length > 0;
-        sendBtn.disabled = !sendVisible || (!stoppingAllowed && !hasContent);
+        const hasContent = Boolean(input?.value.trim()) || (!editing && getSessionOcrTasks().length > 0);
+        sendBtn.disabled = !sendVisible || editOverLimit || (!stoppingAllowed && !hasContent);
         sendBtn.textContent = stoppingAllowed ? "停止" : "发送";
         sendBtn.classList.toggle("ai-stop-button", stoppingAllowed);
         sendBtn.setAttribute("aria-label", stoppingAllowed ? "停止当前 AI 回复" : "发送消息");
@@ -4505,22 +4520,22 @@ function refreshInputAvailability() {
         }
     }
     if (imageBtn) {
-        imageBtn.disabled = visibleMode !== "idle" || voiceActive || getSessionOcrTasks().length >= OCR_MAX_CONCURRENT;
-        setInputControlVisible(imageBtn, visibleMode === "idle");
-        imageBtn.setAttribute("aria-hidden", String(visibleMode !== "idle" || voiceActive));
+        imageBtn.disabled = editing || visibleMode !== "idle" || voiceActive || getSessionOcrTasks().length >= OCR_MAX_CONCURRENT;
+        setInputControlVisible(imageBtn, !editing && visibleMode === "idle");
+        imageBtn.setAttribute("aria-hidden", String(editing || visibleMode !== "idle" || voiceActive));
     }
     if (imageInput) {
-        imageInput.disabled = visibleMode !== "idle" || voiceActive || getSessionOcrTasks().length >= OCR_MAX_CONCURRENT;
-        imageInput.setAttribute("aria-hidden", String(visibleMode !== "idle" || voiceActive));
+        imageInput.disabled = editing || visibleMode !== "idle" || voiceActive || getSessionOcrTasks().length >= OCR_MAX_CONCURRENT;
+        imageInput.setAttribute("aria-hidden", String(editing || visibleMode !== "idle" || voiceActive));
     }
     if (isOcrBatchPreparing()) {
-        if (sendBtn && !imageBatchActive) sendBtn.disabled = true;
+        if (sendBtn && !editing && !imageBatchActive) sendBtn.disabled = true;
         if (imageBtn) imageBtn.disabled = true;
         if (imageInput) imageInput.disabled = true;
     }
     window.dmateVoiceInput?.refresh?.();
     const imagePickerWrap = document.getElementById("imagePickerWrap");
-    if (imagePickerWrap) imagePickerWrap.hidden = visibleMode !== "idle";
+    if (imagePickerWrap) imagePickerWrap.hidden = visibleMode !== "idle" || (editing && !voiceActive);
     if (inputWrap) {
         inputWrap.classList.toggle("ai-input-busy", visibleMode === "ai");
         // CSS 必须只依赖最终可见状态，避免等待 OCR/思考回调时闪现按钮。
@@ -16628,7 +16643,7 @@ function removeOcrTask(id) {
 }
 
 function openImagePicker() {
-    if (ocrEditorTaskId || isOcrBatchPreparing() || isCurrentSessionTyping()
+    if (composerMessageEdit || ocrEditorTaskId || isOcrBatchPreparing() || isCurrentSessionTyping()
         || isSessionBusy(currentId) || isSessionPendingAiStart(currentId)) return;
     if (getSessionOcrTasks().length >= OCR_MAX_CONCURRENT) {
         showCurrentError("每个对话最多 4 张图片，请发送或移除已有图片后再添加。");
@@ -16655,7 +16670,7 @@ async function handleImageSelected(event) {
 
 async function enqueueOcrFiles(files) {
     const selected = Array.from(files || []);
-    if (!selected.length || ocrEditorTaskId) return;
+    if (!selected.length || ocrEditorTaskId || composerMessageEdit) return;
     if (isOcrBatchPreparing() || isOcrSendInProgress() || isSessionBusy(currentId)
         || isSessionPendingAiStart(currentId) || isCurrentSessionTyping()) return;
     if (selected.length > OCR_MAX_CONCURRENT || selected.length + getSessionOcrTasks().length > OCR_MAX_CONCURRENT) {
@@ -17254,6 +17269,16 @@ function ocrBatchCanContinue(run) {
         && sessions.includes(run.session) && !deletedSessionIds[sessionBusyKey(run.session.id)];
 }
 
+function ocrGroupRequestForApi(request, imageCount) {
+    if (!request || imageCount < 2) return request;
+    return ["本组图片共同组成当前任务。下面各条要求适用于本组全部图片，"
+        + "可以按图片顺序或原图图号引用组内其他图片的内容。"
+        + "“图片 n”只标明要求的录入来源，不限制其作用范围；"
+        + "图片序号按本组顺序从 1 开始，不引用其他组的图片。"
+        + "要求中明确指定的对象、限制和先后关系仍按原文执行。"
+        + "各图片及其子图仍是独立对象，不能仅因同组而合并顶点、边或图号。", request].join("\n\n");
+}
+
 function buildOcrGroupMessage(group, sharedRequest) {
     const contexts = sanitizeSemanticContexts(group.tasks.map(task => task.confirmation?.semantic_context));
     if (!contexts || contexts.some((context, index) => context.request_id !== group.tasks[index].id
@@ -17263,13 +17288,13 @@ function buildOcrGroupMessage(group, sharedRequest) {
     const rendered = ocrBatchQuestion(contexts, "rendered_question_text");
     // Numbering is local to this group, exactly like its signed batch context.
     const requirements = group.tasks.map((task, index) => task.userRequest?.trim()
-        ? `图片 ${index + 1}：${task.userRequest.trim()}` : "").filter(Boolean);
+        ? `图片 ${index + 1}：${task.userRequest}` : "").filter(Boolean);
     if (sharedRequest) requirements.push(sharedRequest);
     const userRequest = requirements.join("\n");
     const text = userRequest ? `${rendered}\n\n【我的要求】\n${userRequest}` : rendered;
     const apiText = userRequest
         ? ["【当前指向题目】", question, "【当前指向题目结束】", "",
-            "【本轮唯一需要执行的用户请求】", userRequest, "【本轮请求结束】"].join("\n")
+            "【本轮唯一需要执行的用户请求】", ocrGroupRequestForApi(userRequest, contexts.length), "【本轮请求结束】"].join("\n")
         : question;
     if (text.length > 28000 || apiText.length > 28000)
         throw new Error("同组题目内容过长，请减少图片或拆分组别后发送。");
@@ -17281,7 +17306,7 @@ function buildOcrGroupMessage(group, sharedRequest) {
 
 async function sendOcrBatch() {
     const tasks = getSessionOcrTasks();
-    if (isOcrBatchPreparing() || ocrEditorTaskId || !tasks.length) return;
+    if (composerMessageEdit || isOcrBatchPreparing() || ocrEditorTaskId || !tasks.length) return;
     const session = getCurrent();
     if (!session || tasks.some(task => !isLiveOcrTask(task))) return;
     if (currentId !== session.id || ocrSolvingSessions.has(session.id) || isSessionBusy(session.id)
@@ -17387,6 +17412,20 @@ function initializeChatComposer() {
     const input = document.getElementById("text");
     if (!input) return;
     window.dmateChatComposer = window.DMateChatComposer.mount({ input, onSend: () => handleSendOrStop() });
+    document.querySelector("#chatComposerEditBar .chat-composer-edit-icon")?.append(createChatActionIcon("pencil-line"));
+    document.getElementById("chatComposerEditCancel")?.addEventListener("click", cancelChatMessageEdit);
+    input.addEventListener("select", updateComposerMessageEditDraft);
+    input.addEventListener("keydown", event => {
+        if (!composerMessageEdit || event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
+        event.preventDefault();
+        event.stopPropagation();
+        cancelChatMessageEdit();
+    });
+    chatMessageEditPhone.addEventListener?.("change", () => {
+        if (!chatMessageEditState) return;
+        preserveChatScrollOnce = document.getElementById("chat")?.scrollTop ?? null;
+        renderChat();
+    });
 }
 
 function initializeVoiceInput() {
@@ -17398,7 +17437,8 @@ function initializeVoiceInput() {
         status: document.getElementById("voiceInputStatus"), endpoint: "/voice/transcribe",
         onError: message => showCurrentError(message),
         onStateChange: () => refreshInputAvailability(),
-        getContextKey: () => `${accountState.authenticated ? "account:" + accountState.username : "guest"}:${currentId ?? ""}`,
+        getContextKey: () => `${accountState.authenticated ? "account:" + accountState.username : "guest"}:${currentId ?? ""}`
+            + (composerMessageEdit ? ":edit:" + composerMessageEdit.message.messageId : ""),
         isBusy: () => Boolean(ocrReviewInProgress || isOcrBatchPreparing() || getSessionOcrTasks().length > 0 || isSessionBusy(currentId)
             || isSessionPendingAiStart(currentId) || isCurrentSessionTyping()) });
 }
@@ -17447,7 +17487,7 @@ function initializeOcrTaskPanel() {
             void enqueueOcrFiles(event.dataTransfer.files);
         });
         workspace.addEventListener("paste", event => {
-            if (ocrEditorTaskId) return;
+            if (ocrEditorTaskId || composerMessageEdit) return;
             const files = Array.from(event.clipboardData?.items || [])
                 .filter(item => item.kind === "file" && item.type.startsWith("image/"))
                 .map(item => item.getAsFile()).filter(Boolean);
@@ -17867,7 +17907,17 @@ function hideGeneratedExerciseKnowledgePoints(raw, teaching = null) {
     return output.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+const chatMessageEditPhone = window.matchMedia("(max-width:680px)");
 let chatMessageEditState = null;
+let composerMessageEdit = null;
+
+function chatMessageEditLimit(message) {
+    return message.source === "ocr" ? 28000 : MAX_CHAT_MESSAGE_CHARS;
+}
+
+function chatMessageEditSelection(input) {
+    return { start:input.selectionStart, end:input.selectionEnd, direction:input.selectionDirection };
+}
 
 function validChatMessageEdit(state = chatMessageEditState) {
     return Boolean(state && state.contextVersion === cloudSyncContextVersion
@@ -17877,6 +17927,47 @@ function validChatMessageEdit(state = chatMessageEditState) {
 
 function notifyChatMessageEditChange() {
     window.dispatchEvent(new Event("dmate:chat-edit-draftchange"));
+}
+
+function updateComposerMessageEditDraft(event) {
+    const state = composerMessageEdit;
+    if (state !== chatMessageEditState || !validChatMessageEdit(state) || getCurrent() !== state.session) return;
+    const input = event.currentTarget;
+    state.value = input.value;
+    state.selection = chatMessageEditSelection(input);
+    if (event.type === "select") notifyChatMessageEditChange();
+}
+
+function syncComposerMessageEdit(session) {
+    const state = chatMessageEditState;
+    const next = chatMessageEditPhone.matches && validChatMessageEdit(state) && state.session === session ? state : null;
+    if (composerMessageEdit === next) return;
+    const input = document.getElementById("text");
+    const bar = document.getElementById("chatComposerEditBar");
+    if (!input || !bar) return;
+    if (!composerMessageEdit) captureConversationComposerDraft();
+    else if (composerMessageEdit === state && state.session === session && document.activeElement === input) {
+        state.selection = chatMessageEditSelection(input);
+        state.focusOnRender = true;
+    }
+    composerMessageEdit = next;
+    input.closest(".input-wrap")?.classList.toggle("is-editing-message", Boolean(next));
+    input.setAttribute("aria-label", next ? dmateUiText("重新编辑消息", "Edit message") : dmateUiText("消息输入", "Message input"));
+    bar.hidden = !next;
+    if (next) {
+        input.value = next.value;
+        if (next.selection) input.setSelectionRange(next.selection.start, next.selection.end, next.selection.direction);
+    } else {
+        input.removeAttribute("aria-invalid");
+        applyConversationComposerDraft(getConversationComposerDraft(session?.id ?? null));
+    }
+    refreshInputAvailability();
+    // Keep the focus in the original tap handler so mobile browsers can open
+    // the keyboard while switching from the message action into the input.
+    if (next?.focusOnRender) {
+        next.focusOnRender = false;
+        input.focus({ preventScroll:true });
+    }
 }
 
 function beginChatMessageEdit(sessionId, messageIndex) {
@@ -17912,7 +18003,7 @@ function prepareChatMessageEditRender() {
     const input = state.controller?.textarea;
     if (input && document.activeElement === input) {
         state.focusOnRender = true;
-        state.selection = { start:input.selectionStart, end:input.selectionEnd, direction:input.selectionDirection };
+        state.selection = chatMessageEditSelection(input);
     }
     state.controller?.destroy();
     state.controller = null;
@@ -17920,9 +18011,9 @@ function prepareChatMessageEditRender() {
 
 function renderChatMessageEdit(session, message, bubble) {
     const state = chatMessageEditState;
-    if (!validChatMessageEdit(state) || state.session !== session || state.message !== message) return false;
+    if (composerMessageEdit === state || !validChatMessageEdit(state) || state.session !== session || state.message !== message) return false;
     const controller = window.DMateChatMessageEdit.mount({ host:bubble, value:state.value,
-        maxCharacters:message.source === "ocr" ? 28000 : MAX_CHAT_MESSAGE_CHARS,
+        maxCharacters:chatMessageEditLimit(message),
         onChange:(value, selection) => {
             if (chatMessageEditState !== state || !validChatMessageEdit(state)) return;
             state.value = value; state.selection = selection; notifyChatMessageEditChange();
@@ -17980,7 +18071,8 @@ function editedUserMessage(original, value) {
             message.source = "ocr";
             message.ocrIsQuestion = original.ocrIsQuestion !== false;
             message.apiText = request ? ["【当前指向题目】", apiQuestion, "【当前指向题目结束】", "",
-                "【本轮唯一需要执行的用户请求】", request, "【本轮请求结束】"].join("\n") : apiQuestion;
+                "【本轮唯一需要执行的用户请求】", contexts ? ocrGroupRequestForApi(request, contexts.length) : request,
+                "【本轮请求结束】"].join("\n") : apiQuestion;
             if (contexts) {
                 message.semanticContexts = contexts;
                 const group = sanitizeOcrGroup(original.ocrGroup, original);
@@ -18002,7 +18094,7 @@ async function submitChatMessageEdit(state, value) {
         || getCurrent() !== state.session) return;
     const session = state.session, original = state.message;
     const replacement = editedUserMessage(original, value);
-    const limit = replacement.source === "ocr" ? 28000 : MAX_CHAT_MESSAGE_CHARS;
+    const limit = chatMessageEditLimit(replacement);
     if (!replacement.text.trim() || Array.from(replacement.text).length > limit) {
         showCopyToast(dmateUiText(`单条文字消息最多 ${limit} 字符`, `A message can contain at most ${limit} characters`));
         return;
@@ -18511,6 +18603,7 @@ function renderChat(preparedReply = null) {
     const chat = document.getElementById("chat");
     if (!chat) return;
     const session = getCurrent();
+    syncComposerMessageEdit(session);
     const center = chat.closest(".center");
     if (window.DMateChatComposer?.transitionConversation) {
         window.DMateChatComposer.transitionConversation(center, !session);
@@ -24078,6 +24171,7 @@ document.addEventListener(
             );
         }
 
+        input?.addEventListener("input", updateComposerMessageEditDraft);
         input?.addEventListener("input", refreshInputAvailability);
         input?.addEventListener("input", checkpointGuestDrafts);
         window.addEventListener("dmate:chat-edit-draftchange", checkpointGuestDrafts);

@@ -4334,6 +4334,8 @@ def _chat_response(on_delta=None, cancelled=None):
             semantic_math.update(user_confirmed=True,
                 document_sha256=confirmed_context["document_sha256"],
                 confirmation_revision=confirmed_context["revision"])
+            if confirmed_batch:
+                semantic_math["confirmed_image_count"] = len(confirmed_context["confirmed_sources"])
             from graph_semantic_solver import confirmed_matrix_calculations
             semantic_math = confirmed_matrix_calculations(semantic_math, current_user_content)
         ai_teaching = dict(ai_teaching or {})

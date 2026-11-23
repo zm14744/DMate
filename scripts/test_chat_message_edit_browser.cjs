@@ -7,6 +7,78 @@ const reply = text => ({contentType:'text/event-stream',
  body:'event: final\ndata: '+JSON.stringify({reply:text})+'\n\n'});
 const pause = ms => new Promise(resolve => setTimeout(resolve,ms));
 
+async function checkPhoneComposer(browser) {
+ const context = await browser.newContext({ viewport:{ width:390, height:844 },
+  isMobile:true, hasTouch:true, serviceWorkers:'block' });
+ const page = await context.newPage(), requests=[], errors=[];
+ page.on('pageerror',error=>errors.push(error.message));
+ await page.route('**/auth/me',route=>route.fulfill({json:{authenticated:false}}));
+ await page.route('**/conversation/title',route=>route.fulfill({json:{}}));
+ await page.route('**/chat',route=>{
+  requests.push(route.request().postDataJSON());
+  return route.fulfill(reply('手机编辑后的回答'));
+ });
+ await page.route('**/ocr',()=>{ throw new Error('Editing must not upload a new image'); });
+ try {
+  const original='第一行原消息\n第二行原消息';
+  const regularDraft='原本尚未发送的聊天草稿';
+  const editDraft='改好的消息\n跨过刷新后继续';
+  await page.goto(baseURL,{waitUntil:'networkidle'});
+  await page.evaluate(text=>{
+   newChat();
+   getCurrent().messages=[{role:'user',text,manualIsQuestion:false},{role:'ai',text:'原来的回答'}];
+   saveState(); renderChat();
+  },original);
+  const input=page.locator('#text'), bar=page.locator('#chatComposerEditBar');
+  const open=async()=>{
+   await page.locator('.msg.user > .msg-bubble').tap();
+   await page.locator('.chat-message-edit-button').click();
+   await bar.waitFor({state:'visible'});
+  };
+  await input.fill(regularDraft);
+  const icon=await page.locator('.chat-message-edit-button svg').evaluate(node=>node.outerHTML);
+  await open();
+  assert.equal(await input.inputValue(),original,'The full original message enters the phone composer');
+  assert.equal(await input.evaluate(node=>node===document.activeElement),true);
+  assert.equal(await bar.locator('svg').evaluate(node=>node.outerHTML),icon,'The editor reuses the exact message edit icon');
+  assert.equal(await bar.innerText(),'','The strip has no visible heading or button text');
+  assert.equal(await bar.locator('.modal-close-dot').getAttribute('id'),'chatComposerEditCancel');
+  assert.equal(await page.locator('#imagePickerWrap').isHidden(),true);
+  assert.equal(await page.locator('.chat-message-edit-input').count(),0);
+  await page.evaluate(()=>enqueueOcrFiles([new File(['test'],'test.png',{type:'image/png'})]));
+  assert.equal(await page.evaluate(()=>getSessionOcrTasks().length),0);
+
+  await input.fill(editDraft);
+  await page.setViewportSize({width:820,height:844});
+  await page.locator('.chat-message-edit-input').waitFor();
+  assert.equal(await page.locator('.chat-message-edit-input').inputValue(),editDraft);
+  assert.equal(await input.inputValue(),regularDraft);
+  await page.setViewportSize({width:390,height:844});
+  await bar.waitFor({state:'visible'});
+  assert.equal(await input.inputValue(),editDraft);
+  await page.reload({waitUntil:'networkidle'});
+  await bar.waitFor({state:'visible'});
+  assert.equal(await input.inputValue(),editDraft,'Refreshing restores the edit draft in the same composer');
+  await page.locator('#chatComposerEditCancel').click();
+  assert.equal(await bar.isHidden(),true);
+  assert.equal(await input.inputValue(),regularDraft,'Cancel restores the regular draft');
+  assert.equal(await page.locator('#imagePickerWrap').isVisible(),true);
+  assert.deepEqual(await page.evaluate(()=>getCurrent().messages.map(message=>message.text)),[original,'原来的回答']);
+  assert.equal(requests.length,0);
+
+  await open();
+  await input.fill(editDraft);
+  await page.locator('#sendBtn').click();
+  await page.waitForFunction(()=>getCurrent().messages.some(message=>message.text==='手机编辑后的回答'));
+  assert.equal(requests.length,1);
+  assert.equal(requests[0].messages.at(-1).content,editDraft);
+  assert.equal(await bar.isHidden(),true);
+  assert.equal(await input.inputValue(),regularDraft,'Sending the edit also restores the regular draft');
+  assert.deepEqual(errors,[]);
+  console.log('PASS phone composer edit: full text, exact icon, no attachments, draft isolation, cancel and send');
+ } finally { await context.close(); }
+}
+
 (async () => {
  const browser = await chromium.launch({headless:true,
   ...(process.env.CHROMIUM_EXECUTABLE_PATH ? {executablePath:process.env.CHROMIUM_EXECUTABLE_PATH} : {})});
@@ -172,6 +244,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve,ms));
   for(const width of [390,1440]){
    await page.setViewportSize({width,height:900});
    await page.evaluate(()=>{renderChat();});
+   if(width===390) await page.locator('.msg.user > .msg-bubble').click();
    const button=page.locator('.msg.user .chat-message-edit-button').first();
    const chrome=await button.evaluate(node=>{const r=node.getBoundingClientRect(),svg=node.querySelector('svg'),css=getComputedStyle(svg);
     return{width:r.width,height:r.height,icon:svg.dataset.icon,svgWidth:css.width,stroke:svg.getAttribute('stroke-width')};});
@@ -261,5 +334,6 @@ const pause = ms => new Promise(resolve => setTimeout(resolve,ms));
   assert.deepEqual(retried,{result:true,calls:2,messages:0,deleted:true,draft:null,dirty:false,locked:false});
   await cloud.close();
   console.log('PASS cloud pulls/native updates wait for the draft; in-flight conflict defers replacement and later honors remote deletion');
+  await checkPhoneComposer(browser);
  } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

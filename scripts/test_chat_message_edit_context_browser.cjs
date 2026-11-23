@@ -91,6 +91,31 @@ function context(question, id = 'confirmed-image-one') {
     const canonical = grouped.map((value,index) => `【图片 ${index + 1}】\n${value.question_text}`).join('\n\n');
     const ocrGroup = {id:'confirmed-group',groupId:'group-one',members:[
       {requestId:'image-one',isQuestion:true},{requestId:'image-two',isQuestion:false}]};
+    const assembled = await page.evaluate(contexts => {
+      const tasks = contexts.map((context,index) => ({id:context.request_id,groupId:'group-one',
+        sourceSha256:context.source_sha256,confirmation:{semantic_context:context},isQuestion:index===0,
+        userRequest:index===0?'  用图2的条件解释图1。\n保留原图图号。  ':'核对两张图之间的差异。'}));
+      const foreign = {...tasks[0],id:'foreign-image',groupId:'other-group',userRequest:'OTHER_GROUP_ONLY'};
+      const original = tasks.map(task=>task.userRequest);
+      const group = partitionOcrTasks([tasks[0],foreign,tasks[1]])[0];
+      const message = buildOcrGroupMessage(group,'请逐条回应全部要求。');
+      return {message,original,after:tasks.map(task=>task.userRequest),
+        single:ocrGroupRequestForApi('只分析这张图。',1)};
+    },grouped);
+    assert.deepEqual(assembled.after,assembled.original,'Sharing scope never overwrites individual image drafts');
+    assert.equal(assembled.single,'只分析这张图。','Single-image request semantics stay unchanged');
+    for(const raw of assembled.original) assert.ok(assembled.message.apiText.includes(raw),'Keep each requirement verbatim');
+    assert.ok(assembled.message.apiText.includes('要求适用于本组全部图片'));
+    assert.ok(assembled.message.apiText.includes('引用组内其他图片'));
+    assert.ok(assembled.message.apiText.includes('图片 1：'+assembled.original[0]));
+    assert.ok(assembled.message.apiText.includes('图片 2：'+assembled.original[1]));
+    assert.ok(!assembled.message.apiText.includes('OTHER_GROUP_ONLY'),'Requirements never leak from another group');
+    assert.deepEqual(assembled.message.semanticContexts.map(context=>context.request_id),['image-one','image-two']);
+    await seed([assembled.message]);
+    payload = await sendEdit(0,assembled.message.text);
+    assert.ok(payload.messages.at(-1).content.includes('要求适用于本组全部图片'));
+    assert.ok(payload.messages.at(-1).content.includes(assembled.original[1]));
+    assert.ok(!JSON.stringify(payload).includes('OTHER_GROUP_ONLY'));
     await seed([{role:'user',source:'ocr',ocrIsQuestion:true,text:rendered + marker + '旧组合要求',
       apiText:canonical,semanticContexts:grouped,ocrGroup}]);
     payload = await sendEdit(0,rendered + marker + '结合第二张图解释');
@@ -99,6 +124,8 @@ function context(question, id = 'confirmed-image-one') {
     assert.deepEqual(payload.semantic_contexts.map(value => value.request_id),['image-one','image-two']);
     assert.equal(payload.semantic_context,undefined);
     assert.deepEqual(payload.semantic_contexts,edited.semanticContexts);
+    assert.ok(payload.messages.at(-1).content.includes('要求适用于本组全部图片'));
+    assert.ok(payload.messages.at(-1).content.includes('结合第二张图解释'));
     console.log('PASS grouped OCR edits preserve confirmed image order and question/supporting membership');
 
     // A student answer is rechecked against the retained generated question and reference answer.

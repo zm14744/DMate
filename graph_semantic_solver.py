@@ -349,9 +349,14 @@ def semantic_math_prompt(context):
         row['result'].pop('tool_audit', None)
     if 'question_reference' in context:
         data['question_reference'] = copy.deepcopy(context['question_reference'])
-    confirmed_notice = ('这份结构已由用户修改并确认，是本次解题唯一使用的图；聊天历史中的旧识别边表、'
+    confirmed_notice = ('这份结构已由用户修改并确认，是本次解题唯一使用的图形结构；聊天历史中的旧识别边表、'
                         '旧权值和旧疑点不得覆盖它。若用户需要再次改图，先要求在编辑器修改并重新确认，'
                         '不能悄悄把新假设当成已确认的结构。\n' if context.get('user_confirmed') is True else '')
+    if context.get('user_confirmed') is True and context.get('confirmed_image_count', 0) > 1:
+        confirmed_notice += ('本次确认的多张图片属于同一组，用户在任一图片录入的本轮要求对本组共同生效，'
+                             '可以按图片顺序或原图图号引用组内其他图片；要求的录入来源不限制作用范围。'
+                             '明确指定的对象、限制和先后关系仍按用户原文执行。'
+                             '只引用本次确认组，仍保留各图片和子图的独立身份，不把同号顶点或图号自动合并。\n')
     return (confirmed_notice + '\n【当前题目的统一语义结构与程序计算数据】\n'
             + json.dumps(data, ensure_ascii=False, separators=(',', ':'), allow_nan=False)
             + '\n【程序数据结束】\n'

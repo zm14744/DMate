@@ -5,6 +5,7 @@ not the quality of a production model's response.
 """
 from pathlib import Path
 import sys
+from types import ModuleType
 import unittest
 from unittest.mock import patch
 
@@ -114,6 +115,36 @@ class ConversationRouteTests(unittest.TestCase):
         self.assertEqual(context["context_scope"], "conversation")
         self.assertNotEqual(context["category"], "初等数论")
         self.assertIn("直接完成本轮", teaching_prompt(context))
+
+    def test_confirmed_image_group_passes_shared_scope_to_provider_without_merging_sources(self):
+        from graph_semantic_solver import semantic_math_prompt
+        question = "【图片 1】\n第一张的条件。\n\n【图片 2】\n第二张的条件。"
+        request = "图片 1：用图2的条件解释图1。\n图片 2：保留各自图号。"
+        content = _chat_support.anchored(question, request)
+        resolved = {"document": {"body_text": question, "graphs": []},
+                    "question_text": question, "source_sha256": "a" * 64,
+                    "document_sha256": "b" * 64, "revision": [1, 1],
+                    "confirmed_sources": [{"request_id": "one"}, {"request_id": "two"}]}
+        confirmation = ModuleType("graph_confirmation")
+        confirmation.ConfirmationError = RuntimeError
+        confirmation.confirmation_owner = lambda: "local-owner"
+        confirmation.resolve_confirmed_context = lambda *_: resolved
+        confirmation.attach_confirmation_cookie = lambda response: response
+        batch = ModuleType("graph_confirmation_batch")
+        batch.resolve_confirmed_batch = lambda *_: resolved
+        with patch.dict(sys.modules, {"graph_confirmation": confirmation, "graph_confirmation_batch": batch}), patch(
+            "graph_semantic_solver.inspect_semantic_graphs", return_value={"tool_audit": []}
+        ):
+            call = self.captured_request([message("user", content)], semantic_contexts=[{}, {}])
+            semantic = call.kwargs["teaching_context"]["semantic_math"]
+            self.assertEqual(call.args[0][-1]["content"], content)
+            self.assertEqual(semantic["document"], resolved["document"])
+            self.assertEqual(semantic["confirmed_image_count"], 2)
+            self.assertIn("要求对本组共同生效", semantic_math_prompt(semantic))
+            single_call = self.captured_request([message("user", content)], semantic_context={})
+            single = single_call.kwargs["teaching_context"]["semantic_math"]
+            self.assertNotIn("confirmed_image_count", single)
+            self.assertNotIn("要求对本组共同生效", semantic_math_prompt(single))
 
 
 class ProviderConversationTests(unittest.TestCase):

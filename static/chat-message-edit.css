@@ -48,6 +48,71 @@ body[data-appearance-theme] .msg.user:has(> .msg-bubble > .chat-message-edit) > 
     font-size:var(--dm-filled-font-size,14px);
 }
 .chat-message-edit-error[hidden] { display:none; }
+
+/* Mobile edits reuse the existing composer surface and its measured height. */
+#chatComposerEditBar { display:none; }
+@media(max-width:680px) {
+    body[data-appearance-theme] .center > .input-wrap.is-editing-message:not([hidden]) {
+        padding-top:0 !important;
+    }
+    .input-wrap.is-editing-message > #manualQuestionMode {
+        display:none !important;
+    }
+    body[data-appearance-theme] .center > .input-wrap.is-editing-message:not([hidden]) > .input {
+        flex-wrap:wrap !important;
+    }
+    .input-wrap.is-editing-message > .input > #imagePickerWrap:not([data-voice-active="true"]) {
+        display:none !important;
+    }
+    .input-wrap.is-editing-message > .input > #chatComposerEditBar:not([hidden]) {
+        display:flex;
+        order:-1;
+        flex:0 0 100%;
+        align-items:center;
+        justify-content:space-between;
+        box-sizing:border-box;
+        min-width:0;
+        padding:2px 4px 8px;
+        border-bottom:1px solid var(--border-strong);
+        color:var(--text-secondary);
+    }
+    .chat-composer-edit-icon {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        flex:0 0 20px;
+        width:20px;
+        height:20px;
+    }
+    .chat-composer-edit-icon > svg {
+        display:block;
+        width:20px;
+        height:20px;
+    }
+    #chatComposerEditBar > #chatComposerEditCancel.modal-close-dot {
+        position:relative;
+        flex:0 0 22px !important;
+        width:22px !important;
+        min-width:22px !important;
+        max-width:22px !important;
+        height:22px !important;
+        min-height:22px !important;
+        max-height:22px !important;
+        margin:0 !important;
+        padding:0 !important;
+        border:0 !important;
+        border-radius:50% !important;
+        color:transparent;
+        font-size:0;
+        line-height:0;
+    }
+    #chatComposerEditCancel::before {
+        content:"";
+        position:absolute;
+        inset:-6px;
+        border-radius:inherit;
+    }
+}
 @layer dmate-button-themes {
     body[data-appearance-theme] #chat .msg.user .chat-message-edit-actions > button {
         box-sizing:border-box!important;

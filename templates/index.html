@@ -421,6 +421,10 @@ window.DMATE_CLIENT_CONFIG = {{ {
             <button type="button" class="manual-question-choice" data-manual-question="yes" aria-pressed="false" title="自动识别题目难度">解题</button>
         </div>
         <div class="input">
+            <div id="chatComposerEditBar" role="group" aria-label="重新编辑消息" hidden>
+                <span class="chat-composer-edit-icon" aria-hidden="true"></span>
+                <button id="chatComposerEditCancel" class="modal-close-dot" type="button" aria-label="取消" title="取消"></button>
+            </div>
             <div class="manual-question-composer">
                 <textarea id="text" rows="1" placeholder="询问DMate" autocomplete="off" enterkeyhint="send" aria-label="消息输入"></textarea>
                 <button id="voiceInputBtn" class="voice-input-button" type="button" aria-label="语音输入" title="语音输入" aria-pressed="false">

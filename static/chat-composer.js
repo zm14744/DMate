@@ -501,7 +501,8 @@
         input.addEventListener('keydown', keydown);
         win.addEventListener('resize', refresh);
         win.visualViewport?.addEventListener('resize', refresh);
-        const api = { refresh, refreshPosition() { symbolKeyboard?.refreshPosition(); }, destroy() {
+        const api = { refresh, canSubmit: () => !composing && Date.now() >= commitUntil,
+            refreshPosition() { symbolKeyboard?.refreshPosition(); }, destroy() {
             if (destroyed) return;
             destroyed = true; widthObserver?.disconnect();
             symbolKeyboard?.destroy();
