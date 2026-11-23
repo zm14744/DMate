@@ -12,7 +12,9 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
         if (!container || !container.ownerDocument) throw new Error(uiText('编辑器需要有效的页面容器。'));
         options ||= {};
         const dom = container.ownerDocument;
-        const useOverlay = !options.structureOnly && typeof options.originalUrl === 'string' && /^((blob:)|(data:image\/)|(https?:\/\/))/i.test(options.originalUrl) && root.DMateGraphOverlay?.mount;
+        const blankCanvas = options.drawingOnly && options.blankCanvas === true;
+        const hasImage = typeof options.originalUrl === 'string' && /^((blob:)|(data:image\/)|(https?:\/\/))/i.test(options.originalUrl);
+        const useOverlay = !options.structureOnly && (blankCanvas || hasImage) && root.DMateGraphOverlay?.mount;
         const initialized = (useOverlay || options.previewOnly) && modelApi.ensureAnonymousLabels
             ? modelApi.ensureAnonymousLabels(options.document) : options.document;
         const initial = useOverlay && modelApi.ensureAnonymousLabels
@@ -544,7 +546,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
                 workspace.append(host);
                 container.append(workspace);
                 if (!overlay) overlay = root.DMateGraphOverlay.mount(host, {
-                    instance, originalUrl: options.originalUrl, model, state: overlayState, drawingOnly: options.drawingOnly,
+                    instance, originalUrl: options.originalUrl, blankCanvas, model, state: overlayState, drawingOnly: options.drawingOnly,
                     viewState: options.viewState, onViewChange: options.onViewChange,
                     graph: () => model.getDocument().graphs.find(row => row.id === currentGraph),
                     createRegion: (points,polygon) => {

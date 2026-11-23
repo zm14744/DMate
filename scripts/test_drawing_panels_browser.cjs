@@ -420,6 +420,29 @@ async function history(page) {
   return page.locator('.ddw-history-open');
 }
 
+async function rapidSwitches(page, label) {
+  await history(page);
+  const frames = await page.evaluate(async () => {
+    const read = () => {
+      const canvases = document.querySelectorAll('.ddw-editor .dge-overlay');
+      const canvas = canvases[0];
+      return { count: canvases.length, ready: canvas?.dataset.geometryReady,
+        labels: [...(canvas?.querySelectorAll('.dge-overlay-node .dge-overlay-label') || [])].map(node => node.textContent) };
+    };
+    const result = [];
+    for (const index of [1, 2, 0]) {
+      document.querySelectorAll('.ddw-history-open')[index].click();
+      result.push(read());
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      result.push(read());
+    }
+    return result;
+  });
+  assert.deepEqual(frames, ['B', 'C', 'A'].flatMap(letter => [0, 1].map(() => ({
+    count: 1, ready: 'true', labels: [letter + '1', letter + '2']
+  }))), label + ': each switch displays only its fitted drawing from the first frame');
+}
+
 async function headerExportChecks(page, label, offline = false) {
   const head = page.locator(offline ? '#drawingPanel>.graph-editor-dialog-head' : '#graphEditorDialog>.graph-editor-dialog-head');
   const trigger = head.locator('[data-drawing-export]');
@@ -464,12 +487,12 @@ async function headerExportChecks(page, label, offline = false) {
       const read = (selector, property) => getComputedStyle(editor.querySelector(selector))[property];
       return [
         read('.ddw-canvas-frame', 'backgroundColor'), read('.dge-overlay-stage', 'backgroundColor'),
-        read('.dge-overlay-image', 'visibility'), read('.dge-overlay-dot', 'fill'),
+        read('.dge-overlay-dot', 'fill'),
         read('.dge-overlay-stroke', 'stroke'), read('.dge-overlay-stroke', 'opacity'),
         read('.dge-overlay-svg marker path', 'fill'), read('.dge-overlay-label', 'fill')
       ];
     });
-    assert.deepEqual(canvasPaint, ['rgb(0, 0, 0)', 'rgb(0, 0, 0)', 'hidden',
+    assert.deepEqual(canvasPaint, ['rgb(0, 0, 0)', 'rgb(0, 0, 0)',
       'rgb(255, 255, 255)', 'rgb(255, 255, 255)', '1', 'rgb(255, 255, 255)', 'rgb(255, 255, 255)']);
     for (const index of [0, 1]) {
       if (index) {
@@ -540,6 +563,7 @@ async function runCase(browser, width) {
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/drawing-' + width + '-edge.png' });
     await closeProperty(page);
     assert.deepEqual(await (await history(page)).allTextContents(), names, 'History follows saved array order, not updatedAt');
+    await rapidSwitches(page, 'Online ' + width);
     const savedViews = new Map();
     for (const index of [1, 0, 2]) {
       await zoomAway(page);
@@ -787,6 +811,7 @@ async function runOfflineViewport(browser, width) {
       console.log('PASS offline ' + width + ' ' + kind + ': ' + JSON.stringify(position) + '; last action reachable');
       await closeProperty(page);
     }
+    await rapidSwitches(page, 'Offline ' + width);
     const savedViews = new Map();
     for (const index of [1, 0]) {
       await zoomAway(page);

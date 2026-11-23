@@ -30,7 +30,17 @@
   let committed = normalize(bootstrap?.settings), committedBlob = null, settings = {...committed};
   let visualBlob = null, backgroundURL = '', backgroundMode = 'unchanged';
   let opened = false, pending = false, processing = false, imageEpoch = 0, previousFocus = null;
-  const modalHint = () => $('appearanceModal')?.querySelector('.appearance-apply-hint');
+  function fallbackMessage() {
+    const modal = $('appearanceModal');
+    if (!modal) return null;
+    let message = modal.querySelector('.appearance-apply-hint');
+    if (!message) {
+      message = document.createElement('div'); message.className = 'appearance-apply-hint';
+      message.setAttribute('role','status'); message.setAttribute('aria-live','polite');
+      modal.querySelector('.appearance-footer')?.before(message);
+    }
+    return message;
+  }
 
   function resolvedTheme() {
     if (settings.mode !== 'system') return settings.mode;
@@ -130,8 +140,8 @@
     if (!$('appearanceModal') || opened) return;
     previousFocus = document.activeElement; opened = true; pending = false; processing = false;
     settings = {...committed}; backgroundMode = 'unchanged'; background(committedBlob); paint();
-    if (modalHint()) modalHint().textContent = text('更改会先预览，点击“确认”后才保存');
     const modal = $('appearanceModal');
+    modal.querySelector('.appearance-apply-hint')?.remove();
     modal.classList.remove('hidden'); modal.setAttribute('aria-hidden','false');
     modal.setAttribute('role','dialog'); modal.setAttribute('aria-modal','true');
     const heading = modal.querySelector('.modal-head > div');
@@ -162,7 +172,10 @@
   async function notice(message) {
     if (window.DMateDeleteConfirm?.request && $('appearanceModal')) {
       await window.DMateDeleteConfirm.request($('appearanceModal'), {title:'外观提示',body:message,noticeOnly:true});
-    } else if (modalHint()) modalHint().textContent = message;
+    } else {
+      const fallback = fallbackMessage();
+      if (fallback) fallback.textContent = message;
+    }
   }
   function fail(error) {
     if (!pending) return;

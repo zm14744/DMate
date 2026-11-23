@@ -40,8 +40,9 @@
 .ddw-editor .dge-view-controls{flex:0 0 auto;flex-wrap:nowrap;margin-left:auto;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
 /* A single rounded frame clips the complete scrolling canvas. Native scroll
    remains available for wheel/touch/pan without reserving white track gutters. */
-.ddw-canvas-frame{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden;border:1px solid var(--dge-border,#cbd5e1);border-radius:12px}
+.ddw-canvas-frame{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden;border:1px solid var(--dge-border,#cbd5e1);border-radius:12px;background:#fff}
 .ddw-editor .dge-overlay-viewport{height:auto;flex:1;min-width:0;min-height:0;max-height:none;border:0;border-radius:11px;scrollbar-gutter:auto;scrollbar-width:none}
+.ddw-editor .dge-overlay[data-geometry-ready="false"] .dge-overlay-viewport{visibility:hidden}
 .ddw-editor .dge-overlay-viewport::-webkit-scrollbar{display:none;width:0;height:0}
 /* The drawing surface has its own contrast in the light workspace. */
 body[data-appearance-theme="light"] .ddw-editor :is(.ddw-canvas-frame,.dge-overlay-stage){background:#000}

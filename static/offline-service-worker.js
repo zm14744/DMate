@@ -1,6 +1,6 @@
 "use strict";
-const CACHE_NAME = "dmate-offline-shell-v108";
-const PREVIOUS_CACHE_NAME = "dmate-offline-shell-v107";
+const CACHE_NAME = "dmate-offline-shell-v109";
+const PREVIOUS_CACHE_NAME = "dmate-offline-shell-v108";
 const CACHE_READY = "/__dmate_offline_ready__/"+CACHE_NAME;
 const PRECACHE = [
   "/static/appearance-bootstrap.js?v=2",
@@ -14,7 +14,7 @@ const PRECACHE = [
   "/static/icons/dmate-app-v52-180.png",
   "/static/dmate-main.css?v=71",
   "/static/graph-editor.css?v=27",
-  "/static/drawing-workspace.css?v=53",
+  "/static/drawing-workspace.css?v=54",
   "/static/modal-chrome.css",
   "/static/concept-notebook.css?v=5",
   "/static/ai-answer-renderer.css?v=22",
@@ -35,25 +35,25 @@ const PRECACHE = [
   "/static/scrollbars.js?v=25",
   "/static/graph-editor-model.js",
   "/static/graph-editor-format.js?v=32",
-  "/static/graph-editor-overlay.js?v=42",
+  "/static/graph-editor-overlay.js?v=43",
   "/static/math-markdown.js?v=22",
   "/static/ai-answer-renderer.js?v=22",
   "/static/modal-text.js?v=53",
   "/static/delete-confirm.js",
   "/static/drawing-export.js?v=39",
-  "/static/graph-editor.js?v=54",
-  "/static/drawing-workspace.js?v=60",
+  "/static/graph-editor.js?v=55",
+  "/static/drawing-workspace.js?v=61",
   "/static/vendor/mathjax-3.2.2/es5/tex-svg.js",
   "/static/vendor/marked-15.0.12/marked.umd.js",
   "/static/vendor/dompurify-3.2.6/purify.min.js",
   "/static/ui-tooltip.js?v=50",
   "/static/guest-session.js?v=53",
   "/static/offline-interface-state.js?v=1",
-  "/static/language-catalog.js?v=68",
+  "/static/language-catalog.js?v=69",
   "/static/language-knowledge.js",
   "/static/language.js?v=59",
   "/static/knowledge-graph-labels.js?v=18",
-  "/static/offline-appearance.js?v=10",
+  "/static/offline-appearance.js?v=11",
   "/static/offline-privacy-motion.js?v=4",
   "/static/offline-shell.js?v=41",
   "/static/offline-knowledge-graph.js?v=62",

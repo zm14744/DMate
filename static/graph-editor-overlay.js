@@ -21,7 +21,7 @@ function mount(host,o){
  s.originalVisible = s.originalVisible !== false;
  s.originalOpacity = Number.isFinite(s.originalOpacity)
    ? Math.max(0,Math.min(1,s.originalOpacity)) : 1;
- let w=1000,h=1000,active=null,ghost=null,base=null,scanSequence=0,resizeFrame=null;
+ let w=1000,h=o.blankCanvas?700:1000,active=null,ghost=null,base=null,scanSequence=0,resizeFrame=null;
  const paintedEdges=new Map();
  let sampleCanvas=d.createElement('canvas'),sampleCtx=null,loaded=false,autoFitted=false;
  const pointers=new Map();
@@ -66,7 +66,8 @@ function mount(host,o){
  if(o.textOnly)svg.setAttribute('aria-label','文字框选层');
  const paletteTitle=d.createElement(o.drawingOnly?'summary':'h3');paletteTitle.textContent=o.scanOnly?'框选':o.textOnly?'文字工具':'绘图工具';palette.append(paletteTitle,bar);
  const viewControls=d.createElement('div');viewControls.className='dge-view-controls';viewControls.setAttribute('aria-label','视图控制');
- stage.append(image,svg);scroll.append(stage);root.append(viewControls,palette,scroll);host.append(root);
+ if(!o.blankCanvas)stage.append(image);
+ stage.append(svg);scroll.append(stage);root.append(viewControls,palette,scroll);host.append(root);
  const button=(label,key,fn,parent=bar)=>{const b=d.createElement('button');b.type='button';b.textContent=label;b.dataset.overlayTool=key;b.addEventListener('click',event=>{event.stopPropagation();if(!o.disabled?.()){fn();rememberCamera();}});parent.append(b);return b;};
  for(const [key,label] of (o.scanOnly?[['select','选择 / 平移'],['bounds','图形框选'],['text_rect','文字框选']]:o.textOnly?[['select','选择 / 移动'],['text_rect','框选文字']]:o.drawingOnly?[['select','选择 / 移动'],['vertex','添加顶点'],['edge','添加边']]:[['select','选择 / 移动'],['vertex','添加顶点'],['edge','添加边'],['bounds','框选图形']])){
   button(label,key,()=>{s.mode=o.scanOnly&&s.irregular?(key==='bounds'?'graph_poly':key==='text_rect'?'text_poly':key):key;s.start=null;o.clearSelection?.();draw();});
@@ -828,8 +829,15 @@ function mount(host,o){
    if(cameraFitPending)pendingFitFrame=d.defaultView.requestAnimationFrame(()=>{pendingFitFrame=0;syncDrawingCamera();});
   }
  }
- image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;loaded=true;syncOriginal();buildSampler();if(!syncDrawingCamera())fitView();};
- image.onerror=()=>{status.textContent='原图未能显示，可使用下方结构编辑';};image.src=o.originalUrl;zoom(s.zoom);draw();
+ const prepareGeometry=()=>{loaded=true;if(!syncDrawingCamera())fitView();};
+ if(o.blankCanvas){
+  // A drawing's dimensions are known before paint. Restore its camera without
+  // waiting for a placeholder image to decode or drawing at a provisional size.
+  prepareGeometry();
+ }else{
+  image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;syncOriginal();buildSampler();prepareGeometry();};
+  image.onerror=()=>{status.textContent='原图未能显示，可使用下方结构编辑';};image.src=o.originalUrl;zoom(s.zoom);draw();
+ }
  const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(!syncDrawingCamera()){if(loaded&&!autoFitted)fitImage();else layoutWorld();draw();syncGeometryReady();}}):null;observer?.observe(scroll);observer?.observe(viewControls);
  const resetInteraction=()=>{cancelResizePreview();active=null;ghost=null;base=null;pointers.clear();s.start=null;s.polygonDraft=[];scanSequence++;draw();};
  svg.addEventListener('keydown',e=>{if(e.key==='Escape')resetInteraction();});

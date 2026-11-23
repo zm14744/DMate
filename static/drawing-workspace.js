@@ -20,6 +20,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   // remote actions entirely, including their controls and event handlers.
   const features={ai:options.features?.ai!==false,upload:options.features?.upload!==false};
   let pages=[],activeId='',editor=null,timer=null,destroyed=false,persistError='',aiAbort=null,aiEpoch=0,exportBusy=false,panelMode='',uploadBusy=false;
+  let editorVersion=0;
   let savedRaw='',restoredGallery=false,exportPreview=null,exportPreviewUrl='',chromeFrame=0,observedView=null,observedViewport=null,observedPalette=null,toolsExpanded=false,deletePending=null;
   let noticeFrame=0,noticeCurrent='',noticeQueue=[],persistNoticeShown='';
   let galleryMetadata={};
@@ -279,21 +280,34 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   }
   function schedule(){if(persistence)sessionState.galleryDirty=true;clearTimeout(timer);timer=win.setTimeout(()=>persist(),350);}
   function mountPage(){
+   const version=++editorVersion,current=()=>!destroyed&&version===editorVersion;
    editor?.destroy();editor=null;const p=active(),documentValue=p?.document||emptyDocument();
    name.value=p?.name||'';nameFollowsGraph=false;requirement=p?.requirement||'';answer='';answerDocument='';answerRequirement='';
-   const initial=p?blank(p.name):emptyDocument(),url='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700"><rect width="100%" height="100%" fill="white"/></svg>');
+   const initial=p?blank(p.name):emptyDocument();
    if(p&&(!p.viewState||typeof p.viewState!=='object'||Array.isArray(p.viewState)))p.viewState={};
-   editor=root.DMateGraphEditor.mount(editorHost,{document:clone(documentValue),initialDocument:initial,originalUrl:url,drawingOnly:true,viewState:p?.viewState,
-    onViewChange:()=>{if(!destroyed)schedule();},
-    onChange:value=>{if(destroyed)return;const selected=active();if(!selected)return;selected.document=clone(value);selected.updatedAt=Date.now();
-     if(nameFollowsGraph&&doc.activeElement!==name&&value.graphs[0]){selected.name=caption(value.graphs[0].name);name.value=selected.name;}
+   editor=root.DMateGraphEditor.mount(editorHost,{document:clone(documentValue),initialDocument:initial,blankCanvas:true,drawingOnly:true,viewState:p?.viewState,
+    onViewChange:()=>{if(current())schedule();},
+    onChange:value=>{if(!current()||!p)return;p.document=clone(value);p.updatedAt=Date.now();
+     if(nameFollowsGraph&&doc.activeElement!==name&&value.graphs[0]){p.name=caption(value.graphs[0].name);name.value=p.name;}
      options.onChange?.(clone(value));invalidateAnswer();schedule();},
-    onConfirm:async value=>{const selected=active();if(!selected)return;selected.document=clone(value);selected.name=caption(name.value);selected.updatedAt=Date.now();const saved=persistence?await flush():persist();if(!saved)throw new Error(persistError);if(panelMode==='history')renderPanel();}
+    onConfirm:async value=>{if(!current()||!p)return;p.document=clone(value);p.name=caption(name.value);p.updatedAt=Date.now();const saved=persistence?await flush():persist();if(!saved)throw new Error(persistError);if(current()&&panelMode==='history')renderPanel();}
    });
    const mountedDocument=currentDocument();if(p)p.document=clone(mountedDocument);
    options.onChange?.(clone(mountedDocument));renderPanel();syncChrome();
   }
-  function switchPage(pageId){if(pageId===activeId||!pages.some(p=>p.id===pageId))return;cancelDelete();collect();persist();abortAnswer();activeId=pageId;persist();mountPage();setStatus('');}
+  function switchPage(pageId){
+   const index=pages.findIndex(p=>p.id===pageId);
+   if(index<0||pageId===activeId)return;
+   const offset=index>pages.findIndex(p=>p.id===activeId)?14:-14;
+   cancelDelete();collect();abortAnswer();activeId=pageId;mountPage();persist();setStatus('');
+   if(!win.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    const viewport=editorHost.querySelector('.dge-overlay[data-geometry-ready="true"] .dge-overlay-viewport');
+    viewport?.animate?.([
+     {transform:`translateX(${offset}px)`,opacity:.75},
+     {transform:'translateX(0)',opacity:1}
+    ],{duration:180,easing:'cubic-bezier(.2,.7,.3,1)'});
+   }
+  }
   function newPage(){
    if(pages.length>=50){setStatus('最多保留 50 张绘图，请先导出并删除不再需要的历史绘图。');return;}
    cancelDelete();collect();persist();abortAnswer();const pageName=uiText('绘图 '+(pages.length+1),'Drawing '+(pages.length+1)),p={id:id(),name:pageName,document:blank(pageName),requirement:'',createdAt:Date.now(),updatedAt:Date.now()};pages.push(p);activeId=p.id;persist();mountPage();setStatus('');

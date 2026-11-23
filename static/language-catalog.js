@@ -250,7 +250,6 @@
         "背景模糊": "Background blur",
         "界面面板透明度": "Panel opacity",
         "聊天气泡透明度": "Chat bubble opacity",
-        "更改会先预览，点击“确认”后才保存": "Preview changes, then select Confirm to save.",
         "恢复默认": "Reset to default",
         "确认": "Confirm",
         "背景预览": "Background preview",
