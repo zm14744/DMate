@@ -228,7 +228,7 @@ async function assertLayout(page) {
       },theme);
       const label = viewport.width+'x'+viewport.height+' '+theme;
       assert.equal(result.stroke,theme === 'light' ? 'rgb(0, 0, 0)' : 'rgb(255, 255, 255)',label+': theme ink follows original logo');
-      assert.equal(result.background,{dark:'rgb(13, 13, 13)',light:'rgb(248, 250, 252)',navy:'rgb(15, 23, 42)'}[theme],label+': theme background remains intact');
+      assert.equal(result.background,{dark:'rgb(13, 13, 13)',light:'rgb(245, 245, 247)',navy:'rgb(15, 23, 42)'}[theme],label+': theme background remains intact');
       assert.equal(result.overflow,false,label+': no horizontal overflow');
       assert.equal(result.eyeInside,true,label+': the reveal button stays inside the viewport');
       assert.equal(result.fallbackVisible,false,label+': the fallback does not overlap the growing logo');

@@ -36,7 +36,7 @@
       : window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     root.dataset.appearanceTheme = theme;
     root.style.colorScheme = theme === 'light' ? 'only light' : 'dark';
-    root.style.backgroundColor = {light:'#f8fafc',dark:'#0d0d0d',navy:'#0f172a'}[theme];
+    root.style.backgroundColor = {light:'#f5f5f7',dark:'#0d0d0d',navy:'#0f172a'}[theme];
     const accent = accents[settings.accent], alpha = settings.panelOpacity/100;
     const values = {'--accent':accent[0],'--accent-rgb':accent[1],'--accent-deep':accent[2],
       '--accent-deeper':accent[3],'--accent-soft':accent[4],'--accent-pale':accent[5],
@@ -49,7 +49,7 @@
     if (body) {body.dataset.appearanceTheme = theme;body.style.colorScheme = root.style.colorScheme;}
     document.querySelector('meta[name="color-scheme"]')?.setAttribute('content',root.style.colorScheme);
     document.querySelector('meta[name="supported-color-schemes"]')?.setAttribute('content',theme === 'light' ? 'light' : 'dark');
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',{light:'#f8fafc',dark:'#171717',navy:'#0f172a'}[theme]);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',{light:'#f5f5f7',dark:'#171717',navy:'#0f172a'}[theme]);
     const layer = document.getElementById('appearanceBackgroundLayer');
     if (picture && layer && body) {layer.style.backgroundImage = 'url("'+picture.url+'")';body.classList.add('has-custom-background');}
   }

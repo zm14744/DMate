@@ -78,7 +78,7 @@ async function verifiedOnline(context) {
   assert.ok(frames.length>0);
   assert.ok(frames.every(frame=>frame.theme==='navy' && frame.font==='1.08' && frame.panel==='0.8'),'Every painted frame uses the saved settings');
   await page.evaluate(()=>{appearanceSettings.mode='light';applyAppearanceSettings({save:false});});
-  assert.equal(await page.evaluate(()=>document.documentElement.style.backgroundColor),'rgb(248, 250, 252)','Theme changes update the root overscroll color');
+  assert.equal(await page.evaluate(()=>document.documentElement.style.backgroundColor),'rgb(245, 245, 247)','Theme changes update the root overscroll color');
   await page.close();
 }
 async function offlineStartup(context) {
@@ -102,6 +102,11 @@ async function guestIsolation(context) {
   await page.goto(base+'/',{waitUntil:'commit'});
   await page.waitForFunction(()=>document.body && document.getElementById('appearanceBackgroundLayer'));
   assert.equal((await sample(page)).theme,'light');assert.equal((await sample(page)).background,false,'Guest does not inherit account wallpaper or offline appearance');
+  assert.deepEqual(await page.evaluate(()=>[
+    document.documentElement.style.backgroundColor,
+    document.querySelector('meta[name="theme-color"]').content,
+    getComputedStyle(document.body).backgroundColor
+  ]),['rgb(245, 245, 247)','#f5f5f7','rgb(245, 245, 247)'],'The first document paint, browser bar and page use the same light color');
   main.release();await page.waitForFunction(()=>typeof appearanceSettings!=='undefined' && accountState.configured!==null);
   await page.evaluate(async profile=>{appearanceSettings={...profile,mode:'dark'};applyAppearanceSettings({save:true});
     const canvas=document.createElement('canvas');canvas.width=canvas.height=8;const blob=await new Promise(resolve=>canvas.toBlob(resolve));

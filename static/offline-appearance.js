@@ -78,11 +78,11 @@
     const root = document.documentElement, body = document.body;
     const theme = resolvedTheme(), accent = accents[settings.accent], alpha = settings.panelOpacity / 100;
     root.dataset.appearanceTheme = body.dataset.appearanceTheme = theme;
-    root.style.backgroundColor = {light:'#f8fafc',dark:'#0d0d0d',navy:'#0f172a'}[theme];
+    root.style.backgroundColor = {light:'#f5f5f7',dark:'#0d0d0d',navy:'#0f172a'}[theme];
     root.style.colorScheme = body.style.colorScheme = theme === 'light' ? 'only light' : 'dark';
     document.querySelector('meta[name="color-scheme"]')?.setAttribute('content',theme === 'light' ? 'only light' : 'dark');
     document.querySelector('meta[name="supported-color-schemes"]')?.setAttribute('content',theme === 'light' ? 'light' : 'dark');
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',theme === 'light' ? '#f8fafc' : theme === 'navy' ? '#0f172a' : '#171717');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',theme === 'light' ? '#f5f5f7' : theme === 'navy' ? '#0f172a' : '#171717');
     const values = {
       '--accent':accent[0], '--accent-rgb':accent[1], '--accent-deep':accent[2],
       '--accent-deeper':accent[3], '--accent-soft':accent[4], '--accent-pale':accent[5],

@@ -386,7 +386,7 @@ function applyAppearanceSettings(options = {}) {
 
     body.dataset.appearanceTheme = theme;
     root.dataset.appearanceTheme = theme;
-    root.style.backgroundColor = {light:"#f8fafc",dark:"#0d0d0d",navy:"#0f172a"}[theme];
+    root.style.backgroundColor = {light:"#f5f5f7",dark:"#0d0d0d",navy:"#0f172a"}[theme];
 
     // 用户明确选择浅色时用 only light，阻止部分安卓浏览器再次强制染成深色。
     const browserColorScheme = theme === "light" ? "only light" : "dark";
@@ -403,7 +403,7 @@ function applyAppearanceSettings(options = {}) {
             theme === "light" ? "light" : "dark"
         );
     const browserThemeColor = theme === "light"
-        ? "#f8fafc"
+        ? "#f5f5f7"
         : (theme === "navy" ? "#0f172a" : "#171717");
     document.querySelector('meta[name="theme-color"]')
         ?.setAttribute("content", browserThemeColor);

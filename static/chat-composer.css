@@ -26,9 +26,10 @@ body[data-appearance-theme] {
     --dmate-chat-fade-rgb:15,23,42;
 }
 body[data-appearance-theme="light"] {
-    --dmate-chat-fade-rgb:248,250,252;
-    --dmate-composer-border:rgba(148,163,184,.24);
-    --dmate-composer-shadow:0 4px 16px rgba(15,23,42,.055),0 1px 3px rgba(15,23,42,.025);
+    --dmate-chat-fade-rgb:var(--surface-0-rgb);
+    --dmate-composer-border:color-mix(in srgb,var(--text-muted,#86868b) 24%,transparent);
+    --dmate-composer-shadow:0 4px 16px rgba(0,0,0,.055),0 1px 3px rgba(0,0,0,.025);
+    --dmate-popover-shadow-rgb:0,0,0;
 }
 body[data-appearance-theme="dark"] {
     --dmate-chat-fade-rgb:13,13,13;
@@ -517,7 +518,7 @@ body[data-appearance-theme] > .dmate-symbol-panel:not([hidden]) {
     border-radius:15px !important;
     background:var(--surface-1,#fff) !important;
     color:var(--text-primary,#334155) !important;
-    box-shadow:0 12px 34px rgba(15,23,42,.20) !important;
+    box-shadow:0 12px 34px rgba(var(--dmate-popover-shadow-rgb,15,23,42),.20) !important;
     text-align:left !important;
 }
 .dmate-symbol-panel-head {
@@ -663,7 +664,7 @@ body[data-appearance-theme] > .dmate-symbol-panel button:focus-visible {
         max-height:var(--dm-symbol-max-height,min(320px,calc(100dvh - 20px))) !important;
         padding:8px !important;
         border-radius:13px !important;
-        box-shadow:0 10px 28px rgba(15,23,42,.18) !important;
+        box-shadow:0 10px 28px rgba(var(--dmate-popover-shadow-rgb,15,23,42),.18) !important;
     }
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-keyboard {
         bottom:1px !important;

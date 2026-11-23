@@ -13,11 +13,11 @@ body[data-appearance-theme] {
     --dm-filled-line-height:normal;
 }
 body[data-appearance-theme="light"] {
-    --dm-control-bg:#e2e8f0;
-    --dm-control-hover-bg:#cfd9e6;
-    --dm-control-border:#c2cbd7;
-    --dm-control-hover-border:#94a3b8;
-    --dm-control-text:#334155;
+    --dm-control-bg:#e8e8ed;
+    --dm-control-hover-bg:#dddde3;
+    --dm-control-border:var(--border-strong);
+    --dm-control-hover-border:var(--border-mid);
+    --dm-control-text:var(--text-secondary);
 }
 body[data-appearance-theme="navy"] {
     --dm-control-bg:#1f2937;
@@ -37,9 +37,9 @@ body[data-appearance-theme="dark"] {
 
 /* Shared neutral selection palette, matching the active conversation. */
 body[data-appearance-theme="light"] {
-    --dm-selected-bg:#dce4ee;
-    --dm-selected-hover:#cfd9e5;
-    --dm-selected-ring:#718096;
+    --dm-selected-bg:#e0e0e6;
+    --dm-selected-hover:#d9d9df;
+    --dm-selected-ring:#77777f;
 }
 body[data-appearance-theme="dark"] {
     --dm-selected-bg:#3d3d3d;
@@ -59,19 +59,19 @@ body[data-appearance-theme="navy"] {
     @media(min-width:1101px) {
         /* The notebook's creation action follows the sidebar's New chat palette. */
         body[data-appearance-theme="light"]:not(.has-custom-background) :is(#conceptNotebookDialog,#notesPanel) .dcn-new {
-            --dm-control-bg:#ffffff;
-            --dm-control-hover-bg:#f3f7fc;
-            --dm-control-border:#c3d1e2;
-            --dm-control-hover-border:#91a9c2;
+            --dm-control-bg:var(--surface-2);
+            --dm-control-hover-bg:var(--surface-3);
+            --dm-control-border:var(--border-strong);
+            --dm-control-hover-border:var(--border-mid);
         }
         body[data-appearance-theme="light"]:not(.has-custom-background) .left {
-            --dm-control-bg:#ffffff;
-            --dm-control-hover-bg:#f3f7fc;
-            --dm-control-border:#c3d1e2;
-            --dm-control-hover-border:#91a9c2;
-            background-color:#e2ebf5!important;
+            --dm-control-bg:var(--surface-2);
+            --dm-control-hover-bg:var(--surface-3);
+            --dm-control-border:var(--border-strong);
+            --dm-control-hover-border:var(--border-mid);
+            background-color:var(--surface-1)!important;
             background-image:none!important;
-            border-right:1px solid #c0cedf!important;
+            border-right:1px solid var(--border-strong)!important;
         }
     }
 
@@ -215,8 +215,8 @@ body[data-appearance-theme="navy"] {
     /* Only interaction shows a surface; light / dark / navy each have a
        restrained but distinguishable hover and pressed state. */
     body[data-appearance-theme="light"] {
-        --dm-nav-hover:rgba(51,65,85,.10);
-        --dm-nav-pressed:rgba(51,65,85,.16);
+        --dm-nav-hover:color-mix(in srgb,var(--text-primary) 10%,transparent);
+        --dm-nav-pressed:color-mix(in srgb,var(--text-primary) 16%,transparent);
     }
     body[data-appearance-theme="dark"] {
         --dm-nav-hover:rgba(255,255,255,.09);

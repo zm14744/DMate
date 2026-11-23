@@ -590,9 +590,7 @@ html[data-ui-language="en"] .learning-review-section-title {
    over the legacy light-theme backgrounds instead of merely appending a weaker rule. */
 :root[data-appearance-theme="light"] body:not(.has-custom-background),
 body[data-appearance-theme="light"]:not(.has-custom-background) {
-    background:#f8fafc !important;
-    background-color:#f8fafc !important;
-    background-image:linear-gradient(#f8fafc,#f8fafc) !important;
+    background:var(--surface-0) !important;
 }
 :root[data-appearance-theme="light"] body:not(.has-custom-background) .layout,
 :root[data-appearance-theme="light"] body:not(.has-custom-background) .center,
@@ -602,33 +600,29 @@ body[data-appearance-theme="light"]:not(.has-custom-background) .layout,
 body[data-appearance-theme="light"]:not(.has-custom-background) .center,
 body[data-appearance-theme="light"]:not(.has-custom-background) .chat,
 body[data-appearance-theme="light"]:not(.has-custom-background) .input-wrap {
-    background:#f8fafc !important;
-    background-color:#f8fafc !important;
-    background-image:linear-gradient(#f8fafc,#f8fafc) !important;
+    background:var(--surface-0) !important;
 }
 :root[data-appearance-theme="light"] body:not(.has-custom-background) .left,
 :root[data-appearance-theme="light"] body:not(.has-custom-background) .mobile-topbar,
 body[data-appearance-theme="light"]:not(.has-custom-background) .left,
 body[data-appearance-theme="light"]:not(.has-custom-background) .mobile-topbar {
-    background:#eef3f8 !important;
-    background-color:#eef3f8 !important;
-    background-image:linear-gradient(#eef3f8,#eef3f8) !important;
-    color:#0f172a !important;
+    background:var(--surface-1) !important;
+    color:var(--text-strong) !important;
 }
 @media (min-width:1101px) {
     :root[data-appearance-theme="light"] body:not(.has-custom-background) .left,
     body[data-appearance-theme="light"]:not(.has-custom-background) .left {
-        border-right:1px solid #dbe4ee !important;
+        border-right:1px solid var(--border-strong) !important;
     }
 }
 @media (max-width:1100px) {
     :root[data-appearance-theme="light"] body:not(.has-custom-background) .left,
     body[data-appearance-theme="light"]:not(.has-custom-background) .left {
         border-right:0 !important;
-        border-bottom-color:#dbe4ee !important;
+        border-bottom-color:var(--border-strong) !important;
     }
     :root[data-appearance-theme="light"] body:not(.has-custom-background) .mobile-topbar,
     body[data-appearance-theme="light"]:not(.has-custom-background) .mobile-topbar {
-        border-bottom-color:#dbe4ee !important;
+        border-bottom-color:var(--border-strong) !important;
     }
 }
