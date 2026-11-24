@@ -86,19 +86,16 @@ async function assertLocatePlacement(page, label) {
     range.selectNodeContents(title);
     const text = range.getBoundingClientRect(), action = button.getBoundingClientRect();
     const pane = title.closest('.knowledge-graph-side').getBoundingClientRect();
-    return { text:{left:text.left,right:text.right,bottom:text.bottom,center:text.top+text.height/2},
-      action:{left:action.left,right:action.right,top:action.top,center:action.top+action.height/2},
-      pane:{left:pane.left,right:pane.right} };
+    return { text:{left:text.left,right:text.right,center:text.top+text.height/2},
+      action:{left:action.left,right:action.right,bottom:action.bottom,center:action.top+action.height/2},
+      pane:{left:pane.left,right:pane.right,bottom:pane.bottom} };
   });
-  if (page.viewportSize().width <= 760) {
-    assert.ok(layout.action.top >= layout.text.bottom, label + ': the sheet places the source action below the title');
-  } else {
-    assert.ok(layout.action.left >= layout.text.right + 4,
-      label + ': Go to original question is to the right of the concept title without overlap');
-    assert.ok(Math.abs(layout.text.center - layout.action.center) <= 3,
-      label + ': concept title and source action share one vertically centered header row');
-  }
-  assert.ok(layout.text.left >= layout.pane.left && layout.action.right <= layout.pane.right - 4,
+  assert.ok(layout.action.left >= layout.text.right + 4,
+    label + ': Go to original question is to the right of the concept title without overlap');
+  assert.ok(Math.abs(layout.text.center - layout.action.center) <= 3,
+    label + ': concept title and source action share one vertically centered header row');
+  assert.ok(layout.text.left >= layout.pane.left && layout.action.right <= layout.pane.right - 4
+    && layout.action.bottom <= layout.pane.bottom,
     label + ': the title and source action fit inside the detail pane');
 }
 async function newPage(browser, width, language) {
@@ -191,7 +188,12 @@ async function checkView(browser, width, language) {
     assert.deepEqual(recent.purple,['count_inclusion','function_composition','set_operation'],label+': all involved question concepts remain purple');
     await assertLiveGraph(page,recent,label+'/recent');
     await assertExports(page,recent,label+'/recent');
-    await expandGraphDetails(page);
+    if (width <= 760) {
+      await page.locator('#knowledgeGraphCanvas .kg-mobile-node.selected').click();
+      await settle(page);
+      assert.equal(await page.locator('#knowledgeGraphModal').getAttribute('data-kg-sheet'), 'peek');
+      assert.equal(await page.locator('#knowledgeGraphDetail').isVisible(),false,label+': the collapsed sheet can locate the source with its body hidden');
+    }
     assert.equal(await page.locator(locate).isVisible(),true,label+': recent details provide Go to original question');
     await assertLocatePlacement(page,label+'/recent');
     assert.equal(await page.locator('#knowledgeGraphHistoryTab').isVisible(),false);

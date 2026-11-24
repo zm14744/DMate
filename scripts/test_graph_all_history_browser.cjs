@@ -64,8 +64,8 @@ async function seedConversations(page) {
       question_graph:{version:1,classifier_revision:'catalog-semantic-v5',classification_status:'semantic',classification_source:'catalog_semantic',needs_review:false,sources:{question,solution:''},nodes:[{id,evidence:[{source:'question',quote}]}],edges:[]}});
     const shared = '判断 p 与 q 的合取在什么情况下为真。';
     const generated = '证明命题 p 的双重否定与 p 等价。';
-    const ocrQuestion = '计算集合 A={1,2}, B={2,3} 的并集。';
-    const powerQuestion = '列出集合 A={1,2} 的幂集。';
+    const ocrQuestion = '## 离散数学习题\n\n2. 计算集合 A={1,2}, B={2,3} 的并集。\n(1) 写出并集。\n(2) 判断 2.5 是否属于并集。\n3. 再求交集。';
+    const powerQuestion = '1. 列出集合 A={1,2} 的幂集。\n2. 写出幂集的大小。';
     const logical = teaching('命题逻辑','逻辑联结词',shared,'logic_connectives','合取');
     const sets = teaching('集合与关系','集合运算',ocrQuestion,'set_operation','并集','中等','计算题');
     const top = {id:'history-top',name:'顶部对话 <b>TOP</b>.',nameSource:'user',createdAt:1,updatedAt:1,deletedMessageIds:{},learningQuestion:null,
@@ -169,6 +169,11 @@ async function checkCase(browser,width,language) {
       label+': ordering timestamps are not rendered');
     assert.match(await page.locator('.kg-history-item[data-message-id="top-manual"] .kg-history-preview').innerText(),/为真。$/,
       label+': question punctuation is protected user content');
+    const ocrPreview = page.locator('.kg-history-item[data-message-id="top-ocr"] .kg-history-preview');
+    assert.match(await ocrPreview.innerText(), /^计算集合[\s\S]*\(1\) 写出并集。[\s\S]*\(2\) 判断 2\.5 是否属于并集。\s+再求交集。$/);
+    assert.equal(await ocrPreview.locator('h2,ol').count(), 0, label+': the worksheet heading and outer list marker are omitted');
+    assert.equal(await page.locator('.kg-history-item[data-message-id="lower-later"] .kg-history-preview ol li').count(), 2,
+      label+': an authored numbered list without a worksheet heading keeps both items');
     assert.equal(await page.evaluate(()=>window.__historyInjected),undefined,label+': no injected title markup executes');
     const snapshot=()=>page.evaluate(()=>JSON.stringify(sessions.map(session=>({id:session.id,messages:session.messages}))));
     assert.equal(await snapshot(),fixture.snapshot,label+': aggregate rendering does not mutate manual/OCR/legacy AI messages');

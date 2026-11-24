@@ -5,7 +5,7 @@
 const assert = require('node:assert/strict');
 const { revealInterface } = require('./offline-vault-browser-fixtures.cjs');
 const { chromium } = require('playwright');
-const {pinchGraph, panGraph, expandGraphDetails} = require('./knowledge-graph-touch-fixtures.cjs');
+const {pinchGraph, panGraph, expandGraphDetails, collapseGraphDetails} = require('./knowledge-graph-touch-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const mobile = page => page.viewportSize().width <= 760;
 const frame = page => page.locator('#knowledgeGraphModal');
@@ -179,11 +179,27 @@ async function checkMobileDetailSheet(page) {
     assert.equal(await modal.getAttribute('data-kg-sheet'), 'peek');
     assert.equal(await title.innerText(), '图的基本概念');
     assert.ok(await title.isVisible());
-    assert.equal(await detail.isVisible(), false, 'The collapsed sheet shows only the selected title');
+    assert.equal(await detail.isVisible(), false, 'The collapsed sheet keeps the selected title without its detail body');
     const selectedCamera = await camera();
     const panel = modal.locator('.knowledge-graph-side'), collapsed = await panel.boundingBox();
     assert.notEqual(await panel.evaluate(node => getComputedStyle(node).backgroundColor), 'rgba(0, 0, 0, 0)',
       'The floating details use a panel surface above the graph');
+    const paint=element=>element.evaluate(node=>[node,...node.querySelectorAll('.kg-sheet-grip')].map(part=>{
+      const style=getComputedStyle(part),box=part.getBoundingClientRect();
+      return {paint:Object.fromEntries(['backgroundColor','backgroundImage','color','borderColor','boxShadow','filter','opacity','outlineWidth']
+        .map(key=>[key,style[key]])),box:[box.x,box.y,box.width,box.height]};
+    }));
+    for(const [name,element] of [['handle',handle],['title',title]]){
+      await page.mouse.move(0,0);await settle(page);
+      const idle=await paint(element);
+      await element.hover();await settle(page);
+      assert.deepEqual(await paint(element),idle,name+': hovering has no visual feedback');
+      assert.equal(await modal.getAttribute('data-kg-sheet'),'peek',name+': hover does not open the sheet');
+      await element.tap();await settle(page);
+      assert.equal(await modal.getAttribute('data-kg-sheet'),'peek',name+': tapping does not open the sheet');
+      near((await panel.boundingBox()).height,collapsed.height,name+': taps and hover preserve the collapsed height');
+      assert.deepEqual(await camera(),selectedCamera,name+': taps and hover preserve the graph camera');
+    }
     await swipe(handle, -130, async () => {
       assert.ok((await panel.boundingBox()).height > collapsed.height + 24, 'The sheet follows the finger before release');
       assert.ok(await detail.isVisible(), 'The body appears while the user pulls the sheet up');
@@ -439,7 +455,7 @@ async function gestures(page) {
   await category(page, '证明与归纳');
   await readyGraph(page);
   if (mobile(page)) {
-    if (await frame(page).getAttribute('data-kg-sheet') === 'expanded') await frame(page).locator('.kg-sheet-handle').tap();
+    await collapseGraphDetails(page);
     for (const [factor, limit] of [[1.8, 3], [.5, .65]]) {
       for (let repeat = 0; repeat < 4; repeat++) await pinchGraph(page, factor);
       near(await scale(page), limit, 'Pinching reaches the zoom limit', .001);

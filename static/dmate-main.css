@@ -1531,8 +1531,10 @@ input[type="search"]::-webkit-search-cancel-button {
     background:var(--surface-1);
 }
 
-#knowledgeGraphModal[data-graph-view="history"] .graph-toolbar {
-    border-bottom:0;
+@media (max-width:760px) {
+    #knowledgeGraphModal[data-graph-view="history"] .graph-toolbar {
+        border-bottom:0;
+    }
 }
 
 .graph-toolbar-left {

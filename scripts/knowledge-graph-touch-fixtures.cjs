@@ -35,14 +35,50 @@ async function panGraph(page, dx, dy) {
   await touchGraph(page, ({x,y}) => [[{id:1,x,y}], [{id:1,x:x+dx,y:y+dy}]]);
 }
 
+async function dragGraphDetails(page, delta) {
+  const handle=page.locator('#knowledgeGraphModal .kg-sheet-handle');
+  await handle.waitFor({state:'visible'});
+  await handle.evaluate(async node=>{
+    const panel=node.closest('.knowledge-graph-side');
+    await Promise.all(panel.getAnimations({subtree:true}).filter(animation=>
+      animation.effect?.getComputedTiming().iterations!==Infinity).map(animation=>animation.finished.catch(()=>{})));
+  });
+  const rect=await handle.boundingBox(),x=rect.x+rect.width/2,y=rect.y+rect.height/2;
+  const end=Math.max(2,Math.min(page.viewportSize().height-2,y+delta));
+  if(await page.evaluate(()=>navigator.maxTouchPoints>0)){
+    const cdp=await page.context().newCDPSession(page);
+    const touch=(type,points)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:points});
+    try{
+      await touch('touchStart',[{id:1,x,y}]);
+      for(let step=1;step<=6;step++){
+        await touch('touchMove',[{id:1,x,y:y+(end-y)*step/6}]);
+        await page.evaluate(()=>new Promise(requestAnimationFrame));
+      }
+      await touch('touchEnd',[]);
+    }finally{await cdp.detach();}
+  }else{
+    await page.mouse.move(x,y);await page.mouse.down();
+    await page.mouse.move(x,end,{steps:6});await page.mouse.up();
+  }
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+}
+
+async function collapseGraphDetails(page) {
+  if(page.viewportSize().width>760)return;
+  const modal=page.locator('#knowledgeGraphModal');
+  if(await modal.getAttribute('data-kg-sheet')!=='expanded')return;
+  await dragGraphDetails(page,150);
+  await page.locator('#knowledgeGraphModal[data-kg-sheet="peek"]').waitFor();
+}
+
 async function expandGraphDetails(page) {
   if (page.viewportSize().width > 760) return;
   const modal = page.locator('#knowledgeGraphModal');
   if (!await modal.getAttribute('data-kg-sheet')) {
     await modal.locator('.kg-mobile-node.selected').click();
   }
-  if (await modal.getAttribute('data-kg-sheet') === 'peek') await modal.locator('.kg-sheet-handle').click();
+  if (await modal.getAttribute('data-kg-sheet') === 'peek') await dragGraphDetails(page,-150);
   await page.locator('#knowledgeGraphModal[data-kg-sheet="expanded"] #knowledgeGraphDetail').waitFor();
 }
 
-module.exports = {pinchGraph, panGraph, expandGraphDetails};
+module.exports = {pinchGraph, panGraph, dragGraphDetails, expandGraphDetails, collapseGraphDetails};

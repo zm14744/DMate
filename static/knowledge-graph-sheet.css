@@ -102,32 +102,24 @@
     }
 
     body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] #knowledgeGraphDetailWrap:not([hidden]) {
-        display:flex !important;
+        display:grid !important;
         flex:1 1 0 !important;
-        flex-direction:column;
+        grid-template-columns:minmax(0, 1fr) fit-content(48%);
+        grid-template-rows:26px auto minmax(0, 1fr);
         min-width:0;
         min-height:0 !important;
         height:100% !important;
         max-height:none !important;
         overflow:hidden !important;
-        gap:0;
+        gap:0 10px;
     }
 
     body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] .kg-sheet-handle {
-        display:flex !important;
-        flex:0 0 26px;
+        display:flex;
+        grid-area:1 / 1 / auto / -1;
         align-items:center;
         justify-content:center;
-        width:100%;
-        min-width:0;
-        min-height:26px;
-        margin:0;
-        padding:0;
-        border:0;
-        border-radius:17px 17px 0 0;
-        appearance:none;
         touch-action:none;
-        cursor:grab;
         user-select:none;
         -webkit-user-select:none;
         -webkit-tap-highlight-color:transparent;
@@ -138,19 +130,17 @@
         width:36px;
         height:4px;
         border-radius:999px;
-        background:currentColor;
+        background:var(--text-subtle);
         pointer-events:none;
     }
 
     body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] #knowledgeGraphDetailTitle:not([hidden]) {
         display:-webkit-box;
-        flex:0 0 auto;
-        align-self:stretch;
-        width:auto;
+        grid-area:2 / 1;
+        align-self:center;
         min-width:0;
-        min-height:0;
         margin:0;
-        padding:3px 16px 12px;
+        padding:4px 0 4px 16px;
         overflow:hidden;
         overflow-wrap:anywhere;
         -webkit-box-orient:vertical;
@@ -160,13 +150,17 @@
         line-height:1.4;
         color:var(--text-strong);
         touch-action:none;
-        cursor:grab;
         user-select:none;
         -webkit-user-select:none;
     }
 
+    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] #knowledgeGraphDetailWrap:not(:has(> .kg-question-actions)) > #knowledgeGraphDetailTitle {
+        grid-column:1 / -1;
+        padding-right:16px;
+    }
+
     body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] #knowledgeGraphDetail {
-        flex:1 1 0;
+        grid-area:3 / 1 / auto / -1;
         min-width:0;
         min-height:0 !important;
         height:auto !important;
@@ -179,13 +173,19 @@
     }
 
     body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] #knowledgeGraphDetailWrap > .kg-question-actions {
-        flex:0 0 auto;
-        align-self:stretch;
-        padding:0 16px 10px;
+        grid-area:2 / 2;
+        align-self:center;
+        justify-content:flex-end;
+        padding:4px 16px 4px 0;
     }
 
-    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet="peek"]:not([data-kg-sheet-dragging="up"]) #knowledgeGraphDetail,
-    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet="peek"]:not([data-kg-sheet-dragging="up"]) #knowledgeGraphDetailWrap > .kg-question-actions {
+    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] #knowledgeGraphLocateOriginal {
+        --dm-filled-font-size:13px;
+        --dm-filled-line-height:1.25;
+        --dm-filled-padding:6px 10px;
+    }
+
+    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet="peek"]:not([data-kg-sheet-dragging="up"]) #knowledgeGraphDetail {
         display:none !important;
     }
 
@@ -216,27 +216,6 @@
         }
     }
 
-    @layer dmate-button-themes {
-        body[data-appearance-theme] #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] .kg-sheet-handle {
-            background:transparent !important;
-            background-image:none !important;
-            border:0 !important;
-            color:var(--text-subtle) !important;
-            box-shadow:none !important;
-            transition:color 120ms ease;
-        }
-
-        body[data-appearance-theme] #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] .kg-sheet-handle:is(:hover, :focus-visible, :active) {
-            background:transparent !important;
-            color:var(--text-secondary) !important;
-        }
-
-        body[data-appearance-theme] #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] .kg-sheet-handle:focus-visible {
-            outline:2px solid var(--dm-selected-ring, var(--text-muted)) !important;
-            outline-offset:-4px;
-        }
-    }
-
     @keyframes kg-node-sheet-enter {
         from { opacity:0; transform:translateY(8px); }
         to { opacity:1; transform:translateY(0); }
@@ -244,7 +223,7 @@
 }
 
 @media (max-width:760px) and (prefers-reduced-motion:reduce) {
-    body #knowledgeGraphModal.graph-fullscreen-view :is(.knowledge-graph-side, .kg-sheet-handle) {
+    body #knowledgeGraphModal.graph-fullscreen-view .knowledge-graph-side {
         transition:none !important;
         animation:none !important;
     }

@@ -5,7 +5,7 @@
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const { expect } = require('playwright/test');
-const { expandGraphDetails, pinchGraph } = require('./knowledge-graph-touch-fixtures.cjs');
+const { expandGraphDetails, collapseGraphDetails, pinchGraph } = require('./knowledge-graph-touch-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const historyCards = '#knowledgeGraphModal .kg-history-item';
 
@@ -96,7 +96,7 @@ async function checkDecoration(page, focus, label) {
 async function selectFixtureNode(page, category, id) {
   await page.evaluate(category => setKnowledgeGraphFilter(category), category);
   const modal = page.locator('#knowledgeGraphModal');
-  if (await modal.getAttribute('data-kg-sheet') === 'expanded') await modal.locator('.kg-sheet-handle').click();
+  await collapseGraphDetails(page);
   const node = modal.locator('#knowledgeGraphCanvas [data-knowledge-node-id="' + id + '"]');
   await node.evaluate(element => element.scrollIntoView({block:'center', inline:'center'}));
   await node.click();

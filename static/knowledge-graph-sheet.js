@@ -9,11 +9,11 @@
         const document = host.ownerDocument, window = document.defaultView || root;
         const mobile = window.matchMedia('(max-width:760px)');
         let wrap = null, title = null, detail = null, drag = null, destroyed = false, observed = false;
-        let suppressClickUntil = 0;
-        const handle = document.createElement('button');
-        handle.type = 'button'; handle.className = 'kg-sheet-handle'; handle.hidden = true;
+        const handle = document.createElement('div');
+        handle.className = 'kg-sheet-handle'; handle.hidden = true;
+        handle.setAttribute('aria-hidden', 'true');
         const grip = document.createElement('span');
-        grip.className = 'kg-sheet-grip'; grip.setAttribute('aria-hidden', 'true'); handle.append(grip);
+        grip.className = 'kg-sheet-grip'; handle.append(grip);
         const now = () => window.performance?.now?.() ?? Date.now();
         const state = () => host.dataset.kgSheet;
         const hidden = node => !node || Boolean(node.closest('[hidden],.hidden,[aria-hidden="true"]'));
@@ -26,13 +26,7 @@
                 && window.getComputedStyle(host).visibility !== 'hidden';
         }
         function paint() {
-            const expanded = state() === 'expanded';
             handle.hidden = !['peek', 'expanded'].includes(state());
-            handle.setAttribute('aria-expanded', String(expanded));
-            handle.setAttribute('aria-controls', detail?.id || 'knowledgeGraphDetail');
-            const source = expanded ? '收起节点详情' : '展开节点详情';
-            const english = expanded ? 'Collapse node details' : 'Expand node details';
-            handle.setAttribute('aria-label', root.DMateI18n?.t?.(source, english) ?? source);
         }
         function resetDrag() {
             const previous = drag; drag = null;
@@ -58,7 +52,6 @@
             if (drag || event.button !== 0 || !state() || !eligible()) return;
             if (event.currentTarget === title
                 && event.target.closest?.('a,button,input,select,textarea,[contenteditable="true"]')) return;
-            suppressClickUntil = 0;
             const peekHeight = parseFloat(window.getComputedStyle(host).getPropertyValue('--kg-sheet-peek-height')) || 0;
             drag = { id:event.pointerId, target:event.currentTarget, state:state(),
                 x:event.clientX, y:event.clientY, lastY:event.clientY, started:now(),
@@ -83,7 +76,6 @@
             if (!drag || event.pointerId !== drag.id) return;
             const previous = resetDrag();
             if (!previous.moved) return;
-            suppressClickUntil = now() + 450;
             const delta = previous.lastY - previous.y;
             const swipe = Math.abs(delta) >= 32
                 || Math.abs(delta) >= 16 && Math.abs(delta) / Math.max(1, now() - previous.started) >= .35;
@@ -93,15 +85,7 @@
         }
         function pointerCancel(event) {
             if (!drag || event.pointerId !== drag.id) return;
-            if (drag.moved) suppressClickUntil = now() + 450;
             resetDrag();
-        }
-        function click(event) {
-            if (now() < suppressClickUntil) {
-                event.preventDefault(); event.stopImmediatePropagation(); return;
-            }
-            if (!state() || !eligible()) return;
-            setState(state() === 'expanded' ? 'peek' : 'expanded');
         }
         function keydown(event) {
             if (event.key === 'Escape' && state() === 'expanded') {
@@ -115,7 +99,7 @@
             const method = add ? 'addEventListener' : 'removeEventListener';
             for (const [type, handler] of [['pointerdown', pointerDown], ['pointermove', pointerMove],
                 ['pointerup', pointerEnd], ['pointercancel', pointerCancel],
-                ['lostpointercapture', pointerCancel], ['click', click]]) node[method](type, handler);
+                ['lostpointercapture', pointerCancel]]) node[method](type, handler);
         }
         const observer = typeof window.MutationObserver === 'function' ? new window.MutationObserver(sync) : null;
         function parts() {
@@ -146,7 +130,7 @@
             if (!eligible()) { close(); return false; }
             const expanded = keepExpanded && state() === 'expanded';
             detail.scrollTop = 0;
-            resetDrag(); suppressClickUntil = 0; setState(expanded ? 'expanded' : 'peek');
+            resetDrag(); setState(expanded ? 'expanded' : 'peek');
             return true;
         }
         function resize() { resetDrag(); sync(); }

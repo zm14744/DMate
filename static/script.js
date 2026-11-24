@@ -22035,6 +22035,31 @@ function locateWrongQuestionGraphOriginal(reference, context) {
     });
 }
 
+function knowledgeGraphHistoryPreviewText(text) {
+    let stem = text.trim();
+    const lineEnd = stem.indexOf("\n");
+    let hasWorksheetTitle = false;
+    if (lineEnd !== -1) {
+        const heading = stem.slice(0, lineEnd).replace(/^#{1,6}\s*/, "")
+            .replace(/[*_【】\[\]:：]/g, "").trim();
+        hasWorksheetTitle = /^(?:离散数学\s*)?(?:习题(?:集)?|练习(?:题)?|试卷|试题)$/.test(heading)
+            || /^(?:discrete math(?:ematics)?\s+)?(?:exercises?|practice (?:questions?|problems?)|exam(?: paper)?)$/i.test(heading);
+        if (hasWorksheetTitle) stem = stem.slice(lineEnd + 1).trimStart();
+    }
+    const ordinal = /^(\d{1,3})[、.．](?![\d.．])[ \t]*/gm;
+    const first = ordinal.exec(stem);
+    if (!first || first.index !== 0) return stem;
+    const siblings = [...stem.matchAll(ordinal)];
+    const start = Number(first[1]);
+    if (Number(siblings[0]?.[1]) === start + 1) {
+        // Without an explicit worksheet title this may be the author's
+        // numbered steps. Nested and parenthesized lists retain their markers.
+        if (!hasWorksheetTitle || !siblings.every((item, index) => Number(item[1]) === start + index + 1)) return stem;
+        return stem.replace(ordinal, (marker, number, offset) => offset ? "\n" : "").trim() || stem;
+    }
+    return stem.slice(first[0].length).trimStart() || stem;
+}
+
 function renderKnowledgeGraphHistory(items) {
     const list = document.getElementById("knowledgeGraphHistory");
     if (!list) return;
@@ -22063,7 +22088,7 @@ function renderKnowledgeGraphHistory(items) {
         const preview = document.createElement("div");
         preview.className = "kg-history-preview ai-content";
         preview.setAttribute("data-i18n-content", "");
-        preview.innerHTML = markdownToHtml(prepareAiDisplayText(item.text));
+        preview.innerHTML = markdownToHtml(prepareAiDisplayText(knowledgeGraphHistoryPreviewText(item.text)));
         const actions = document.createElement("div");
         actions.className = "kg-history-actions";
         const graph = document.createElement("button");
