@@ -1720,6 +1720,7 @@ input[type="search"]::-webkit-search-cancel-button {
     color:var(--text-subtle);
 }
 
+.learning-empty-state,
 #knowledgeGraphModal .kg-empty-state {
     display:flex;
     flex-direction:column;
@@ -1729,12 +1730,13 @@ input[type="search"]::-webkit-search-cancel-button {
     background:transparent;
     color:var(--text-muted);
     font-size:var(--font-small);
-    font-weight:500;
+    font-weight:600;
     line-height:1.4;
     text-align:center;
 }
 
-#knowledgeGraphModal .kg-empty-state-icon {
+.learning-empty-state > svg,
+#knowledgeGraphModal .kg-empty-state > svg {
     width:44px;
     height:44px;
     color:var(--text-subtle);
@@ -2100,7 +2102,7 @@ input[type="search"]::-webkit-search-cancel-button {
 #knowledgeGraphDetail > .kg-node-empty {
     background:transparent;
     font-size:calc(22px * var(--font-scale));
-    font-weight:600;
+    font-weight:500;
     line-height:1.3;
 }
 

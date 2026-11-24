@@ -453,7 +453,13 @@
     list.classList.add("wrong-book-list");
     list.replaceChildren();
     if (!groups.size) {
-      list.append(el("div", "wrong-empty offline-empty", tr("无", "None")));
+      const empty = el("div", "wrong-empty offline-empty learning-empty-state", tr("暂时没有错题", "No mistakes yet"));
+      const icon = document.querySelector("#wrongBookBtn > svg")?.cloneNode(true);
+      if (icon) {
+        icon.removeAttribute("class");
+        empty.prepend(icon);
+      }
+      list.append(empty);
       return;
     }
     for (const {value:row,records,snapshot} of visible) {

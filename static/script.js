@@ -10286,6 +10286,11 @@ function renderWrongBook() {
     updateWrongBookToolbar(allItems);
 
     if (!items.length) {
+        if (!allItems.length) {
+            list.append(createLearningEmptyState("wrong-empty learning-empty-state", "wrongBookBtn",
+                dmateUiText("暂时没有错题", "No mistakes yet")));
+            return;
+        }
         const empty = document.createElement("div");
         empty.className = "wrong-empty";
 
@@ -22156,12 +22161,12 @@ function placeKnowledgeGraphSideTabs() {
     return tabs;
 }
 
-function createKnowledgeGraphQuestionEmptyState(message) {
+function createLearningEmptyState(className, buttonId, message) {
     const empty = document.createElement("div");
-    empty.className = "kg-empty kg-empty-state";
-    const icon = document.querySelector("#knowledgeGraphBtn > svg")?.cloneNode(true);
+    empty.className = className;
+    const icon = document.querySelector(`#${buttonId} > svg`)?.cloneNode(true);
     if (icon) {
-        icon.setAttribute("class", "kg-empty-state-icon");
+        icon.removeAttribute("class");
         empty.append(icon);
     }
     const label = document.createElement("span");
@@ -22189,7 +22194,7 @@ function renderKnowledgeGraphSide({refreshHistory = true} = {}) {
         const empty = document.querySelector("#knowledgeGraphCanvas > .kg-empty");
         if (empty) {
             const hasQuestions = items.length > 0;
-            empty.replaceWith(createKnowledgeGraphQuestionEmptyState(
+            empty.replaceWith(createLearningEmptyState("kg-empty kg-empty-state", "knowledgeGraphBtn",
                 hasQuestions ? dmateUiText("请选择题目", "Select a question") : dmateUiText("暂时没有题目", "No questions yet")));
         }
     }

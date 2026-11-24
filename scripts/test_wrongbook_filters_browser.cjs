@@ -110,6 +110,13 @@ async function runCase(browser, width) {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => typeof openWrongBook === 'function');
     assert.equal(await page.evaluate(() => wrongBookFilter), 'pending', 'A new page starts at pending correction');
+    await page.evaluate(() => openWrongBook());
+    const emptyBook = page.locator('#wrongBookList .wrong-empty');
+    assert.equal(await emptyBook.innerText(), '暂时没有错题');
+    assert.equal(await emptyBook.locator('svg').innerHTML(), await page.locator('#wrongBookBtn > svg').innerHTML());
+    await page.evaluate(() => DMateI18n.setLanguage('en', false));
+    assert.equal(await emptyBook.innerText(), 'No mistakes yet');
+    await page.evaluate(() => { DMateI18n.setLanguage('zh-CN', false); closeWrongBook(); });
     await seed(page);
     await page.evaluate(() => openWrongBook());
     await page.locator('#wrongBookModal').waitFor({ state: 'visible' });
@@ -217,6 +224,7 @@ async function runCase(browser, width) {
       if (width <= 1100) await checkMobileFilterRow(page);
       await page.locator('#wrongBookSearch').fill('__no_matching_concept__');
       assert.equal(await page.locator('#wrongBookList .wrong-empty').innerText(), empty, 'No search match');
+      assert.equal(await page.locator('#wrongBookList .wrong-empty svg').count(), 0, 'A filtered result is distinct from an empty book');
       await page.locator('#wrongBookSearch').fill('');
       for (const filter of ['pending', 'corrected']) {
         await page.evaluate(filter => {

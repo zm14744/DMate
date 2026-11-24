@@ -351,9 +351,14 @@
         const language = selectedLanguage(options);
         if (!snapshot.hasAnyRecord) {
             const empty = document.createElement('div');
-            empty.className = 'learning-review-empty';
+            empty.className = 'learning-review-empty learning-empty-state';
             empty.setAttribute('translate', 'no');
-            empty.textContent = language.startsWith('en') ? 'None' : '无';
+            empty.textContent = language.startsWith('en') ? 'No learning review yet' : '暂时没有学习回顾';
+            const icon = document.querySelector('#learningReviewBtn > svg')?.cloneNode(true);
+            if (icon) {
+                icon.removeAttribute('class');
+                empty.prepend(icon);
+            }
             container.replaceChildren(empty);
             return;
         }

@@ -140,7 +140,8 @@ async function noOverflow(page,panel) {
 async function exercise(page,reference,width) {
   await navigate(page,'mistakes');
   await page.waitForFunction(()=>document.getElementById('mistakeList').textContent.trim().length>0);
-  assert.equal((await page.locator('#mistakeList').innerText()).trim(),'无');
+  assert.equal((await page.locator('#mistakeList').innerText()).trim(),'暂时没有错题');
+  assert.equal(await page.locator('#mistakeList .wrong-empty svg').innerHTML(), await page.locator('#wrongBookBtn > svg').innerHTML());
   assert.equal(await page.locator('#addMistake,#recordDialog,#recordForm,#recordTitle,#recordContent').count(),0,
     'The removed manual mistake controls are absent, not merely hidden');
   assert.equal((await page.locator('#mistakesPanel .offline-toolbar').innerText()).includes('仅保存在当前设备'),false);
@@ -173,8 +174,8 @@ async function exercise(page,reference,width) {
   assert.equal((await records(page,'mistakes')).length,1,'Cancel removal retains the original record');
   await remove.click();await confirmDeletion(page,mistakeRemovalTitle,offlineRemovalText);
   await page.waitForFunction(async()=>(await __offlineTestStore.all('mistakes')).length===0);
-  await page.waitForFunction(()=>document.getElementById('mistakeList').textContent.trim()==='无');
-  assert.equal((await page.locator('#mistakeList').innerText()).trim(),'无');
+  await page.waitForFunction(()=>document.getElementById('mistakeList').textContent.trim()==='暂时没有错题');
+  assert.equal((await page.locator('#mistakeList').innerText()).trim(),'暂时没有错题');
   await navigate(page,'questions');
   if(width<=1100)await page.locator('#questionFullView').click();
   assert.equal(await page.locator('#questionDetail [data-action="add-to-mistakes"]').count(),0);

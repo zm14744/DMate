@@ -83,6 +83,12 @@ async function test(browser, width) {
     const close = page.locator('#learningReviewClose');
     await close.waitFor();
     assert.equal(await close.evaluate(node => node === document.activeElement), true);
+    const emptyReview = page.locator('#learningReviewBody .learning-review-empty');
+    assert.equal(await emptyReview.innerText(), '暂时没有学习回顾');
+    assert.equal(await emptyReview.locator('svg').innerHTML(), await page.locator('#learningReviewBtn > svg').innerHTML());
+    await page.evaluate(() => DMateI18n.setLanguage('en', false));
+    assert.equal(await emptyReview.innerText(), 'No learning review yet');
+    await page.evaluate(() => DMateI18n.setLanguage('zh-CN', false));
     await hidden(page, 'Modal autofocus after screenshot keys has no unsolicited close hint');
     await hint(page, close, '关闭', false);
     await page.keyboard.press('PrintScreen');
