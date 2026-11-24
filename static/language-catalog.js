@@ -235,7 +235,6 @@
         "紫色": "Purple",
         "青绿色": "Teal",
         "主题色": "Accent color",
-        "文字大小": "Text size",
         "小": "Small",
         "标准": "Standard",
         "大": "Large",

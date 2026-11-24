@@ -317,7 +317,7 @@ async function appearanceControls(page, width, theme, reference) {
   await dialog.waitFor();
   assert.equal(await dialog.locator('[data-appearance-mode]').count(), 4, 'All four theme choices are available');
   assert.equal(await dialog.locator('[data-appearance-accent]').count(), 3, 'All accent choices are available');
-  assert.equal(await dialog.locator('[data-appearance-font]').count(), 3, 'All font sizes are available');
+  assert.equal(await dialog.locator('[data-appearance-font]').count(), 0, 'Appearance uses the standard text size');
   assert.equal(await dialog.locator('[data-appearance-fit]').count(), 2, 'Both wallpaper fit modes are available');
   for (const id of ['appearanceMaskRange', 'appearanceBlurRange', 'appearancePanelRange', 'appearanceBubbleRange']) {
     await dialog.locator('#' + id).waitFor({ state: 'visible' });

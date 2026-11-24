@@ -5,9 +5,9 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
-const {installStorageProbe, revealInterface} = require('./offline-vault-browser-fixtures.cjs');
+const {installStorageProbe, revealInterface, row} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
-const profile = { mode:'dark', accent:'purple', fontSize:'large', backgroundFit:'contain',
+const profile = { mode:'dark', accent:'purple', backgroundFit:'contain',
   mask:17, blur:3, panelOpacity:80, bubbleOpacity:70 };
 
 async function ready(page) {
@@ -55,6 +55,7 @@ async function appearance(page) {
   });
 }
 async function appearanceControls(page) {
+  assert.equal(await page.locator('#appearanceModal [data-appearance-font]').count(), 0);
   const separators = await page.locator('#appearanceModal').evaluate(dialog => [
     ...[...dialog.querySelectorAll('.modal-head, .appearance-section')].map(node => getComputedStyle(node).borderBottomWidth),
     ...[...dialog.querySelectorAll('.appearance-apply-hint, .appearance-footer')].map(node => getComputedStyle(node).borderTopWidth)
@@ -63,7 +64,7 @@ async function appearanceControls(page) {
     'Appearance groups and dialog chrome have no internal divider lines');
   return page.locator('#appearanceModal').evaluate(dialog => {
     const selectors = ['.appearance-card', '.modal-head', '.appearance-section-title',
-      '[data-appearance-mode="dark"]', '[data-appearance-accent="purple"]', '[data-appearance-font="large"]',
+      '[data-appearance-mode="dark"]', '[data-appearance-accent="purple"]',
       '[data-appearance-fit="contain"]', '#appearanceMaskRange', '#appearanceBlurRange',
       '#appearancePanelRange', '#appearanceBubbleRange', '#appearanceDone', '#appearanceClose'];
     return Object.fromEntries(selectors.map(selector => {
@@ -123,11 +124,13 @@ async function filledAppearanceActions(page) {
       await writeAppearanceBackgroundBlob(blob);
       setAppearanceBackgroundVisual(blob);
       const snapshot = await window.DMateOfflineBridge.snapshot();
+      snapshot.appearance.settings.fontSize = 'small';
       if (Array.isArray(snapshot.drawings)) snapshot.drawings = JSON.stringify({version:2,activeId:snapshot.drawings[0]?.id || '',pages:snapshot.drawings});
       await DMateOfflineHandoff.stage(snapshot);
-    }, profile);
+    }, { ...profile, fontSize:'large' });
     await settledWallpaper(page);
     const online = await appearance(page);
+    assert.equal(online['--font-scale'], '1', 'A legacy size uses standard text in the online application');
     await openAppearance(page);
     await filledAppearanceActions(page);
     const onlineControls = await appearanceControls(page);
@@ -135,6 +138,8 @@ async function filledAppearanceActions(page) {
     await page.goto(baseURL + '/offline', { waitUntil:'networkidle' });
     await ready(page);
     await settledWallpaper(page);
+    assert.equal((await row(page, 'settings', 'appearance')).settings.fontSize, 'small',
+      'Opening existing device settings leaves the stored record intact');
     assert.deepEqual(await appearance(page), online,
       'Offline wallpaper, theme, font, opacity, and shared background layers must match online');
     console.log('PASS online/offline custom wallpaper, ten appearance variables, and both background layers match');
@@ -159,6 +164,8 @@ async function filledAppearanceActions(page) {
     await page.locator('#appearanceModal').waitFor({ state:'hidden' });
     await page.reload({ waitUntil:'networkidle' }); await ready(page); await settledWallpaper(page);
     assert.deepEqual(await page.evaluate(() => window.DMateOfflineAppearance.getSettings()), profile);
+    assert.deepEqual((await row(page, 'settings', 'appearance')).settings, profile,
+      'Confirming appearance removes the legacy size and preserves the other settings');
     assert.equal(await page.evaluate(() => window.DMateOfflineAppearance.getBackground()?.type), 'image/webp');
     assert.equal(await page.evaluate(() => document.body.classList.contains('has-custom-background')), true);
     console.log('PASS uploaded PNG is prepared, previewed, confirmed, and retained with settings after reload');

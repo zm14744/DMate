@@ -177,7 +177,6 @@ const APPEARANCE_MAX_IMAGE_SIDE = 1920;
 const APPEARANCE_DEFAULTS = Object.freeze({
     mode: "system",
     accent: "blue",
-    fontSize: "standard",
     backgroundFit: "cover",
     mask: 35,
     blur: 0,
@@ -251,9 +250,6 @@ function normalizeAppearanceSettings(value) {
         )
             ? source.accent
             : APPEARANCE_DEFAULTS.accent,
-        fontSize: ["small", "standard", "large"].includes(source.fontSize)
-            ? source.fontSize
-            : APPEARANCE_DEFAULTS.fontSize,
         backgroundFit: ["cover", "contain"].includes(source.backgroundFit)
             ? source.backgroundFit
             : APPEARANCE_DEFAULTS.backgroundFit,
@@ -365,19 +361,12 @@ function resolveAppearanceTheme() {
     }
 }
 
-function fontScaleForAppearance(size) {
-    if (size === "small") return 0.92;
-    if (size === "large") return 1.08;
-    return 1;
-}
-
 function applyAppearanceSettings(options = {}) {
     const root = document.documentElement;
     const body = document.body;
 
     if (!root || !body) return;
 
-    const previousFontScale = root.style.getPropertyValue("--font-scale");
     appearanceSettings = normalizeAppearanceSettings(appearanceSettings);
 
     const accent = APPEARANCE_ACCENTS[appearanceSettings.accent]
@@ -441,10 +430,7 @@ function applyAppearanceSettings(options = {}) {
         "--bubble-alpha",
         String(appearanceSettings.bubbleOpacity / 100)
     );
-    root.style.setProperty(
-        "--font-scale",
-        String(fontScaleForAppearance(appearanceSettings.fontSize))
-    );
+    root.style.setProperty("--font-scale", "1");
     root.style.setProperty(
         "--background-mask-alpha",
         String(appearanceSettings.mask / 100)
@@ -464,19 +450,11 @@ function applyAppearanceSettings(options = {}) {
 
     syncAppearanceControls();
 
-    // 主题等外观由 CSS 更新；只有字号变化才需要重新计算图谱节点布局。
-    // 返回标签页或视频时也会检查系统主题，不能因此重绘并重置缩放、位置。
+    // Theme changes invalidate the export while the live graph uses CSS.
     const graphModal = document.getElementById("knowledgeGraphModal");
-    if (
-        graphModal
-        && !graphModal.classList.contains("hidden")
-        && typeof renderKnowledgeGraph === "function"
-    ) {
+    if (graphModal && !graphModal.classList.contains("hidden")) {
         knowledgeGraphPreparedPngPromise = null;
         knowledgeGraphPreparedPngKey = "";
-        if (root.style.getPropertyValue("--font-scale") !== previousFontScale) {
-            renderKnowledgeGraph();
-        }
     }
 }
 
@@ -492,13 +470,6 @@ function syncAppearanceControls() {
         button.classList.toggle(
             "active",
             button.dataset.appearanceAccent === appearanceSettings.accent
-        );
-    });
-
-    document.querySelectorAll("[data-appearance-font]").forEach(button => {
-        button.classList.toggle(
-            "active",
-            button.dataset.appearanceFont === appearanceSettings.fontSize
         );
     });
 
@@ -1021,14 +992,6 @@ function bindAppearanceControls() {
     document.querySelectorAll("[data-appearance-accent]").forEach(button => {
         button.addEventListener("click", () => {
             appearanceSettings.accent = button.dataset.appearanceAccent;
-            appearanceDraftDirty = true;
-            applyAppearanceSettings({ save:false });
-        });
-    });
-
-    document.querySelectorAll("[data-appearance-font]").forEach(button => {
-        button.addEventListener("click", () => {
-            appearanceSettings.fontSize = button.dataset.appearanceFont;
             appearanceDraftDirty = true;
             applyAppearanceSettings({ save:false });
         });

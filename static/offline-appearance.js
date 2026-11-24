@@ -5,7 +5,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const text = value => window.DMateI18n?.t?.(value) ?? value;
-  const defaults = Object.freeze({ mode:'system', accent:'blue', fontSize:'standard',
+  const defaults = Object.freeze({ mode:'system', accent:'blue',
     backgroundFit:'cover', mask:35, blur:0, panelOpacity:100, bubbleOpacity:100 });
   const accents = {
     blue:['#3b82f6','59,130,246','#2563eb','#1d4ed8','#60a5fa','#93c5fd'],
@@ -19,7 +19,6 @@
     return {
       mode:['system','light','dark','navy'].includes(source.mode) ? source.mode : defaults.mode,
       accent:Object.hasOwn(accents, source.accent) ? source.accent : defaults.accent,
-      fontSize:['small','standard','large'].includes(source.fontSize) ? source.fontSize : defaults.fontSize,
       backgroundFit:['cover','contain'].includes(source.backgroundFit) ? source.backgroundFit : defaults.backgroundFit,
       mask:clamp(source.mask,0,70,defaults.mask), blur:clamp(source.blur,0,12,defaults.blur),
       panelOpacity:clamp(source.panelOpacity,75,100,defaults.panelOpacity),
@@ -49,8 +48,7 @@
     return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
   function syncControls() {
-    for (const [attribute, value] of [['mode',settings.mode],['accent',settings.accent],
-      ['font',settings.fontSize],['fit',settings.backgroundFit]]) {
+    for (const [attribute, value] of [['mode',settings.mode],['accent',settings.accent],['fit',settings.backgroundFit]]) {
       document.querySelectorAll('[data-appearance-' + attribute + ']').forEach(button => {
         const active = button.getAttribute('data-appearance-' + attribute) === value;
         button.classList.toggle('active', active);
@@ -101,7 +99,7 @@
       '--shell-alpha':Math.max(.30,Math.min(.48,alpha*.44)),
       '--composer-alpha':Math.max(.38,Math.min(.58,alpha*.52)),
       '--bubble-alpha':settings.bubbleOpacity/100,
-      '--font-scale':settings.fontSize === 'small' ? .92 : settings.fontSize === 'large' ? 1.08 : 1,
+      '--font-scale':1,
       '--background-mask-alpha':settings.mask/100, '--background-blur':settings.blur + 'px',
       '--background-size':settings.backgroundFit
     };
@@ -241,7 +239,7 @@
     listen('appearanceBackgroundViewerClose','click',closeViewer);
     listen('appearanceBackgroundViewer','click',event => { if (event.target === $('appearanceBackgroundViewer')) closeViewer(); });
     listen('appearanceModal','click',event => { if (event.target === $('appearanceModal')) close(); });
-    for (const [attribute,key] of [['mode','mode'],['accent','accent'],['font','fontSize'],['fit','backgroundFit']]) {
+    for (const [attribute,key] of [['mode','mode'],['accent','accent'],['fit','backgroundFit']]) {
       document.querySelectorAll('[data-appearance-' + attribute + ']').forEach(button => button.addEventListener('click',() => {
         if (!opened || pending) return;
         settings = normalize({...settings,[key]:button.getAttribute('data-appearance-' + attribute)}); paint();

@@ -6,7 +6,7 @@ const {chromium} = require('playwright');
 const {installStorageProbe} = require('./offline-vault-browser-fixtures.cjs');
 const base = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const owner = 'appearance-first-paint';
-const profile = {mode:'navy',accent:'teal',fontSize:'large',backgroundFit:'contain',mask:17,blur:3,panelOpacity:80,bubbleOpacity:70};
+const profile = {mode:'navy',accent:'teal',backgroundFit:'contain',mask:17,blur:3,panelOpacity:80,bubbleOpacity:70};
 function gate() {let release;const ready = new Promise(resolve => {release = resolve;});return {ready,release};}
 async function sample(page) {
   return page.evaluate(() => ({theme:document.documentElement.dataset.appearanceTheme,
@@ -22,10 +22,10 @@ async function savedPaint(page) {
   try { await page.waitForFunction(() => document.body?.classList.contains('has-custom-background')); }
   catch(error) {console.error('Missing wallpaper',await sample(page),await page.evaluate(()=>({bootstrap:window.DMateAppearanceBootstrap && {scope:DMateAppearanceBootstrap.scope,owner:DMateAppearanceBootstrap.owner,settings:DMateAppearanceBootstrap.settings},meta:localStorage.getItem('discrete_math_ai_cloud_sync_v1')})));throw error;}
   const actual = await sample(page);
-  assert.deepEqual({...actual,backgroundImage:''},{theme:'navy',bodyTheme:'navy',accent:'#14b8a6',font:'1.08',panel:'0.8',bubble:'0.7',background:true,backgroundImage:''});
+  assert.deepEqual({...actual,backgroundImage:''},{theme:'navy',bodyTheme:'navy',accent:'#14b8a6',font:'1',panel:'0.8',bubble:'0.7',background:true,backgroundImage:''});
   assert.match(actual.backgroundImage,/blob:/);
 }
-async function seed(page) {
+async function seed(page, legacySize) {
   await page.goto(base+'/static/offline.html',{waitUntil:'networkidle'});
   await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
   await page.evaluate(async ({owner,profile}) => {
@@ -43,7 +43,8 @@ async function seed(page) {
     });
     await __offlineTestStore.put('settings',{id:'appearance',settings:profile,backgroundBlob:blob});
     await DMateOfflineAppearance.apply(profile,blob);
-  },{owner,profile});
+    localStorage.setItem('dmate:offline:appearance-paint:v1',JSON.stringify(profile));
+  },{owner,profile:{...profile,fontSize:legacySize}});
 }
 async function captureFrames(context) {
   await context.addInitScript(() => {
@@ -76,7 +77,7 @@ async function verifiedOnline(context) {
   assert.equal((await sample(page)).backgroundImage,initialURL,'Verified account initialization keeps the same wallpaper');
   const frames=await page.evaluate(()=>__appearanceFrames);
   assert.ok(frames.length>0);
-  assert.ok(frames.every(frame=>frame.theme==='navy' && frame.font==='1.08' && frame.panel==='0.8'),'Every painted frame uses the saved settings');
+  assert.ok(frames.every(frame=>frame.theme==='navy' && frame.font==='1' && frame.panel==='0.8'),'Every painted frame keeps the saved colors and standard text size');
   await page.evaluate(()=>{appearanceSettings.mode='light';applyAppearanceSettings({save:false});});
   assert.equal(await page.evaluate(()=>document.documentElement.style.backgroundColor),'rgb(245, 245, 247)','Theme changes update the root overscroll color');
   await page.close();
@@ -92,7 +93,7 @@ async function offlineStartup(context) {
   await savedPaint(page);
   assert.equal((await sample(page)).backgroundImage,initialURL,'Offline application adopts its predecoded device wallpaper');
   const frames=await page.evaluate(()=>__appearanceFrames);
-  assert.ok(frames.length>0 && frames.every(frame=>frame.theme==='navy' && frame.font==='1.08' && frame.panel==='0.8'));
+  assert.ok(frames.length>0 && frames.every(frame=>frame.theme==='navy' && frame.font==='1' && frame.panel==='0.8'));
   await page.close();
 }
 async function guestIsolation(context) {
@@ -126,7 +127,7 @@ async function guestIsolation(context) {
       // identity and the deliberately held scripts used by these first-paint checks.
       const context=await browser.newContext({viewport:{width,height:900},colorScheme:'light',serviceWorkers:'block'});
       await installStorageProbe(context);await captureFrames(context);
-      const seedPage=await context.newPage();await seed(seedPage);await seedPage.close();
+      const seedPage=await context.newPage();await seed(seedPage,width===1440?'large':'small');await seedPage.close();
       await verifiedOnline(context);await offlineStartup(context);await guestIsolation(context);
       await context.close();console.log('Appearance first-paint, delayed initialization, and isolation passed at '+width+'px');
     }

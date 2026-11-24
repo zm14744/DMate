@@ -114,11 +114,11 @@ async function filter(page, value) {
   await full(page);
 }
 
-async function font(page, mode, offline) {
-  await page.evaluate(({ mode, offline }) => {
-    if (offline) DMateOfflineAppearance.apply({ ...DMateOfflineAppearance.getSettings(), mode: 'dark', fontSize: mode });
-    else { appearanceSettings = { ...appearanceSettings, mode: 'dark', fontSize: mode }; applyAppearanceSettings({ save: false }); }
-  }, { mode, offline });
+async function scaleLabels(page, scale, offline) {
+  await page.evaluate(({ scale, offline }) => {
+    document.documentElement.style.setProperty('--font-scale', String(scale));
+    if (!offline) renderKnowledgeGraph();
+  }, { scale, offline });
   await settle(page);
 }
 
@@ -131,7 +131,7 @@ async function check(page, expected, language, label) {
   }, { expected, language });
   assert.deepEqual(result.issues, [], label + ': actual label bounds\n' + result.issues.slice(0, 12).join('\n'));
   assert.ok(Math.abs(result.fontSize - (page.viewportSize().width <= 760 ? 13 : 12) * result.fontScale) < .02,
-    label + ': changing appearance really updates the label font, rather than reusing stale geometry');
+    label + ': the rendered label uses the requested fixture scale');
   return result;
 }
 
@@ -305,12 +305,16 @@ async function runCase(browser, width, offline) {
       await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
     }
     await page.locator('#knowledgeGraphCanvas .kg-section').waitFor();
+    await page.evaluate(async offline => {
+      if (offline) await DMateOfflineAppearance.apply({ ...DMateOfflineAppearance.getSettings(), mode:'dark' });
+      else { appearanceSettings = { ...appearanceSettings, mode:'dark' }; applyAppearanceSettings({save:false}); }
+    }, offline);
     await page.evaluate(installProbe);
     const categories = await page.locator('#knowledgeGraphCategory option').evaluateAll(options => options.map(option => option.value));
     assert.equal(categories.length, 11);
     for (const language of ['zh-CN', 'en']) {
       await page.evaluate(value => DMateI18n.setLanguage(value, false), language);
-      await font(page, 'standard', offline);
+      await scaleLabels(page, 1, offline);
       let count = 0, maxCenter = 0;
       for (const category of categories) {
         await filter(page, category);
@@ -320,14 +324,15 @@ async function runCase(browser, width, offline) {
         count += result.count;
         maxCenter = Math.max(maxCenter, result.maxCenterError);
       }
-      for (const size of ['small', 'large']) {
+      for (const scale of [.92, 1.08]) {
         await filter(page, '全部');
-        await font(page, size, offline);
+        await scaleLabels(page, scale, offline);
         await full(page);
-        const result = await check(page, all, language, (offline ? 'offline' : 'online') + '/' + width + '/' + language + '/' + size);
+        const result = await check(page, all, language, (offline ? 'offline' : 'online') + '/' + width + '/' + language + '/' + scale);
+        assert.equal(result.fontScale, scale);
         maxCenter = Math.max(maxCenter, result.maxCenterError);
       }
-      await font(page, 'standard', offline);
+      await scaleLabels(page, 1, offline);
       await filter(page, '全部');
       await png(page, all, language, offline);
       await boundaries(page, language, (offline ? 'offline' : 'online') + '-' + width);

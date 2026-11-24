@@ -5,7 +5,7 @@
   const script = document.currentScript;
   const scope = script?.dataset.scope || 'online', owner = script?.dataset.owner || '';
   const offlineKey = 'dmate:offline:appearance-paint:v1';
-  const defaults = {mode:'system',accent:'blue',fontSize:'standard',backgroundFit:'cover',mask:35,blur:0,panelOpacity:100,bubbleOpacity:100};
+  const defaults = {mode:'system',accent:'blue',backgroundFit:'cover',mask:35,blur:0,panelOpacity:100,bubbleOpacity:100};
   const accents = {
     blue:['#3b82f6','59,130,246','#2563eb','#1d4ed8','#60a5fa','#93c5fd'],
     purple:['#8b5cf6','139,92,246','#7c3aed','#6d28d9','#a78bfa','#c4b5fd'],
@@ -16,7 +16,6 @@
     const source = value || {};
     return {mode:['system','light','dark','navy'].includes(source.mode) ? source.mode : defaults.mode,
       accent:Object.hasOwn(accents,source.accent) ? source.accent : defaults.accent,
-      fontSize:['small','standard','large'].includes(source.fontSize) ? source.fontSize : defaults.fontSize,
       backgroundFit:['cover','contain'].includes(source.backgroundFit) ? source.backgroundFit : defaults.backgroundFit,
       mask:number(source.mask,0,70,35),blur:number(source.blur,0,12,0),
       panelOpacity:number(source.panelOpacity,75,100,100),bubbleOpacity:number(source.bubbleOpacity,60,100,100)};
@@ -40,7 +39,7 @@
     const accent = accents[settings.accent], alpha = settings.panelOpacity/100;
     const values = {'--accent':accent[0],'--accent-rgb':accent[1],'--accent-deep':accent[2],
       '--accent-deeper':accent[3],'--accent-soft':accent[4],'--accent-pale':accent[5],
-      '--accent-bg':'rgba('+accent[1]+',.22)','--font-scale':settings.fontSize === 'small' ? .92 : settings.fontSize === 'large' ? 1.08 : 1,
+      '--accent-bg':'rgba('+accent[1]+',.22)','--font-scale':1,
       '--panel-alpha':alpha,'--workspace-alpha':Math.max(.08,Math.min(.18,alpha*.14)),
       '--shell-alpha':Math.max(.30,Math.min(.48,alpha*.44)),'--composer-alpha':Math.max(.38,Math.min(.58,alpha*.52)),
       '--bubble-alpha':settings.bubbleOpacity/100,'--background-mask-alpha':settings.mask/100,

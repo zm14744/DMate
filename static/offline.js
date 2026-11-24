@@ -1233,7 +1233,8 @@
     const saved = await transaction("settings", "readonly", os => os.get("appearance"));
     const patch = changes?.settings || changes || {};
     const next = {...(saved?.settings || {})};
-    for (const key of ["mode","accent","fontSize","panelOpacity","bubbleOpacity","backgroundFit","blur","mask"])
+    delete next.fontSize;
+    for (const key of ["mode","accent","panelOpacity","bubbleOpacity","backgroundFit","blur","mask"])
       if (Object.hasOwn(patch,key)) next[key] = patch[key];
     const value = {...saved,id:"appearance",settings:next,updatedAt:stamp()};
     if (changes?.removeBackground) delete value.backgroundBlob;
