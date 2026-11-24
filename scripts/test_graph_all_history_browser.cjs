@@ -188,25 +188,34 @@ async function checkCase(browser,width,language) {
       assert.ok(reachable, label + ': the graph empty state does not cover the tabs');
     }
     assert.equal(await page.locator(cards+' .kg-history-points').count(),0,label+': history previews omit topic subtitles');
-    const selectPrompt = mobile ? (language === 'en' ? 'None' : '无') : (language === 'en' ? 'Select a question' : '请选择题目');
-    assert.equal(await page.locator('#knowledgeGraphCanvas').innerText(), selectPrompt,
-      label+': history with available questions waits for a selection');
-    const selectIcon = page.locator('#knowledgeGraphCanvas > .kg-empty-state svg');
-    assert.equal(await selectIcon.isVisible(), !mobile, label+': the selection icon is desktop only');
-    if (!mobile) {
-      const artwork = svg => svg.innerHTML;
-      assert.equal(await selectIcon.evaluate(artwork), await page.locator('#knowledgeGraphBtn > svg').evaluate(artwork),
-        label+': the prompt reuses the navigation graph icon');
-      const positioned = await selectIcon.evaluate(svg => {
-        const box = svg.getBoundingClientRect();
-        return box.height >= 40 && box.bottom <= svg.nextElementSibling.getBoundingClientRect().top;
-      });
-      assert.ok(positioned, label+': the enlarged decorative icon sits above the prompt');
-    }
+    const checkInlineList = async () => {
+      assert.equal(await page.locator('#knowledgeGraphCanvas').isVisible(), false, label+': the mobile list has no canvas above it');
+      assert.ok(await page.locator('#knowledgeGraphHistory').evaluate(list => {
+        const tabs = document.getElementById('knowledgeGraphSideTabs');
+        const pane = list.closest('.knowledge-graph-side');
+        const bounds = list.getBoundingClientRect(), toolbar = tabs.parentElement.getBoundingClientRect();
+        const layout = pane.parentElement.getBoundingClientRect();
+        return tabs.parentElement.matches('.graph-toolbar') && getComputedStyle(pane).position !== 'absolute'
+          && Math.abs(bounds.top - toolbar.bottom) <= 1 && Math.abs(bounds.bottom - layout.bottom) <= 1;
+      }), label+': the inline mobile list fills the area immediately below the toolbar');
+    };
+    if (mobile) await checkInlineList();
     await page.locator('#knowledgeGraphDetailTab').click();
-    assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),true,label+': the historical detail tab can open before choosing a past question');
-    const noNodes = mobile ? (language === 'en' ? 'None' : '无') : (language === 'en' ? 'No nodes yet' : '暂无节点');
-    assert.equal(await page.locator('#knowledgeGraphDetail').innerText(), noNodes);
+    const selectPrompt = language === 'en' ? 'Select a question' : '请选择题目';
+    assert.equal(await page.locator('#knowledgeGraphCanvas').innerText(), selectPrompt,
+      label+': historical detail waits for a question selection');
+    const selectIcon = page.locator('#knowledgeGraphCanvas > .kg-empty-state svg');
+    assert.equal(await selectIcon.isVisible(), true, label+': the selection prompt includes the graph icon');
+    const artwork = svg => svg.innerHTML;
+    assert.equal(await selectIcon.evaluate(artwork), await page.locator('#knowledgeGraphBtn > svg').evaluate(artwork),
+      label+': the prompt reuses the navigation graph icon');
+    const positioned = await selectIcon.evaluate(svg => {
+      const box = svg.getBoundingClientRect();
+      return box.height >= 40 && box.bottom <= svg.nextElementSibling.getBoundingClientRect().top;
+    });
+    assert.ok(positioned, label+': the enlarged decorative icon sits above the prompt');
+    assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),!mobile,label+': only desktop shows a separate empty detail pane');
+    if (!mobile) assert.equal(await page.locator('#knowledgeGraphDetail').innerText(),language === 'en' ? 'No nodes yet' : '暂无节点');
     assert.equal(await page.locator('#knowledgeGraphDetail svg').count(),0,label+': empty details contain no icon');
     assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),true,label+': empty historical details keep both sidebar tabs accessible');
     assert.deepEqual(await page.evaluate(()=>knowledgeGraphDisplayedNodes().map(node=>node.id)),[],label+': unselected historical details never fall back to a full course graph');
@@ -253,6 +262,7 @@ async function checkCase(browser,width,language) {
       label+': history graph retains the selected question concepts in purple');
     await page.locator('#knowledgeGraphHistoryTab').click();
     assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(),true,label+': the history sidebar tab returns to the list without changing top-level mode');
+    if (mobile) await checkInlineList();
     await assertModeControls(page,'history',label+'/return to historical list');
     await page.locator('#knowledgeGraphDetailTab').click();
     assert.equal(await page.locator('#knowledgeGraphDetailTitle').isVisible(),true,label+': revisiting details shows the selected node title');

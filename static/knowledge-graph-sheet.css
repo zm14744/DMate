@@ -1,5 +1,4 @@
-/* Mobile graphs use the existing viewport directly. Details and history float
-   over it without resizing the graph as they open, expand or follow a drag. */
+/* Mobile node details float over the graph. History uses its own content area. */
 @media (max-width:760px) {
     body #knowledgeGraphModal.graph-fullscreen-view {
         --kg-sheet-peek-height:80px;
@@ -11,12 +10,12 @@
         --kg-sheet-motion:220ms cubic-bezier(.2, .65, .3, 1);
     }
 
-    body #knowledgeGraphModal.graph-fullscreen-view .graph-toolbar {
+    body #knowledgeGraphModal:is(.graph-fullscreen-view,[data-graph-view="history"]) .graph-toolbar {
         flex-wrap:wrap;
         align-items:stretch;
     }
 
-    body #knowledgeGraphModal.graph-fullscreen-view .graph-toolbar > #knowledgeGraphSideTabs:not([hidden]) {
+    body #knowledgeGraphModal .graph-toolbar > #knowledgeGraphSideTabs:not([hidden]) {
         display:flex !important;
         flex:0 0 100%;
         width:100%;
@@ -24,7 +23,7 @@
         padding:0;
     }
 
-    body #knowledgeGraphModal.graph-fullscreen-view .graph-toolbar > #knowledgeGraphSideTabs .graph-side-tab {
+    body #knowledgeGraphModal .graph-toolbar > #knowledgeGraphSideTabs .graph-side-tab {
         min-height:36px;
         padding:6px 10px;
         font-size:13px;
@@ -40,15 +39,11 @@
         --kg-sheet-rest-height:var(--kg-sheet-expanded-height);
     }
 
-    body #knowledgeGraphModal.graph-fullscreen-view:has(#knowledgeGraphHistoryWrap:not([hidden]):not(.hidden)) {
-        --kg-sheet-rest-height:var(--kg-sheet-expanded-height);
-    }
-
-    body #knowledgeGraphModal.graph-fullscreen-view .knowledge-graph-layout {
+    body #knowledgeGraphModal:is(.graph-fullscreen-view,[data-graph-view="history"]) .knowledge-graph-layout {
         position:relative;
     }
 
-    body #knowledgeGraphModal.graph-fullscreen-view:is([data-kg-sheet], :has(#knowledgeGraphHistoryWrap:not([hidden]):not(.hidden))) .knowledge-graph-side {
+    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] .knowledge-graph-side {
         position:absolute;
         z-index:1005;
         inset:auto 10px var(--kg-sheet-bottom);
@@ -75,21 +70,33 @@
         display:none !important;
     }
 
-    body #knowledgeGraphModal.graph-fullscreen-view:has(#knowledgeGraphHistoryWrap:not([hidden]):not(.hidden)) #knowledgeGraphDetailWrap {
-        display:none !important;
+    body #knowledgeGraphModal[data-graph-view="history"] .knowledge-graph-layout {
+        overflow:hidden !important;
+        padding-bottom:0 !important;
     }
 
-    body #knowledgeGraphModal.graph-fullscreen-view #knowledgeGraphHistoryWrap:not([hidden]):not(.hidden) {
+    /* Keep the selected graph's viewport measured while the list is open. */
+    body #knowledgeGraphModal[data-graph-view="history"]:has(#knowledgeGraphHistoryWrap:not([hidden])) .knowledge-graph-main {
+        position:absolute;
+        inset:0;
+        visibility:hidden;
+        pointer-events:none;
+    }
+
+    body #knowledgeGraphModal[data-graph-view="history"]:has(#knowledgeGraphHistoryWrap:not([hidden])) .knowledge-graph-side,
+    body #knowledgeGraphModal[data-graph-view="history"] #knowledgeGraphHistoryWrap:not([hidden]) {
         display:flex !important;
         flex:1 1 0 !important;
-        min-width:0;
         min-height:0 !important;
-        height:100% !important;
         max-height:none !important;
         overflow:hidden !important;
     }
 
-    body #knowledgeGraphModal.graph-fullscreen-view #knowledgeGraphHistoryWrap:not([hidden]):not(.hidden) > #knowledgeGraphHistory {
+    body #knowledgeGraphModal[data-graph-view="history"]:not(.graph-fullscreen-view):has(#knowledgeGraphHistoryWrap[hidden]) .knowledge-graph-side {
+        display:none !important;
+    }
+
+    body #knowledgeGraphModal[data-graph-view="history"] #knowledgeGraphHistoryWrap:not([hidden]) > #knowledgeGraphHistory {
         flex:1 1 0;
         min-width:0;
         min-height:0 !important;
@@ -209,7 +216,7 @@
 
     @layer dmate-panel-surfaces {
         /* Use the modal surface when the side becomes a floating sheet. */
-        body[data-appearance-theme] #knowledgeGraphModal.graph-fullscreen-view:is([data-kg-sheet], :has(#knowledgeGraphHistoryWrap:not([hidden]):not(.hidden))) .knowledge-graph-side {
+        body[data-appearance-theme] #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] .knowledge-graph-side {
             background-color:var(--dmate-modal-background, var(--surface-2)) !important;
             background-image:none !important;
         }

@@ -22088,12 +22088,22 @@ function knowledgeGraphHistoryPreviewText(text) {
     return stem.slice(first[0].length).trimStart() || stem;
 }
 
-function renderKnowledgeGraphHistory(items) {
+function knowledgeGraphHistoryPrompt(hasQuestions) {
+    return hasQuestions ? dmateUiText("请选择题目", "Select a question")
+        : dmateUiText("暂时没有题目", "No questions yet");
+}
+
+function renderKnowledgeGraphHistory(items, mobile) {
     const list = document.getElementById("knowledgeGraphHistory");
     if (!list) return;
     list.replaceChildren();
     const total = items.length;
     if (!total) {
+        if (mobile) {
+            list.append(createLearningEmptyState("graph-detail-empty kg-empty-state", "knowledgeGraphBtn",
+                knowledgeGraphHistoryPrompt(false)));
+            return;
+        }
         const empty = document.createElement("div");
         empty.className = "graph-detail-empty";
         empty.textContent = dmateUiText("无", "None");
@@ -22151,7 +22161,8 @@ function placeKnowledgeGraphSideTabs() {
     const modal = document.getElementById("knowledgeGraphModal");
     if (!tabs || !modal) return tabs;
 
-    if (modal.classList.contains("graph-fullscreen-view")) {
+    const mobileHistory = knowledgeGraphViewMode === "history" && window.matchMedia("(max-width: 760px)").matches;
+    if (mobileHistory || modal.classList.contains("graph-fullscreen-view")) {
         const toolbar = modal.querySelector(".graph-toolbar");
         if (toolbar && tabs.parentElement !== toolbar) toolbar.append(tabs);
     } else {
@@ -22177,7 +22188,8 @@ function createLearningEmptyState(className, buttonId, message) {
 
 function renderKnowledgeGraphSide({refreshHistory = true} = {}) {
     const historical = knowledgeGraphViewMode === "history";
-    const desktopHistory = historical && !window.matchMedia("(max-width: 760px)").matches;
+    const mobileHistory = historical && window.matchMedia("(max-width: 760px)").matches;
+    const desktopHistory = historical && !mobileHistory;
     if (!historical) knowledgeGraphSideMode = "detail";
     const history = historical && knowledgeGraphSideMode === "history";
     const tabs = placeKnowledgeGraphSideTabs();
@@ -22190,12 +22202,12 @@ function renderKnowledgeGraphSide({refreshHistory = true} = {}) {
         const count = items.length;
         historyTab.textContent = dmateUiText(`历史题目 (${count})`, `Past questions (${count})`);
     }
-    if (desktopHistory && !knowledgeGraphQuestionReference && items) {
+    if (historical && items && (!knowledgeGraphQuestionReference || mobileHistory)) {
         const empty = document.querySelector("#knowledgeGraphCanvas > .kg-empty");
         if (empty) {
-            const hasQuestions = items.length > 0;
             empty.replaceWith(createLearningEmptyState("kg-empty kg-empty-state", "knowledgeGraphBtn",
-                hasQuestions ? dmateUiText("请选择题目", "Select a question") : dmateUiText("暂时没有题目", "No questions yet")));
+                knowledgeGraphQuestionReference ? dmateUiText("暂无节点", "No nodes yet")
+                    : knowledgeGraphHistoryPrompt(items.length > 0)));
         }
     }
     for (const [id, selected] of [["knowledgeGraphDetailTab", !history], ["knowledgeGraphHistoryTab", history]]) {
@@ -22207,7 +22219,7 @@ function renderKnowledgeGraphSide({refreshHistory = true} = {}) {
         const page = document.getElementById(id);
         if (page) { page.hidden = !shown; page.classList.toggle("hidden", !shown); }
     }
-    if (history) renderKnowledgeGraphHistory(items);
+    if (history) renderKnowledgeGraphHistory(items, mobileHistory);
     else {
         document.getElementById("knowledgeGraphHistory")?.replaceChildren();
         renderKnowledgeGraphDetail({desktopHistory});
