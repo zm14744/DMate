@@ -25,19 +25,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements-agents.txt ./
+# Use the base image's pip and cache package downloads between builds.
 RUN --mount=type=cache,id=dmate-pip,target=/root/.cache/pip,sharing=locked \
-    unset PIP_NO_CACHE_DIR && python -m pip install --upgrade pip && \
-    python -m pip install -r requirements.txt
+    unset PIP_NO_CACHE_DIR && \
+    python -m pip install --disable-pip-version-check --timeout 45 --retries 3 -r requirements.txt
 
 FROM runtime-deps AS web-icons
 RUN --mount=type=bind,source=scripts/generate_icons.py,target=/opt/dmate-icon-build/scripts/generate_icons.py \
     python /opt/dmate-icon-build/scripts/generate_icons.py --web-only
 
-# Assemble UI updates on the small Python base, independently of OCR weights.
+# Assemble web files independently of dependencies and OCR weights.
 FROM python:3.10-slim AS app-files
 WORKDIR /app
+# Check Python syntax independently of changes to templates and static assets.
+COPY *.py ./
+RUN python -m compileall -q -l --invalidation-mode checked-hash .
 COPY . .
-RUN python -m compileall -q -l .
 COPY --link --from=web-icons /opt/dmate-icon-build/static/icons/ /app/static/icons/
 
 FROM runtime-deps
