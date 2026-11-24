@@ -21846,18 +21846,6 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
     container.appendChild(section);
 }
 
-// Edge emphasis belongs to the desktop graph. Phone taps open node details.
-function updateKnowledgeGraphEdgeEmphasis(canvas, selectedNodeId) {
-    if (!canvas) return;
-    canvas.querySelectorAll(".kg-edge").forEach(edge => {
-        const related = Boolean(selectedNodeId) && (
-            edge.dataset.from === selectedNodeId
-            || edge.dataset.to === selectedNodeId
-        );
-        edge.classList.toggle("is-related", related);
-    });
-}
-
 function openKnowledgeGraphNodeSheet(keepExpanded = false) {
     const modal = document.getElementById("knowledgeGraphModal");
     if (!modal?.classList.contains("graph-fullscreen-view") || !window.matchMedia("(max-width:760px)").matches) return;
@@ -21935,7 +21923,6 @@ function selectKnowledgeGraphNode(nodeId, sourceElement = null, {keepSheetExpand
         ".kg-mobile-node, .kg-node-group"
     );
     selected?.classList.add("selected");
-    updateKnowledgeGraphEdgeEmphasis(canvas, nodeId);
 
     // 只刷新右侧/下方详情，不重建全部节点和连线。
     // 手机上点击节点时不会再出现整张图谱闪一下、卡一下。
@@ -22413,7 +22400,7 @@ function renderKnowledgeGraphDetail() {
 
 
 
-function renderKnowledgeGraph() {
+function renderKnowledgeGraph({viewportOnly = false} = {}) {
     const modal = document.getElementById(
         "knowledgeGraphModal"
     );
@@ -22514,7 +22501,6 @@ function renderKnowledgeGraph() {
     }
     canvas.querySelectorAll(".kg-mobile-viewport,.kg-desktop-viewport").forEach(viewport => viewport._kgDispose?.());
     canvas.replaceChildren(fragment);
-    updateKnowledgeGraphEdgeEmphasis(canvas, knowledgeGraphSelectedNodeId);
     const topologyKey = questionView
         ? JSON.stringify([knowledgeGraphReferenceKey(context.questionReference),
             visibleNodes.map(node => [node.id, node.prerequisites])])
@@ -22523,7 +22509,12 @@ function renderKnowledgeGraph() {
     installKnowledgeGraphViewMemory(canvas.querySelector(".kg-mobile-viewport,.kg-desktop-viewport"),
         viewKey, knowledgeGraphViewMemory, mobileGraph);
 
-    renderKnowledgeGraphSide();
+    if (viewportOnly) {
+        placeKnowledgeGraphSideTabs();
+        knowledgeGraphNodeSheet?.sync();
+    } else {
+        renderKnowledgeGraphSide();
+    }
     // Read the final canvas dimensions after its adjacent detail panel exists.
     // Fit/restore before the browser can paint the newly inserted viewport.
     canvas.querySelector(".kg-mobile-viewport,.kg-desktop-viewport")?._kgInitializeView?.();
@@ -22536,7 +22527,7 @@ function renderKnowledgeGraph() {
 window.matchMedia?.("(max-width: 760px)").addEventListener("change", () => {
     const modal = document.getElementById("knowledgeGraphModal");
     if (!modal || modal.classList.contains("hidden")) return;
-    renderKnowledgeGraph();
+    renderKnowledgeGraph({viewportOnly: true});
 });
 
 

@@ -2,6 +2,7 @@
 (function(root){
 "use strict";
 const documents=new WeakMap();
+const connectionPaths=new Map();
 function context(doc=root.document){
  if(documents.has(doc))return documents.get(doc);
  const canvas=doc.createElement('canvas'),ctx=canvas.getContext('2d');
@@ -97,8 +98,10 @@ function layout(label,badge='',options={}){
  return result;
 }
 function prepare(nodes,options){
+ const doc=options.document||root.document;
+ const layoutOptions={...options,document:doc,fontScale:options.fontScale??fontScale(doc),fontFamily:options.fontFamily||fontFamily(doc)};
  const layouts=new Map();let height=options.minHeight||0;
- for(const node of nodes){const value=layout(options.label(node),options.badge?.(node)||'',options);layouts.set(node.id,value);height=Math.max(height,value.height);}
+ for(const node of nodes){const value=layout(options.label(node),options.badge?.(node)||'',layoutOptions);layouts.set(node.id,value);height=Math.max(height,value.height);}
  return {width:options.width,height,layouts};
 }
 function metadata(node,value){node.dataset.label=value.label;node.dataset.badge=value.badge;node.dataset.labelLines=JSON.stringify(value.lines);}
@@ -168,23 +171,23 @@ function routeConnection(fromId,toId,start,end,positions,nodeWidth,nodeHeight,cr
   const abc=between(ab,bc,.5),bcd=between(bc,cd,.5),mid=between(abc,bcd,.5);
   return [[a,ab,abc,mid],[mid,bcd,cd,d]];
  };
- const overlaps=(a,b,c,d,rect)=>{
-  const xs=[a[0],b[0],c[0],d[0]],ys=[a[1],b[1],c[1],d[1]];
-  return Math.max(...xs)>rect.left+.001&&Math.min(...xs)<rect.right-.001
-   &&Math.max(...ys)>rect.top+.001&&Math.min(...ys)<rect.bottom-.001;
- };
+ const curveBounds=([a,b,c,d])=>({
+  left:Math.min(a[0],b[0],c[0],d[0]),right:Math.max(a[0],b[0],c[0],d[0]),
+  top:Math.min(a[1],b[1],c[1],d[1]),bottom:Math.max(a[1],b[1],c[1],d[1])
+ });
+ const overlaps=(bounds,rect)=>bounds.right>rect.left+.001&&bounds.left<rect.right-.001
+  &&bounds.bottom>rect.top+.001&&bounds.top<rect.bottom-.001;
  // Recursive control-hull bounds conservatively certify the entire curve,
  // rather than missing a narrow obstacle between a handful of samples.
- const hits=(curve,rect,depth=0)=>{
-  if(!overlaps(...curve,rect))return false;
+ const hits=(curve,rect,depth,bounds=curveBounds(curve))=>{
+  if(!overlaps(bounds,rect))return false;
   if(depth>=12)return true;
   const halves=split(...curve);
   return hits(halves[0],rect,depth+1)||hits(halves[1],rect,depth+1);
  };
  const clearCurve=curve=>{
-  const ys=curve.map(point=>point[1]);
-  return Math.min(...ys)>=0&&Math.max(...ys)<=limit
-   &&!rectangles.some(rect=>hits(curve,rect));
+  const bounds=curveBounds(curve);
+  return bounds.top>=0&&bounds.bottom<=limit&&!rectangles.some(rect=>hits(curve,rect,0,bounds));
  };
  const clearRoute=(segments,origin=first)=>{
   let previous=origin;
@@ -217,14 +220,27 @@ function routeConnection(fromId,toId,start,end,positions,nodeWidth,nodeHeight,cr
   return samples.filter(sample=>sample.distance>12&&sample.distance<total-12);
  };
  const key=(x,y)=>Math.floor(x/8)+','+Math.floor(y/8);
+ // An edge scores several candidates against the same already-routed edges.
+ const nearbyCells=new Map();
+ const nearby=(x,y)=>{
+  const cell=x+','+y;
+  if(nearbyCells.has(cell))return nearbyCells.get(cell);
+  const lists=[];
+  for(let dx=-2;dx<=2;dx++)for(let dy=-2;dy<=2;dy++){
+   const list=session.cells.get((x+dx)+','+(y+dy));
+   if(list)lists.push(list);
+  }
+  nearbyCells.set(cell,lists);
+  return lists;
+ };
  const occupied=samples=>{
   if(!session?.cells?.size)return 0;
   let score=0;const runs=[0,0,0],limits=[6,1,.4],weights=[1,20,1000];
   for(const sample of samples){
    let nearest=Infinity;
    const x=Math.floor(sample.x/8),y=Math.floor(sample.y/8);
-   for(let dx=-2;dx<=2;dx++)for(let dy=-2;dy<=2;dy++){
-    for(const previous of session.cells.get((x+dx)+','+(y+dy))||[]){
+   for(const list of nearby(x,y)){
+    for(const previous of list){
      if(Math.abs(sample.tx*previous.tx+sample.ty*previous.ty)<.99756||!previous.step)continue;
      const vx=previous.x-previous.px,vy=previous.y-previous.py;
      const t=Math.max(0,Math.min(1,((sample.x-previous.px)*vx+(sample.y-previous.py)*vy)/(previous.step*previous.step)));
@@ -253,13 +269,14 @@ function routeConnection(fromId,toId,start,end,positions,nodeWidth,nodeHeight,cr
   ])};
  };
  let bestRoute=null,bestScore=Infinity,bestSamples=null;
- const consider=(segments,shapeCost=0)=>{
-  if(!segments.length||!clearRoute(segments))return false;
+ const scoreCandidate=(segments,shapeCost)=>{
   const samples=session?.cells?.size?sampleRoute(segments):null;
   const score=shapeCost+occupied(samples||[]);
   if(score<bestScore){bestRoute=segments;bestScore=score;bestSamples=samples;}
   return score<.001;
  };
+ const consider=(segments,shapeCost=0)=>shapeCost<bestScore&&segments.length>0
+  &&clearRoute(segments)&&scoreCandidate(segments,shapeCost);
  // Short relations follow one bend. Keep the control points in order on
  // the main axis so a connection always advances toward the next level.
  const connect=(a,b,arc=0,curvature=.42,skew=0)=>{
@@ -313,10 +330,14 @@ function routeConnection(fromId,toId,start,end,positions,nodeWidth,nodeHeight,cr
  const excursion=lane=>Math.max(minCross-lane,lane-maxCross,0);
  let channel;
  for(const lane of lanes){
+  const shapeCost=8+excursion(lane)*.1+Math.abs(lane-center)*.002;
+  // Only the first clear lane is needed for the fallback. After it,
+  // ignore candidates whose shape cost alone cannot beat the best route.
+  if(channel!==undefined&&session?.cells?.size&&shapeCost>=bestScore)continue;
   const candidate=through(lane);
   if(!clearRoute(candidate))continue;
   if(channel===undefined)channel=lane;
-  consider(candidate,8+excursion(lane)*.1+Math.abs(lane-center)*.002);
+  if(candidate.length)scoreCandidate(candidate,shapeCost);
   if(!session?.cells?.size&&excursion(lane)<=height)return finish(candidate);
  }
 
@@ -407,13 +428,25 @@ function routeGraphConnections(nodes,positions,nodeWidth,nodeHeight,crossSize,ve
  }));
 }
 function appendGraphConnections(svg,nodes,positions,nodeWidth,nodeHeight,crossSize,vertical=false){
+ const key=JSON.stringify([vertical,nodeWidth,nodeHeight,crossSize,
+  nodes.map(node=>[node.id,node.name,node.prerequisites]),
+  Array.from(positions,([id,point])=>[id,point.x,point.y])]);
+ let paths=connectionPaths.get(key);
+ if(paths){
+  connectionPaths.delete(key);
+ }else{
+  paths=routeGraphConnections(nodes,positions,nodeWidth,nodeHeight,crossSize,vertical)
+   .map(({from,to,route})=>({from,to,d:routeSvgD(route)}));
+  if(connectionPaths.size>=16)connectionPaths.delete(connectionPaths.keys().next().value);
+ }
+ connectionPaths.set(key,paths);
  const className=vertical?'kg-mobile-edge':'kg-edge';
- for(const {from,to,route} of routeGraphConnections(nodes,positions,nodeWidth,nodeHeight,crossSize,vertical)){
+ for(const {from,to,d} of paths){
   const path=svg.ownerDocument.createElementNS(svg.namespaceURI,'path');
   path.setAttribute('class',className);
   path.setAttribute('data-from',from);
   path.setAttribute('data-to',to);
-  path.setAttribute('d',routeSvgD(route));
+  path.setAttribute('d',d);
   svg.appendChild(path);
  }
 }

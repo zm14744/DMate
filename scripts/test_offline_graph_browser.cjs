@@ -126,6 +126,8 @@ async function selectFirst(page) {
   await node.click();
   await settle(page);
   assert.equal(await frame(page).locator(mobile(page) ? '.kg-mobile-node.selected' : '.kg-node-group.selected').count(), 1);
+  assert.equal(await frame(page).locator('.kg-edge.is-related,.kg-mobile-edge.is-related').count(), 0,
+    'Selecting a concept leaves its relationship lines unmarked');
   const selection = await node.evaluate(node => {
     const marker = node.matches('.kg-mobile-node') ? node : node.querySelector('rect');
     const css = getComputedStyle(marker), probe = document.createElement('span');
@@ -178,7 +180,6 @@ async function checkMobileDetailSheet(page) {
     assert.equal(await title.innerText(), '图的基本概念');
     assert.ok(await title.isVisible());
     assert.equal(await detail.isVisible(), false, 'The collapsed sheet shows only the selected title');
-    assert.equal(await modal.locator('.kg-mobile-edge.is-related').count(), 0);
     const selectedCamera = await camera();
     const panel = modal.locator('.knowledge-graph-side'), collapsed = await panel.boundingBox();
     assert.notEqual(await panel.evaluate(node => getComputedStyle(node).backgroundColor), 'rgba(0, 0, 0, 0)',

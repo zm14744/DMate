@@ -76,17 +76,6 @@ function clampMobileGraphScale(value) {
     return Math.max(0.65, Math.min(3, number));
 }
 
-function updateKnowledgeGraphEdgeEmphasis(canvas, selectedNodeId) {
-    if (!canvas) return;
-    canvas.querySelectorAll(".kg-edge").forEach(edge => {
-        const related = Boolean(selectedNodeId) && (
-            edge.dataset.from === selectedNodeId
-            || edge.dataset.to === selectedNodeId
-        );
-        edge.classList.toggle("is-related", related);
-    });
-}
-
 function mount(host,options={}) {
  if(!host)throw new Error('知识图谱容器未加载');
  const document=host.ownerDocument,window=document.defaultView||root;
@@ -162,7 +151,7 @@ function mount(host,options={}) {
    const selected=node.dataset.nodeId===knowledgeGraphSelectedNodeId;node.classList.toggle('selected',selected);node.setAttribute('aria-pressed',String(selected));
    const rect=node.querySelector('rect');if(rect)rect.setAttribute('stroke-width',selected?'3':'2');
   }
-  updateKnowledgeGraphEdgeEmphasis(canvas,knowledgeGraphSelectedNodeId);renderDetail();
+  renderDetail();
   if(showSheet&&isMobileAppShell()&&host.classList.contains('graph-fullscreen-view')){
    nodeSheet||=root.DMateKnowledgeGraphSheet?.mount(host);
    nodeSheet?.open({keepExpanded});
@@ -196,7 +185,7 @@ function mount(host,options={}) {
    if(focus)node.focus({preventScroll:true});
   }));
  }
- function renderKnowledgeGraph(){
+ function renderKnowledgeGraph({viewportOnly=false}={}){
   if(destroyed)return;
   host.dataset.ready='false';host.dataset.graphReady='false';
   disposeViews();visibleNodes=allNodes.filter(n=>category==='全部'||n.category===category);
@@ -212,13 +201,13 @@ function mount(host,options={}) {
   if(mobileGraph)renderMobileKnowledgeGraphSection(fragment,visibleNodes,categoryLabel(),countLabel(),{});
   else renderKnowledgeGraphSection(fragment,visibleNodes,categoryLabel(),countLabel(),{});
   canvas.replaceChildren(fragment);
-  updateKnowledgeGraphEdgeEmphasis(canvas,knowledgeGraphSelectedNodeId);
   canvas.querySelectorAll('.kg-node-group,.kg-mobile-node').forEach((node,i)=>{
    node.dataset.nodeId=String(visibleNodes[i].id);node.setAttribute('role','button');node.setAttribute('aria-label',dmateKnowledgeLabel(visibleNodes[i].name));node.setAttribute('aria-pressed',String(node.classList.contains('selected')));
    if(node.localName==='g'){node.setAttribute('tabindex','0');node.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();selectKnowledgeGraphNode(node.dataset.nodeId,node);}},{signal});}
   });
   const viewKey=[mobileGraph?'mobile':'desktop',dmateUiLanguage(),visibleNodes.map(node=>node.id).join(',')].join('|');
-  renderDetail();nodeSheet?.sync();root.DMateI18n?.translate(host);
+  if(!viewportOnly){renderDetail();root.DMateI18n?.translate(host);}
+  nodeSheet?.sync();
   const viewport=canvas.querySelector('.kg-mobile-viewport,.kg-desktop-viewport');
   const ready=()=>{if(!destroyed&&(!viewport||canvas.contains(viewport))){host.dataset.ready='true';host.dataset.graphReady='true';}};
   if(viewport)installKnowledgeGraphViewMemory(viewport,viewKey,viewMemory,mobileGraph,ready);
@@ -259,7 +248,7 @@ function mount(host,options={}) {
   if(next!==lastFontScale){lastFontScale=next;renderKnowledgeGraph();}
  });
  fontObserver.observe(document.documentElement,{attributes:true,attributeFilter:['style']});
- window.matchMedia('(max-width:760px)').addEventListener('change',renderKnowledgeGraph,{signal});
+ window.matchMedia('(max-width:760px)').addEventListener('change',()=>renderKnowledgeGraph({viewportOnly:true}),{signal});
  window.addEventListener('dmate:languagechange',renderKnowledgeGraph,{signal});
  const observer=new ResizeObserver(()=>{if(!destroyed)canvas.querySelector('.kg-desktop-viewport')?._kgResizeRememberedView?.();});observer.observe(canvas);
  renderKnowledgeGraph();

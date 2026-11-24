@@ -596,8 +596,7 @@ async function checkSelectionBorder(browser, theme) {
       await page.locator('#knowledgeGraphCanvas [data-knowledge-node-id="proof_direct_contradiction"]').click();
       const plainStyle = await stroke();
       assert.notEqual(plainStyle[0], accent, theme + ': unrelated edges use the normal stroke');
-      if (page === mobile) assert.deepEqual(selectedStyle, plainStyle, theme + ': tapping a phone node preserves its edge styles');
-      else assert.equal(selectedStyle[0], accent, theme + ': desktop selection highlights its relationship');
+      assert.deepEqual(selectedStyle, plainStyle, theme + ': selection preserves edge color, width and opacity');
     }
     if (process.env.KG_SCREENSHOT_DIR) {
       await mobile.screenshot({ path: process.env.KG_SCREENSHOT_DIR + '/graph-selection-after-390-' + theme + '.png' });

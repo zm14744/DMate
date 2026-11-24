@@ -7392,11 +7392,6 @@ body[data-appearance-theme="light"] #knowledgeGraphModal,
     vector-effect:non-scaling-stroke;
     opacity:.88;
 }
-#knowledgeGraphModal :is(.kg-edge,.kg-mobile-edge).is-related {
-    stroke:var(--accent);
-    stroke-width:1.6;
-    opacity:1;
-}
 
 /* =========================================================
    2026-10-12 外观统一修复：
