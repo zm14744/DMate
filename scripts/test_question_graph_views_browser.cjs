@@ -269,11 +269,13 @@ async function checkReferenceGuards(browser) {
     await page.locator('#chat [data-message-index="0"].history-locate-flash').waitFor();
     await openHistory(page);
     const stale=await page.locator('.kg-history-item[data-message-id="pointer-a"] [data-history-action="locate"]').elementHandle();
+    assert.equal(await page.locator('.kg-history-item').count(), 2);
+    assert.equal(await page.locator('#knowledgeGraphCanvas').innerText(), '请选择题目');
     await page.locator('.kg-history-item[data-message-id="pointer-a"] [data-history-action="graph"]').click();
     await page.evaluate(()=>{getCurrent().messages[0].text='改成另一个不同的命题问题';renderKnowledgeGraph();});
     await stale.evaluate(button=>button.click());
     assert.equal(await page.locator('#knowledgeGraphModal').isVisible(),true,'edited selected question invalidates its captured locator');
-    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'无','stale historical subject becomes empty instead of borrowing the latest question');
+    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'请选择题目','a stale subject returns to the selection prompt while other questions remain');
     assert.equal(await page.locator(locate).isVisible(),false);
     await page.evaluate(()=>{getCurrent().messages[0].text='用逻辑等价证明命题 p 的双重否定与 p 等价';});
     await openHistory(page);
@@ -282,7 +284,7 @@ async function checkReferenceGuards(browser) {
     await page.evaluate(()=>{window.__removedGraphQuestion=getCurrent().messages.shift();renderKnowledgeGraph();});
     await deleted.evaluate(button=>button.click());
     assert.equal(await page.locator('#knowledgeGraphModal').isVisible(),true,'deleted selected question invalidates its locator');
-    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'无','deleted historical subject becomes empty without falling back to the latest question');
+    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'请选择题目','deleting the selected subject asks for another selection');
     assert.equal(await page.locator(locate).isVisible(),false);
     await page.evaluate(()=>getCurrent().messages.unshift(window.__removedGraphQuestion));
     await openHistory(page);
@@ -292,7 +294,19 @@ async function checkReferenceGuards(browser) {
     await oldOwner.evaluate(button=>button.click());
     assert.equal(await page.locator('#knowledgeGraphModal').isVisible(),true,'old owner context cannot close graph or switch source');
     await page.evaluate(()=>renderKnowledgeGraph());
-    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'无');
+    assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(),'请选择题目');
+    await page.evaluate(()=>{
+      const text = '证明命题 P 为真。';
+      getCurrent().messages = [{messageId:'no-recognized-node', role:'user', text, manualIsQuestion:true,
+        questionTeaching:__graphTeachingFixture(text, [])}];
+    });
+    await openHistory(page);
+    await page.locator('.kg-history-item[data-message-id="no-recognized-node"] [data-history-action="graph"]').click();
+    assert.equal(await page.locator('#knowledgeGraphCanvas').innerText(),'无','a chosen question with no nodes has its own empty graph');
+    assert.equal(await page.locator('#knowledgeGraphDetail').innerText(),'暂无节点');
+    await page.evaluate(()=>{getCurrent().messages=[];renderKnowledgeGraph();});
+    assert.equal(await page.locator('#knowledgeGraphCanvas').innerText(),'暂时没有题目');
+    assert.equal(await page.locator('#knowledgeGraphHistoryTab').innerText(),'历史题目 (0)');
     await page.evaluate(()=>{
       const teaching=__graphTeachingFixture('分别说明集合运算与逻辑等价的定义',['set_operation','logic_equivalence']);
       sessions=[{id:'independent-concepts',name:'不同知识分支',nameSource:'user',teaching,learningQuestion:null,deletedMessageIds:{},

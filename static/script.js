@@ -569,7 +569,6 @@ async function applyAppearanceDraft() {
     appearanceDraftOriginalSettings = null;
 
     document.getElementById("appearanceModal")?.classList.add("hidden");
-    showCopyToast("外观设置已确认");
 }
 
 function openAppearanceDatabase() {
@@ -7186,17 +7185,20 @@ async function copyChatMessageText(message, content) {
     return ok;
 }
 
-// Static Lucide artwork (ISC); keep action icons available without a CDN.
-function createChatActionIcon(name) {
+// Static Lucide artwork (ISC), available without a CDN.
+function createLucideIcon(name, className = "dmate-lucide-icon") {
     const paths = {
         copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
         trash: '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
         image: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
         'pencil-line': '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/><path d="M13 21h8"/>',
-        'book-plus': '<path d="M12 7v6"/><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><path d="M9 10h6"/>'
+        'book-plus': '<path d="M12 7v6"/><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><path d="M9 10h6"/>',
+        'list-mouse-pointer': '<path d="M3 5h18M3 12h9M3 19h8"/><path d="m15 12 2 8 2-2 3-1-7-5Z"/>',
+        files: '<path d="M15 2H6a2 2 0 0 0-2 2v11"/><rect x="8" y="6" width="12" height="16" rx="2"/>',
+        network: '<rect x="9" y="2" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/><path d="M12 8v4M5 16v-2a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2"/>'
     };
     const svg = createSvgElement("svg", {
-        class: "dmate-lucide-icon", viewBox: "0 0 24 24", width: 20, height: 20,
+        class: className, viewBox: "0 0 24 24", width: 20, height: 20,
         fill: "none", stroke: "currentColor", "stroke-width": 1.8,
         "stroke-linecap": "round", "stroke-linejoin": "round",
         "aria-hidden": "true", focusable: "false", "data-icon": name
@@ -7211,7 +7213,7 @@ function createChatTextCopyButton(onCopy) {
     button.className = "rich-copy-smart chat-text-copy";
     button.title = "复制文本";
     button.setAttribute("aria-label", "复制文本");
-    button.appendChild(createChatActionIcon("copy"));
+    button.appendChild(createLucideIcon("copy"));
     button.addEventListener("click", () => {
         Promise.resolve(onCopy()).catch(error => {
             console.warn("文本复制失败：", error);
@@ -11992,7 +11994,7 @@ function createSmartCopyButton(onExport) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "rich-copy-smart chat-image-copy";
-    button.appendChild(createChatActionIcon("image"));
+    button.appendChild(createLucideIcon("image"));
     button.title = dmateUiText("以图片形式导出", "Export as image");
     button.setAttribute("aria-label", button.title);
     button.addEventListener("click", async () => {
@@ -17334,7 +17336,7 @@ function initializeChatComposer() {
     const input = document.getElementById("text");
     if (!input) return;
     window.dmateChatComposer = window.DMateChatComposer.mount({ input, onSend: () => handleSendOrStop() });
-    document.querySelector("#chatComposerEditBar .chat-composer-edit-icon")?.append(createChatActionIcon("pencil-line"));
+    document.querySelector("#chatComposerEditBar .chat-composer-edit-icon")?.append(createLucideIcon("pencil-line"));
     document.getElementById("chatComposerEditCancel")?.addEventListener("click", cancelChatMessageEdit);
     input.addEventListener("select", updateComposerMessageEditDraft);
     input.addEventListener("keydown", event => {
@@ -18706,7 +18708,7 @@ function renderChat(preparedReply = null) {
             wrongButton.type = "button";
             wrongButton.className = "chat-wrong-book";
             wrongButton.setAttribute("aria-label", "记为错题");
-            wrongButton.appendChild(createChatActionIcon("book-plus"));
+            wrongButton.appendChild(createLucideIcon("book-plus"));
             wrongButton.title = "记为错题";
             wrongButton.onclick = () => (
                 markChatMessageAsWrong(
@@ -18724,7 +18726,7 @@ function renderChat(preparedReply = null) {
             editButton.className = "chat-message-edit-button";
             editButton.setAttribute("aria-label", "重新编辑");
             editButton.title = "重新编辑";
-            editButton.appendChild(createChatActionIcon("pencil-line"));
+            editButton.appendChild(createLucideIcon("pencil-line"));
             editButton.onclick = () => beginChatMessageEdit(session.id, messageIndex);
             actions.appendChild(editButton);
         }
@@ -18733,7 +18735,7 @@ function renderChat(preparedReply = null) {
         deleteButton.type = "button";
         deleteButton.className = "danger chat-message-delete";
         deleteButton.setAttribute("aria-label", "删除消息");
-        deleteButton.appendChild(createChatActionIcon("trash"));
+        deleteButton.appendChild(createLucideIcon("trash"));
         deleteButton.title = "删除消息";
         deleteButton.onclick = () => (
             deleteChatMessage(
@@ -22157,8 +22159,18 @@ function placeKnowledgeGraphSideTabs() {
     return tabs;
 }
 
+function createKnowledgeGraphEmptyState(className, icon, message) {
+    const empty = document.createElement("div");
+    empty.className = className + " kg-empty-state";
+    const label = document.createElement("span");
+    label.textContent = message;
+    empty.append(createLucideIcon(icon, "kg-empty-state-icon"), label);
+    return empty;
+}
+
 function renderKnowledgeGraphSide({refreshHistory = true} = {}) {
     const historical = knowledgeGraphViewMode === "history";
+    const desktopHistory = historical && !window.matchMedia("(max-width: 760px)").matches;
     if (!historical) knowledgeGraphSideMode = "detail";
     const history = historical && knowledgeGraphSideMode === "history";
     const tabs = placeKnowledgeGraphSideTabs();
@@ -22170,6 +22182,15 @@ function renderKnowledgeGraphSide({refreshHistory = true} = {}) {
     if (historyTab && items !== null) {
         const count = items.length;
         historyTab.textContent = dmateUiText(`历史题目 (${count})`, `Past questions (${count})`);
+    }
+    if (desktopHistory && !knowledgeGraphQuestionReference && items) {
+        const empty = document.querySelector("#knowledgeGraphCanvas > .kg-empty");
+        if (empty) {
+            const hasQuestions = items.length > 0;
+            empty.replaceWith(createKnowledgeGraphEmptyState("kg-empty",
+                hasQuestions ? "list-mouse-pointer" : "files",
+                hasQuestions ? dmateUiText("请选择题目", "Select a question") : dmateUiText("暂时没有题目", "No questions yet")));
+        }
     }
     for (const [id, selected] of [["knowledgeGraphDetailTab", !history], ["knowledgeGraphHistoryTab", history]]) {
         const button = document.getElementById(id);
@@ -22183,12 +22204,12 @@ function renderKnowledgeGraphSide({refreshHistory = true} = {}) {
     if (history) renderKnowledgeGraphHistory(items);
     else {
         document.getElementById("knowledgeGraphHistory")?.replaceChildren();
-        renderKnowledgeGraphDetail();
+        renderKnowledgeGraphDetail({desktopHistory});
     }
     knowledgeGraphNodeSheet?.sync();
 }
 
-function renderKnowledgeGraphDetail() {
+function renderKnowledgeGraphDetail({desktopHistory = false} = {}) {
     const title = document.getElementById(
         "knowledgeGraphDetailTitle"
     );
@@ -22205,6 +22226,11 @@ function renderKnowledgeGraphDetail() {
         knowledgeGraphSelectedNodeId = "";
         title.hidden = true;
         title.textContent = "";
+        if (desktopHistory) {
+            detail.replaceChildren(createKnowledgeGraphEmptyState("graph-detail-empty", "network",
+                dmateUiText("暂无节点", "No nodes yet")));
+            return;
+        }
         const empty = document.createElement("div");
         empty.className = "graph-detail-empty";
         empty.textContent = document.querySelector("#knowledgeGraphCanvas > .kg-empty")?.textContent

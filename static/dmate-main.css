@@ -1720,6 +1720,32 @@ input[type="search"]::-webkit-search-cancel-button {
     color:var(--text-subtle);
 }
 
+#knowledgeGraphModal .kg-empty-state {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:12px;
+    padding:16px;
+    background:transparent;
+    color:var(--text-muted);
+    font-size:var(--font-small);
+    font-weight:500;
+    line-height:1.4;
+    text-align:center;
+}
+
+#knowledgeGraphModal .kg-empty-state-icon {
+    width:44px;
+    height:44px;
+    color:var(--text-subtle);
+    stroke-width:1.4;
+}
+
+#knowledgeGraphDetail .kg-empty-state-icon {
+    width:36px;
+    height:36px;
+}
+
 #knowledgeGraphCanvas:has(> .kg-empty:only-child) {
     display:flex;
     align-items:center;

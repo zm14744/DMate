@@ -9,7 +9,7 @@ async function nextFrames(page) {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
-async function assertEmpty(page, text, label, mode = 'focus') {
+async function assertEmpty(page, text, label, mode = 'focus', detailText = text) {
   assert.equal((await page.locator('#knowledgeGraphCanvas').innerText()).trim(), text, label + ': canvas contains only the empty label');
   const canvasPosition = await page.locator('#knowledgeGraphCanvas').evaluate(canvas => {
     const pane = canvas.getBoundingClientRect(), empty = canvas.querySelector(':scope > .kg-empty').getBoundingClientRect();
@@ -21,7 +21,7 @@ async function assertEmpty(page, text, label, mode = 'focus') {
     label + ': empty canvas label is centered in both axes');
   assert.ok(Math.abs(canvasPosition.height - canvasPosition.availableHeight) <= 1 && canvasPosition.height > 120,
     label + ': empty canvas fills its available graph body');
-  assert.equal((await page.locator('#knowledgeGraphDetail').innerText()).trim(), text, label + ': detail contains only the empty label');
+  assert.equal((await page.locator('#knowledgeGraphDetail').innerText()).trim(), detailText, label + ': detail contains only its empty label');
   assert.equal(await page.locator('#knowledgeGraphDetailTitle').isVisible(), false, label + ': no stale selected-node title');
   const position = await page.locator('#knowledgeGraphDetail').evaluate(body => {
     const pane = body.getBoundingClientRect(), empty = body.querySelector('.graph-detail-empty').getBoundingClientRect();
@@ -49,6 +49,8 @@ async function assertEmpty(page, text, label, mode = 'focus') {
 
 async function checkEmptyRecent(browser, width) {
   const mobile = width <= 760;
+  const noQuestions = mobile ? '无' : '暂时没有题目', noNodes = mobile ? '无' : '暂无节点';
+  const noQuestionsEn = mobile ? 'None' : 'No questions yet', noNodesEn = mobile ? 'None' : 'No nodes yet';
   const page = await browser.newPage({ viewport: { width, height: 844 },
     ...(mobile ? { isMobile: true, hasTouch: true } : {}) });
   const errors = [];
@@ -70,17 +72,25 @@ async function checkEmptyRecent(browser, width) {
     await page.evaluate(() => selectKnowledgeGraphDisplayMode('focus'));
     assert.equal(await page.evaluate(() => knowledgeGraphViewMode), 'full', width + ': an unavailable recent page cannot be selected programmatically');
     await page.locator('#knowledgeGraphHistoryBtn').click();
-    await page.waitForFunction(() => knowledgeGraphInitialized && document.getElementById('knowledgeGraphCanvas').innerText.trim() === '无');
-    assert.equal((await page.locator('#knowledgeGraphHistory').innerText()).trim(), '无', width + ': empty history list uses the same empty label');
+    await page.waitForFunction(text => knowledgeGraphInitialized && document.getElementById('knowledgeGraphCanvas').innerText.trim() === text, noQuestions);
+    assert.equal((await page.locator('#knowledgeGraphHistory').innerText()).trim(), '无', width + ': the history list shows its own empty label');
     await page.locator('#knowledgeGraphDetailTab').click();
-    await assertEmpty(page, '无', width + '/history without a selected question', 'history');
+    await assertEmpty(page, noQuestions, width + '/history without questions', 'history', noNodes);
+    for (const [panel, icon] of [['#knowledgeGraphCanvas', 'files'], ['#knowledgeGraphDetail', 'network']]) {
+      const decoration = page.locator(panel + ' .kg-empty-state svg[data-icon="' + icon + '"]');
+      assert.equal(await decoration.isVisible(), !mobile, width + ': the desktop empty state shows its icon');
+      if (!mobile) {
+        assert.equal(await decoration.getAttribute('aria-hidden'), 'true');
+        assert.equal(await decoration.getAttribute('focusable'), 'false');
+      }
+    }
 
     // English must update the same open dialog, rather than requiring reopen.
     await page.evaluate(() => window.DMateI18n.setLanguage('en', false));
-    await page.waitForFunction(() => document.getElementById('knowledgeGraphCanvas').innerText.trim() === 'None');
-    await assertEmpty(page, 'None', width + '/live English', 'history');
+    await page.waitForFunction(text => document.getElementById('knowledgeGraphCanvas').innerText.trim() === text, noQuestionsEn);
+    await assertEmpty(page, noQuestionsEn, width + '/live English', 'history', noNodesEn);
     await page.evaluate(() => window.DMateI18n.setLanguage('zh-CN', false));
-    await page.waitForFunction(() => document.getElementById('knowledgeGraphCanvas').innerText.trim() === '无');
+    await page.waitForFunction(text => document.getElementById('knowledgeGraphCanvas').innerText.trim() === text, noQuestions);
 
     // A legacy session snapshot without a real question cannot revive that node.
     await page.evaluate(() => {
@@ -93,7 +103,7 @@ async function checkEmptyRecent(browser, width) {
       selectKnowledgeGraphNode('logic_truth');
     });
     assert.equal(await page.locator('#knowledgeGraphScopeBtn').isVisible(), false, width + ': stale session metadata cannot revive latest-question navigation');
-    await assertEmpty(page, '无', width + '/stale snapshot and selected node', 'history');
+    await assertEmpty(page, noQuestions, width + '/stale snapshot and selected node', 'history', noNodes);
     const rejected = await page.evaluate(async () => {
       let saves = 0;
       const original = window.DMateDrawingExport;
@@ -128,7 +138,7 @@ async function checkEmptyRecent(browser, width) {
     assert.ok(before.top > 0, width + ': full graph test camera was moved');
     await page.evaluate(() => selectKnowledgeGraphDisplayMode('history'));
     await page.locator('#knowledgeGraphDetailTab').click();
-    await assertEmpty(page, '无', width + '/full to empty history', 'history');
+    await assertEmpty(page, noQuestions, width + '/full to empty history', 'history', noNodes);
     assert.ok(await page.locator('#knowledgeGraphModal .graph-toolbar').isVisible(), width + ': empty mode exposes the toolbar');
     await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
     await page.waitForSelector(viewSelector);
