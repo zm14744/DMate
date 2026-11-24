@@ -100,9 +100,6 @@ function installProbe() {
 }
 
 async function full(page) {
-  if (page.viewportSize().width <= 760 && !await page.locator('#knowledgeGraphCanvas .kg-mobile-viewport').count()) {
-    await page.locator('#knowledgeGraphCanvas .kg-mobile-expand').click();
-  }
   await page.locator('#knowledgeGraphCanvas .kg-node-group,#knowledgeGraphCanvas .kg-mobile-node').first().waitFor();
   await settle(page);
 }

@@ -21,7 +21,7 @@
   overflow:hidden;
   background:transparent;
 }
-#knowledgeGraphModal.offline-graph-inline:not(.graph-fullscreen-view) > .graph-modal-card {
+#knowledgeGraphModal.offline-graph-inline > .graph-modal-card {
   width:100%!important;
   height:100%!important;
   max-height:none!important;
@@ -30,23 +30,12 @@
   flex:1 1 auto;
   border-radius:16px!important;
 }
-#knowledgeGraphModal.offline-graph-inline.graph-fullscreen-view {
-  position:fixed;
-  inset:0;
-  z-index:1000;
-  display:flex;
-  width:100vw;
-  height:100vh;
-  height:100dvh;
-  padding:0;
-  overflow:hidden;
-  background:var(--surface-2);
-}
-#knowledgeGraphModal.offline-graph-inline.graph-fullscreen-view > .graph-modal-card {
-  width:100%!important;
-  height:100%!important;
-  max-height:100%!important;
-  border-radius:0!important;
+@media(max-width:760px) {
+  /* Local floating details stay beneath the workspace navigation drawer. */
+  #graphPanel > #knowledgeGraphModal.offline-graph-inline {
+    z-index:0;
+    isolation:isolate;
+  }
 }
 #knowledgeGraphModal .offline-graph-concept-button { margin-top:12px; }
 
@@ -79,6 +68,6 @@
 }
 
 /* Keep the zoom value aligned with the first fitted/restored graph frame. */
-#knowledgeGraphModal.offline-graph-inline[data-graph-ready="false"] :is(.kg-desktop-zoom-controls,.kg-mobile-zoom-controls) {
+#knowledgeGraphModal.offline-graph-inline[data-graph-ready="false"] .kg-desktop-zoom-controls {
   visibility:hidden;
 }

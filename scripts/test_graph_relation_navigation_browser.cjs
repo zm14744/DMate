@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const { expect } = require('playwright/test');
+const { expandGraphDetails, pinchGraph } = require('./knowledge-graph-touch-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const historyCards = '#knowledgeGraphModal .kg-history-item';
 
@@ -92,6 +93,15 @@ async function checkDecoration(page, focus, label) {
   }
 }
 
+async function selectFixtureNode(page, category, id) {
+  await page.evaluate(category => setKnowledgeGraphFilter(category), category);
+  const modal = page.locator('#knowledgeGraphModal');
+  if (await modal.getAttribute('data-kg-sheet') === 'expanded') await modal.locator('.kg-sheet-handle').click();
+  const node = modal.locator('#knowledgeGraphCanvas [data-knowledge-node-id="' + id + '"]');
+  await node.evaluate(element => element.scrollIntoView({block:'center', inline:'center'}));
+  await node.click();
+}
+
 async function expectDestination(page, id, category, label) {
   await page.waitForFunction(({ id, category }) => knowledgeGraphViewMode === 'full'
     && knowledgeGraphFilter === category && knowledgeGraphSelectedNodeId === id, { id, category });
@@ -101,17 +111,14 @@ async function expectDestination(page, id, category, label) {
   assert.equal(await page.locator('#knowledgeGraphFocusBtn').getAttribute('aria-pressed'), 'true', label + ': all-knowledge mode is active');
   assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),false,label + ': all-knowledge mode has no sidebar tabs');
   assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(),false,label + ': all-knowledge mode hides historical content');
-  const fullscreen=await page.locator('#knowledgeGraphModal').evaluate(node=>node.classList.contains('graph-fullscreen-view'));
   assert.equal(await page.locator('#knowledgeGraphHistoryBtn').count(),1,label + ': history remains a single independent top-level mode');
-  assert.equal(await page.locator('#knowledgeGraphModal .graph-toolbar').isVisible(),!fullscreen,
-    label + ': graph fullscreen controls the toolbar visibility');
-  assert.equal(await page.locator('#knowledgeGraphHistoryBtn').isVisible(),!fullscreen,
-    label + ': history is visible with the normal toolbar and hidden with fullscreen chrome');
+  assert.ok(await page.locator('#knowledgeGraphModal .graph-toolbar').isVisible(), label + ': the graph retains its toolbar');
+  assert.ok(await page.locator('#knowledgeGraphHistoryBtn').isVisible(), label + ': history remains available');
   assert.equal(await page.locator('#knowledgeGraphDetailWrap').evaluate(node=>node.hidden),false,
     label + ': all-knowledge mode activates node details');
   assert.ok(await page.locator('#knowledgeGraphDetailWrap').isVisible(), label + ': the destination title is visible');
-  if (fullscreen) assert.equal(await page.locator('#knowledgeGraphModal').getAttribute('data-kg-sheet'), 'peek',
-    label + ': opening a relation from inline details reveals the destination preview');
+  if (page.viewportSize().width <= 760) assert.equal(await page.locator('#knowledgeGraphModal').getAttribute('data-kg-sheet'), 'expanded',
+    label + ': following a relation preserves the expanded detail sheet');
   // Selection updates before the navigation frame scrolls and focuses the node.
   const destination = page.locator('#knowledgeGraphCanvas .selected[data-knowledge-node-id="' + id + '"]');
   await expect(destination, label + ': relation destination receives focus').toBeFocused();
@@ -166,6 +173,7 @@ async function checkCase(browser, width, language) {
     await page.locator('#knowledgeGraphFocusBtn').click();
     await checkDecoration(page, false, label + '/all');
     await page.locator('#knowledgeGraphScopeBtn').click();
+    await expandGraphDetails(page);
     const predecessor = page.locator('#knowledgeGraphDetail .graph-detail-term[data-knowledge-node-id="logic_reasoning"]');
     await predecessor.waitFor({ state: 'visible' });
     assert.equal(await predecessor.evaluate(node => node.tagName), 'BUTTON', label + ': predecessor is keyboard-accessible');
@@ -191,26 +199,21 @@ async function checkCase(browser, width, language) {
     }
     await checkDecoration(page, false, label + '/navigated full');
 
-    await page.evaluate(() => {
-      setKnowledgeGraphFullscreenView(false);
-      setKnowledgeGraphFilter('全部'); selectKnowledgeGraphNode('set_operation');
-    });
+    await selectFixtureNode(page, '全部', 'set_operation');
+    await expandGraphDetails(page);
     const successor = page.locator('#knowledgeGraphDetail .graph-detail-term[data-knowledge-node-id="function_mapping"]');
     await successor.click();
     await expectDestination(page, 'function_mapping', '函数', label + '/cross-module successor');
 
-    await page.evaluate(() => {
-      setKnowledgeGraphFullscreenView(false);
-      setKnowledgeGraphFilter('证明与归纳'); selectKnowledgeGraphNode('proof_induction');
-    });
-    if (mobile) await page.locator('.kg-mobile-expand').click();
+    await selectFixtureNode(page, '证明与归纳', 'proof_induction');
     const viewSelector = mobile ? '.kg-mobile-viewport' : '.kg-desktop-viewport';
     await page.waitForSelector(viewSelector);
     await settle(page);
     const view = await page.locator(viewSelector).elementHandle();
     const camera = () => view.evaluate(node => ({ scale: node._kgScale || Number(node.querySelector('.kg-desktop-zoom-surface').dataset.scale),
       left: node.scrollLeft, top: node.scrollTop }));
-    await page.locator(mobile ? '.kg-mobile-zoom-btn' : '#knowledgeGraphDesktopZoomIn').last().click();
+    if (mobile) await pinchGraph(page, 1.25);
+    else await page.locator('#knowledgeGraphDesktopZoomIn').click();
     await settle(page);
     // Make the destination visible before testing the camera-preserving path;
     // a target outside the viewport is expected to scroll just into view.
@@ -224,7 +227,7 @@ async function checkCase(browser, width, language) {
     });
     await settle(page);
     const cameraBefore = await camera();
-    if (mobile) await page.evaluate(() => setKnowledgeGraphFullscreenView(false));
+    await expandGraphDetails(page);
     await page.locator('#knowledgeGraphDetail .graph-detail-term[data-knowledge-node-id="proof_strong_induction"]').click();
     await expectDestination(page, 'proof_strong_induction', '证明与归纳', label + '/same-module successor');
     assert.equal(await view.evaluate(node => node.isConnected), true, label + ': same-module relation retains the graph DOM');

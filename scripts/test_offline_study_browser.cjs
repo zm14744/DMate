@@ -3,6 +3,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const { expandGraphDetails } = require('./knowledge-graph-touch-fixtures.cjs');
 const { installStorageProbe, revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const migrationReview = require('../offline-content/example-practice-migration.json');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
@@ -407,10 +408,7 @@ async function run(browser, width) {
     await page.locator('#graphPanel').waitFor({state:'visible'});
     await page.waitForFunction(id => document.querySelector('#knowledgeGraphCanvas .selected[data-node-id]')?.dataset.nodeId === id,
       data.concept.graphNodeId);
-    if (await page.locator('#knowledgeGraphModal').evaluate(node => node.classList.contains('graph-fullscreen-view'))) {
-      await page.locator('#knowledgeGraphModal .kg-mobile-expand').click();
-      await settle(page);
-    }
+    await expandGraphDetails(page);
     const learning = page.locator('#knowledgeGraphDetail .offline-graph-learning-links');
     assert.equal(await learning.locator('.graph-parent-concept [data-concept-id="' + data.concept.id + '"]').count(), 1,
       'The graph footer links back to the exact overview whose example was migrated');

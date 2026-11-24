@@ -125,9 +125,9 @@ async function run(browser,width) {
     for(const source of ['text','ocr','ai']) {
       await page.evaluate(async source => {
         closeKnowledgeGraph();currentId='fixed-'+source;renderAll();await openKnowledgeGraph();
-        selectKnowledgeGraphDisplayMode('focus');setKnowledgeGraphFullscreenView(false);
+        selectKnowledgeGraphDisplayMode('focus');
       },source);
-      if(width<760 && !await page.locator('.kg-mobile-viewport').count())await page.locator('.kg-mobile-expand').click();
+      await page.locator('#knowledgeGraphCanvas .kg-mobile-node,#knowledgeGraphCanvas .kg-node-group').first().waitFor();
       const drawn=await page.locator('#knowledgeGraphCanvas .kg-mobile-node,#knowledgeGraphCanvas .kg-node-group')
         .evaluateAll(nodes=>nodes.map(node=>node.dataset.knowledgeNodeId).sort());
       assert.deepEqual(drawn,expected.ids,source+': actual renderer uses fixed scope');

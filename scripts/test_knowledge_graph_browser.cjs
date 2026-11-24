@@ -4,6 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const {pinchGraph, expandGraphDetails} = require('./knowledge-graph-touch-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const near = (actual, expected, message, tolerance = 1.5) =>
   assert.ok(Math.abs(actual - expected) <= tolerance,
@@ -75,12 +76,6 @@ async function checkReachableEdges(page, label) {
   assert.ok(end.nodes.bottom <= end.content.bottom + 1.5, label + ': last nodes inaccessible below');
   assert.ok(end.nodes.right > end.content.left, label + ': horizontal scrolling overshoots graph');
   assert.ok(end.nodes.bottom > end.content.top, label + ': vertical scrolling overshoots graph');
-}
-
-async function fit(page) {
-  await page.locator('.kg-mobile-zoom-fit').click();
-  await settleGraph(page);
-  return snapshot(page);
 }
 
 async function checkCourseGeometry(page, mobile) {
@@ -184,18 +179,38 @@ async function checkZoomLimits(browser, width) {
     const categories = await page.locator('#knowledgeGraphCategory option').evaluateAll(options => options.map(option => option.value));
     for (const category of categories) {
       await page.evaluate(value => setKnowledgeGraphFilter(value), category);
-      if (mobile && !await page.locator('.kg-mobile-viewport').count()) await page.locator('.kg-mobile-expand').click();
       await page.locator(mobile ? '.kg-mobile-viewport' : '.kg-desktop-viewport').waitFor();
       if (category === '全部') courseRanks = await checkCourseGeometry(page, mobile);
-      const result = await page.evaluate(async ({mobile, extendedIdle}) => {
-        const view = document.querySelector(mobile ? '.kg-mobile-viewport' : '.kg-desktop-viewport');
-        const surface = view.querySelector(mobile ? '.kg-mobile-zoom-surface' : '.kg-desktop-zoom-surface');
-        const stage = surface.querySelector(mobile ? '.kg-mobile-stage' : '.kg-desktop-zoom-stage');
-        const label = mobile ? document.querySelector('.kg-mobile-zoom-label') : document.getElementById('knowledgeGraphDesktopZoomLabel');
-        const buttons = mobile ? document.querySelectorAll('.kg-mobile-zoom-btn') : null;
-        const plus = mobile ? buttons[1] : document.getElementById('knowledgeGraphDesktopZoomIn');
-        const minus = mobile ? buttons[0] : document.getElementById('knowledgeGraphDesktopZoomOut');
-        const scale = () => mobile ? view._kgScale : Number(surface.dataset.scale);
+      if (mobile) {
+        await settleGraph(page);
+        for (const [factor, limit] of [[6, 3], [.15, .65]]) {
+          await pinchGraph(page, factor);
+          const before = await snapshot(page);
+          near(before.scale, limit, category + ': pinch reaches the mobile limit', .0001);
+          const watch = await page.locator('.kg-mobile-viewport').evaluateHandle(view => {
+            const camera = () => [view._kgScale, view.scrollLeft, view.scrollTop].join(',');
+            const initial = camera();
+            let stable = true, frame;
+            const sample = () => { stable &&= camera() === initial; frame = requestAnimationFrame(sample); };
+            sample();
+            const observer = new MutationObserver(() => { stable = false; });
+            observer.observe(view, {subtree:true, childList:true, attributes:true,
+              attributeFilter:['style','data-scale','data-kg-ready']});
+            return () => { cancelAnimationFrame(frame); observer.disconnect(); return stable; };
+          });
+          await pinchGraph(page, factor);
+          assert.ok(await watch.evaluate(stop => stop()), category + ': every clamped pinch frame keeps the graph stable');
+          await watch.dispose();
+          assert.deepEqual(await snapshot(page), before, category + ': repeating a clamped pinch retains the camera');
+        }
+        continue;
+      }
+      const result = await page.evaluate(async extendedIdle => {
+        const view = document.querySelector('.kg-desktop-viewport');
+        const surface = view.querySelector('.kg-desktop-zoom-surface'), stage = surface.querySelector('.kg-desktop-zoom-stage');
+        const label = document.getElementById('knowledgeGraphDesktopZoomLabel');
+        const plus = document.getElementById('knowledgeGraphDesktopZoomIn'), minus = document.getElementById('knowledgeGraphDesktopZoomOut');
+        const scale = () => Number(surface.dataset.scale);
         const frames = count => new Promise(resolve => {
           const tick = () => --count ? requestAnimationFrame(tick) : resolve();
           requestAnimationFrame(tick);
@@ -208,7 +223,7 @@ async function checkZoomLimits(browser, width) {
             nodes:stage.querySelectorAll('.kg-mobile-node,.kg-node-group').length};
         };
         const traces = [];
-        for (const [kind,button,limit] of [['maximum',plus,mobile ? 3 : 2.5],['minimum',minus,mobile ? .65 : .8]]) {
+        for (const [kind,button,limit] of [['maximum',plus,2.5],['minimum',minus,.8]]) {
           // Reach the clamp through the actual control, including scrollbar
           // transitions; never assign a scale directly for this regression.
           let previous = null;
@@ -236,7 +251,7 @@ async function checkZoomLimits(browser, width) {
           traces.push({kind,limit,before,samples,mutations});
         }
         return traces;
-      }, {mobile, extendedIdle:!mobile && category === categories[1]});
+      }, category === categories[1]);
       for (const trace of result) {
         const label = width + '/' + category + '/' + trace.kind;
         if (trace.limit !== null) near(trace.before.scale, trace.limit, label + ': reached the zoom clamp', .000001);
@@ -264,13 +279,15 @@ async function checkReturnPreservesView(browser, width) {
     // over the landing page intentionally resets it to all knowledge.
     await page.evaluate(() => newChat());
     await openFullGraph(page);
-    if (mobile) {
-      await page.locator('.kg-mobile-expand').click();
-      await settleGraph(page);
-    } else await page.waitForSelector(viewSelector);
-    await page.evaluate(() => selectKnowledgeGraphNode('logic_truth'));
-    const zoomIn = mobile ? page.locator('.kg-mobile-zoom-btn').last() : page.locator('#knowledgeGraphDesktopZoomIn');
-    for (let i = 0; i < 5; i++) await zoomIn.click();
+    if (mobile) await settleGraph(page);
+    else await page.waitForSelector(viewSelector);
+    const truth = page.locator(viewSelector + ' [data-knowledge-node-id="logic_truth"]');
+    await truth.click();
+    const enlarge = async clicks => {
+      if (mobile) await pinchGraph(page, 1.2 ** clicks);
+      else for (let i = 0; i < clicks; i++) await page.locator('#knowledgeGraphDesktopZoomIn').click();
+    };
+    await enlarge(5);
     const viewport = await page.locator(viewSelector).elementHandle();
     const state = () => viewport.evaluate(view => ({
       scale: view._kgScale || Number(view.querySelector('.kg-desktop-zoom-surface').dataset.scale),
@@ -293,6 +310,7 @@ async function checkReturnPreservesView(browser, width) {
     await checkPreserved(width + '/system theme');
 
     // Open the real lesson link in its popup, substituting only the external page.
+    if (mobile) await expandGraphDetails(page);
     const video = page.locator('.kg-video-section a[target="_blank"]').first();
     const href = await video.getAttribute('href');
     await page.context().route(href, route => route.fulfill({ contentType: 'text/html', body: '<title>Lesson</title>' }));
@@ -315,21 +333,23 @@ async function checkReturnPreservesView(browser, width) {
       left: view.scrollLeft, top: view.scrollTop
     }));
     const categoryFit = await fitted();
-    await page.locator(mobile ? '.kg-mobile-zoom-fit' : '#knowledgeGraphDesktopZoomFit').click();
-    assert.deepEqual(await fitted(), categoryFit, width + ': category is already fitted');
-    for (let i = 0; i < 3; i++) await zoomIn.click();
+    if (!mobile) {
+      await page.locator('#knowledgeGraphDesktopZoomFit').click();
+      assert.deepEqual(await fitted(), categoryFit, width + ': category is already fitted');
+    }
+    await enlarge(3);
     await page.locator(viewSelector).evaluate(view => { view.scrollLeft = 40; view.scrollTop = 80; });
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const categoryCustom = await fitted();
     await page.evaluate(() => { closeKnowledgeGraph(); openKnowledgeGraph(); });
-    if (mobile) {
-      await page.locator('.kg-mobile-expand').click();
-      await settleGraph(page);
-    } else await page.waitForSelector(viewSelector);
+    if (mobile) await settleGraph(page);
+    else await page.waitForSelector(viewSelector);
     if (!mobile) await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     assert.deepEqual(await fitted(), categoryCustom, width + ': reopening restores the category camera');
-    await page.locator(mobile ? '.kg-mobile-zoom-fit' : '#knowledgeGraphDesktopZoomFit').click();
-    assert.deepEqual(await fitted(), categoryFit, width + ': explicit Fit still restores the initial category framing');
+    if (!mobile) {
+      await page.locator('#knowledgeGraphDesktopZoomFit').click();
+      assert.deepEqual(await fitted(), categoryFit, width + ': explicit Fit restores the initial category framing');
+    }
     console.log('PASS ' + width + ': tab/video/reopen preserve view; unseen categories fit once');
   } finally { await page.close(); }
 }
@@ -348,7 +368,10 @@ async function checkPanelPresentation(browser, width) {
       width + ': remove the whole summary row');
 
     // Keep this same dialog open while changing language in both directions.
-    await page.evaluate(() => selectKnowledgeGraphNode('logic_truth'));
+    if (mobile) {
+      await page.locator('.kg-mobile-node[data-knowledge-node-id="logic_truth"]').tap();
+      await expandGraphDetails(page);
+    } else await page.evaluate(() => selectKnowledgeGraphNode('logic_truth'));
     const heading = page.locator('[data-kg-video-heading]');
     await heading.waitFor();
     for (const [language, expected] of [['en', 'Teaching videos'], ['zh-CN', '教学视频']]) {
@@ -443,10 +466,9 @@ async function mobileCase(browser, width) {
   try {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
     await openFullGraph(page);
-    await page.waitForSelector('.kg-mobile-entry-only');
-    assert.equal(await page.locator('.kg-mobile-stage').count(), 0, 'Preview should keep only the full-view entry');
-    await page.locator('.kg-mobile-expand').click();
     await settleGraph(page);
+    assert.equal(await page.locator('.kg-mobile-entry-only,.kg-mobile-expand,.kg-mobile-zoom-controls,.kg-mobile-zoom-btn,.kg-mobile-zoom-fit,.kg-mobile-zoom-label').count(), 0,
+      'Opening the mobile graph immediately displays the touch canvas without view or zoom buttons');
     const categories = await page.locator('#knowledgeGraphCategory option').evaluateAll(options => options.map(option => option.value));
     assert.ok(categories.length > 2, 'Expected real knowledge-graph categories');
     for (const category of categories) {
@@ -458,23 +480,17 @@ async function mobileCase(browser, width) {
       assert.ok(initial.scale >= .85 - .001, label + ': automatically fitted labels are too small');
       checkCenteredAxes(initial, label);
       await checkReachableEdges(page, label);
-      await fit(page);
-      await page.locator('.kg-mobile-zoom-btn').last().click();
-      const zoomed = await snapshot(page);
-      assert.ok(zoomed.scale > initial.scale, label + ': zoom-in does not change scale');
-      await page.locator('.kg-mobile-zoom-btn').first().click();
-      near((await snapshot(page)).scale, initial.scale, label + ': zoom-out reverses zoom-in', .0001);
-      await page.locator('.kg-mobile-zoom-btn').last().click();
-      const restored = await fit(page);
-      near(restored.scale, initial.scale, label + ': Fit restores scale', .0001);
-      checkCenteredAxes(restored, label + '/refit');
+      await pinchGraph(page, 1.25);
+      assert.ok((await snapshot(page)).scale > initial.scale, label + ': spreading two fingers enlarges the graph');
+      await pinchGraph(page, .8);
+      near((await snapshot(page)).scale, initial.scale, label + ': pinching in reverses pinching out', .002);
       console.log('PASS ' + label + ': ' + initial.nodes.count + ' nodes, fit ' + Math.round(initial.scale * 100) + '%');
     }
 
-    // Resize preserves the last camera, including a camera set by explicit Fit.
+    // Resize preserves the last touch camera.
     await page.evaluate(() => setKnowledgeGraphFilter('全部'));
     await settleGraph(page);
-    await page.locator('.kg-mobile-zoom-btn').last().click();
+    await pinchGraph(page, 1.2);
     await page.locator('.kg-mobile-viewport').evaluate(view => {
       view.scrollLeft = (view.scrollWidth - view.clientWidth) / 2;
       view.scrollTop = (view.scrollHeight - view.clientHeight) / 2;
@@ -492,16 +508,16 @@ async function mobileCase(browser, width) {
     near(resizedManual.scale, manual.scale, width + ': resize preserves manual zoom', .0001);
     near(centerPoint(resizedManual).x, centerPoint(manual).x, width + ': resize preserves horizontal graph center');
     near(centerPoint(resizedManual).y, centerPoint(manual).y, width + ': resize preserves vertical graph center');
-    const explicit = await fit(page);
+    const beforeHeightChange = await snapshot(page);
     await page.setViewportSize({ width, height: 600 });
     await settleGraph(page);
     const retained = await snapshot(page);
-    near(retained.scale, explicit.scale, width + ': resize preserves the explicitly fitted scale', .0001);
+    near(retained.scale, beforeHeightChange.scale, width + ': height changes preserve the pinch scale', .0001);
     checkCenteredAxes(retained, width + '/resize');
     await page.setViewportSize({ width, height: 844 });
     await settleGraph(page);
     const originalViewport = await snapshot(page);
-    near(originalViewport.scale, explicit.scale, width + ': height restoration preserves scale', .0001);
+    near(originalViewport.scale, beforeHeightChange.scale, width + ': height restoration preserves scale', .0001);
     await page.setViewportSize({ width: 820, height: 844 });
     await page.waitForSelector('.kg-desktop-zoom-stage');
     assert.equal(await page.locator('.kg-mobile-stage').count(), 0, 'Breakpoint must replace the mobile graph');
@@ -531,7 +547,6 @@ async function checkSelectionBorder(browser, theme) {
       await page.waitForSelector('#knowledgeGraphCanvas .kg-section');
       await page.evaluate(() => setKnowledgeGraphFilter('证明与归纳'));
     }
-    await mobile.locator('.kg-mobile-expand').click();
     await settleGraph(mobile);
     const accent = await mobile.evaluate(() => {
       const probe = document.createElement('span');
@@ -599,14 +614,13 @@ async function checkNodeGestures(browser, width) {
   try {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
     await openFullGraph(page);
-    await page.waitForSelector('.kg-mobile-entry-only');
+    await settleGraph(page);
     // Exercise the actual module picker before testing the graph's gesture area.
     await page.locator('#knowledgeGraphCategoryTrigger').tap();
     await page.waitForSelector('#mobileChoiceModal[open]');
     await page.locator('.mobile-choice-option').filter({ hasText: '证明与归纳' }).tap();
     await page.waitForFunction(() => document.getElementById('knowledgeGraphCategory').value === '证明与归纳');
     assert.equal(await page.locator('#mobileChoiceModal').evaluate(modal => modal.open), false);
-    await page.locator('.kg-mobile-expand').tap();
     await settleGraph(page);
     await page.evaluate(() => {
       const selectNode = selectKnowledgeGraphNode;
@@ -624,7 +638,8 @@ async function checkNodeGestures(browser, width) {
       const node = [...document.querySelectorAll('.kg-mobile-node:not(.selected)')].find(candidate => {
         const rect = candidate.getBoundingClientRect();
         const x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
-        return x > view.left + 8 && x < view.right - 8 && y > view.top + 8 && y < view.bottom - 80;
+        return x > view.left + 8 && x < view.right - 8 && y > view.top + 8 && y < view.bottom - 8
+          && candidate.contains(document.elementFromPoint(x, y));
       });
       if (!node) throw new Error('No visible unselected knowledge node');
       const rect = node.getBoundingClientRect();
@@ -654,9 +669,8 @@ async function checkNodeGestures(browser, width) {
       near(after.scroll.top, before.scroll.top, width + ': finger jitter must not pan vertically', .5);
     }
 
-    await fit(page);
     // Enlarge this small module so both tested widths have a real pan range.
-    for (let index = 0; index < 3; index++) await page.locator('.kg-mobile-zoom-btn').last().click();
+    await pinchGraph(page, 1.8);
     point = await nodePoint();
     const beforeDrag = await selectedName();
     const beforeDragCount = await page.evaluate(() => window.graphSelectionCount);
@@ -670,7 +684,7 @@ async function checkNodeGestures(browser, width) {
     assert.ok((await snapshot(page)).scroll.left > oldLeft, width + ': horizontal drag must pan the graph');
     await nativeTap(await nodePoint()); // A new tap must work without a cooldown after dragging.
 
-    await fit(page);
+    await pinchGraph(page, .75);
     const beforePinch = (await snapshot(page)).scale;
     const beforePinchCount = await page.evaluate(() => window.graphSelectionCount);
     const center = await page.locator('.kg-mobile-viewport').evaluate(view => {

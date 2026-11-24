@@ -54,7 +54,6 @@ async function checkCase(browser, width) {
     assert.equal(fixture.immutable, true, 'Initial graph browsing leaves conversation records unchanged');
     assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(), false, width + ': all knowledge exposes only node details');
     assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(), false, width + ': all knowledge hides the history pane');
-    if (mobile) await page.locator('.kg-mobile-expand').click();
     const node = page.locator('#knowledgeGraphCanvas [data-knowledge-node-id="proof_strong_induction"]');
     await node.waitFor({ state: 'visible' });
     await page.evaluate(() => { window.__selectionHistoryCalls = 0; });
@@ -95,8 +94,6 @@ async function checkCase(browser, width) {
     });
     assert.equal(updated.calls, 0, width + ': a full-graph data render does not aggregate unrelated question history');
     assert.equal(await page.locator('#knowledgeGraphHistoryTab').isVisible(), false);
-    if (mobile && await page.locator('#knowledgeGraphModal').evaluate(modal => modal.classList.contains('graph-fullscreen-view')))
-      await page.locator('.kg-mobile-expand').click();
     await page.evaluate(() => { window.__selectionHistoryCalls = 0; });
     await page.locator('#knowledgeGraphHistoryBtn').click();
     assert.ok(await page.evaluate(() => window.__selectionHistoryCalls) > 0, width + ': entering the history page reads current message contents');
@@ -109,13 +106,11 @@ async function checkCase(browser, width) {
     assert.equal(await page.locator('#knowledgeGraphHistory .kg-history-conversation-title,#knowledgeGraphHistory .kg-history-number,#knowledgeGraphHistory time,#knowledgeGraphHistory [datetime]').count(),0,
       width+': large flat history does not render titles, question numbers or timestamps');
     await page.locator('#knowledgeGraphHistory .kg-history-item[data-message-id="selection-new-question-1"] [data-history-action="graph"]').click();
-    if (mobile) await page.locator('.kg-mobile-expand').click();
     await page.evaluate(() => { window.__selectionHistoryCalls = 0; });
     await page.locator('#knowledgeGraphCanvas [data-knowledge-node-id="logic_truth_table"]').click();
     assert.equal(await page.evaluate(() => window.__selectionHistoryCalls), 0,
       width + ': a historical question node click also avoids global history scans');
     assert.equal(await page.locator('#knowledgeGraphDetailTitle').textContent(), '真值表');
-    if (mobile) await page.locator('.kg-mobile-expand').click();
     await page.evaluate(() => {
       const text = '证明命题 p 与 q 的双重否定定律';
       sessions[0].messages.push({ role: 'user', messageId: 'selection-new-question-2', text,

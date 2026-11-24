@@ -59,7 +59,6 @@ async function fixturePage(browser, width) {
 async function openRecent(page) {
   await page.evaluate(async () => {
     await openKnowledgeGraph(); selectKnowledgeGraphDisplayMode('focus');
-    setKnowledgeGraphFullscreenView(false);
   });
   await settle(page);
 }
@@ -79,11 +78,9 @@ async function assertGraph(page, width, expected, expectedEdges, label) {
     label + ': no review/verification gate is presented');
   assert.equal(await page.locator('.kg-empty-retry').count(), 0, label + ': viewing has no classification retry action');
   if (!expected.length) return;
-  if (width <= 760 && !await page.locator('.kg-mobile-viewport').count()) await page.locator('.kg-mobile-expand').click();
-  const rendered = await page.locator('#knowledgeGraphCanvas .kg-mobile-node,#knowledgeGraphCanvas .kg-node-group')
+  const rendered = await page.locator(width <= 760 ? '#knowledgeGraphCanvas .kg-mobile-node' : '#knowledgeGraphCanvas .kg-node-group')
     .evaluateAll(nodes => nodes.map(node => node.dataset.knowledgeNodeId).sort());
   assert.deepEqual(rendered, expected, label + ': actual graph renderer immediately draws the saved concepts');
-  if (width <= 760) await page.locator('.kg-mobile-expand').click();
 }
 
 async function checkManualAndOcr(browser, width) {

@@ -4,6 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const { pinchGraph } = require('./knowledge-graph-touch-fixtures.cjs');
 const {installStorageProbe,revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const dimensions = { desktop: { width: 1440, height: 900 }, mobile: { width: 390, height: 844 } };
@@ -93,8 +94,7 @@ function view(page, kind) {
 
 function controls(page, kind, action) {
   if (kind === 'drawing') return page.locator('[data-overlay-tool="zoom-' + action + '"]');
-  if (!isMobile(page)) return page.locator('#knowledgeGraphDesktopZoom' + ({ in: 'In', out: 'Out', fit: 'Fit' }[action]));
-  return page.locator(action === 'fit' ? '.kg-mobile-zoom-fit' : '.kg-mobile-zoom-btn').nth(action === 'in' ? 1 : 0);
+  return page.locator('#knowledgeGraphDesktopZoom' + ({ in: 'In', out: 'Out', fit: 'Fit' }[action]));
 }
 
 async function ready(page, kind) {
@@ -107,10 +107,6 @@ async function ready(page, kind) {
       return !dialog?.open || !dialog.dataset.positioning;
     });
   } else {
-    const modal = page.locator('#knowledgeGraphModal');
-    if (isMobile(page) && !await modal.evaluate(node => node.classList.contains('graph-fullscreen-view'))) {
-      await modal.locator('.kg-mobile-expand').click();
-    }
     await view(page, kind).waitFor({ state: 'visible' });
     await page.waitForFunction(() => {
       const viewport = document.querySelector('.kg-mobile-viewport');
@@ -148,6 +144,10 @@ function sameCamera(actual, expected, label) {
 async function firstFit(page, kind, label) {
   await ready(page, kind);
   const initial = await camera(page, kind);
+  if (kind === 'graph' && isMobile(page)) {
+    assert.ok(initial.scale > 0 && initial.nodeCenters.length > 0, label + ': nodes are laid out at an initial scale');
+    return initial;
+  }
   await controls(page, kind, 'fit').click(); await settle(page);
   sameCamera(await camera(page, kind), initial, label + ': first entry already matches Adapt');
   return initial;
@@ -155,7 +155,8 @@ async function firstFit(page, kind, label) {
 
 async function customize(page, kind, variant) {
   // Use real controls so the engine records a deliberate camera change.
-  for (let i = 0; i < (kind === 'drawing' ? 8 : 5); i++) {
+  if (kind === 'graph' && isMobile(page)) await pinchGraph(page, 2);
+  else for (let i = 0; i < (kind === 'drawing' ? 8 : 5); i++) {
     const plus = controls(page, kind, 'in'); if (!await plus.isEnabled()) break;
     await plus.click();
   }
@@ -190,9 +191,6 @@ async function sameModeEdgeResize(page, mode, label) {
 
 async function reopen(page, kind, offline) {
   if (offline) {
-    if (kind === 'graph' && await page.locator('#knowledgeGraphModal').evaluate(node => node.classList.contains('graph-fullscreen-view'))) {
-      await page.locator('.kg-mobile-expand').click(); await settle(page);
-    }
     await offlinePanel(page, 'concepts');
     await offlinePanel(page, kind === 'graph' ? 'graph' : 'drawing');
   } else if (kind === 'drawing') {
@@ -240,15 +238,16 @@ async function runCase(browser, kind, offline, first) {
     await reopen(page, kind, offline);
     sameCamera(await camera(page, kind), remembered[first], label + ': close/panel return');
     if (kind === 'drawing') await drawingPageRoundTrip(page, remembered[first], label);
-    // Explicit Adapt is still an action, not a permanently forced camera mode.
-    await controls(page, kind, 'fit').click(); await settle(page);
+    if (kind === 'graph' && isMobile(page)) await pinchGraph(page, .65);
+    else await controls(page, kind, 'fit').click();
+    await settle(page);
     const adapted = await camera(page, kind);
-    assert.notEqual(adapted.scale, remembered[first].scale, label + ': Adapt still resets custom zoom');
+    assert.notEqual(adapted.scale, remembered[first].scale, label + ': the user can adjust zoom after returning');
     await resize(page, kind, other); await resize(page, kind, first);
-    sameCamera(await camera(page, kind), adapted, label + ': manually adapted view is retained');
+    sameCamera(await camera(page, kind), adapted, label + ': last adjusted view is retained');
     assert.equal(calls(), 0, label + ': responsive views never call a model');
     assert.deepEqual(errors, [], label + ': no page errors');
-    console.log('PASS ' + label + ': first-fit, independent desktop/mobile cameras, return/reopen and explicit Adapt');
+    console.log('PASS ' + label + ': initial fit, independent desktop/mobile cameras and zoom after reopening');
   } finally { await context.close(); }
 }
 

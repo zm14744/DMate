@@ -4,6 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const { expandGraphDetails } = require('./knowledge-graph-touch-fixtures.cjs');
 const {revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const concepts = require('../static/offline-content/concepts.zh-CN.json').concepts;
 const questions = require('../static/offline-content/questions.zh-CN.json').questions;
@@ -279,9 +280,7 @@ async function linksClearConflicts(page) {
   await openLibraryDetail(page, 'concepts');
   await page.locator('#conceptDetail .concept-graph-module [data-graph-node-id="' + linkedChild.graph_node_id + '"]').click();
   await page.locator('#graphPanel').waitFor({ state: 'visible' });
-  if (await page.locator('#knowledgeGraphModal').evaluate(modal => modal.classList.contains('graph-fullscreen-view'))) {
-    await page.locator('.kg-mobile-expand').click(); await settle(page);
-  }
+  await expandGraphDetails(page);
   await page.locator('.graph-related-exercises [data-question-id="' + linkedQuestion.id + '"]').click();
   await assertLinkedQuestion(page);
 }

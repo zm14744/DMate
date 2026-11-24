@@ -2,6 +2,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const { expandGraphDetails, pinchGraph } = require('./knowledge-graph-touch-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 
 async function nextFrames(page) {
@@ -109,17 +110,14 @@ async function checkEmptyRecent(browser, width) {
     // through a visit to a history page without a selected question.
     await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
     await page.waitForSelector('#knowledgeGraphCanvas .kg-section');
-    if (mobile) await page.locator('.kg-mobile-expand').click();
     const viewSelector = mobile ? '.kg-mobile-viewport' : '.kg-desktop-viewport';
     await page.waitForSelector(viewSelector);
     await nextFrames(page);
     assert.equal(await page.evaluate(() => knowledgeGraphDisplayedNodes().length), await page.evaluate(() => knowledgeGraphData.nodes.length));
     await page.evaluate(() => selectKnowledgeGraphNode('logic_truth'));
     assert.ok(await page.locator('#knowledgeGraphDetail .kg-video-section').count(), width + ': valid full node initially has videos');
-    for (let index = 0; index < 5; index++) {
-      if (mobile) await page.locator('.kg-mobile-zoom-btn').last().click();
-      else await page.locator('#knowledgeGraphDesktopZoomIn').click();
-    }
+    if (mobile) await pinchGraph(page, 2);
+    else for (let index = 0; index < 5; index++) await page.locator('#knowledgeGraphDesktopZoomIn').click();
     await page.locator(viewSelector).evaluate(view => { view.scrollLeft = 60; view.scrollTop = 140; });
     await nextFrames(page);
     const camera = () => page.locator(viewSelector).evaluate(view => ({
@@ -131,8 +129,7 @@ async function checkEmptyRecent(browser, width) {
     await page.evaluate(() => selectKnowledgeGraphDisplayMode('history'));
     await page.locator('#knowledgeGraphDetailTab').click();
     await assertEmpty(page, '无', width + '/full to empty history', 'history');
-    assert.equal(await page.locator('#knowledgeGraphModal').evaluate(modal => modal.classList.contains('graph-fullscreen-view')), false,
-      width + ': empty mode exposes toolbar and detail');
+    assert.ok(await page.locator('#knowledgeGraphModal .graph-toolbar').isVisible(), width + ': empty mode exposes the toolbar');
     await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
     await page.waitForSelector(viewSelector);
     await nextFrames(page);
@@ -240,6 +237,7 @@ async function checkHistoryModes(browser, width) {
           assert.equal(await page.locator('#knowledgeGraphModal .kg-history-item').count(), 3);
           await page.locator('#knowledgeGraphHistory .kg-history-item').last().locator('[data-history-action="graph"]').click();
           await page.waitForFunction(() => knowledgeGraphViewMode === 'history' && knowledgeGraphSelectedNodeId === 'logic_equivalence');
+          await expandGraphDetails(page);
           assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(), true,
             width + '/' + language + ': selecting a historical graph opens its node details');
           assert.equal(await page.locator('#knowledgeGraphLocateOriginal').count(), 0,

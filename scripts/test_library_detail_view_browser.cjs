@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const { revealInterface } = require('./offline-vault-browser-fixtures.cjs');
 const { chromium } = require('playwright');
+const { expandGraphDetails } = require('./knowledge-graph-touch-fixtures.cjs');
 const concepts = require('../static/offline-content/concepts.zh-CN.json').concepts;
 const questions = require('../static/offline-content/questions.zh-CN.json').questions;
 const translations = require('../static/offline-content/translations.en.json');
@@ -210,8 +211,7 @@ async function links(page) {
   await page.locator('#conceptDetail .concept-graph-module-link').click();
   await page.locator('#graphPanel').waitFor({ state: 'visible' });
   assert.equal(await dialog(page).evaluate(node => node.open), false, 'Graph links close the library detail overlay');
-  const graph = page.locator('#knowledgeGraphModal');
-  if (await graph.evaluate(node => node.classList.contains('graph-fullscreen-view'))) await page.locator('.kg-mobile-expand').click();
+  await expandGraphDetails(page);
   await page.locator('.graph-parent-concept [data-concept-id="' + child.graph_node_id + '"]').click();
   await page.locator('#conceptDetail').waitFor({ state: 'visible' }); await settle(page);
   assert.equal((await page.locator('#conceptDetail .detail-title').innerText()).trim(), concepts.find(c => c.id === child.graph_node_id).title);

@@ -5,15 +5,13 @@
 const assert = require('node:assert/strict');
 const { revealInterface } = require('./offline-vault-browser-fixtures.cjs');
 const { chromium } = require('playwright');
+const {pinchGraph, panGraph, expandGraphDetails} = require('./knowledge-graph-touch-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const mobile = page => page.viewportSize().width <= 760;
 const frame = page => page.locator('#knowledgeGraphModal');
 const nodes = page => frame(page).locator(mobile(page) ? '.kg-mobile-node' : '.kg-node-group');
 const view = page => frame(page).locator(mobile(page) ? '.kg-mobile-viewport' : '.kg-desktop-viewport');
-const zoom = (page, action) => mobile(page)
-  ? action === 'fit' ? frame(page).locator('.kg-mobile-zoom-fit')
-    : frame(page).locator('.kg-mobile-zoom-btn').nth(action === 'in' ? 1 : 0)
-  : frame(page).locator('#knowledgeGraphDesktopZoom' + ({ in: 'In', out: 'Out', fit: 'Fit' }[action]));
+const zoom = (page, action) => frame(page).locator('#knowledgeGraphDesktopZoom' + ({ in: 'In', out: 'Out', fit: 'Fit' }[action]));
 const near = (actual, expected, label, tolerance = 1.5) => assert.ok(Math.abs(actual - expected) <= tolerance,
   label + ': ' + actual + ' vs ' + expected);
 const settle = page => page.evaluate(async () => {
@@ -36,22 +34,13 @@ async function category(page, name) {
   }, name);
   assert.ok(option, 'The requested canonical module or display label exists: ' + name);
   if (mobile(page)) {
-    if (await view(page).count()) await frame(page).locator('.kg-mobile-expand').click();
     await frame(page).locator('#knowledgeGraphCategoryTrigger').click();
     await page.locator('#mobileChoiceModal').getByRole('radio', { name: option.label, exact: true }).click();
   } else await frame(page).locator('#knowledgeGraphCategory').selectOption(option.value);
   await settle(page);
 }
 
-async function fullGraph(page) {
-  if (mobile(page)) {
-    // A viewport resize can return before its media-query renderer runs.
-    // Wait for that renderer, then avoid clicking an already restored exit.
-    await frame(page).locator('.kg-mobile-section').waitFor({ state: 'attached' });
-    if (!await frame(page).evaluate(root => root.classList.contains('graph-fullscreen-view'))) {
-      await frame(page).locator('.kg-mobile-expand').click();
-    }
-  }
+async function readyGraph(page) {
   await view(page).waitFor();
   await page.waitForFunction(() => {
     const element = document.querySelector('.kg-mobile-viewport');
@@ -96,7 +85,7 @@ async function visual(page, size) {
       const node = selector === ':scope' ? card : card.querySelector(selector);
       if (!node) throw new Error('Missing graph comparison node: ' + selector);
       const rect = node.getBoundingClientRect(), css = getComputedStyle(node);
-      result[selector] = { rect: [rect.x - origin.x, rect.y - origin.y, rect.width, rect.height],
+      result[selector] = { rect: node.getClientRects().length ? [rect.x - origin.x, rect.y - origin.y, rect.width, rect.height] : [],
         style: Object.fromEntries(['display', 'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'color',
           'backgroundColor', 'borderTopWidth', 'borderTopColor', 'borderTopStyle', 'borderRadius',
           'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'gap'].map(key => [key, css[key]])) };
@@ -180,8 +169,9 @@ async function checkMobileDetailSheet(page) {
     // This course node has 12 successors. A short phone viewport makes its
     // genuine details overflow in the disconnected workspace as well as online.
     await page.setViewportSize({width:viewport.width, height:520});
-    await fullGraph(page);
-    assert.equal(await modal.getAttribute('data-kg-sheet'), null, 'Entering the phone graph keeps the sheet closed');
+    await readyGraph(page);
+    assert.equal(await modal.locator('.kg-mobile-expand,.kg-mobile-zoom-controls,.kg-mobile-zoom-label').count(), 0);
+    assert.equal(await modal.getAttribute('data-kg-sheet'), null, 'The initial graph leaves the sheet closed');
     await stage.getByRole('button', {name:'图的基本概念', exact:true}).tap();
     await settle(page);
     assert.equal(await modal.getAttribute('data-kg-sheet'), 'peek');
@@ -205,16 +195,14 @@ async function checkMobileDetailSheet(page) {
     assert.equal(await modal.getAttribute('data-kg-sheet'), 'expanded');
     await swipe(title, 125);
     assert.equal(await modal.getAttribute('data-kg-sheet'), 'peek');
-    await swipe(handle, 100);
-    assert.equal(await modal.getAttribute('data-kg-sheet'), null);
+    await swipe(handle, 100, async () => {
+      near((await panel.boundingBox()).height, collapsed.height, 'Pulling down stops at the title bar');
+    });
+    assert.equal(await modal.getAttribute('data-kg-sheet'), 'peek');
     assert.deepEqual(await camera(), selectedCamera, 'Sheet gestures retain the graph camera');
     await stage.getByRole('button', {name:'路径与连通性', exact:true}).tap();
     await settle(page);
     assert.equal(await modal.getAttribute('data-kg-sheet'), 'peek');
-    assert.equal(await title.innerText(), '路径与连通性');
-    await modal.locator('.kg-mobile-expand').click();
-    assert.equal(await modal.getAttribute('data-kg-sheet'), null);
-    assert.ok(await detail.isVisible(), 'Exiting the full view restores the inline details');
     assert.equal(await title.innerText(), '路径与连通性');
   } finally {
     await cdp.detach();
@@ -269,18 +257,18 @@ async function onlineReference(browser, width, theme, available) {
     assert.equal(categories[0], '全部模块', 'The all-module option has the explicit browsing label');
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/online-graph-' + width + '-' + theme + '.png' });
     const expected = {};
-    await fullGraph(page);
+    await readyGraph(page);
     if (mobile(page) && theme === 'light') await checkMobileDetailSheet(page);
     for (const name of categories) {
       await category(page, name);
-      await fullGraph(page);
+      await readyGraph(page);
       await removeOnlineOnly(page);
       expected[name] = { topology: await topology(page), details: await selectFirst(page) };
       await removeOnlineOnly(page);
     }
     if (mobile(page) && process.env.OFFLINE_SCREENSHOT_DIR) {
       await category(page, '初等数论');
-      await fullGraph(page);
+      await readyGraph(page);
       await selectFirst(page);
       await removeOnlineOnly(page);
       await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/online-graph-full-' + width + '-' + theme + '.png' });
@@ -344,7 +332,8 @@ async function inlineLayout(page) {
       return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
     };
     return { parent: root.parentElement.id, insideMain: main.contains(root), modal: root.classList.contains('modal'),
-      fullscreen: root.classList.contains('graph-fullscreen-view'), close: root.querySelector('#knowledgeGraphClose') !== null,
+      canvasVisible: Boolean(root.querySelector('.kg-mobile-viewport,.kg-desktop-viewport')?.getClientRects().length),
+      close: root.querySelector('#knowledgeGraphClose') !== null,
       position: getComputedStyle(root).position, background: getComputedStyle(root).backgroundColor,
       root: box(root), main: box(main), sidebar: box(sidebar), documentWidth: document.documentElement.scrollWidth,
       viewportWidth: innerWidth, portalMarkers: [...document.getElementById('graphPanel').childNodes]
@@ -353,11 +342,11 @@ async function inlineLayout(page) {
   assert.equal(state.parent, 'graphPanel');
   assert.equal(state.insideMain, true, 'The normal graph belongs to the main content area');
   assert.equal(state.modal, false, 'The embedded graph has no modal overlay');
-  assert.equal(state.fullscreen, false);
+  assert.equal(state.canvasVisible, true, 'The embedded graph presents its canvas immediately');
   assert.equal(state.close, false, 'The embedded tool does not acquire a modal close dot');
   assert.equal(state.position, 'relative');
   assert.equal(state.background, 'rgba(0, 0, 0, 0)', 'The inline host has no backdrop');
-  assert.equal(state.portalMarkers, 0, 'Exited full view leaves no portal placeholder');
+  assert.equal(state.portalMarkers, 0, 'The embedded graph has no portal placeholder');
   assert.ok(state.root.left >= state.main.left - 1 && state.root.right <= state.main.right + 1
     && state.root.top >= state.main.top - 1 && state.root.bottom <= state.main.bottom + 1,
   'The graph fits the main content bounds: ' + JSON.stringify(state));
@@ -382,34 +371,21 @@ async function inlineLifecycle(page) {
   await openOfflineGraph(page);
   await inlineLayout(page);
   if (!mobile(page)) return;
-  for (const exit of ['button', 'Escape']) {
-    await fullGraph(page);
-    assert.equal(await frame(page).evaluate(root => root.parentElement === document.body), true,
-      'Only mobile full view is portalled to the body');
-    if (exit === 'button') await frame(page).locator('.kg-mobile-expand').click();
-    else await page.keyboard.press('Escape');
-    await settle(page);
-    await inlineLayout(page);
-    assert.equal(await frame(page).locator('.kg-mobile-entry-only').count(), 1);
-  }
-  await fullGraph(page);
+  await readyGraph(page);
+  assert.equal(await frame(page).locator('.kg-mobile-expand,.kg-mobile-zoom-controls').count(), 0);
   await page.setViewportSize({ width: 820, height: 900 });
   await frame(page).locator('.kg-node-group').first().waitFor();
   await settle(page);
   await inlineLayout(page);
   await page.setViewportSize({ width: 390, height: 900 });
-  await fullGraph(page);
-  assert.equal(await frame(page).evaluate(root => root.classList.contains('graph-fullscreen-view')
-    && root.parentElement === document.body), true, 'Returning to mobile restores its prior full-view layout');
-  // Exercise the real navigation handler during full view, as an application
-  // navigation can occur while its sidebar button is intentionally covered.
-  await page.locator('.offline-nav-item[data-panel="concepts"]').evaluate(button => button.click());
-  await page.locator('#conceptsPanel').waitFor({ state: 'visible' });
-  assert.equal(await frame(page).isVisible(), false, 'Switching modules removes the portalled full-view surface');
+  await readyGraph(page);
+  await inlineLayout(page);
+  await switchPanel('concepts');
+  assert.equal(await frame(page).isVisible(), false, 'Switching modules hides the embedded graph');
   assert.equal(await frame(page).evaluate(root => root.parentElement.id), 'graphPanel');
   await openOfflineGraph(page);
   await inlineLayout(page);
-  assert.equal(await page.locator('#knowledgeGraphModal').count(), 1, 'Repeated portal lifecycles keep one graph instance');
+  assert.equal(await page.locator('#knowledgeGraphModal').count(), 1, 'Resizing and switching modules keep one graph instance');
 }
 
 async function checkClampedZoom(page) {
@@ -424,10 +400,10 @@ async function checkClampedZoom(page) {
     }));
     const result = await button.evaluate(async button => {
       const root = document.getElementById('knowledgeGraphModal');
-      const view = root.querySelector('.kg-mobile-viewport,.kg-desktop-viewport');
-      const surface = view.querySelector('.kg-mobile-zoom-surface,.kg-desktop-zoom-surface');
-      const stage = surface.querySelector('.kg-mobile-stage,.kg-desktop-zoom-stage');
-      const label = root.querySelector('.kg-mobile-zoom-label,#knowledgeGraphDesktopZoomLabel');
+      const view = root.querySelector('.kg-desktop-viewport');
+      const surface = view.querySelector('.kg-desktop-zoom-surface');
+      const stage = surface.querySelector('.kg-desktop-zoom-stage');
+      const label = root.querySelector('#knowledgeGraphDesktopZoomLabel');
       const capture = () => {
         const rect = stage.getBoundingClientRect();
         return {scale:view._kgScale || Number(surface.dataset.scale),label:label.textContent,
@@ -447,7 +423,7 @@ async function checkClampedZoom(page) {
       observer.disconnect();
       return {before,samples,mutations};
     });
-    const limit = action === 'out' ? (mobile(page) ? .65 : .8) : (mobile(page) ? 3 : 2.5);
+    const limit = action === 'out' ? .8 : 2.5;
     near(result.before.scale, limit, 'Offline '+action+' reaches its zoom clamp', .000001);
     assert.equal(result.mutations,0,'Offline '+action+' at its clamp causes no graph or label rewrites');
     assert.equal(result.before.visible,'visible','The disconnected graph remains visible at its limit');
@@ -460,32 +436,35 @@ async function checkClampedZoom(page) {
 
 async function gestures(page) {
   await category(page, '证明与归纳');
-  await fullGraph(page);
-  await zoom(page, 'fit').click();
-  const fitted = await scale(page);
-  await zoom(page, 'in').click();
-  assert.ok(await scale(page) > fitted, 'Zoom-in changes the actual graph scale');
-  await zoom(page, 'fit').click();
-  near(await scale(page), fitted, 'Fit restores the category scale', .001);
-  await checkClampedZoom(page);
-  for (let i = 0; i < 5; i++) await zoom(page, 'in').click();
+  await readyGraph(page);
+  if (mobile(page)) {
+    if (await frame(page).getAttribute('data-kg-sheet') === 'expanded') await frame(page).locator('.kg-sheet-handle').tap();
+    for (const [factor, limit] of [[1.8, 3], [.5, .65]]) {
+      for (let repeat = 0; repeat < 4; repeat++) await pinchGraph(page, factor);
+      near(await scale(page), limit, 'Pinching reaches the zoom limit', .001);
+      const camera = () => view(page).evaluate(node => [node._kgScale, node.scrollTop, node.scrollLeft]);
+      const clamped = await camera();
+      await pinchGraph(page, factor);
+      assert.deepEqual(await camera(), clamped, 'Further pinching keeps the clamped camera stable');
+    }
+    for (let repeat = 0; repeat < 3; repeat++) await pinchGraph(page, 1.8);
+  } else {
+    await zoom(page, 'fit').click();
+    const fitted = await scale(page);
+    await zoom(page, 'in').click();
+    assert.ok(await scale(page) > fitted, 'Zoom-in changes the actual graph scale');
+    await zoom(page, 'fit').click();
+    near(await scale(page), fitted, 'Fit restores the category scale', .001);
+    await checkClampedZoom(page);
+    for (let i = 0; i < 5; i++) await zoom(page, 'in').click();
+  }
   await view(page).evaluate(node => { node.scrollLeft = 0; node.scrollTop = 0; });
   const before = await view(page).evaluate(node => ({ x: node.scrollLeft, y: node.scrollTop, max: node.scrollWidth - node.clientWidth }));
   assert.ok(before.max > 30, 'The zoomed chart has a meaningful horizontal pan range');
   const rect = await view(page).boundingBox(), x = rect.x + rect.width * .7, y = rect.y + rect.height * .65;
   if (mobile(page)) {
-    const cdp = await page.context().newCDPSession(page);
-    const touch = (type, touchPoints) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints });
-    await touch('touchStart', [{ id: 1, x, y }]);
-    await touch('touchMove', [{ id: 1, x: x - 40, y }]);
-    await touch('touchEnd', []);
+    await panGraph(page, -50, 0);
     assert.ok(await view(page).evaluate(node => node.scrollLeft) > before.x, 'A real finger drag pans the graph');
-    const initial = await scale(page), center = rect.x + rect.width / 2;
-    await touch('touchStart', [{ id: 1, x: center - 30, y }, { id: 2, x: center + 30, y }]);
-    await touch('touchMove', [{ id: 1, x: center - 48, y }, { id: 2, x: center + 48, y }]);
-    await touch('touchEnd', []);
-    assert.ok(await scale(page) > initial, 'A real two-finger pinch zooms the graph');
-    await cdp.detach();
   } else {
     await page.mouse.move(x, y);
     await page.mouse.wheel(80, 0);
@@ -510,15 +489,14 @@ async function gestures(page) {
   });
   assert.ok(edges.right <= edges.viewRight + 2 && edges.bottom <= edges.viewBottom + 2,
     'Scrolling reaches the farthest nodes without clipping: ' + JSON.stringify(edges));
-  await zoom(page, 'fit').click();
+  if (!mobile(page)) await zoom(page, 'fit').click();
   await selectFirst(page); // Gestures must not swallow the next independent selection.
 }
 
 async function liveLanguage(page) {
   await category(page, '初等数论');
-  await fullGraph(page);
+  await readyGraph(page);
   await selectFirst(page);
-  if (mobile(page)) await frame(page).locator('.kg-mobile-expand').click();
   const original = await frame(page).elementHandle();
   for (const language of ['en', 'zh-CN']) {
     await page.evaluate(value => DMateI18n.setLanguage(value, false), language);
@@ -547,7 +525,6 @@ async function png(page) {
   // Exercise the real PNG rasterizer and local download fallback; no system
   // clipboard is modified by this browser regression.
   await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined }));
-  if (mobile(page) && await view(page).count()) await frame(page).locator('.kg-mobile-expand').click();
   const downloading = page.waitForEvent('download');
   await frame(page).locator('#knowledgeGraphCopyBtn').click();
   const download = await downloading, chunks = [];
@@ -579,17 +556,18 @@ async function relationNavigation(page) {
   };
 
   await category(page, '全部');
-  await fullGraph(page);
+  await readyGraph(page);
   await frame(page).locator('[data-node-id="logic_reasoning"]').scrollIntoViewIfNeeded();
   await frame(page).locator('[data-node-id="logic_reasoning"]').click();
-  if (mobile(page)) await frame(page).locator('.kg-mobile-expand').click();
+  await expandGraphDetails(page);
   const successor = frame(page).locator('#knowledgeGraphDetail button.graph-detail-term[data-graph-node-id="proof_induction"]');
   await successor.click();
   await assertDestination('proof_induction', '数学归纳法', '证明与归纳');
 
   await page.evaluate(() => DMateI18n.setLanguage('en', false));
   await category(page, '全部');
-  if (!mobile(page)) await fullGraph(page);
+  await readyGraph(page);
+  await expandGraphDetails(page);
   const prerequisite = frame(page).locator('#knowledgeGraphDetail button.graph-detail-term[data-graph-node-id="logic_reasoning"]');
   await prerequisite.focus();
   await prerequisite.press('Enter');
@@ -631,11 +609,11 @@ async function relationNavigation(page) {
   await page.evaluate(() => DMateI18n.setLanguage('zh-CN', false));
   if (mobile(page)) {
     await category(page, '全部');
-    assert.equal(await view(page).count(), 0, 'The inline mobile graph shows its entry rather than a canvas');
+    assert.ok(await view(page).isVisible());
+    await expandGraphDetails(page);
     await frame(page).locator('#knowledgeGraphDetail button.graph-detail-term[data-graph-node-id="proof_induction"]').click();
     await assertDestination('proof_induction', '数学归纳法', '证明与归纳');
-    assert.equal(await frame(page).evaluate(root => root.classList.contains('graph-fullscreen-view')), true,
-      'A mobile inline relation opens the full graph to reveal its destination');
+    await inlineLayout(page);
   }
 }
 
@@ -696,15 +674,16 @@ async function runCase(browser, width, theme) {
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/offline-graph-preview-' + width + '-' + theme + '.png' });
     for (const [selector, expected] of Object.entries(reference.initial.blocks)) {
       assert.deepEqual(actual.blocks[selector].style, expected.style, label + ': shared graph styles ' + selector);
+      assert.equal(actual.blocks[selector].rect.length, expected.rect.length, label + ': matching visibility ' + selector);
       actual.blocks[selector].rect.forEach((value, index) => near(value, expected.rect[index],
         label + ': shared graph geometry ' + selector));
     }
     assert.deepEqual(await frame(page).locator('#knowledgeGraphCategory option').allTextContents(), reference.categories);
-    await fullGraph(page);
+    await readyGraph(page);
     if (mobile(page) && theme === 'light') await checkMobileDetailSheet(page);
     for (const name of reference.categories) {
       await category(page, name);
-      await fullGraph(page);
+      await readyGraph(page);
       assert.deepEqual(await topology(page), reference.expected[name].topology, label + '/' + name + ': shared node geometry, labels and edge routing');
       assert.deepEqual(await selectFirst(page), reference.expected[name].details, label + '/' + name + ': direct prerequisites and successors');
     }
@@ -717,17 +696,17 @@ async function runCase(browser, width, theme) {
     assert.equal(await frame(page).locator('#knowledgeGraphCategory').inputValue(), '全部', 'The module selector restores the complete graph');
     await page.reload({ waitUntil: 'networkidle' });
     await openOfflineGraph(page);
-    await fullGraph(page);
+    await readyGraph(page);
     assert.equal(await nodes(page).count(), reference.expected[reference.categories[0]].topology.nodes.length, 'The complete graph is available after another disconnected reload');
     await category(page, '初等数论');
-    await fullGraph(page);
+    await readyGraph(page);
     await selectFirst(page);
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/offline-graph-' + width + '-' + theme + '.png' });
     assert.deepEqual(errors, [], label + ': no page errors');
     assert.deepEqual(failures, [], label + ': all necessary graph assets are cached');
     assert.deepEqual(api, [], label + ': no online video or API calls');
     console.log('PASS ' + label + ': online layout/styles, ' + reference.categories.length
-      + ' categories, relation module navigation, selected outlines, zoom/Fit/' + (mobile(page) ? 'drag/pinch' : 'scroll/clipping')
+      + ' categories, relation module navigation, selected outlines, ' + (mobile(page) ? 'drag/pinch' : 'zoom/Fit/scroll/clipping')
       + ', live language switching, PNG and two truly offline reloads');
   } catch (error) {
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/FAILED-offline-graph-' + width + '-' + theme + '.png' }).catch(() => {});

@@ -5021,71 +5021,6 @@ body[data-appearance-theme="light"] .input input {
         overflow:hidden !important;
     }
 
-    .kg-mobile-expand {
-        position:absolute;
-        top:8px;
-        right:8px;
-        z-index:4;
-        min-height:32px;
-        padding:5px 10px;
-        border:1px solid var(--border-strong);
-        border-radius:999px;
-        background:var(--surface-2);
-        color:var(--text-primary);
-        font-size:12px;
-        font-weight:700;
-        line-height:1.2;
-        cursor:pointer;
-        box-shadow:0 4px 14px rgba(0,0,0,.18);
-    }
-
-    .kg-mobile-zoom-controls {
-        display:none;
-        align-items:center;
-        gap:6px;
-        position:fixed;
-        left:50%;
-        bottom:max(12px, calc(env(safe-area-inset-bottom) + 8px));
-        transform:translateX(-50%);
-        z-index:1004;
-        padding:6px;
-        border:1px solid var(--border-strong);
-        border-radius:999px;
-        background:color-mix(in srgb, var(--surface-2) 94%, transparent);
-        box-shadow:0 8px 24px rgba(0,0,0,.28);
-        backdrop-filter:blur(12px);
-        -webkit-backdrop-filter:blur(12px);
-    }
-
-    .kg-mobile-zoom-controls button {
-        width:auto;
-        min-width:40px;
-        min-height:38px;
-        margin:0;
-        padding:6px 10px;
-        border:1px solid var(--border-strong);
-        border-radius:999px;
-        background:var(--surface-3);
-        color:var(--text-primary);
-        font-size:16px;
-        font-weight:700;
-        line-height:1;
-    }
-
-    .kg-mobile-zoom-controls .kg-mobile-zoom-fit {
-        min-width:54px;
-        font-size:12px;
-    }
-
-    .kg-mobile-zoom-label {
-        min-width:50px;
-        color:var(--text-secondary);
-        font-size:12px;
-        font-weight:700;
-        text-align:center;
-        font-variant-numeric:tabular-nums;
-    }
-
     :root,
     body {
         --kg-mobile-viewport-bg:rgba(var(--surface-0-rgb), .96);
@@ -5108,7 +5043,6 @@ body[data-appearance-theme="light"] .input input {
         overflow:auto;
         overscroll-behavior:contain;
         -webkit-overflow-scrolling:touch;
-        /* 非完整查看：预览区自己可以横向与纵向浏览整张图谱。 */
         touch-action:pan-x pan-y;
         border-radius:10px;
         background:var(--kg-mobile-viewport-bg);
@@ -5225,9 +5159,7 @@ body[data-appearance-theme="light"] .input input {
         padding-bottom:max(12px, env(safe-area-inset-bottom));
     }
 
-    /* 点击“完整查看”后，只保留标题栏和图谱，让图谱吃满剩余屏幕。
-       图谱本身仍可横向/纵向拖动，不会再被 38dvh 的预览高度限制。 */
-    #knowledgeGraphModal.graph-fullscreen-view .graph-toolbar,
+    /* The mobile canvas fills the space below the toolbar. */
     #knowledgeGraphModal.graph-fullscreen-view .graph-summary,
     #knowledgeGraphModal.graph-fullscreen-view .knowledge-graph-side,
     #knowledgeGraphModal.graph-fullscreen-view .kg-section-title,
@@ -5267,14 +5199,6 @@ body[data-appearance-theme="light"] .input input {
         overflow:hidden !important;
     }
 
-    #knowledgeGraphModal.graph-fullscreen-view .kg-mobile-expand {
-        position:fixed;
-        top:max(58px, calc(env(safe-area-inset-top) + 52px));
-        right:10px;
-        z-index:1003;
-        background:var(--surface-2);
-    }
-
     #knowledgeGraphModal.graph-fullscreen-view .kg-mobile-stage {
         will-change:transform;
         backface-visibility:hidden;
@@ -5287,15 +5211,11 @@ body[data-appearance-theme="light"] .input input {
         max-height:none !important;
         overflow:auto !important;
         overscroll-behavior:contain !important;
-        /* 完整查看由 JS 接管单指二维拖动和双指缩放。 */
+        /* The graph handles one-finger panning and two-finger zoom. */
         touch-action:none !important;
         border-radius:0 !important;
         padding:10px 10px 72px !important;
         scroll-padding:16px 16px 84px;
-    }
-
-    #knowledgeGraphModal.graph-fullscreen-view .kg-mobile-zoom-controls {
-        display:flex !important;
     }
 }
 
@@ -5619,29 +5539,6 @@ body[data-appearance-theme="light"] .input input {
         overscroll-behavior:auto !important;
     }
 
-    /* 普通预览内部只横向滚动；上下滑动永远交给整页。
-       横向也改用浏览器原生滚动，不再由 JS 每帧改 scrollLeft。 */
-    #knowledgeGraphModal:not(.graph-fullscreen-view) .kg-mobile-viewport {
-        overflow-x:auto !important;
-        overflow-y:auto !important;
-        overscroll-behavior:contain !important;
-        -webkit-overflow-scrolling:touch;
-        touch-action:pan-x pan-y !important;
-        scroll-behavior:auto !important;
-    }
-
-    /* 完整查看仍由图谱自身接管二维拖动/缩放。 */
-    #knowledgeGraphModal.graph-fullscreen-view .kg-mobile-viewport {
-        touch-action:none !important;
-        overscroll-behavior:contain !important;
-    }
-
-    /* 完整查看底部控制条去掉实时模糊，降低移动 GPU 合成压力。 */
-    .kg-mobile-zoom-controls {
-        backdrop-filter:none !important;
-        -webkit-backdrop-filter:none !important;
-        background:var(--surface-2) !important;
-    }
 }
 
 @keyframes mobilePageEnterV8 {
@@ -7041,8 +6938,7 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         font-size:13px;
     }
     #knowledgeGraphModal .graph-legend,
-    #knowledgeGraphModal .graph-summary,
-    #knowledgeGraphModal .kg-mobile-expand {
+    #knowledgeGraphModal .graph-summary {
         display:none !important;
     }
     #knowledgeGraphModal.graph-fullscreen-view .knowledge-graph-layout {
@@ -7151,52 +7047,6 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
 }
 @media (max-width:760px) {
     .kg-desktop-zoom-controls { display:none !important; }
-}
-
-
-/* 手机图谱回归：保留原来的完整查看界面，仅移除非完整预览图。桌面图谱不受影响。 */
-@media (max-width:760px) {
-    #knowledgeGraphModal:not(.graph-fullscreen-view) .kg-mobile-entry-only {
-        position:relative;
-        box-sizing:border-box;
-        min-height:132px !important;
-        height:auto !important;
-        display:flex !important;
-        flex-direction:column !important;
-        align-items:center;
-        justify-content:center;
-        gap:8px;
-        overflow:visible !important;
-    }
-    #knowledgeGraphModal:not(.graph-fullscreen-view) .kg-mobile-entry-only .kg-section-title,
-    #knowledgeGraphModal:not(.graph-fullscreen-view) .kg-mobile-entry-only .kg-section-desc {
-        display:none !important;
-    }
-    #knowledgeGraphModal:not(.graph-fullscreen-view) .kg-mobile-entry-only .kg-mobile-expand {
-        display:inline-flex !important;
-        position:static !important;
-        align-items:center;
-        justify-content:center;
-        min-height:44px;
-        min-width:148px;
-        font-size:15px;
-    }
-    /* 完整查看仍使用旧布局：标题、右上角退出按钮、画布和底部缩放工具。 */
-    #knowledgeGraphModal.graph-fullscreen-view .graph-toolbar,
-    #knowledgeGraphModal.graph-fullscreen-view .graph-summary,
-    #knowledgeGraphModal.graph-fullscreen-view .knowledge-graph-side {
-        display:none !important;
-    }
-    #knowledgeGraphModal.graph-fullscreen-view .kg-mobile-expand {
-        display:inline-flex !important;
-        align-items:center;
-        justify-content:center;
-        position:fixed !important;
-        top:max(58px, calc(env(safe-area-inset-top) + 52px));
-        right:10px;
-        z-index:1003;
-        min-height:36px;
-    }
 }
 
 

@@ -4,6 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const { expandGraphDetails } = require('./knowledge-graph-touch-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const MAIN = '先求集合 A={1,2,3} 与 B={2,3,4} 的交集，再从交集中选出一个元素，有多少种选法';
 const OTHER = '求集合 C={4,5} 与 D={5,6} 的交集';
@@ -115,6 +116,7 @@ async function locateAndExpect(page, id, filter, conversation, label) {
     wrongBookSearch = '不会匹配任何错题的搜索内容';
     wrongBookFilter = wrongBookFilter === 'pending' ? 'corrected' : 'pending';
   });
+  await expandGraphDetails(page);
   await page.locator('#knowledgeGraphLocateOriginal').click();
   await page.locator('#knowledgeGraphModal').waitFor({ state: 'hidden' });
   await page.locator('#wrongBookModal').waitFor({ state: 'visible' });
@@ -151,6 +153,7 @@ async function checkWrongBookGraph(browser, width) {
     await assertOnlyWrongNavigation(page, label);
     assert.deepEqual(await graphSnapshot(page), { mode: 'wrong', scope: 'wrong', ids: EXPECTED,
       purple: EXPECTED, edges: ['set_operation>count_perm_comb'] }, label + ': source-specific cross-module graph is reused immediately');
+    await expandGraphDetails(page);
     assert.equal(await page.locator('#knowledgeGraphLocateOriginal').isVisible(), true,
       label + ': detail header offers wrong-book source navigation');
     await page.evaluate(() => selectKnowledgeGraphNode('set_operation'));
@@ -161,11 +164,9 @@ async function checkWrongBookGraph(browser, width) {
       purple: EXPECTED, edges: ['set_operation>count_perm_comb'] },
     label + ': relation navigation preserves the dedicated wrong-question scope');
     await assertOnlyWrongNavigation(page, label + '/relation navigation');
-    if (width <= 760 && !await page.locator('.kg-mobile-viewport').count()) await page.locator('.kg-mobile-expand').click();
     const drawn = page.locator('#knowledgeGraphCanvas [data-knowledge-node-id]');
     assert.deepEqual((await drawn.evaluateAll(nodes => nodes.map(node => node.dataset.knowledgeNodeId))).sort(), EXPECTED,
       label + ': actual renderer draws the same two involved nodes');
-    if (width <= 760) await page.locator('.kg-mobile-expand').click();
     await page.evaluate(() => DMateI18n.setLanguage('en', false));
     await settle(page);
     assert.match(await page.locator('#knowledgeGraphCanvas .kg-section-title').textContent(), /[A-Za-z]/,

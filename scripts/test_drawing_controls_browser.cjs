@@ -82,6 +82,33 @@ async function drawingPaint(page, searchBackground, theme) {
   assert.ok(controls.minusLeft>=controls.clearRight, 'Zoom controls follow Clear on the right');
   assert.ok(Math.abs(controls.minusCenter-controls.undoCenter)<=1, 'Zoom and Undo share the same action row');
   assert.ok(Math.abs(controls.right-controls.rowRight)<=1, 'Zoom controls align with the action row’s right edge');
+  if(page.viewportSize().width<=600){
+    const layout=await page.locator('.dmate-drawing-workspace').evaluate(shell=>{
+      const box=node=>{const r=node.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
+      return {pages:[...shell.querySelectorAll('.ddw-page-actions>button')].map(box),
+        tools:box(shell.querySelector('.dge-tool-palette>summary')),
+        actions:[...shell.querySelectorAll('.ddw-side-actions>button')].map(box),
+        clear:box(shell.querySelector('[data-editor-clear]')),frame:box(shell.querySelector('.ddw-canvas-frame'))};
+    });
+    assert.ok(layout.pages.every(button=>Math.abs(button.top-layout.pages[0].top)<1
+      && Math.abs(button.width-layout.pages[0].width)<1),'Page actions occupy one row of equal-width buttons');
+    const firstRow=[layout.tools,...layout.actions.slice(0,2)];
+    assert.ok(firstRow.every(button=>Math.abs(button.top-layout.tools.top)<1
+      && Math.abs(button.width-layout.tools.width)<1),'Drawing tools, settings and information form one aligned row');
+    for(let i=1;i<firstRow.length;i++)assert.ok(firstRow[i].left-firstRow[i-1].right>=4,'Canvas buttons retain distinct tap targets');
+    for(const button of [...firstRow,...layout.actions.slice(2)])assert.ok(button.left>=layout.frame.left&&button.right<=layout.frame.right,'Canvas buttons stay inside the drawing frame');
+    if(layout.actions.length===4)assert.ok(layout.actions[2].top-layout.actions[0].bottom>=4
+      && Math.abs(layout.actions[2].top-layout.actions[3].top)<1,'The two AI actions share the second row');
+    assert.ok(layout.clear.height<=40,'Clear does not wrap in a narrow action row');
+    assert.ok(controls.minusLeft-controls.clearRight>=6,'Clear and the zoom group remain visibly separated');
+    const language=await page.evaluate(()=>document.documentElement.lang);
+    try{
+      await page.evaluate(()=>DMateI18n.setLanguage('en',false));await settle(page);
+      const overflow=await page.locator('.ddw-page-actions>button,.dge-tool-palette>summary,.ddw-side-actions>button')
+        .evaluateAll(buttons=>buttons.filter(button=>button.scrollWidth>button.clientWidth+1).map(button=>button.textContent));
+      assert.deepEqual(overflow,[],'Long English labels wrap within their mobile buttons');
+    }finally{await page.evaluate(language=>DMateI18n.setLanguage(language,false),language);await settle(page);}
+  }
   assert.equal(await page.locator('.ddw-name').evaluate(input => getComputedStyle(input).backgroundColor), searchBackground,
     'Drawing name uses the search input surface without imposing search dimensions');
   await checkIcon(page.locator('[data-editor-undo]'), 'undo-2', 24);
@@ -266,7 +293,7 @@ async function runCase(browser, width, theme, offline) {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
-    for (const [width, theme] of [[1440, 'light'], [390, 'dark']]) for (const offline of [false, true]) await runCase(browser, width, theme, offline);
+    for (const [width, theme] of [[1440, 'light'], [390, 'dark'], [320, 'dark']]) for (const offline of [false, true]) await runCase(browser, width, theme, offline);
     const context = await browser.newContext({ viewport: { width: 820, height: 900 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
     try {
       const page = await context.newPage(); await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });

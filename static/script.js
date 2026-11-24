@@ -1059,7 +1059,6 @@ const knowledgeGraphViewMemory = new Map();
 let knowledgeGraphInitialized = false;
 let knowledgeGraphOpenRevision = 0;
 let knowledgeGraphOpenDataPromise = null;
-let knowledgeGraphMobileFullscreen = false;
 let knowledgeGraphNodeSheet = null;
 let knowledgeGraphScope = "current";
 let knowledgeGraphQuestionReference = null;
@@ -12016,8 +12015,7 @@ function buildKnowledgeGraphImageCopyTarget() {
     const canvas = document.getElementById("knowledgeGraphCanvas");
     if (!canvas || !knowledgeGraphDisplayedNodes().length) return null;
 
-    // 手机端默认只显示“完整查看”入口，不会预先创建 .kg-mobile-stage。
-    // 用户直接点复制时，在屏幕外临时构建同一份图谱，避免要求先点完整查看。
+    // Build an off-screen copy only if the mobile canvas is not mounted.
     let temporaryHost = null;
     let mobileStage = canvas.querySelector?.(".kg-mobile-stage");
     const svg = canvas.querySelector?.(".kg-svg");
@@ -20730,14 +20728,14 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile) {
     requestAnimationFrame(() => requestAnimationFrame(() => viewport._kgInitializeView?.()));
 }
 
-function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
+function installMobileGraphInteraction(viewport, surface, stage) {
     if (!viewport || !surface || !stage) return;
 
     const baseWidth = Math.max(1, Number(stage.dataset.baseWidth) || stage.scrollWidth || 1);
     const baseHeight = Math.max(1, Number(stage.dataset.baseHeight) || stage.scrollHeight || 1);
     const modal = document.getElementById("knowledgeGraphModal");
     const pointers = new Map();
-    let fullscreenPan = null;
+    let pan = null;
     let pinch = null;
     let pinchFrame = 0;
     let pendingPinch = null;
@@ -20750,12 +20748,6 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     const currentScale = () => (
         clampMobileGraphScale(viewport._kgScale || 1)
     );
-
-    const updateLabel = scale => {
-        if (zoomLabel) {
-            zoomLabel.textContent = `${Math.round(scale * 100)}%`;
-        }
-    };
 
     const graphPoint = anchor => {
         const viewRect = viewport.getBoundingClientRect();
@@ -20789,8 +20781,8 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
 
     const applyScale = (nextScale, anchor = null) => {
         const scale = clampMobileGraphScale(nextScale);
-        // A clamped button/wheel zoom has no new camera to apply. Avoid
-        // reanchoring it or repainting the same graph at either limit.
+        // When zoom hits a limit, avoid shifting the camera or
+        // repainting the same graph.
         if (anchor && viewport._kgScale === scale) return scale;
         if (anchor) viewport._kgBeginViewInteraction?.();
         const point = anchor ? graphPoint(anchor) : null;
@@ -20803,7 +20795,6 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
         // inside it, while oversized axes keep their full scroll range.
         stage.style.left = `${Math.max(0, (surface.clientWidth - baseWidth * scale) / 2)}px`;
         stage.style.top = `${Math.max(0, (surface.clientHeight - baseHeight * scale) / 2)}px`;
-        updateLabel(scale);
 
         if (point) positionGraphPoint(point, anchor);
         lastCenterAnchor = centerAnchor();
@@ -20912,58 +20903,48 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     viewport.addEventListener("pointerdown", event => {
         if (event.pointerType === "mouse" && event.button !== 0) return;
 
-        const fullscreen = Boolean(modal?.classList.contains("graph-fullscreen-view"));
-
-        // 普通图谱预览由原生滚动容器接管横向、纵向两轴；
-        // 不拦截 pointermove，以保留安卓浏览器的惯性与边界滚动。
-        if (!fullscreen) return;
+        if (!modal?.classList.contains("graph-fullscreen-view")) return;
 
         // A fresh gesture must not inherit the previous drag's click guard.
         if (!pointers.size) suppressClickUntil = 0;
         pointers.set(event.pointerId, event);
 
-        if (fullscreen) {
-            if (pointers.size >= 2) {
-                for (const pointerId of pointers.keys()) {
-                    try { viewport.setPointerCapture(pointerId); } catch (_error) {}
-                }
-                const [a, b] = [...pointers.values()].slice(0, 2);
-                const center = pointerCenter(a, b);
-                const scale = currentScale();
-                pinch = {
-                    distance: Math.max(1, pointerDistance(a, b)),
-                    scale,
-                    point: graphPoint(center)
-                };
-                fullscreenPan = null;
-                suppressClickUntil = performance.now() + 300;
-                event.preventDefault();
-                return;
+        if (pointers.size >= 2) {
+            for (const pointerId of pointers.keys()) {
+                try { viewport.setPointerCapture(pointerId); } catch (_error) {}
             }
-
-            fullscreenPan = {
-                pointerId: event.pointerId,
-                node: event.target.closest?.(".kg-mobile-node"),
-                x: event.clientX,
-                y: event.clientY,
-                left: viewport.scrollLeft,
-                top: viewport.scrollTop,
-                moved: false
+            const [a, b] = [...pointers.values()].slice(0, 2);
+            const center = pointerCenter(a, b);
+            const scale = currentScale();
+            pinch = {
+                distance: Math.max(1, pointerDistance(a, b)),
+                scale,
+                point: graphPoint(center)
             };
+            pan = null;
+            suppressClickUntil = performance.now() + 300;
+            event.preventDefault();
             return;
         }
 
+        pan = {
+            pointerId: event.pointerId,
+            node: event.target.closest?.(".kg-mobile-node"),
+            x: event.clientX,
+            y: event.clientY,
+            left: viewport.scrollLeft,
+            top: viewport.scrollTop,
+            moved: false
+        };
     }, { passive: false });
 
     viewport.addEventListener("pointermove", event => {
-        const fullscreen = Boolean(modal?.classList.contains("graph-fullscreen-view"));
-
-        if (!fullscreen) return;
+        if (!modal?.classList.contains("graph-fullscreen-view")) return;
 
         if (!pointers.has(event.pointerId)) return;
         pointers.set(event.pointerId, event);
 
-        if (fullscreen && pointers.size >= 2) {
+        if (pointers.size >= 2) {
             const [a, b] = [...pointers.values()].slice(0, 2);
             if (!pinch) {
                 const center = pointerCenter(a, b);
@@ -20994,20 +20975,20 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
             return;
         }
 
-        if (fullscreen && fullscreenPan?.pointerId === event.pointerId) {
-            const dx = event.clientX - fullscreenPan.x;
-            const dy = event.clientY - fullscreenPan.y;
+        if (pan?.pointerId === event.pointerId) {
+            const dx = event.clientX - pan.x;
+            const dy = event.clientY - pan.y;
             // Finger taps naturally wobble a few pixels. Keep the native node
             // click (and its original target) until this is a real drag.
-            if (!fullscreenPan.moved) {
+            if (!pan.moved) {
                 if (Math.hypot(dx, dy) < dragSlop) return;
-                fullscreenPan.moved = true;
+                pan.moved = true;
                 try { viewport.setPointerCapture(event.pointerId); } catch (_error) {}
             }
             fitted = false;
             suppressClickUntil = performance.now() + 300;
-            viewport.scrollLeft = fullscreenPan.left - dx;
-            viewport.scrollTop = fullscreenPan.top - dy;
+            viewport.scrollLeft = pan.left - dx;
+            viewport.scrollTop = pan.top - dy;
             event.preventDefault();
             return;
         }
@@ -21016,11 +20997,11 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
 
     const finishPointer = event => {
         const tappedNode = event.type === "pointerup" && event.pointerType !== "mouse"
-            && fullscreenPan?.pointerId === event.pointerId && !fullscreenPan.moved
-            && Math.hypot(event.clientX - fullscreenPan.x, event.clientY - fullscreenPan.y) < dragSlop
+            && pan?.pointerId === event.pointerId && !pan.moved
+            && Math.hypot(event.clientX - pan.x, event.clientY - pan.y) < dragSlop
             && pointers.size === 1 && !pinch
-            ? fullscreenPan.node : null;
-        if (pinch || fullscreenPan?.moved) {
+            ? pan.node : null;
+        if (pinch || pan?.moved) {
             // Suppress only the compatibility click from this completed
             // gesture, even if the user paused before lifting their finger.
             suppressClickUntil = performance.now() + 300;
@@ -21028,8 +21009,8 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
         const wasPinching = Boolean(pinch);
         pointers.delete(event.pointerId);
 
-        if (fullscreenPan?.pointerId === event.pointerId) {
-            fullscreenPan = null;
+        if (pan?.pointerId === event.pointerId) {
+            pan = null;
         }
 
         if (pointers.size < 2) {
@@ -21041,7 +21022,7 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
             && pointers.size === 1
         ) {
             const remaining = [...pointers.values()][0];
-            fullscreenPan = {
+            pan = {
                 pointerId: remaining.pointerId,
                 x: remaining.clientX,
                 y: remaining.clientY,
@@ -21074,7 +21055,7 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
         }
     }, true);
 
-    // 桌面调试/触控板也能 Ctrl+滚轮缩放完整图谱。
+    // Trackpads can also zoom the graph with Ctrl+wheel.
     viewport.addEventListener("wheel", event => {
         if (!modal?.classList.contains("graph-fullscreen-view") || !event.ctrlKey) {
             return;
@@ -21084,42 +21065,6 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
         applyScale(currentScale() * factor, point);
         event.preventDefault();
     }, { passive: false });
-}
-
-function setKnowledgeGraphFullscreenView(enabled) {
-    const modal = document.getElementById("knowledgeGraphModal");
-    if (!modal) return;
-
-    const next = Boolean(enabled);
-    if (!next) knowledgeGraphNodeSheet?.close();
-    if (window.matchMedia('(max-width:760px)').matches) knowledgeGraphMobileFullscreen = next;
-    modal.classList.toggle("graph-fullscreen-view", next);
-
-    const button = modal.querySelector(".kg-mobile-expand");
-    if (button) {
-        button.textContent = next ? "退出完整查看" : "完整查看";
-        button.setAttribute(
-            "aria-label",
-            next ? "退出知识图谱完整查看" : "完整查看知识图谱"
-        );
-    }
-
-    requestAnimationFrame(() => {
-        const viewport = modal.querySelector(".kg-mobile-viewport");
-        if (!viewport) return;
-
-        viewport._kgInitializeView?.();
-    });
-}
-
-function toggleKnowledgeGraphFullscreenView() {
-    const modal = document.getElementById("knowledgeGraphModal");
-    if (!modal) return;
-    setKnowledgeGraphFullscreenView(
-        !modal.classList.contains("graph-fullscreen-view")
-    );
-    // 预览状态只构造入口按钮，进入完整查看时再生成图谱，退出时释放图谱。
-    renderKnowledgeGraph();
 }
 
 function syncKnowledgeGraphWorkspaceDefault({returnedHome = false} = {}) {
@@ -21136,7 +21081,6 @@ function syncKnowledgeGraphWorkspaceDefault({returnedHome = false} = {}) {
         knowledgeGraphFilter = "全部";
         knowledgeGraphSelectedNodeId = "";
         knowledgeGraphDesktopScale = 1;
-        knowledgeGraphMobileFullscreen = false;
         knowledgeGraphViewMemory.clear();
         knowledgeGraphPreparedPngPromise = null;
         knowledgeGraphPreparedPngKey = "";
@@ -21215,8 +21159,7 @@ async function openKnowledgeGraph() {
         modal.style.visibility = "hidden";
         modal.style.pointerEvents = "none";
         modal.classList.remove("hidden");
-        // 手机仍先显示“完整查看”入口，进入后再创建完整图谱。
-        setKnowledgeGraphFullscreenView(false);
+        knowledgeGraphNodeSheet?.close();
         renderKnowledgeGraph();
         for (;;) {
             if (revision !== knowledgeGraphOpenRevision) return false;
@@ -21266,6 +21209,8 @@ function closeKnowledgeGraph() {
 
 function renderKnowledgeGraphLoading(message) {
     knowledgeGraphNodeSheet?.close();
+    document.getElementById("knowledgeGraphModal")?.classList.remove("graph-fullscreen-view");
+    placeKnowledgeGraphSideTabs();
     const canvas = document.getElementById(
         "knowledgeGraphCanvas"
     );
@@ -21503,60 +21448,6 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
         section.appendChild(desc);
     }
 
-    const graphModal = document.getElementById("knowledgeGraphModal");
-    const isExpanded = graphModal?.classList.contains("graph-fullscreen-view");
-    const expandButton = document.createElement("button");
-    expandButton.type = "button";
-    expandButton.className = "kg-mobile-expand";
-    expandButton.textContent = isExpanded ? "退出完整查看" : "完整查看";
-    expandButton.setAttribute(
-        "aria-label",
-        isExpanded ? "退出知识图谱完整查看" : "完整查看知识图谱"
-    );
-    expandButton.addEventListener("click", event => {
-        event.preventDefault();
-        event.stopPropagation();
-        toggleKnowledgeGraphFullscreenView();
-    });
-    section.appendChild(expandButton);
-
-    if (!isExpanded && !options.forCopy) {
-        // 不再渲染非完整查看的小图：只保留进入原有完整查看的入口。
-        section.classList.add("kg-mobile-entry-only");
-        container.appendChild(section);
-        return;
-    }
-
-    const zoomControls = document.createElement("div");
-    zoomControls.className = "kg-mobile-zoom-controls";
-
-    const zoomOut = document.createElement("button");
-    zoomOut.type = "button";
-    zoomOut.className = "kg-mobile-zoom-btn";
-    zoomOut.textContent = "−";
-    zoomOut.setAttribute("aria-label", "缩小图谱");
-    zoomOut.title = dmateUiText("缩小", "Zoom out");
-
-    const zoomLabel = document.createElement("span");
-    zoomLabel.className = "kg-mobile-zoom-label";
-    zoomLabel.textContent = "100%";
-
-    const zoomIn = document.createElement("button");
-    zoomIn.type = "button";
-    zoomIn.className = "kg-mobile-zoom-btn";
-    zoomIn.textContent = "+";
-    zoomIn.setAttribute("aria-label", "放大图谱");
-    zoomIn.title = dmateUiText("放大", "Zoom in");
-
-    const zoomFit = document.createElement("button");
-    zoomFit.type = "button";
-    zoomFit.className = "kg-mobile-zoom-fit";
-    zoomFit.textContent = "适应";
-    zoomFit.title = dmateUiText("调整到可读大小", "Fit to a readable size");
-
-    zoomControls.append(zoomOut, zoomLabel, zoomIn, zoomFit);
-    section.appendChild(zoomControls);
-
     if (!nodes.length) {
         const empty = document.createElement("div");
         empty.className = "kg-empty";
@@ -21590,7 +21481,7 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
 
     const viewport = document.createElement("div");
     viewport.className = "kg-mobile-viewport";
-    viewport.setAttribute("aria-label", "完整知识图谱：单指拖动、双指缩放，所有知识关联线均可见");
+    viewport.setAttribute("aria-label", dmateUiText("知识图谱：单指拖动、双指缩放", "Knowledge graph: drag to pan, pinch to zoom"));
 
     const zoomSurface = document.createElement("div");
     zoomSurface.className = "kg-mobile-zoom-surface";
@@ -21665,41 +21556,9 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
 
     if (options.forCopy) return;
 
-    installMobileGraphInteraction(
-        viewport,
-        zoomSurface,
-        stage,
-        zoomLabel
-    );
+    installMobileGraphInteraction(viewport, zoomSurface, stage);
 
-    zoomOut.addEventListener("click", event => {
-        event.preventDefault();
-        event.stopPropagation();
-        const rect = viewport.getBoundingClientRect();
-        viewport._kgSetScale?.(
-            (viewport._kgScale || 1) / 1.2,
-            { x: rect.width / 2, y: rect.height / 2 }
-        );
-    });
-
-    zoomIn.addEventListener("click", event => {
-        event.preventDefault();
-        event.stopPropagation();
-        const rect = viewport.getBoundingClientRect();
-        viewport._kgSetScale?.(
-            (viewport._kgScale || 1) * 1.2,
-            { x: rect.width / 2, y: rect.height / 2 }
-        );
-    });
-
-    zoomFit.addEventListener("click", event => {
-        event.preventDefault();
-        event.stopPropagation();
-        viewport._kgBeginViewInteraction?.();
-        viewport._kgFit?.();
-    });
-
-    // section 先在 DocumentFragment 内构造；等挂载、全屏 flex 布局完成后再适应。
+    // Fit after the fragment is mounted and the mobile canvas is sized.
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             if (viewport._kgInitializeView) viewport._kgInitializeView();
@@ -22031,9 +21890,6 @@ function navigateKnowledgeGraphRelation(nodeId) {
     }
     knowledgeGraphSideMode = "detail";
     knowledgeGraphSelectedNodeId = target.id;
-    if (window.matchMedia("(max-width:760px)").matches && !knowledgeGraphMobileFullscreen) {
-        setKnowledgeGraphFullscreenView(true);
-    }
     if (reuseCanvas) selectKnowledgeGraphNode(target.id, existing, {keepSheetExpanded:true});
     else {
         renderKnowledgeGraph();
@@ -22271,13 +22127,31 @@ function renderKnowledgeGraphHistory(items) {
 function setKnowledgeGraphSideMode(mode) {
     knowledgeGraphSideMode = knowledgeGraphViewMode === "history" && mode === "history" ? "history" : "detail";
     renderKnowledgeGraphSide();
+    if (knowledgeGraphSideMode === "detail" && knowledgeGraphSelectedNodeId) {
+        openKnowledgeGraphNodeSheet(true);
+    }
+}
+
+function placeKnowledgeGraphSideTabs() {
+    const tabs = document.getElementById("knowledgeGraphSideTabs");
+    const modal = document.getElementById("knowledgeGraphModal");
+    if (!tabs || !modal) return tabs;
+
+    if (modal.classList.contains("graph-fullscreen-view")) {
+        const toolbar = modal.querySelector(".graph-toolbar");
+        if (toolbar && tabs.parentElement !== toolbar) toolbar.append(tabs);
+    } else {
+        const side = modal.querySelector(".knowledge-graph-side");
+        if (side && tabs.parentElement !== side) side.prepend(tabs);
+    }
+    return tabs;
 }
 
 function renderKnowledgeGraphSide({refreshHistory = true} = {}) {
     const historical = knowledgeGraphViewMode === "history";
     if (!historical) knowledgeGraphSideMode = "detail";
     const history = historical && knowledgeGraphSideMode === "history";
-    const tabs = document.getElementById("knowledgeGraphSideTabs");
+    const tabs = placeKnowledgeGraphSideTabs();
     if (tabs) tabs.hidden = !historical;
     // Selecting a node cannot change questions. Keep the displayed count until
     // a data render or history opening refreshes it; history itself is always read fresh.
@@ -22575,6 +22449,7 @@ function renderKnowledgeGraph() {
     knowledgeGraphPreparedPngPromise = null;
     knowledgeGraphPreparedPngKey = "";
     if (!knowledgeGraphData.nodes.length) {
+        modal.classList.remove("graph-fullscreen-view");
         canvas.querySelectorAll(".kg-mobile-viewport,.kg-desktop-viewport").forEach(viewport => viewport._kgDispose?.());
         canvas.innerHTML = (
             '<div class="kg-empty">知识图谱目前还是空的。</div>'
@@ -22594,8 +22469,6 @@ function renderKnowledgeGraph() {
 
     if (isKnowledgeGraphQuestionView() && !visibleNodes.length) {
         canvas.querySelectorAll(".kg-mobile-viewport,.kg-desktop-viewport").forEach(viewport => viewport._kgDispose?.());
-        // Keep the remembered camera/full-view preference, but expose the
-        // normal toolbar and empty detail instead of an empty fullscreen pane.
         modal.classList.remove("graph-fullscreen-view");
         const empty = document.createElement("div");
         empty.className = "kg-empty";
@@ -22618,9 +22491,7 @@ function renderKnowledgeGraph() {
             : `最近一题关联 ${visibleNodes.length} 个知识点`)
         : dmateUiText(`${fullNodes.length} 个知识点`, `${fullNodes.length} concepts`);
     const mobileGraph = window.matchMedia?.("(max-width: 760px)")?.matches;
-    if (mobileGraph && knowledgeGraphMobileFullscreen) {
-        modal.classList.add("graph-fullscreen-view");
-    }
+    modal.classList.toggle("graph-fullscreen-view", Boolean(mobileGraph && visibleNodes.length));
 
     // 离线构造 DOM，完成后一次性替换，避免清空画布导致布局横跳。
     const fragment = document.createDocumentFragment();
@@ -22665,8 +22536,6 @@ function renderKnowledgeGraph() {
 window.matchMedia?.("(max-width: 760px)").addEventListener("change", () => {
     const modal = document.getElementById("knowledgeGraphModal");
     if (!modal || modal.classList.contains("hidden")) return;
-    modal.classList.toggle("graph-fullscreen-view",
-        window.matchMedia('(max-width:760px)').matches && knowledgeGraphMobileFullscreen);
     renderKnowledgeGraph();
 });
 
@@ -23071,19 +22940,6 @@ function installMobileSwipeNavigation() {
 
 function getTopMobileGesturePage() {
     if (!isMobileAppShell()) return null;
-
-    const graphModal = document.getElementById("knowledgeGraphModal");
-    if (
-        graphModal
-        && !graphModal.classList.contains("hidden")
-        && graphModal.classList.contains("graph-fullscreen-view")
-    ) {
-        return {
-            overlay:graphModal,
-            surface:graphModal.querySelector(".graph-modal-card") || graphModal,
-            close:() => setKnowledgeGraphFullscreenView(false)
-        };
-    }
 
     const dialog = document.activeElement?.closest?.("dialog[open]")
         || document.querySelector("dialog[open]");

@@ -4,6 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const { expandGraphDetails } = require('./knowledge-graph-touch-fixtures.cjs');
 const {revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const concepts = require('../static/offline-content/concepts.zh-CN.json').concepts;
 const questions = require('../static/offline-content/questions.zh-CN.json').questions;
@@ -125,13 +126,6 @@ async function checkQuestionLinks(page, question, lang) {
   return actual;
 }
 
-async function exitFullGraph(page) {
-  if (await page.locator('#knowledgeGraphModal').evaluate(modal => modal.classList.contains('graph-fullscreen-view'))) {
-    await page.locator('.kg-mobile-expand').click();
-    await settle(page);
-  }
-}
-
 async function checkGraphSelection(page, node) {
   await page.locator('#graphPanel').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#knowledgeGraphCategory').inputValue(), node.category);
@@ -196,7 +190,7 @@ async function allOverviewSections(page) {
 }
 
 async function footerReachable(page) {
-  await exitFullGraph(page);
+  await expandGraphDetails(page);
   const last = page.locator('.graph-related-exercises [data-question-id]').last();
   await last.scrollIntoViewIfNeeded();
   const state = await last.evaluate(button => {
@@ -218,20 +212,19 @@ async function graphPracticeRoundTrip(page, lang) {
   assert.equal(initial.category, next.category, 'The multi-module fixture supports an actual same-category node click');
   await clickModule(page, '#questionDetail .question-graph-modules ', initial);
   await checkGraphLinks(page, initial, lang);
-  // This is a real graph-node click, with the mobile canvas expanded by reveal.
   const node = page.locator('#knowledgeGraphCanvas ' + (graphMobile(page) ? '.kg-mobile-node' : '.kg-node-group') + '[data-node-id="' + next.id + '"]');
   await node.scrollIntoViewIfNeeded();
   await node.click();
   await checkGraphSelection(page, next);
   const related = await checkGraphLinks(page, next, lang);
-  await exitFullGraph(page);
+  await expandGraphDetails(page);
   await page.locator('.graph-parent-concept [data-concept-id="' + next.id + '"]').click();
   await page.locator('#conceptsPanel').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#conceptList .concept-item.active').getAttribute('data-concept-id'), next.id);
   assert.equal(await page.locator('#conceptDetail .concept-related-exercises').count(), 0);
   assert.equal(await page.locator('#knowledgeGraphModal').evaluate(modal =>
-    modal.closest('#graphPanel') !== null && !modal.classList.contains('graph-fullscreen-view')), true,
-  'Leaving a full mobile graph restores its inline host');
+    modal.closest('#graphPanel') !== null), true,
+  'The graph stays in its original panel when opening a linked concept');
 
   // Keep deliberately conflicting practice filters while visiting graph.
   await openQuestion(page, sameParent);
@@ -239,7 +232,7 @@ async function graphPracticeRoundTrip(page, lang) {
   await choose(page, '#questionCategory', otherCategory);
   await choose(page, '#questionDifficulty', '困难');
   await navigate(page, 'graph');
-  await exitFullGraph(page);
+  await expandGraphDetails(page);
   await checkGraphLinks(page, next, lang);
   const target = questionMap.get(related.find(link => link.id !== sameParent.id).id);
   await page.locator('.graph-related-exercises [data-question-id="' + target.id + '"]').click();
@@ -263,14 +256,14 @@ async function graphPracticeRoundTrip(page, lang) {
   assert.equal(await page.locator('#conceptList .concept-item.active').getAttribute('data-concept-id'), conceptId);
   const module = nodeMap.get(conceptMap.get(conceptId).graph_node_id);
   await clickModule(page, '#conceptDetail .concept-graph-module ', module);
-  await exitFullGraph(page);
+  await expandGraphDetails(page);
   await checkGraphLinks(page, module, lang);
 
   // Returning from the graph opens the same exercise and its localized detail.
   const matched = questionMap.get(conceptMap.get(module.id).related_questions[0]);
   await openQuestion(page, matched);
   await clickModule(page, '#questionDetail .question-graph-modules ', module);
-  await exitFullGraph(page);
+  await expandGraphDetails(page);
   await page.locator('.graph-related-exercises [data-question-id="' + matched.id + '"]').click();
   assert.equal((await page.locator('#questionDetail .detail-title').innerText()).trim(), title(matched, 'questions', lang));
   assert.equal(await page.locator('#questionList .question-item.active').getAttribute('data-question-id'), matched.id);

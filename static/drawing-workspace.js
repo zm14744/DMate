@@ -186,13 +186,18 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    // so the overlay's standalone inline palette placement cannot compete.
    const origin=body.getBoundingClientRect(),frame=viewport?.parentElement;
    const canvasBox=frame?.getBoundingClientRect()||origin,inset=18,controlsTop=canvasBox.top+inset;
+   const compactButtons=win.matchMedia('(max-width:600px)').matches;
    body.style.setProperty('--ddw-controls-right',Math.max(inset,origin.right-canvasBox.right+inset)+'px');
    body.style.setProperty('--ddw-controls-top',(controlsTop-origin.top)+'px');
+   if(compactButtons){
+    body.style.setProperty('--ddw-controls-left',(canvasBox.left-origin.left+inset)+'px');
+    body.style.setProperty('--ddw-tools-width',Math.max(1,(canvasBox.width-inset*2-12)/3)+'px');
+   }
    if(palette){const parent=palette.offsetParent?.getBoundingClientRect()||origin;
     body.style.setProperty('--ddw-tools-top',(controlsTop-parent.top)+'px');
     body.style.setProperty('--ddw-tools-left',(canvasBox.left+inset-parent.left)+'px');}
    const toolBox=palette?.querySelector(':scope > summary')?.getBoundingClientRect();
-   if(toolBox&&rail.getBoundingClientRect().left<toolBox.right+12)body.style.setProperty('--ddw-controls-top',(toolBox.bottom-origin.top+12)+'px');
+   if(!compactButtons&&toolBox&&rail.getBoundingClientRect().left<toolBox.right+12)body.style.setProperty('--ddw-controls-top',(toolBox.bottom-origin.top+12)+'px');
    const top=Math.max(rail.getBoundingClientRect().bottom,toolBox?.bottom||0)-origin.top+8;
    body.style.setProperty('--ddw-panel-top',top+'px');
    const propertyOrigin=editorHost.querySelector('.dge-workspace')?.getBoundingClientRect()||origin;

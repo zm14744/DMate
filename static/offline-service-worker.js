@@ -1,6 +1,6 @@
 "use strict";
-const CACHE_NAME = "dmate-offline-shell-v116";
-const PREVIOUS_CACHE_NAME = "dmate-offline-shell-v115";
+const CACHE_NAME = "dmate-offline-shell-v117";
+const PREVIOUS_CACHE_NAME = "dmate-offline-shell-v116";
 const CACHE_READY = "/__dmate_offline_ready__/"+CACHE_NAME;
 const PRECACHE = [
   "/static/appearance-bootstrap.js?v=3",
@@ -12,9 +12,9 @@ const PRECACHE = [
   "/static/icons/dmate-app-v52-48.png",
   "/static/icons/dmate-app-v52-192.png",
   "/static/icons/dmate-app-v52-180.png",
-  "/static/dmate-main.css?v=74",
+  "/static/dmate-main.css?v=75",
   "/static/graph-editor.css?v=27",
-  "/static/drawing-workspace.css?v=54",
+  "/static/drawing-workspace.css?v=55",
   "/static/modal-chrome.css",
   "/static/concept-notebook.css?v=6",
   "/static/ai-answer-renderer.css?v=22",
@@ -23,8 +23,8 @@ const PRECACHE = [
   "/static/appearance-panels.css",
   "/static/dmate-shared-overrides.css?v=24",
   "/static/button-themes.css?v=67",
-  "/static/offline-knowledge-graph.css?v=54",
-  "/static/knowledge-graph-sheet.css?v=1",
+  "/static/offline-knowledge-graph.css?v=55",
+  "/static/knowledge-graph-sheet.css?v=2",
   "/static/offline.css?v=69",
   "/static/search-controls.css?v=27",
   "/static/search-controls.js?v=27",
@@ -43,7 +43,7 @@ const PRECACHE = [
   "/static/delete-confirm.js",
   "/static/drawing-export.js?v=39",
   "/static/graph-editor.js?v=55",
-  "/static/drawing-workspace.js?v=61",
+  "/static/drawing-workspace.js?v=62",
   "/static/vendor/mathjax-3.2.2/es5/tex-svg.js",
   "/static/vendor/marked-15.0.12/marked.umd.js",
   "/static/vendor/dompurify-3.2.6/purify.min.js",
@@ -54,11 +54,11 @@ const PRECACHE = [
   "/static/language-knowledge.js",
   "/static/language.js?v=59",
   "/static/knowledge-graph-labels.js?v=21",
-  "/static/knowledge-graph-sheet.js?v=1",
+  "/static/knowledge-graph-sheet.js?v=2",
   "/static/offline-appearance.js?v=12",
   "/static/offline-privacy-motion.js?v=4",
   "/static/offline-shell.js?v=42",
-  "/static/offline-knowledge-graph.js?v=65",
+  "/static/offline-knowledge-graph.js?v=66",
   "/static/offline-vault.js?v=2",
   "/static/offline-handoff.js?v=1",
   "/static/offline-storage.js?v=4",

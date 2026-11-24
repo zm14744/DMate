@@ -4,6 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const {pinchGraph, expandGraphDetails} = require('./knowledge-graph-touch-fixtures.cjs');
 const {installStorageProbe, records, revealInterface} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const panels = ['graph', 'concepts', 'questions', 'mistakes', 'notes', 'drawing'];
@@ -600,9 +601,7 @@ async function curriculum(page) {
     await page.locator('#graphPanel').waitFor({state:'visible'});
     await page.waitForFunction(id => document.querySelector('#knowledgeGraphModal .selected[data-node-id]')?.dataset.nodeId === id, topic.id);
     assert.equal(await page.locator('#knowledgeGraphCategory').inputValue(), topic.category);
-    if (await page.locator('#knowledgeGraphModal').evaluate(node => node.classList.contains('graph-fullscreen-view'))) {
-      await page.locator('#knowledgeGraphModal .kg-mobile-expand').click();
-    }
+    assert.equal(await page.locator('#knowledgeGraphModal').evaluate(node => node.parentElement.id), 'graphPanel');
   }
 }
 
@@ -617,7 +616,6 @@ async function graph(page) {
     await page.locator('#mobileChoiceModal').getByRole('radio', {name:'全部模块', exact:true}).click();
   }
   const mobile = await page.evaluate(() => matchMedia('(max-width:760px)').matches);
-  if (mobile) await host.locator('.kg-mobile-expand').click();
   const nodeSelector = mobile ? '.kg-mobile-node' : 'svg .kg-node-group';
   const edgeSelector = mobile ? '.kg-mobile-edge' : 'svg .kg-edge';
   assert.ok(await host.locator(nodeSelector + '[data-node-id]').count() > 20, 'Graph renders the real course nodes');
@@ -639,12 +637,21 @@ async function graph(page) {
   assert.equal(await host.locator(nodeSelector + '.selected').getAttribute('data-node-id'), nodeId);
   const viewport = host.locator('.offline-graph-canvas');
   const original = await viewport.evaluate(node => Number(node.dataset.scale));
-  await host.locator(mobile ? '.kg-mobile-zoom-btn' : '#knowledgeGraphDesktopZoomIn').last().click();
-  assert.ok(await viewport.evaluate(node => Number(node.dataset.scale)) > original);
-  await host.locator(mobile ? '.kg-mobile-zoom-fit' : '#knowledgeGraphDesktopZoomFit').click();
-  const restored = await viewport.evaluate(node => Number(node.dataset.scale));
-  assert.ok(Math.abs(restored - original) < .001, 'Fit restores graph scale');
-  if (mobile) await host.locator('.kg-mobile-expand').click();
+  if (mobile) {
+    assert.equal(await host.locator('.kg-mobile-expand,.kg-mobile-zoom-controls,.kg-mobile-zoom-label').count(), 0);
+    await pinchGraph(page, 1.4);
+    const enlarged = await viewport.evaluate(node => Number(node.dataset.scale));
+    assert.ok(enlarged > original, 'Spreading two fingers zooms the embedded graph');
+    await pinchGraph(page, 1 / 1.4);
+    assert.ok(await viewport.evaluate(node => Number(node.dataset.scale)) < enlarged, 'Pinching inward reduces the graph scale');
+    await expandGraphDetails(page);
+  } else {
+    await host.locator('#knowledgeGraphDesktopZoomIn').click();
+    assert.ok(await viewport.evaluate(node => Number(node.dataset.scale)) > original);
+    await host.locator('#knowledgeGraphDesktopZoomFit').click();
+    const restored = await viewport.evaluate(node => Number(node.dataset.scale));
+    assert.ok(Math.abs(restored - original) < .001, 'Fit restores graph scale');
+  }
   const learning = host.locator('.offline-graph-learning-links');
   assert.equal(await learning.locator('.graph-parent-concept').getByRole('heading', {name:'总概念', exact:true}).count(), 1);
   assert.equal(await learning.getByRole('button', {name:'查看概念', exact:true}).count(), 0);

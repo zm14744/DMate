@@ -4,6 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const { expandGraphDetails } = require('./knowledge-graph-touch-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const cards = '#knowledgeGraphHistory .kg-history-item';
 
@@ -15,7 +16,6 @@ async function openHistory(page) {
   await page.evaluate(async () => {
     if (document.getElementById('knowledgeGraphModal').classList.contains('hidden')) await openKnowledgeGraph();
     selectKnowledgeGraphDisplayMode('history');
-    setKnowledgeGraphFullscreenView(false);
   });
   await page.locator('#knowledgeGraphHistoryWrap').waitFor({state:'visible'});
   await settle(page);
@@ -38,6 +38,7 @@ async function fullHasNoHistory(page,label,recentAvailable=true) {
   await settle(page);
   await assertModeControls(page,'full',label,recentAvailable);
   assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),false,label+': full mode has no sidebar mode tabs');
+  await expandGraphDetails(page);
   assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),true,label+': full mode shows only node details');
   assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(),false,label+': full mode does not show the history list');
   assert.equal(await page.locator(cards).count(),0,label+': full mode does not leave hidden history cards behind');
@@ -49,6 +50,7 @@ async function recentHasNoHistory(page, label) {
   await settle(page);
   await assertModeControls(page,'focus',label);
   assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),false,label+': recent mode has no sidebar mode tabs');
+  await expandGraphDetails(page);
   assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),true,label+': recent mode shows node details');
   assert.equal(await page.locator('#knowledgeGraphHistoryTab').isVisible(), false, label + ': recent mode hides the history entry');
   assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(), false, label + ': recent mode hides history content');
@@ -139,11 +141,11 @@ async function checkCase(browser,width,language) {
     await assertModeControls(page,'history',label+'/history list');
     assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),true,label+': only history mode exposes detail/history tabs');
     if (mobile) {
-      const positions=await page.evaluate(()=>({
-        emptyBottom:document.querySelector('#knowledgeGraphCanvas > .kg-empty').getBoundingClientRect().bottom,
-        tabsTop:document.getElementById('knowledgeGraphSideTabs').getBoundingClientRect().top
+      const reachable = await page.locator('#knowledgeGraphSideTabs button').evaluateAll(buttons => buttons.every(button => {
+        const rect = button.getBoundingClientRect();
+        return button.contains(document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2));
       }));
-      assert.ok(positions.emptyBottom <= positions.tabsTop,label+': the graph empty state does not cover the tabs');
+      assert.ok(reachable, label + ': the graph empty state does not cover the tabs');
     }
     assert.equal(await page.locator(cards+' .kg-history-points').count(),0,label+': history previews omit topic subtitles');
     assert.equal(await page.locator('#knowledgeGraphCanvas').innerText(),language==='en'?'None':'无',
@@ -177,6 +179,7 @@ async function checkCase(browser,width,language) {
     await page.waitForFunction(()=>knowledgeGraphViewMode==='history'&&knowledgeGraphScope==='history'&&knowledgeGraphSelectedNodeId==='logic_equivalence');
     assert.equal(await page.evaluate(()=>currentId),'history-lower',label+': graph navigation does not switch the conversation');
     await assertModeControls(page,'history',label+'/historical detail');
+    await expandGraphDetails(page);
     assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),true,label+': selecting a past graph opens historical node details');
     assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(),false,label+': the historical list yields to its selected details');
     assert.equal(await page.locator('#knowledgeGraphLocateOriginal').count(),0,label+': historical node details have no recent-only source locator');
@@ -190,6 +193,8 @@ async function checkCase(browser,width,language) {
     await page.locator('#knowledgeGraphHistoryTab').click();
     assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(),true,label+': the history sidebar tab returns to the list without changing top-level mode');
     await assertModeControls(page,'history',label+'/return to historical list');
+    await page.locator('#knowledgeGraphDetailTab').click();
+    assert.equal(await page.locator('#knowledgeGraphDetailTitle').isVisible(),true,label+': revisiting details shows the selected node title');
     await recentHasNoHistory(page,label);
     assert.equal(await page.evaluate(()=>getCurrent().id),'history-lower',label+': recent mode still uses the actual current conversation');
     assert.equal(await snapshot(),fixture.snapshot,label+': graph/side-mode navigation does not rewrite questions');
@@ -261,7 +266,7 @@ async function checkModeTransitions(browser,width) {
     await page.locator('#sessions>.session[data-session-id="'+id+'"] [data-session-name]').evaluate(node=>node.click());
     await page.waitForFunction(id=>String(currentId)===id,id);
     assert.equal(await page.evaluate(()=>String(getCurrent().id)),id,label+': the real sidebar handler selects '+id);
-    await page.evaluate(async()=>{await openKnowledgeGraph();setKnowledgeGraphFullscreenView(false);});
+    await page.evaluate(() => openKnowledgeGraph());
     await settle(page);
   };
   const enterHome=async()=>{
@@ -283,6 +288,7 @@ async function checkModeTransitions(browser,width) {
     });
     await page.evaluate(async()=>openKnowledgeGraph());
     await recentHasNoHistory(page,label+'/recent');
+    await expandGraphDetails(page);
     assert.equal(await page.locator('#knowledgeGraphLocateOriginal').isVisible(),true,label+': recent details retain source navigation');
     await switchConversation('history-top');
     await assertModeControls(page,'focus',label+'/switch nonempty while recent');
@@ -294,6 +300,7 @@ async function checkModeTransitions(browser,width) {
     await page.evaluate(async()=>openKnowledgeGraph());
     await assertModeControls(page,'history',label+'/reopen historical detail');
     assert.equal(await page.evaluate(()=>knowledgeGraphQuestionReference.messageId),subject,label+': reopening preserves the selected historical question');
+    await expandGraphDetails(page);
     assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),true,label+': reopening preserves the historical detail pane');
     await switchConversation('history-lower');
     await assertModeControls(page,'history',label+'/switch nonempty while history');

@@ -4,6 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const { expandGraphDetails } = require('./knowledge-graph-touch-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const locate = '#knowledgeGraphLocateOriginal';
 
@@ -14,7 +15,6 @@ async function openGraph(page, mode) {
   await page.evaluate(async mode => {
     if (document.getElementById('knowledgeGraphModal').classList.contains('hidden')) await openKnowledgeGraph();
     selectKnowledgeGraphDisplayMode(mode);
-    setKnowledgeGraphFullscreenView(false);
   }, mode);
   await settle(page);
 }
@@ -34,8 +34,7 @@ async function snapshot(page) {
     };
   });
 }
-async function assertLiveGraph(page, width, expected, label) {
-  if (width <= 760 && !await page.locator('.kg-mobile-viewport').count()) await page.locator('.kg-mobile-expand').click();
+async function assertLiveGraph(page, expected, label) {
   await settle(page);
   const drawn = await page.evaluate(() => {
     const canvas = document.getElementById('knowledgeGraphCanvas');
@@ -50,7 +49,6 @@ async function assertLiveGraph(page, width, expected, label) {
   assert.deepEqual(drawn.ids,expected.ids,label+': real graph renders every involved cross-module node');
   assert.deepEqual(drawn.purple,expected.purple,label+': real graph retains purple question concepts');
   assert.equal(drawn.edges,expected.edges.length,label+': rendered links match the real knowledge relationships');
-  if (width <= 760) await page.locator('.kg-mobile-expand').click();
 }
 async function assertExports(page, expected, label) {
   const result = await page.evaluate(async () => {
@@ -79,7 +77,7 @@ async function assertExports(page, expected, label) {
     label + ': redundant related-question detail pill is absent');
   assert.equal(await page.locator('#knowledgeGraphDetail').getByText(/^(本题相关|Related to this question|Related to the selected question)$/).count(), 0);
 }
-async function assertLocateBesideTitle(page, label) {
+async function assertLocatePlacement(page, label) {
   await settle(page);
   const layout = await page.evaluate(() => {
     const title = document.getElementById('knowledgeGraphDetailTitle');
@@ -88,16 +86,20 @@ async function assertLocateBesideTitle(page, label) {
     range.selectNodeContents(title);
     const text = range.getBoundingClientRect(), action = button.getBoundingClientRect();
     const pane = title.closest('.knowledge-graph-side').getBoundingClientRect();
-    return { text:{left:text.left,right:text.right,center:text.top+text.height/2},
-      action:{left:action.left,right:action.right,center:action.top+action.height/2},
+    return { text:{left:text.left,right:text.right,bottom:text.bottom,center:text.top+text.height/2},
+      action:{left:action.left,right:action.right,top:action.top,center:action.top+action.height/2},
       pane:{left:pane.left,right:pane.right} };
   });
-  assert.ok(layout.action.left >= layout.text.right + 4,
-    label + ': Go to original question is to the right of the concept title without overlap');
-  assert.ok(Math.abs(layout.text.center - layout.action.center) <= 3,
-    label + ': concept title and source action share one vertically centered header row');
+  if (page.viewportSize().width <= 760) {
+    assert.ok(layout.action.top >= layout.text.bottom, label + ': the sheet places the source action below the title');
+  } else {
+    assert.ok(layout.action.left >= layout.text.right + 4,
+      label + ': Go to original question is to the right of the concept title without overlap');
+    assert.ok(Math.abs(layout.text.center - layout.action.center) <= 3,
+      label + ': concept title and source action share one vertically centered header row');
+  }
   assert.ok(layout.text.left >= layout.pane.left && layout.action.right <= layout.pane.right - 4,
-    label + ': the title/action row fits inside the detail pane');
+    label + ': the title and source action fit inside the detail pane');
 }
 async function newPage(browser, width, language) {
   const context = await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',
@@ -187,10 +189,11 @@ async function checkView(browser, width, language) {
     for(const id of ['function_mapping','relation_cartesian','relation_equivalence','relation_closure','graph_tree'])
       assert.equal(recent.ids.includes(id),false,label+': an unrelated module branch is not dumped into the question graph');
     assert.deepEqual(recent.purple,['count_inclusion','function_composition','set_operation'],label+': all involved question concepts remain purple');
-    await assertLiveGraph(page,width,recent,label+'/recent');
+    await assertLiveGraph(page,recent,label+'/recent');
     await assertExports(page,recent,label+'/recent');
+    await expandGraphDetails(page);
     assert.equal(await page.locator(locate).isVisible(),true,label+': recent details provide Go to original question');
-    await assertLocateBesideTitle(page,label+'/recent');
+    await assertLocatePlacement(page,label+'/recent');
     assert.equal(await page.locator('#knowledgeGraphHistoryTab').isVisible(),false);
     await page.locator(locate).click();
     await page.locator('#chat [data-message-index="0"].history-locate-flash').waitFor();
@@ -204,7 +207,7 @@ async function checkView(browser, width, language) {
     assert.deepEqual(historic,recent,label+': selected history question uses exactly the recent graph presentation');
     assert.equal(await page.evaluate(()=>currentId),'current-conversation',label+': historical graph viewing leaves the current conversation intact');
     assert.equal(await page.evaluate(()=>document.getElementById('knowledgeGraphModal').dataset.graphView),'history',label+': historical question graph uses its independent cross-module presentation');
-    await assertLiveGraph(page,width,historic,label+'/history');
+    await assertLiveGraph(page,historic,label+'/history');
     await assertExports(page,historic,label+'/history');
     assert.equal(await page.locator(locate).isVisible(),false,label+': historical details omit the recent-only source locator');
     assert.equal(await page.evaluate(()=>knowledgeGraphViewMode),'history',label+': a selected historical graph stays in the independent history mode');
@@ -212,6 +215,7 @@ async function checkView(browser, width, language) {
     assert.equal(await page.evaluate(()=>JSON.stringify(sessions)),original,label+': graph/export preserve grouped OCR tokens, member flags, text and metadata');
     assert.equal(await page.locator('#knowledgeGraphDetail .graph-detail-term[data-knowledge-node-id="relation_cartesian"]').count(),0,
       label+': details do not leak a static course successor into the question graph');
+    await expandGraphDetails(page);
     await page.locator('#knowledgeGraphDetail .graph-detail-term[data-knowledge-node-id="function_composition"]').click();
     await settle(page);
     const plain=await snapshot(page);
@@ -224,7 +228,6 @@ async function checkView(browser, width, language) {
     assert.equal(await page.evaluate(()=>knowledgeGraphSelectedNodeId),'function_composition');
     await openHistory(page);
     await page.locator('.kg-history-item[data-message-id="past-group"] [data-history-action="graph"]').click();
-    if(width<=760&&await page.locator('.kg-mobile-viewport').count())await page.locator('.kg-mobile-expand').click();
     await page.evaluate(()=>{
       const session=sessions.find(session=>session.id==='past-conversation');
       session.messages.push(session.messages.shift()); renderKnowledgeGraph();
@@ -302,7 +305,7 @@ async function checkReferenceGuards(browser) {
     while(pending.length)for(const id of adjacent.get(pending.shift()))if(!reachable.has(id)){reachable.add(id);pending.push(id);}
     assert.ok(independent.ids.includes('logic_equivalence'),'independent involved concepts are still shown');
     assert.equal(reachable.has('logic_equivalence'),false,'unrelated course branches are not forced together with invented relationships');
-    await assertLiveGraph(page,1440,independent,'independent concepts');
+    await assertLiveGraph(page,independent,'independent concepts');
     assert.deepEqual(modelCalls,[]); assert.deepEqual(errors,[]);
     console.log('PASS question references: previous-question pointer, independent involved concepts and stale edit/owner guards');
   } finally {await context.close();}
@@ -396,7 +399,7 @@ async function checkQuestionSpecificTopology(browser, width) {
       assert.deepEqual(graph.ids,expected.ids,width+'/case'+index+': only this question’s evidenced nodes appear');
       assert.deepEqual(graph.purple,expected.purple,width+'/case'+index+': every involved module is purple');
       assert.deepEqual(graph.edges,expected.edges,width+'/case'+index+': dependencies belong to this question rather than the course');
-      await assertLiveGraph(page,width,expected,width+'/case'+index);
+      await assertLiveGraph(page,expected,width+'/case'+index);
       for (const id of item.nodes) {
         await page.evaluate(id=>selectKnowledgeGraphNode(id),id);
         const relations=await page.locator('#knowledgeGraphDetail .graph-detail-field').evaluateAll(fields=>fields.slice(0,2)
@@ -427,7 +430,7 @@ async function checkRegisteredLegacySnapshot(browser) {
     await openGraph(page,'focus');
     const expected={ids:['count_perm_comb'],purple:['count_perm_comb'],edges:[],categories:['计数与组合']};
     assert.deepEqual(await snapshot(page),expected,'already recognized implicit knowledge displays without inferring it again');
-    await assertLiveGraph(page,1440,expected,'registered legacy');
+    await assertLiveGraph(page,expected,'registered legacy');
     await openGraph(page,'full');await openGraph(page,'focus');
     await page.evaluate(()=>{closeKnowledgeGraph();saveState();if(!loadState({guest:true}))throw Error('No saved snapshot');renderAll();});
     await openGraph(page,'focus');
@@ -610,7 +613,7 @@ async function checkCompletedAnswerReusesInlineGraph(browser) {
     await openGraph(page,'focus');
     assert.deepEqual(await snapshot(page),expected,'the completed answer graph is immediately available in the recent view');
     assert.equal(await page.evaluate(()=>getActiveKnowledgeContext().questionGraph.classification_status),'semantic');
-    await assertLiveGraph(page,1440,expected,'inline answer');
+    await assertLiveGraph(page,expected,'inline answer');
     await openHistory(page);
     await page.locator('.kg-history-item[data-message-id="inline-question"] [data-history-action="graph"]').click();
     assert.deepEqual(await snapshot(page),expected,'history uses the same already reviewed answer graph');

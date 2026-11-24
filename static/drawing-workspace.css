@@ -108,7 +108,28 @@ body[data-appearance-theme="light"] .ddw-editor .dge-tool-palette>summary:not([a
 .ddw-export-download{display:inline-block;border-radius:9px;padding:10px 20px;background:var(--accent,#3b82f6);color:white;text-decoration:none;flex-shrink:0}
 @media(max-width:760px){.graph-editor-dialog:has(.dmate-drawing-workspace),.dmate-drawing-workspace{--ddw-close-size:22px}}
 @media(max-width:600px){.ddw-header{gap:6px}.ddw-name{width:100%;padding:7px 10px}.ddw-page-actions{width:100%;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.ddw-page-actions>button{font-size:12px;padding:8px 10px;white-space:nowrap}.ddw-side-actions{gap:4px}.ddw-side-actions>button{font-size:12px;padding:7px 6px}.ddw-editor .dge-tool-palette>summary,.ddw-editor .dge-tool-palette[open]>summary{padding:7px 8px;font-size:12px}}
-@media(max-width:600px){.ddw-editor>.dge-topline{gap:4px}.ddw-editor>.dge-topline>.dge-clear-button{font-size:14px;padding:6px 8px}.ddw-editor .dge-view-controls{gap:2px}.ddw-editor .dge-view-controls>button{padding:5px 6px}}
+@media(max-width:600px){
+ .ddw-page-actions:has(>.ddw-upload-button){grid-template-columns:repeat(3,minmax(0,1fr))}
+ .ddw-page-actions>button{white-space:normal}
+ .dmate-drawing-workspace:lang(en){--ddw-mobile-control-height:48px}
+ .ddw-side-actions{left:var(--ddw-controls-left,18px);width:auto;max-width:none;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;pointer-events:none}
+ .ddw-side-actions>button{box-sizing:border-box;min-height:34px;line-height:1.4;padding:6px 4px;white-space:normal;pointer-events:auto}
+ .ddw-side-actions>button:nth-child(-n+2){min-height:var(--ddw-mobile-control-height,34px)}
+ .ddw-side-actions>button:nth-child(1){grid-column:3/span 2}
+ .ddw-side-actions>button:nth-child(2){grid-column:5/span 2}
+ .ddw-side-actions>button:nth-child(3){grid-column:1/span 3}
+ .ddw-side-actions>button:nth-child(4){grid-column:4/span 3}
+ .ddw-editor .dge-tool-palette{width:var(--ddw-tools-width,84px);max-width:none}
+ .ddw-editor .dge-tool-palette>summary,.ddw-editor .dge-tool-palette[open]>summary{box-sizing:border-box;min-height:var(--ddw-mobile-control-height,34px);width:100%;padding:6px 4px;display:flex;align-items:center;justify-content:center;white-space:normal}
+}
+@media(max-width:600px){
+ .ddw-editor>.dge-topline{gap:6px}
+ .ddw-editor>.dge-topline>.dge-history-arrow{width:36px;min-width:36px;height:36px;min-height:36px;padding:5px!important}
+ .ddw-editor>.dge-topline>.dge-clear-button{flex-shrink:0;white-space:nowrap;min-height:36px;font-size:14px;padding:6px 8px}
+ .ddw-editor .dge-view-controls{gap:2px}
+ .ddw-editor .dge-view-controls>button{padding:5px 4px}
+ .ddw-editor .dge-overlay-zoom{min-width:36px}
+}
 @media(max-width:900px){
  .ddw-side-panel,.ddw-editor .dge-float-content{width:min(300px,calc(100vw - 24px));padding:10px}
  .ddw-panel-header,.ddw-editor-panel-header{gap:8px;margin-bottom:8px}

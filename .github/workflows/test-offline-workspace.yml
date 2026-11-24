@@ -109,6 +109,7 @@ on:
       - 'scripts/test_library_detail_view_browser.cjs'
       - 'scripts/test_drawing_panels_browser.cjs'
       - 'scripts/test_responsive_graph_views_browser.cjs'
+      - 'scripts/knowledge-graph-touch-fixtures.cjs'
       - 'scripts/test_overlay_zoom_browser.cjs'
       - 'scripts/test_math_diagram_browser.cjs'
       - '.github/workflows/test-offline-workspace.yml'
@@ -220,6 +221,7 @@ on:
       - 'scripts/test_library_detail_view_browser.cjs'
       - 'scripts/test_drawing_panels_browser.cjs'
       - 'scripts/test_responsive_graph_views_browser.cjs'
+      - 'scripts/knowledge-graph-touch-fixtures.cjs'
       - 'scripts/test_overlay_zoom_browser.cjs'
       - 'scripts/test_math_diagram_browser.cjs'
       - '.github/workflows/test-offline-workspace.yml'
@@ -357,6 +359,7 @@ jobs:
           node --check scripts/test_library_detail_view_browser.cjs
           node --check scripts/test_drawing_panels_browser.cjs
           node --check scripts/test_responsive_graph_views_browser.cjs
+          node --check scripts/knowledge-graph-touch-fixtures.cjs
           node --check scripts/test_overlay_zoom_browser.cjs
           node --check scripts/test_math_diagram_browser.cjs
       - name: Test math startup, rendering queue and proof endings

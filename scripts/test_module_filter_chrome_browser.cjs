@@ -28,20 +28,12 @@ async function noOverflow(page) {
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Module controls do not create horizontal overflow');
 }
 
-async function inlineGraph(page) {
-  if (await page.locator('#knowledgeGraphModal').evaluate(modal => modal.classList.contains('graph-fullscreen-view'))) {
-    await page.locator('#knowledgeGraphModal .kg-mobile-expand').click();
-    await settle(page);
-  }
-}
-
 async function moduleLabel(page, value, english) {
   return value === '全部' ? english ? 'All modules' : '全部模块'
     : page.evaluate(value => window.DMateKnowledgeLanguage.label(value), value);
 }
 
 async function chooseModule(page, value, english = false) {
-  await inlineGraph(page);
   const select = page.locator('#knowledgeGraphCategory');
   if (mobile(page)) {
     await page.locator('#knowledgeGraphCategoryTrigger').tap();
@@ -58,13 +50,8 @@ async function chooseModule(page, value, english = false) {
   await settle(page);
   assert.equal(await select.inputValue(), value, 'Filtering keeps canonical category values');
   const expected = value === '全部' ? nodes : nodes.filter(node => node.category === value);
-  if (graphMobile(page)) {
-    await page.locator('#knowledgeGraphModal .kg-mobile-expand').click();
-    await page.waitForSelector('#knowledgeGraphCanvas .kg-mobile-node');
-  }
   assert.equal(await page.locator('#knowledgeGraphCanvas ' + (graphMobile(page) ? '.kg-mobile-node' : '.kg-node-group')).count(),
     expected.length, 'The chosen real module controls the displayed graph');
-  await inlineGraph(page);
   assert.equal(await select.evaluate(select => select.selectedOptions[0].label), await moduleLabel(page, value, english));
   if (mobile(page)) assert.equal((await page.locator('#knowledgeGraphCategoryTrigger').innerText()).trim(), await moduleLabel(page, value, english));
 }

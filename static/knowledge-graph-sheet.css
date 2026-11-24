@@ -1,7 +1,7 @@
-/* Mobile node details float over the existing graph; its camera and viewport
-   keep their dimensions while the sheet opens, expands or follows a drag. */
+/* Mobile graphs use the existing viewport directly. Details and history float
+   over it without resizing the graph as they open, expand or follow a drag. */
 @media (max-width:760px) {
-    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] {
+    body #knowledgeGraphModal.graph-fullscreen-view {
         --kg-sheet-peek-height:80px;
         --kg-sheet-expanded-height:min(480px, 52dvh);
         --kg-sheet-rest-height:var(--kg-sheet-peek-height);
@@ -11,15 +11,44 @@
         --kg-sheet-motion:220ms cubic-bezier(.2, .65, .3, 1);
     }
 
+    body #knowledgeGraphModal.graph-fullscreen-view .graph-toolbar {
+        flex-wrap:wrap;
+        align-items:stretch;
+    }
+
+    body #knowledgeGraphModal.graph-fullscreen-view .graph-toolbar > #knowledgeGraphSideTabs:not([hidden]) {
+        display:flex !important;
+        flex:0 0 100%;
+        width:100%;
+        margin:0;
+        padding:0;
+    }
+
+    body #knowledgeGraphModal.graph-fullscreen-view .graph-toolbar > #knowledgeGraphSideTabs .graph-side-tab {
+        min-height:36px;
+        padding:6px 10px;
+        font-size:13px;
+        line-height:1.3;
+    }
+
+    body #knowledgeGraphModal.graph-fullscreen-view .kg-mobile-viewport {
+        padding-bottom:96px !important;
+        scroll-padding-bottom:96px;
+    }
+
     body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet="expanded"] {
         --kg-sheet-rest-height:var(--kg-sheet-expanded-height);
     }
 
-    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] .knowledge-graph-layout {
+    body #knowledgeGraphModal.graph-fullscreen-view:has(#knowledgeGraphHistoryWrap:not([hidden]):not(.hidden)) {
+        --kg-sheet-rest-height:var(--kg-sheet-expanded-height);
+    }
+
+    body #knowledgeGraphModal.graph-fullscreen-view .knowledge-graph-layout {
         position:relative;
     }
 
-    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] .knowledge-graph-side {
+    body #knowledgeGraphModal.graph-fullscreen-view:is([data-kg-sheet], :has(#knowledgeGraphHistoryWrap:not([hidden]):not(.hidden))) .knowledge-graph-side {
         position:absolute;
         z-index:1005;
         inset:auto 10px var(--kg-sheet-bottom);
@@ -30,7 +59,7 @@
         height:var(--kg-sheet-height) !important;
         min-width:0;
         min-height:0 !important;
-        max-height:var(--kg-sheet-max-height) !important;
+        max-height:min(var(--kg-sheet-max-height), calc(100% - 16px - env(safe-area-inset-bottom))) !important;
         overflow:hidden !important;
         border:1px solid var(--border-strong);
         border-radius:18px;
@@ -42,9 +71,34 @@
         isolation:isolate;
     }
 
-    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] #knowledgeGraphSideTabs,
-    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] #knowledgeGraphHistoryWrap {
+    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] .knowledge-graph-side > #knowledgeGraphSideTabs {
         display:none !important;
+    }
+
+    body #knowledgeGraphModal.graph-fullscreen-view:has(#knowledgeGraphHistoryWrap:not([hidden]):not(.hidden)) #knowledgeGraphDetailWrap {
+        display:none !important;
+    }
+
+    body #knowledgeGraphModal.graph-fullscreen-view #knowledgeGraphHistoryWrap:not([hidden]):not(.hidden) {
+        display:flex !important;
+        flex:1 1 0 !important;
+        min-width:0;
+        min-height:0 !important;
+        height:100% !important;
+        max-height:none !important;
+        overflow:hidden !important;
+    }
+
+    body #knowledgeGraphModal.graph-fullscreen-view #knowledgeGraphHistoryWrap:not([hidden]):not(.hidden) > #knowledgeGraphHistory {
+        flex:1 1 0;
+        min-width:0;
+        min-height:0 !important;
+        height:auto !important;
+        max-height:none !important;
+        overflow:auto !important;
+        overscroll-behavior:contain;
+        touch-action:pan-y;
+        -webkit-overflow-scrolling:touch;
     }
 
     body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] #knowledgeGraphDetailWrap:not([hidden]) {
@@ -141,13 +195,7 @@
         text-overflow:ellipsis;
     }
 
-    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] .kg-mobile-zoom-controls {
-        bottom:calc(var(--kg-sheet-bottom) + var(--kg-sheet-height) + 10px);
-        transition:bottom var(--kg-sheet-motion);
-    }
-
-    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet-dragging] .knowledge-graph-side,
-    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet-dragging] .kg-mobile-zoom-controls {
+    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet-dragging] .knowledge-graph-side {
         transition:none !important;
     }
 
@@ -162,7 +210,7 @@
     @layer dmate-panel-surfaces {
         /* The side was a transparent structural wrapper before becoming a
            floating sheet. Give this surface its own existing panel paint. */
-        body[data-appearance-theme] #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] .knowledge-graph-side {
+        body[data-appearance-theme] #knowledgeGraphModal.graph-fullscreen-view:is([data-kg-sheet], :has(#knowledgeGraphHistoryWrap:not([hidden]):not(.hidden))) .knowledge-graph-side {
             background-color:var(--dm-frost-panel-strong, var(--surface-2)) !important;
             background-image:none !important;
         }
@@ -196,7 +244,7 @@
 }
 
 @media (max-width:760px) and (prefers-reduced-motion:reduce) {
-    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] :is(.knowledge-graph-side, .kg-mobile-zoom-controls, .kg-sheet-handle) {
+    body #knowledgeGraphModal.graph-fullscreen-view :is(.knowledge-graph-side, .kg-sheet-handle) {
         transition:none !important;
         animation:none !important;
     }

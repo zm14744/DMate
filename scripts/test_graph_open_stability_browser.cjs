@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { installStorageProbe, revealInterface, row } = require('./offline-vault-browser-fixtures.cjs');
 const { writeFileSync } = require('node:fs');
 const { chromium } = require('playwright');
+const { pinchGraph } = require('./knowledge-graph-touch-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 let lastTrace = null;
 const mobile = page => page.viewportSize().width <= 760;
@@ -36,15 +37,13 @@ function installFrameProbe() {
     const viewport = canvas?.querySelector('.kg-mobile-viewport,.kg-desktop-viewport');
     const nodeList = [...(canvas?.querySelectorAll('.kg-mobile-node,.kg-node-group') || [])];
     const selected = nodeList.find(node => node.classList.contains('selected')) || nodeList[0];
-    const label = modal?.querySelector(viewport?.classList.contains('kg-mobile-viewport')
-      ? '.kg-mobile-zoom-label' : '#knowledgeGraphDesktopZoomLabel');
+    const label = modal?.querySelector('#knowledgeGraphDesktopZoomLabel');
     const loading = shown ? [...modal.querySelectorAll('.kg-empty,.wrong-empty,.offline-loading,[role="status"]')]
       .filter(visible).map(node => node.textContent.trim()).filter(text => /准备中|加载中|正在加载|preparing|loading/i.test(text)) : [];
-    return { shown, fullscreen: Boolean(modal?.classList.contains('graph-fullscreen-view')),
+    return { shown,
       mode: modal?.dataset.graphView || '', ready: modal?.dataset.graphReady || '',
       modal: shown ? rect(modal) : null, card: shown ? rect(card) : null,
       canvas: shown ? rect(canvas) : null, loading,
-      entry: shown && visible(canvas?.querySelector('.kg-mobile-expand')) ? rect(canvas.querySelector('.kg-mobile-expand')) : null,
       nodeCount: nodeList.length, viewportShown: shown && visible(viewport),
       viewport: shown && visible(viewport) ? rect(viewport) : null,
       scale: viewport?._kgScale || Number(viewport?.querySelector('.kg-desktop-zoom-surface')?.dataset.scale) || 0,
@@ -80,12 +79,11 @@ function sameRect(actual, expected, label) {
 
 const relative = (box, origin) => box && origin ? [box[0] - origin[0], box[1] - origin[1], box[2], box[3]] : null;
 
-function stableTrace(trace, label, { fullscreen = false, mode = 'full', nodes = null, graph = true } = {}) {
+function stableTrace(trace, label, { mode = 'full', nodes = null } = {}) {
   lastTrace = { label, trace };
   assert.ok(trace.length >= 12, label + ': sampled multiple painted frames');
   for (const sample of trace) assert.deepEqual(sample.loading, [], label + ': no visible preparation/loading page');
-  const matching = trace.filter(sample => sample.shown && sample.fullscreen === fullscreen
-    && sample.mode === mode && (nodes === null || sample.nodeCount === nodes));
+  const matching = trace.filter(sample => sample.shown && sample.mode === mode && (nodes === null || sample.nodeCount === nodes));
   assert.ok(matching.length >= 8, label + ': expected graph presentation became visible');
   const last = matching.at(-1);
   for (const sample of matching) {
@@ -94,32 +92,26 @@ function stableTrace(trace, label, { fullscreen = false, mode = 'full', nodes = 
     sameRect(relative(sample.canvas, sample.card), relative(last.canvas, last.card), label + ': stable canvas layout');
     if (sample.zoomLabel !== null) assert.equal(sample.zoomLabel, last.zoomLabel, label + ': no visible provisional zoom percentage');
   }
-  if (graph) {
-    const shown = matching.filter(sample => sample.viewportShown);
-    assert.ok(shown.length >= 8 && last.viewportShown, label + ': graph viewport was actually visible');
-    for (const sample of shown) {
-      near(sample.scale, last.scale, label + ': first visible scale matches settled scale', .0001);
-      assert.equal(sample.selectedId, last.selectedId, label + ': selection stays stable');
-      sameRect(relative(sample.viewport, sample.card), relative(last.viewport, last.card), label + ': stable viewport layout');
-      for (const key of ['selected', 'first']) sameRect(relative(sample[key], sample.viewport),
-        relative(last[key], last.viewport), label + ': stable ' + key + ' inside viewport');
-      sample.scroll.forEach((value, index) => near(value, last.scroll[index], label + ': no late camera scroll/' + index, 2));
-    }
-  } else {
-    assert.ok(last.entry, label + ': mobile complete-view entry exists');
-    for (const sample of matching) sameRect(relative(sample.entry, sample.card), relative(last.entry, last.card), label + ': stable complete-view entry');
+  const shown = matching.filter(sample => sample.viewportShown);
+  assert.ok(shown.length >= 8 && last.viewportShown, label + ': graph viewport was actually visible');
+  for (const sample of shown) {
+    near(sample.scale, last.scale, label + ': first visible scale matches settled scale', .0001);
+    assert.equal(sample.selectedId, last.selectedId, label + ': selection stays stable');
+    sameRect(relative(sample.viewport, sample.card), relative(last.viewport, last.card), label + ': stable viewport layout');
+    for (const key of ['selected', 'first']) sameRect(relative(sample[key], sample.viewport),
+      relative(last[key], last.viewport), label + ': stable ' + key + ' inside viewport');
+    sample.scroll.forEach((value, index) => near(value, last.scroll[index], label + ': no late camera scroll/' + index, 2));
   }
   return last;
 }
 
-async function ready(page, graph = true) {
-  await page.waitForFunction(graph => {
+async function ready(page) {
+  await page.waitForFunction(() => {
     const modal = document.getElementById('knowledgeGraphModal');
     if (!modal || modal.classList.contains('hidden') || modal.dataset.graphReady !== 'true') return false;
-    if (!graph) return Boolean(modal.querySelector('.kg-mobile-expand'));
     const view = modal.querySelector('.kg-mobile-viewport,.kg-desktop-viewport');
     return view?.dataset.kgReady === 'true' && getComputedStyle(view).visibility !== 'hidden';
-  }, graph);
+  });
 }
 
 async function fixture(browser, width, offline = false) {
@@ -161,19 +153,9 @@ async function gatedData(page) {
   });
 }
 
-async function fullView(page, label, nodes = null) {
-  if (!mobile(page)) return;
-  const fullscreen = await page.locator('#knowledgeGraphModal').evaluate(modal => modal.classList.contains('graph-fullscreen-view'));
-  if (!fullscreen) {
-    await start(page); await page.locator('.kg-mobile-expand').click();
-    await ready(page); await frames(page);
-    stableTrace(await stop(page), label, { fullscreen: true, nodes });
-  }
-}
-
 async function customize(page) {
-  const plus = page.locator(mobile(page) ? '.kg-mobile-zoom-btn' : '#knowledgeGraphDesktopZoomIn');
-  for (let index = 0; index < 4; index++) await (mobile(page) ? plus.last() : plus).click();
+  if (mobile(page)) await pinchGraph(page, 2);
+  else for (let index = 0; index < 4; index++) await page.locator('#knowledgeGraphDesktopZoomIn').click();
   await page.locator(viewportSelector(page)).evaluate(view => { view.scrollLeft = 65; view.scrollTop = 120; });
   await frames(page, 4);
   return snapshot(page);
@@ -193,38 +175,36 @@ async function onlineCase(browser, width) {
     await frames(page, 18);
     assert.equal((await snapshot(page)).shown, false, 'Cold data preparation keeps the previous page visible');
     await page.evaluate(() => releaseGraphData());
-    await ready(page, !mobile(page)); await frames(page);
+    await ready(page); await frames(page);
     const initialCount = await page.evaluate(() => knowledgeGraphData.nodes.length);
     stableTrace(await stop(page), 'online/' + width + '/cold all knowledge',
-      { nodes: mobile(page) ? 0 : initialCount, graph: !mobile(page) });
+      { nodes: initialCount });
     assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(), false,
       'The initial all-knowledge graph has only node details');
     await page.evaluate(() => restoreGraphData());
 
     await start(page); await page.locator('#knowledgeGraphScopeBtn').click();
-    await ready(page, !mobile(page)); await frames(page);
-    stableTrace(await stop(page), 'online/' + width + '/recent question', { mode: 'focus', nodes: mobile(page) ? 0 : 1, graph: !mobile(page) });
+    await ready(page); await frames(page);
+    stableTrace(await stop(page), 'online/' + width + '/recent question', { mode: 'focus', nodes: 1 });
     await page.evaluate(() => closeKnowledgeGraph());
     await gatedData(page); await start(page);
     await page.evaluate(() => { void openKnowledgeGraph(); });
     await frames(page, 18);
     assert.equal((await snapshot(page)).shown, false, 'Cold recent data preparation keeps the previous page visible');
     await page.evaluate(() => releaseGraphData());
-    await ready(page, !mobile(page)); await frames(page);
-    stableTrace(await stop(page), 'online/' + width + '/cold focus', { mode: 'focus', graph: !mobile(page) });
+    await ready(page); await frames(page);
+    stableTrace(await stop(page), 'online/' + width + '/cold focus', { mode: 'focus' });
     await page.evaluate(() => restoreGraphData());
 
     await start(page); await page.locator('#knowledgeGraphFocusBtn').click();
     const count = await page.evaluate(() => knowledgeGraphData.nodes.length);
-    await ready(page, !mobile(page)); await frames(page);
-    stableTrace(await stop(page), 'online/' + width + '/all knowledge', { nodes: mobile(page) ? 0 : count, graph: !mobile(page) });
-    await fullView(page, 'online/' + width + '/first complete view', count);
+    await ready(page); await frames(page);
+    stableTrace(await stop(page), 'online/' + width + '/all knowledge', { nodes: count });
     const saved = await customize(page);
     await page.evaluate(() => closeKnowledgeGraph());
     await start(page); await page.evaluate(() => { void openKnowledgeGraph(); });
-    await ready(page, !mobile(page)); await frames(page);
-    stableTrace(await stop(page), 'online/' + width + '/cached reopen', { nodes: mobile(page) ? 0 : count, graph: !mobile(page) });
-    await fullView(page, 'online/' + width + '/remembered complete view', count);
+    await ready(page); await frames(page);
+    stableTrace(await stop(page), 'online/' + width + '/cached reopen', { nodes: count });
     remembered(await snapshot(page), saved, 'online/' + width);
 
     await page.evaluate(() => closeKnowledgeGraph());
@@ -251,33 +231,28 @@ async function offlineNavigation(page, name, measure) {
 async function offlineCase(browser, width) {
   const { page, context, errors, modelCalls } = await fixture(browser, width, true);
   try {
-    await ready(page, !mobile(page)); await frames(page);
-    stableTrace(await stop(page), 'offline/' + width + '/cold document first paint', { graph: !mobile(page) });
+    await ready(page); await frames(page);
+    stableTrace(await stop(page), 'offline/' + width + '/cold document first paint');
     await offlineNavigation(page, 'graph', true);
-    await ready(page, !mobile(page)); await frames(page);
-    const count = mobile(page) ? null : await page.locator('#knowledgeGraphCanvas .kg-node-group').count();
-    stableTrace(await stop(page), 'offline/' + width + '/first graph', { nodes: count, graph: !mobile(page) });
-    await fullView(page, 'offline/' + width + '/first complete view');
+    await ready(page); await frames(page);
+    const count = require('../static/offline-content/knowledge_graph.json').nodes.length;
+    stableTrace(await stop(page), 'offline/' + width + '/first graph', { nodes: count });
     const saved = await customize(page);
-    if (mobile(page)) await page.locator('.kg-mobile-expand').click();
     await offlineNavigation(page, 'concepts', false);
     await offlineNavigation(page, 'graph', true);
-    await ready(page, !mobile(page)); await frames(page);
-    stableTrace(await stop(page), 'offline/' + width + '/reopen graph', { graph: !mobile(page) });
-    await fullView(page, 'offline/' + width + '/remembered complete view');
+    await ready(page); await frames(page);
+    stableTrace(await stop(page), 'offline/' + width + '/reopen graph');
     remembered(await snapshot(page), saved, 'offline/' + width);
-    if (mobile(page)) await page.locator('.kg-mobile-expand').click();
     const select = page.locator('#knowledgeGraphCategory');
     const smallCount = require('../static/offline-content/knowledge_graph.json').nodes.filter(node => node.category === '证明与归纳').length;
     await start(page);
     await select.evaluate(select => {
       select.value = '证明与归纳'; select.dispatchEvent(new Event('change', { bubbles: true }));
     });
-    await ready(page, !mobile(page)); await frames(page);
-    stableTrace(await stop(page), 'offline/' + width + '/small module', { nodes: mobile(page) ? 0 : smallCount, graph: !mobile(page) });
-    await fullView(page, 'offline/' + width + '/small complete view');
+    await ready(page); await frames(page);
+    stableTrace(await stop(page), 'offline/' + width + '/small module', { nodes: smallCount });
     assert.deepEqual(modelCalls, []); assert.deepEqual(errors, []);
-    console.log('PASS offline/' + width + ': first/default/small/fullview frames stable and remembered camera retained');
+    console.log('PASS offline/' + width + ': first/default/small module frames stable and remembered camera retained');
   } finally { await context.close(); }
 }
 

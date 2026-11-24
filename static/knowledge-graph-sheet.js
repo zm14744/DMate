@@ -1,4 +1,4 @@
-/* The graph keeps one real detail panel; mobile fullscreen adds sheet gestures. */
+/* On mobile the graph's detail panel also acts as a bottom sheet. */
 (function (root) {
     'use strict';
     const mounted = new WeakMap();
@@ -59,9 +59,11 @@
             if (event.currentTarget === title
                 && event.target.closest?.('a,button,input,select,textarea,[contenteditable="true"]')) return;
             suppressClickUntil = 0;
+            const peekHeight = parseFloat(window.getComputedStyle(host).getPropertyValue('--kg-sheet-peek-height')) || 0;
             drag = { id:event.pointerId, target:event.currentTarget, state:state(),
                 x:event.clientX, y:event.clientY, lastY:event.clientY, started:now(),
-                height:(host.querySelector('.knowledge-graph-side') || wrap).getBoundingClientRect().height, moved:false };
+                height:(host.querySelector('.knowledge-graph-side') || wrap).getBoundingClientRect().height,
+                peekHeight, moved:false };
             try { drag.target.setPointerCapture(event.pointerId); } catch (_) {}
         }
         function pointerMove(event) {
@@ -72,7 +74,7 @@
             drag.moved = true;
             const viewport = window.visualViewport?.height || window.innerHeight;
             const maximum = Math.min(host.getBoundingClientRect().height || viewport, viewport);
-            const height = Math.max(0, Math.min(maximum, drag.height - delta));
+            const height = Math.max(drag.peekHeight, Math.min(maximum, drag.height - delta));
             host.dataset.kgSheetDragging = delta < 0 ? 'up' : 'down';
             host.style.setProperty('--kg-sheet-drag-height', Math.round(height) + 'px');
             if (event.cancelable) event.preventDefault();
@@ -87,8 +89,7 @@
                 || Math.abs(delta) >= 16 && Math.abs(delta) / Math.max(1, now() - previous.started) >= .35;
             if (!eligible()) { close(); return; }
             if (!swipe) { setState(previous.state); return; }
-            if (delta < 0) setState('expanded');
-            else setState(previous.state === 'expanded' ? 'peek' : null);
+            setState(delta < 0 ? 'expanded' : 'peek');
         }
         function pointerCancel(event) {
             if (!drag || event.pointerId !== drag.id) return;
@@ -103,7 +104,9 @@
             setState(state() === 'expanded' ? 'peek' : 'expanded');
         }
         function keydown(event) {
-            if (event.key === 'Escape' && close()) {
+            if (event.key === 'Escape' && state() === 'expanded') {
+                resetDrag();
+                setState('peek');
                 event.preventDefault(); event.stopPropagation();
             }
         }

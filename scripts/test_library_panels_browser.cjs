@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const { revealInterface } = require('./offline-vault-browser-fixtures.cjs');
 const { chromium } = require('playwright');
+const { expandGraphDetails } = require('./knowledge-graph-touch-fixtures.cjs');
 const concepts = require('../static/offline-content/concepts.zh-CN.json').concepts;
 const questions = require('../static/offline-content/questions.zh-CN.json').questions;
 const nodes = require('../static/offline-content/knowledge_graph.json').nodes;
@@ -211,10 +212,7 @@ async function graphRoundTrip(page, concept, language = 'zh-CN') {
     return node.right > view.left && node.left < view.right && node.bottom > view.top && node.top < view.bottom;
   }, node.id);
   assert.equal((await page.locator('#knowledgeGraphDetailTitle').innerText()).trim(), expectedName);
-  if (await page.locator('#knowledgeGraphModal').evaluate(modal => modal.classList.contains('graph-fullscreen-view'))) {
-    await page.locator('.kg-mobile-expand').click();
-    await settle(page);
-  }
+  await expandGraphDetails(page);
   await page.locator('.graph-parent-concept [data-concept-id="' + node.id + '"]').click();
   await page.locator('#conceptsPanel').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#conceptList .concept-item.active').getAttribute('data-concept-id'), node.id,
