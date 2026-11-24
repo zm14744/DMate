@@ -4,6 +4,7 @@
 body[data-appearance-theme] {
     --dm-frost-panel:rgba(var(--surface-1-rgb),var(--panel-alpha));
     --dm-frost-panel-strong:rgba(var(--surface-2-rgb),var(--panel-alpha));
+    --dmate-modal-background:rgba(var(--dmate-chat-background-rgb),var(--panel-alpha));
     --kg-mobile-viewport-bg:rgba(var(--surface-0-rgb),var(--panel-alpha));
 }
 
@@ -56,17 +57,21 @@ body[data-appearance-theme] {
     }
 
     body[data-appearance-theme] :is(.left,.right,.mobile-topbar) {
-        background-color:rgba(var(--surface-1-rgb),var(--panel-alpha))!important;
+        background-color:rgba(var(--dmate-sidebar-rgb,var(--surface-1-rgb)),var(--panel-alpha))!important;
         background-image:none!important;
     }
 
-    /* Keep a barely shaded light sidebar without a visible dividing stroke.
-       The shared panel paint uses an important layer, so override it here rather
-       than adding another competing unlayered background. */
+    /* systemGray5 gives the light navigation rail depth against the workspace. */
+    body[data-appearance-theme="light"] .left {
+        --dmate-sidebar-rgb:229,229,234;
+    }
     body[data-appearance-theme="light"]:not(.has-custom-background) .left {
-        background-color:rgb(var(--surface-1-rgb))!important;
+        background-color:rgb(var(--dmate-sidebar-rgb))!important;
         background-image:none!important;
         border-right-color:transparent!important;
+    }
+    body[data-appearance-theme="light"] .left :is(.session.active,.offline-nav-item.active) {
+        --dm-selected-bg:#d1d1d6;
     }
 
     @media(max-width:1100px) {
@@ -75,7 +80,7 @@ body[data-appearance-theme] {
         body[data-appearance-theme="light"] { --dm-mobile-background-rgb:var(--surface-1-rgb); }
         body[data-appearance-theme="dark"] { --dm-mobile-background-rgb:13,13,13; }
         body[data-appearance-theme] :is(#conversationSidebar,#learningToolsPanel) {
-            background-color:rgba(var(--dm-mobile-background-rgb),var(--panel-alpha))!important;
+            background-color:rgba(var(--dmate-sidebar-rgb,var(--dm-mobile-background-rgb)),var(--panel-alpha))!important;
             background-image:none!important;
         }
 
@@ -104,8 +109,19 @@ body[data-appearance-theme] {
     }
 
     body[data-appearance-theme] :is(
-        .modal-card,.ocr-review-dialog,.graph-editor-dialog,.dcn-dialog,.dcn-confirm,
-        .ocr-group-dialog,.dmate-png-save-panel,
+        .modal-card:not(.offline-graph-inline > .modal-card),
+        .ocr-review-dialog,dialog.graph-editor-dialog,dialog.dcn-dialog,.dcn-confirm,
+        .ocr-group-dialog,.dmate-png-save-panel,.dmate-delete-confirm,
+        .dmate-update-dialog,.offline-library-dialog
+    ) {
+        background-color:var(--dmate-modal-background)!important;
+        background-image:none!important;
+        backdrop-filter:none!important;
+        -webkit-backdrop-filter:none!important;
+    }
+
+    body[data-appearance-theme] :is(
+        .offline-graph-inline > .modal-card,.graph-editor-dialog:not(dialog),.dcn-dialog:not(dialog),
         .input,.ocr-task-panel,.kg-mobile-zoom-controls,
         .dge-tool-palette,.dge-float-panel,.dge-float-content,.dge-selection-panel,
         .dge-overlay-tools,.dgs-source-picker,.ddw-side-panel,.ddw-export-preview

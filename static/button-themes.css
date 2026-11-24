@@ -69,7 +69,6 @@ body[data-appearance-theme="navy"] {
             --dm-control-hover-bg:var(--surface-3);
             --dm-control-border:var(--border-strong);
             --dm-control-hover-border:var(--border-mid);
-            background-color:var(--surface-1)!important;
             background-image:none!important;
             border-right:1px solid var(--border-strong)!important;
         }

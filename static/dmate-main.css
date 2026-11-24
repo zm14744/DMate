@@ -2250,6 +2250,10 @@ input[type="search"]::-webkit-search-cancel-button {
     --background-size:cover;
 }
 
+body[data-appearance-theme] {
+    --dmate-chat-background-rgb:var(--surface-0-rgb);
+}
+
 /* The same light palette serves the first paint, body and top-level dialogs. */
 :root[data-appearance-theme="light"],
 body[data-appearance-theme="light"] {
@@ -6077,6 +6081,7 @@ body[data-appearance-theme="light"] #accountDeleteOpen.account-delete:hover {
 body[data-appearance-theme="dark"] {
     --surface-0:#212121;
     --surface-0-rgb:33,33,33;
+    --dmate-chat-background-rgb:13,13,13;
     --surface-1:rgba(23,23,23,var(--panel-alpha));
     --surface-1-rgb:23,23,23;
     --surface-2:rgba(38,38,38,var(--panel-alpha));
@@ -6599,7 +6604,7 @@ body[data-appearance-theme="dark"] .ocr-review-dialog {
 /* 黑色主题进一步压到接近 GPT 的黑度，但左右栏与中央仍保持层级差。 */
 body[data-appearance-theme="dark"]:not(.has-custom-background),
 body[data-appearance-theme="dark"]:not(.has-custom-background) .layout {
-    background:#0d0d0d !important;
+    background:rgb(var(--dmate-chat-background-rgb)) !important;
 }
 body[data-appearance-theme="dark"]:not(.has-custom-background) .left,
 body[data-appearance-theme="dark"]:not(.has-custom-background) .right,
@@ -6609,7 +6614,7 @@ body[data-appearance-theme="dark"]:not(.has-custom-background) .mobile-topbar {
 body[data-appearance-theme="dark"]:not(.has-custom-background) .center,
 body[data-appearance-theme="dark"]:not(.has-custom-background) .chat,
 body[data-appearance-theme="dark"]:not(.has-custom-background) .input-wrap {
-    background:#0d0d0d !important;
+    background:rgb(var(--dmate-chat-background-rgb)) !important;
 }
 body[data-appearance-theme="dark"] .left { border-right-color:#181818 !important; }
 body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important; }

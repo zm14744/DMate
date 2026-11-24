@@ -208,10 +208,9 @@
     }
 
     @layer dmate-panel-surfaces {
-        /* The side was a transparent structural wrapper before becoming a
-           floating sheet. Give this surface its own existing panel paint. */
+        /* Use the modal surface when the side becomes a floating sheet. */
         body[data-appearance-theme] #knowledgeGraphModal.graph-fullscreen-view:is([data-kg-sheet], :has(#knowledgeGraphHistoryWrap:not([hidden]):not(.hidden))) .knowledge-graph-side {
-            background-color:var(--dm-frost-panel-strong, var(--surface-2)) !important;
+            background-color:var(--dmate-modal-background, var(--surface-2)) !important;
             background-image:none !important;
         }
     }

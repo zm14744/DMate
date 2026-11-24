@@ -4,6 +4,7 @@
  */
 'use strict';
 const assert = require('node:assert/strict');
+const {inflateSync} = require('node:zlib');
 const { chromium } = require('playwright');
 const {installStorageProbe, revealInterface, row} = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
@@ -105,6 +106,99 @@ async function filledAppearanceActions(page) {
   await page.waitForTimeout(150);
 }
 
+async function settlePalette(page) {
+  await page.evaluate(async()=>{
+    await Promise.all(document.getAnimations().filter(animation=>
+      animation.effect?.getComputedTiming().iterations!==Infinity).map(animation=>animation.finished.catch(()=>{})));
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  });
+}
+
+async function surfacePixel(page,locator,{left=7,top}={}) {
+  const box=await locator.boundingBox();
+  const png=await page.screenshot({clip:{x:Math.floor(box.x+(left??box.width/2)),y:Math.floor(box.y+(top??box.height/2)),width:1,height:1}});
+  assert.ok([2,6].includes(png[25]),'The screenshot stores RGB pixels');
+  const chunks=[];
+  for(let offset=8;offset<png.length;){
+    const size=png.readUInt32BE(offset);
+    if(png.toString('ascii',offset+4,offset+8)==='IDAT')chunks.push(png.subarray(offset+8,offset+8+size));
+    offset+=size+12;
+  }
+  // A one-pixel first scanline has no left/up pixel; every PNG filter's
+  // predictor is zero, so these bytes are the actual visible RGB.
+  return [...inflateSync(Buffer.concat(chunks)).subarray(1,4)];
+}
+
+async function sharedThemeSurfaces(browser,width,offline) {
+  const context=await browser.newContext({viewport:{width,height:900},deviceScaleFactor:1,serviceWorkers:'block'});
+  const page=await context.newPage(),edition=offline?'offline':'online';
+  const paint=locator=>locator.evaluate(node=>{
+    const css=getComputedStyle(node),rgba=css.backgroundColor.match(/[\d.]+/g).map(Number);
+    return {rgb:rgba.slice(0,3),alpha:rgba[3]??1,opacity:Number(css.opacity),image:css.backgroundImage};
+  });
+  const checkPaint=async(locator,base,alpha,label)=>{
+    const value=await paint(locator);
+    assert.deepEqual(value.rgb,base,label+': the panel uses the visible chat base');
+    assert.ok(Math.abs(value.alpha-alpha)<.001,label+': panel transparency remains adjustable');
+    assert.equal(value.opacity,1,label+': text and controls do not inherit panel transparency');
+    assert.equal(value.image,'none',label+': no image or gradient overrides the panel base');
+  };
+  try{
+    await page.goto(baseURL+(offline?'/offline':''),{waitUntil:'networkidle'});
+    if(offline)await ready(page);
+    else await page.evaluate(()=>{
+      newChat();getCurrent().name='主题验证';getCurrent().nameSource='user';
+      getCurrent().messages=[{role:'user',text:'颜色验证'},{role:'ai',text:'这是一段普通讲解。'}];renderChat();
+    });
+    for(const [mode,expected] of [['light',[245,245,247]],['dark',[13,13,13]],['navy',[15,23,42]]]){
+      await page.evaluate(async({mode,offline})=>{
+        if(offline)await DMateOfflineAppearance.apply({...DMateOfflineAppearance.getSettings(),mode,panelOpacity:100},null);
+        else{clearAppearanceBackgroundVisual();appearanceSettings={...APPEARANCE_DEFAULTS,mode,panelOpacity:100};applyAppearanceSettings({save:true});}
+      },{mode,offline});
+      await settlePalette(page);
+      const base=await surfacePixel(page,page.locator(offline?'#offlineMain':'#chat'),{left:null,...(offline?{top:3}:{})});
+      assert.deepEqual(base,expected,edition+'/'+width+'/'+mode+': actual visible workspace color');
+      if(mode==='light'){
+        const opener=page.locator(offline?(width<=1100?'#offlineNavToggle':'#offlineDesktopSidebarOpen')
+          :(width<=1100?'#mobileNavBtn':'#desktopSidebarOpen'));
+        if(await opener.getAttribute('aria-expanded')!=='true')await opener.click();
+        await settlePalette(page);
+        assert.deepEqual(await surfacePixel(page,page.locator(offline?'#offlineSidebar':'#conversationSidebar')),
+          [229,229,234],edition+'/'+width+': light sidebar has the shared subtle gray shade');
+        if(width<=1100){
+          if(offline)await page.locator('#offlineNavClose').click();
+          else await page.evaluate(()=>closeMobileShellDrawers());
+          await settlePalette(page);
+        }
+      }
+      await page.evaluate(offline=>offline?DMateOfflineAppearance.open():openAppearance(),offline);
+      const card=page.locator('#appearanceModal .appearance-card');
+      await card.waitFor({state:'visible'});await settlePalette(page);
+      for(const alpha of [1,.8]){
+        if(alpha<1){
+          await page.locator('#appearancePanelRange').evaluate(node=>{node.value='80';node.dispatchEvent(new Event('input',{bubbles:true}));});
+          await settlePalette(page);
+        }
+        const label=edition+'/'+width+'/'+mode+'/'+alpha;
+        await checkPaint(card,base,alpha,label+' appearance');
+        if(alpha===1)assert.deepEqual(await surfacePixel(page,card),base,label+': actual appearance pixels match chat');
+        await page.evaluate(()=>{void DMateDeleteConfirm.request(document.getElementById('appearanceModal'),
+          {title:'颜色核对',body:'用于验证弹窗背景。',noticeOnly:true});});
+        const notice=page.locator('.dmate-delete-confirm[open]');
+        await notice.waitFor({state:'visible'});await settlePalette(page);
+        await checkPaint(notice,base,alpha,label+' native notice');
+        assert.equal(await notice.locator('.dmate-delete-confirm-title').evaluate(node=>getComputedStyle(node).opacity),'1');
+        if(alpha===1)assert.deepEqual(await surfacePixel(page,notice),base,label+': native dialog pixels match chat');
+        await notice.locator('.dmate-delete-confirm-close').click();
+        await notice.waitFor({state:'detached'});
+      }
+      await page.locator('#appearanceClose').click();
+      await page.waitForFunction(()=>document.documentElement.style.getPropertyValue('--panel-alpha').trim()==='1');
+    }
+    console.log('PASS '+edition+' '+width+': actual chat/sidebar pixels, shared modal/native colors and live panel opacity across three themes');
+  }finally{await context.close();}
+}
+
 (async () => {
   const browser = await chromium.launch({ headless:true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath:process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
@@ -114,6 +208,7 @@ async function filledAppearanceActions(page) {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   try {
+    for(const width of [1440,390])for(const offline of [false,true])await sharedThemeSurfaces(browser,width,offline);
     await page.goto(baseURL + '/', { waitUntil:'networkidle' });
     await page.evaluate(async settings => {
       appearanceSettings = { ...APPEARANCE_DEFAULTS, ...settings };
