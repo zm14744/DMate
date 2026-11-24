@@ -8,6 +8,10 @@ body[data-appearance-theme] {
     --kg-mobile-viewport-bg:rgba(var(--surface-0-rgb),var(--panel-alpha));
 }
 
+body[data-appearance-theme="dark"] {
+    --dmate-modal-background:rgba(34,34,34,var(--panel-alpha));
+}
+
 @layer dmate-panel-surfaces {
     /* Assistant replies are transcript text, including live streamed turns.
        Keep user bubbles and independent learning panels on their own surfaces. */
@@ -61,9 +65,9 @@ body[data-appearance-theme] {
         background-image:none!important;
     }
 
-    /* systemGray5 gives the light navigation rail depth against the workspace. */
+    /* Keep a subtle cool gray separation from the light workspace. */
     body[data-appearance-theme="light"] .left {
-        --dmate-sidebar-rgb:229,229,234;
+        --dmate-sidebar-rgb:235,235,239;
     }
     body[data-appearance-theme="light"]:not(.has-custom-background) .left {
         background-color:rgb(var(--dmate-sidebar-rgb))!important;

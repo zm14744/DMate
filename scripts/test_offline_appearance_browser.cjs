@@ -138,7 +138,7 @@ async function sharedThemeSurfaces(browser,width,offline) {
   });
   const checkPaint=async(locator,base,alpha,label)=>{
     const value=await paint(locator);
-    assert.deepEqual(value.rgb,base,label+': the panel uses the visible chat base');
+    assert.deepEqual(value.rgb,base,label+': the panel uses the theme dialog color');
     assert.ok(Math.abs(value.alpha-alpha)<.001,label+': panel transparency remains adjustable');
     assert.equal(value.opacity,1,label+': text and controls do not inherit panel transparency');
     assert.equal(value.image,'none',label+': no image or gradient overrides the panel base');
@@ -158,13 +158,14 @@ async function sharedThemeSurfaces(browser,width,offline) {
       await settlePalette(page);
       const base=await surfacePixel(page,page.locator(offline?'#offlineMain':'#chat'),{left:null,...(offline?{top:3}:{})});
       assert.deepEqual(base,expected,edition+'/'+width+'/'+mode+': actual visible workspace color');
+      const modalColor=mode==='dark'?[34,34,34]:base;
       if(mode==='light'){
         const opener=page.locator(offline?(width<=1100?'#offlineNavToggle':'#offlineDesktopSidebarOpen')
           :(width<=1100?'#mobileNavBtn':'#desktopSidebarOpen'));
         if(await opener.getAttribute('aria-expanded')!=='true')await opener.click();
         await settlePalette(page);
         assert.deepEqual(await surfacePixel(page,page.locator(offline?'#offlineSidebar':'#conversationSidebar')),
-          [229,229,234],edition+'/'+width+': light sidebar has the shared subtle gray shade');
+          [235,235,239],edition+'/'+width+': light sidebar has the shared subtle gray shade');
         if(width<=1100){
           if(offline)await page.locator('#offlineNavClose').click();
           else await page.evaluate(()=>closeMobileShellDrawers());
@@ -180,15 +181,15 @@ async function sharedThemeSurfaces(browser,width,offline) {
           await settlePalette(page);
         }
         const label=edition+'/'+width+'/'+mode+'/'+alpha;
-        await checkPaint(card,base,alpha,label+' appearance');
-        if(alpha===1)assert.deepEqual(await surfacePixel(page,card),base,label+': actual appearance pixels match chat');
+        await checkPaint(card,modalColor,alpha,label+' appearance');
+        if(alpha===1)assert.deepEqual(await surfacePixel(page,card),modalColor,label+': actual appearance pixels match the dialog color');
         await page.evaluate(()=>{void DMateDeleteConfirm.request(document.getElementById('appearanceModal'),
           {title:'颜色核对',body:'用于验证弹窗背景。',noticeOnly:true});});
         const notice=page.locator('.dmate-delete-confirm[open]');
         await notice.waitFor({state:'visible'});await settlePalette(page);
-        await checkPaint(notice,base,alpha,label+' native notice');
+        await checkPaint(notice,modalColor,alpha,label+' native notice');
         assert.equal(await notice.locator('.dmate-delete-confirm-title').evaluate(node=>getComputedStyle(node).opacity),'1');
-        if(alpha===1)assert.deepEqual(await surfacePixel(page,notice),base,label+': native dialog pixels match chat');
+        if(alpha===1)assert.deepEqual(await surfacePixel(page,notice),modalColor,label+': native dialog pixels match the dialog color');
         await notice.locator('.dmate-delete-confirm-close').click();
         await notice.waitFor({state:'detached'});
       }
