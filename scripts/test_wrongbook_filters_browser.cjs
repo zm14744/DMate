@@ -114,6 +114,11 @@ async function runCase(browser, width) {
     const emptyBook = page.locator('#wrongBookList .wrong-empty');
     assert.equal(await emptyBook.innerText(), '暂时没有错题');
     assert.equal(await emptyBook.locator('svg').innerHTML(), await page.locator('#wrongBookBtn > svg').innerHTML());
+    assert.ok(await emptyBook.evaluate(el => {
+      const group = el.getBoundingClientRect(), list = el.parentElement.getBoundingClientRect();
+      return Math.abs(group.left + group.width / 2 - list.left - list.width / 2) <= 1
+        && Math.abs(group.top + group.height / 2 - list.top - list.height / 2) <= 1;
+    }), 'The empty book message is centered below the filters');
     await page.evaluate(() => DMateI18n.setLanguage('en', false));
     assert.equal(await emptyBook.innerText(), 'No mistakes yet');
     await page.evaluate(() => { DMateI18n.setLanguage('zh-CN', false); closeWrongBook(); });

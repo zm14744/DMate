@@ -37,6 +37,11 @@ body.offline-workspace .offline-main.center { position:relative; display:flex !i
 .offline-list { display:grid; gap:12px; }
 #mistakeList { grid-template-columns:minmax(0,1fr); }
 #mistakeList > .wrong-card { min-width:0; max-width:100%; }
+#mistakesPanel:has(> #mistakeList > .wrong-empty:only-child) {
+  display:flex; flex-direction:column;
+}
+#mistakeList:has(> .wrong-empty:only-child) { flex:1; place-items:center; }
+#mistakeList > .wrong-empty { min-height:0; padding:16px; }
 /* Offline cards continue in the page scrollport instead of clipping each
    question to the online modal's compact preview height. */
 #mistakesPanel .wrong-question { max-height:none; overflow:visible; }

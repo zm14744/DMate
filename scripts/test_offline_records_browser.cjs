@@ -142,6 +142,14 @@ async function exercise(page,reference,width) {
   await page.waitForFunction(()=>document.getElementById('mistakeList').textContent.trim().length>0);
   assert.equal((await page.locator('#mistakeList').innerText()).trim(),'暂时没有错题');
   assert.equal(await page.locator('#mistakeList .wrong-empty svg').innerHTML(), await page.locator('#wrongBookBtn > svg').innerHTML());
+  assert.ok(await page.locator('#mistakeList .wrong-empty').evaluate(el=>{
+    const group=el.getBoundingClientRect(),list=el.parentElement.getBoundingClientRect();
+    const panel=el.closest('#mistakesPanel'),style=getComputedStyle(panel);
+    const panelBottom=panel.getBoundingClientRect().bottom-parseFloat(style.paddingBottom)-parseFloat(style.borderBottomWidth);
+    return Math.abs(list.bottom-panelBottom)<=1
+      && Math.abs(group.left+group.width/2-list.left-list.width/2)<=1
+      && Math.abs(group.top+group.height/2-list.top-list.height/2)<=1;
+  }), 'The empty book message is centered in the remaining offline page');
   assert.equal(await page.locator('#addMistake,#recordDialog,#recordForm,#recordTitle,#recordContent').count(),0,
     'The removed manual mistake controls are absent, not merely hidden');
   assert.equal((await page.locator('#mistakesPanel .offline-toolbar').innerText()).includes('仅保存在当前设备'),false);

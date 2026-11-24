@@ -74,6 +74,12 @@ async function checkEmptyRecent(browser, width) {
     await page.locator('#knowledgeGraphHistoryBtn').click();
     await page.waitForFunction(text => knowledgeGraphInitialized && document.getElementById('knowledgeGraphCanvas').innerText.trim() === text, noQuestions);
     assert.equal((await page.locator('#knowledgeGraphHistory').innerText()).trim(), '无', width + ': the history list shows its own empty label');
+    assert.ok(await page.locator('#knowledgeGraphHistory > .graph-detail-empty').evaluate(el => {
+      const label = el.getBoundingClientRect(), list = el.parentElement.getBoundingClientRect();
+      return list.height > 100
+        && Math.abs(label.left + label.width / 2 - list.left - list.width / 2) <= 1
+        && Math.abs(label.top + label.height / 2 - list.top - list.height / 2) <= 1;
+    }), width + ': the empty history label is centered in the available pane');
     await page.locator('#knowledgeGraphDetailTab').click();
     await assertEmpty(page, noQuestions, width + '/history without questions', 'history', noNodes);
     const decoration = page.locator('#knowledgeGraphCanvas > .kg-empty-state svg');
