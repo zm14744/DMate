@@ -186,6 +186,14 @@ async function runCase(browser, width) {
         .find(item => item.id === 'filter-new-pending').createdAt), captured.createdAt);
     };
     await expectCapturedDate();
+    await source.getByRole('button', { name: '查看复测', exact: true }).click();
+    const emptyRetests = page.locator('#wrongRetestReviewList');
+    assert.equal(await emptyRetests.innerText(), '暂时没有题目');
+    assert.equal(await emptyRetests.locator('svg').count(), 0, 'The retest placeholder is text only');
+    await page.evaluate(() => DMateI18n.setLanguage('en', false));
+    assert.equal(await emptyRetests.innerText(), 'No questions yet');
+    await page.evaluate(() => DMateI18n.setLanguage('zh-CN', false));
+    await page.locator('#wrongRetestReviewModal .modal-close-dot').click();
     assert.equal(await page.evaluate(() => processWrongQuestionRetestReply({ id: 'filter-local-retest',
       retest: { wrongQuestionId: 'filter-new-pending', stage: 'checking', targetPoints: ['直接证明与反证法'],
         generatedQuestion: '本地复测题', generatedAnswer: '本地复测答案' } }, '答案正确')), true);
@@ -218,20 +226,22 @@ async function runCase(browser, width) {
     'Both merge directions preserve the capture time independently of newer editable fields');
     assert.equal(clocks.legacyCreatedAt, 1700000000000, 'A legacy entry recovers its capture time from its stable ID');
 
-    for (const [language, empty] of [['zh-CN', '无'], ['en', 'None']]) {
+    for (const [language, noMatches, noMistakes] of [['zh-CN', '无', '暂时没有错题'], ['en', 'None', 'No mistakes yet']]) {
       await page.evaluate(language => DMateI18n.setLanguage(language, false), language);
       assert.equal(await page.locator('#wrongBookSearch').getAttribute('placeholder'), language === 'en' ? 'Search' : '搜索');
       if (width <= 1100) await checkMobileFilterRow(page);
+      await pending.click();
       await page.locator('#wrongBookSearch').fill('__no_matching_concept__');
-      assert.equal(await page.locator('#wrongBookList .wrong-empty').innerText(), empty, 'No search match');
+      assert.equal(await emptyBook.innerText(), noMatches, 'No search match');
       assert.equal(await page.locator('#wrongBookList .wrong-empty svg').count(), 0, 'A filtered result is distinct from an empty book');
       await page.locator('#wrongBookSearch').fill('');
       for (const filter of ['pending', 'corrected']) {
         await page.evaluate(filter => {
           for (const item of learningState.wrongQuestions) item.corrected = filter === 'pending';
-          setWrongBookFilter(filter);
         }, filter);
-        assert.equal(await page.locator('#wrongBookList .wrong-empty').innerText(), empty, 'No ' + filter + ' records');
+        await page.locator(`[data-wrong-filter="${filter}"]`).click();
+        assert.equal(await emptyBook.innerText(), noMistakes, 'No ' + filter + ' records');
+        assert.equal(await emptyBook.locator('svg').isVisible(), true, 'An empty status tab displays the Mistake Book icon');
       }
     }
     await page.evaluate(() => DMateI18n.setLanguage('zh-CN', false));

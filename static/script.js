@@ -8589,7 +8589,7 @@ function openWrongRetestReview(id) {
     if (!history.length) {
         const empty = document.createElement("div");
         empty.className = "learning-review-empty";
-        empty.textContent = "无";
+        empty.textContent = dmateUiText("暂时没有题目", "No questions yet");
         list.appendChild(empty);
     }
     history.forEach((record,index) => {
@@ -10286,7 +10286,7 @@ function renderWrongBook() {
     updateWrongBookToolbar(allItems);
 
     if (!items.length) {
-        if (!allItems.length) {
+        if (!allItems.some(item => wrongBookStatus(item).key === wrongBookFilter)) {
             list.append(createLearningEmptyState("wrong-empty learning-empty-state", "wrongBookBtn",
                 dmateUiText("暂时没有错题", "No mistakes yet")));
             return;
