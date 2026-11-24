@@ -35,7 +35,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    for(const [tag,attributes] of [['rect',{width:18,height:18,x:3,y:3,rx:2,ry:2}],['circle',{cx:9,cy:9,r:2}],['path',{d:'m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'}]]){const part=doc.createElementNS(svg.namespaceURI,tag);for(const [key,value] of Object.entries(attributes))part.setAttribute(key,String(value));svg.append(part);}return svg;};
   const shell=el('section','dmate-drawing-workspace'),top=el('div','ddw-header'),name=el('input','ddw-name');
   name.type='text';name.maxLength=80;name.setAttribute('aria-label','绘图名称');
-  const actions=el('div','ddw-page-actions'),body=el('div','ddw-body'),editorHost=el('div','ddw-editor'),rail=el('div','ddw-side-actions'),panel=el('aside','ddw-side-panel'),noticeOwner=el('div','ddw-notice-owner');
+  const actions=el('div','ddw-page-actions'),body=el('div','ddw-body'),editorHost=el('div','ddw-editor'),canvasControls=el('div','ddw-canvas-controls'),rail=el('div','ddw-side-actions'),panel=el('aside','ddw-side-panel'),noticeOwner=el('div','ddw-notice-owner');
   noticeOwner.hidden=true;
   const settingsButton=button('绘图设置',()=>toggleEditorPanel('graphs')),informationButton=button('图形信息',()=>toggleEditorPanel('results'));
   const historyButton=button('历史绘图',()=>togglePanel('history')),aiButton=features.ai?button('AI指导',()=>togglePanel('ai')):null;
@@ -47,7 +47,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   historyButton.setAttribute('aria-expanded','false');aiButton?.setAttribute('aria-expanded','false');
   const newButton=button('新建空白页',()=>newPage()),exportButton=button('',()=>exportImage(),'ddw-header-export'),uploadButton=features.upload?button('上传',()=>uploadImage(),'ddw-primary ddw-upload-button'):null;
   exportButton.dataset.drawingExport='true';exportButton.title=uiText('以图片形式导出','Export as image');exportButton.setAttribute('aria-label',exportButton.title);exportButton.append(imageIcon());
-  actions.append(newButton,historyButton);if(uploadButton)actions.append(uploadButton);top.append(name,actions);rail.append(settingsButton,informationButton);if(aiButton)rail.append(aiButton,generateButton);body.append(editorHost,rail);shell.append(top,body,panel,noticeOwner);host.replaceChildren(shell);host.classList.add('has-drawing-workspace');
+  actions.append(newButton,historyButton);if(uploadButton)actions.append(uploadButton);top.append(name,actions);rail.append(settingsButton,informationButton);if(aiButton)rail.append(aiButton,generateButton);body.append(editorHost);shell.append(top,body,panel,noticeOwner);host.replaceChildren(shell);host.classList.add('has-drawing-workspace');
   const exportHeader=host.closest('.graph-editor-dialog')?.querySelector(':scope > .graph-editor-dialog-head')||top;
   let requirement='',answer='',answerDocument='',answerRequirement='',nameFollowsGraph=false,aiTask='';
   const active=()=>pages.find(p=>p.id===activeId);
@@ -103,10 +103,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
     leftEdge=Math.max(leftEdge,hostBox.left+margin);topEdge=Math.max(topEdge,hostBox.top+margin);
     rightEdge=Math.min(rightEdge,hostBox.right-margin);bottomEdge=Math.min(bottomEdge,hostBox.bottom-margin);
    }
-   // Translated rail labels can wrap. Keep every row reachable when a
-   // popover opens from a button in the first row.
-   const triggerBox=trigger.getBoundingClientRect(),railBox=trigger.closest('.ddw-side-actions')?.getBoundingClientRect();
-   const anchor=railBox?{left:triggerBox.left,right:triggerBox.right,top:railBox.top,bottom:railBox.bottom}:triggerBox;
+   const anchor=trigger.getBoundingClientRect();
    const canvasBox=content.matches('.dge-float-content,.dge-overlay-tools')
     ?editorHost.querySelector('.ddw-canvas-frame')?.getBoundingClientRect():null;
    if(canvasBox?.width&&canvasBox.height){
@@ -185,20 +182,16 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    // The frame never pans. Own these positions through scoped CSS variables
    // so the overlay's standalone inline palette placement cannot compete.
    const origin=body.getBoundingClientRect(),frame=viewport?.parentElement;
-   const canvasBox=frame?.getBoundingClientRect()||origin,inset=18,controlsTop=canvasBox.top+inset;
-   const compactButtons=win.matchMedia('(max-width:600px)').matches;
-   body.style.setProperty('--ddw-controls-right',Math.max(inset,origin.right-canvasBox.right+inset)+'px');
-   body.style.setProperty('--ddw-controls-top',(controlsTop-origin.top)+'px');
-   if(compactButtons){
-    body.style.setProperty('--ddw-controls-left',(canvasBox.left-origin.left+inset)+'px');
-    body.style.setProperty('--ddw-tools-width',Math.max(1,(canvasBox.width-inset*2-12)/3)+'px');
+   if(frame&&palette){
+    if(canvasControls.parentElement!==frame.parentElement)frame.after(canvasControls);
+    if(palette.parentElement!==canvasControls)canvasControls.replaceChildren(palette,rail);
+    const canvasBox=frame.getBoundingClientRect(),anchor=canvasControls.offsetParent?.getBoundingClientRect()||origin;
+    const inset=canvasBox.width<=600?8:18;
+    canvasControls.style.left=(canvasBox.left-anchor.left+inset)+'px';
+    canvasControls.style.right=(anchor.right-canvasBox.right+inset)+'px';
+    canvasControls.style.top=(canvasBox.top-anchor.top+inset)+'px';
    }
-   if(palette){const parent=palette.offsetParent?.getBoundingClientRect()||origin;
-    body.style.setProperty('--ddw-tools-top',(controlsTop-parent.top)+'px');
-    body.style.setProperty('--ddw-tools-left',(canvasBox.left+inset-parent.left)+'px');}
-   const toolBox=palette?.querySelector(':scope > summary')?.getBoundingClientRect();
-   if(!compactButtons&&toolBox&&rail.getBoundingClientRect().left<toolBox.right+12)body.style.setProperty('--ddw-controls-top',(toolBox.bottom-origin.top+12)+'px');
-   const top=Math.max(rail.getBoundingClientRect().bottom,toolBox?.bottom||0)-origin.top+8;
+   const top=canvasControls.isConnected?canvasControls.getBoundingClientRect().bottom-origin.top+8:8;
    body.style.setProperty('--ddw-panel-top',top+'px');
    const propertyOrigin=editorHost.querySelector('.dge-workspace')?.getBoundingClientRect()||origin;
    body.style.setProperty('--ddw-property-top',Math.max(0,origin.top+top-propertyOrigin.top)+'px');
