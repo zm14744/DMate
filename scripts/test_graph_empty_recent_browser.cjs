@@ -76,13 +76,15 @@ async function checkEmptyRecent(browser, width) {
     assert.equal((await page.locator('#knowledgeGraphHistory').innerText()).trim(), '无', width + ': the history list shows its own empty label');
     await page.locator('#knowledgeGraphDetailTab').click();
     await assertEmpty(page, noQuestions, width + '/history without questions', 'history', noNodes);
-    for (const [panel, icon] of [['#knowledgeGraphCanvas', 'files'], ['#knowledgeGraphDetail', 'network']]) {
-      const decoration = page.locator(panel + ' .kg-empty-state svg[data-icon="' + icon + '"]');
-      assert.equal(await decoration.isVisible(), !mobile, width + ': the desktop empty state shows its icon');
-      if (!mobile) {
-        assert.equal(await decoration.getAttribute('aria-hidden'), 'true');
-        assert.equal(await decoration.getAttribute('focusable'), 'false');
-      }
+    const decoration = page.locator('#knowledgeGraphCanvas > .kg-empty-state svg');
+    assert.equal(await decoration.isVisible(), !mobile, width + ': only desktop shows an icon above the empty history label');
+    assert.equal(await page.locator('#knowledgeGraphDetail svg').count(), 0, width + ': the empty node details are text only');
+    if (!mobile) {
+      const artwork = svg => svg.innerHTML;
+      assert.equal(await decoration.evaluate(artwork), await page.locator('#knowledgeGraphBtn > svg').evaluate(artwork),
+        width + ': empty history reuses the navigation graph icon');
+      assert.equal(await decoration.getAttribute('aria-hidden'), 'true');
+      assert.equal(await decoration.getAttribute('focusable'), 'false');
     }
 
     // English must update the same open dialog, rather than requiring reopen.

@@ -1741,11 +1741,6 @@ input[type="search"]::-webkit-search-cancel-button {
     stroke-width:1.4;
 }
 
-#knowledgeGraphDetail .kg-empty-state-icon {
-    width:36px;
-    height:36px;
-}
-
 #knowledgeGraphCanvas:has(> .kg-empty:only-child) {
     display:flex;
     align-items:center;
@@ -2100,6 +2095,13 @@ input[type="search"]::-webkit-search-cancel-button {
 #knowledgeGraphDetailTitle[hidden] + #knowledgeGraphDetail > .graph-detail-empty {
     margin:0;
     text-align:center;
+}
+
+#knowledgeGraphDetail > .kg-node-empty {
+    background:transparent;
+    font-size:calc(22px * var(--font-scale));
+    font-weight:600;
+    line-height:1.3;
 }
 
 @media(max-width:760px) {

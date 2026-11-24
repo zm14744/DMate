@@ -191,9 +191,12 @@ async function checkCase(browser,width,language) {
     const selectPrompt = mobile ? (language === 'en' ? 'None' : '无') : (language === 'en' ? 'Select a question' : '请选择题目');
     assert.equal(await page.locator('#knowledgeGraphCanvas').innerText(), selectPrompt,
       label+': history with available questions waits for a selection');
-    const selectIcon = page.locator('#knowledgeGraphCanvas > .kg-empty-state svg[data-icon="list-mouse-pointer"]');
+    const selectIcon = page.locator('#knowledgeGraphCanvas > .kg-empty-state svg');
     assert.equal(await selectIcon.isVisible(), !mobile, label+': the selection icon is desktop only');
     if (!mobile) {
+      const artwork = svg => svg.innerHTML;
+      assert.equal(await selectIcon.evaluate(artwork), await page.locator('#knowledgeGraphBtn > svg').evaluate(artwork),
+        label+': the prompt reuses the navigation graph icon');
       const positioned = await selectIcon.evaluate(svg => {
         const box = svg.getBoundingClientRect();
         return box.height >= 40 && box.bottom <= svg.nextElementSibling.getBoundingClientRect().top;
@@ -204,6 +207,7 @@ async function checkCase(browser,width,language) {
     assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),true,label+': the historical detail tab can open before choosing a past question');
     const noNodes = mobile ? (language === 'en' ? 'None' : '无') : (language === 'en' ? 'No nodes yet' : '暂无节点');
     assert.equal(await page.locator('#knowledgeGraphDetail').innerText(), noNodes);
+    assert.equal(await page.locator('#knowledgeGraphDetail svg').count(),0,label+': empty details contain no icon');
     assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),true,label+': empty historical details keep both sidebar tabs accessible');
     assert.deepEqual(await page.evaluate(()=>knowledgeGraphDisplayedNodes().map(node=>node.id)),[],label+': unselected historical details never fall back to a full course graph');
     assert.equal(await page.locator('#knowledgeGraphLocateOriginal').count(),0,label+': an unselected historical detail has no source locator');
