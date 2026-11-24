@@ -215,7 +215,7 @@ _OFFLINE_CONTENT_PACKS = {
 _ONLINE_SCRIPT_GROUPS = {
     'workspace': (
         'offline-interface-state.js', 'language-catalog.js', 'language-knowledge.js', 'language.js',
-        'modal-text.js', 'knowledge-graph-labels.js', 'question-knowledge-graph.js', 'exercise-intent.js',
+        'modal-text.js', 'knowledge-graph-labels.js', 'knowledge-graph-sheet.js', 'question-knowledge-graph.js', 'exercise-intent.js',
         'graph-editor-model.js', 'graph-editor-format.js', 'graph-editor-overlay.js', 'graph-editor.js',
         'math-diagram.js', 'math-markdown.js', 'ai-answer-renderer.js', 'delete-confirm.js',
         'drawing-export.js', 'drawing-workspace.js', 'graph-scan-workspace.js', 'voice-input.js',

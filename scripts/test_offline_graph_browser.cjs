@@ -154,6 +154,75 @@ async function selectFirst(page) {
         value: field.querySelector('.graph-detail-field-value').textContent.trim() })));
 }
 
+async function checkMobileDetailSheet(page) {
+  const modal = frame(page), stage = modal.locator('.kg-mobile-stage');
+  const title = modal.locator('#knowledgeGraphDetailTitle'), detail = modal.locator('#knowledgeGraphDetail');
+  const handle = modal.locator('.kg-sheet-handle'), viewport = page.viewportSize();
+  const camera = () => view(page).evaluate(node => {
+    const rect = node.getBoundingClientRect();
+    return [node.scrollLeft, node.scrollTop, node._kgScale, rect.x, rect.y, rect.width, rect.height];
+  });
+  const cdp = await page.context().newCDPSession(page);
+  const swipe = async (element, delta, halfway) => {
+    const rect = await element.boundingBox(), x = rect.x + rect.width / 2, y = rect.y + rect.height / 2;
+    const end = Math.max(2, Math.min(page.viewportSize().height - 2, y + delta));
+    const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', {type, touchPoints:points});
+    await touch('touchStart', [{id:1, x, y}]);
+    for (let step = 1; step <= 6; step++) {
+      await touch('touchMove', [{id:1, x, y:y + (end - y) * step / 6}]);
+      await page.evaluate(() => new Promise(requestAnimationFrame));
+      if (step === 3 && halfway) await halfway();
+    }
+    await touch('touchEnd', []);
+    await settle(page);
+  };
+  try {
+    // This course node has 12 successors. A short phone viewport makes its
+    // genuine details overflow in the disconnected workspace as well as online.
+    await page.setViewportSize({width:viewport.width, height:520});
+    await fullGraph(page);
+    assert.equal(await modal.getAttribute('data-kg-sheet'), null, 'Entering the phone graph keeps the sheet closed');
+    await stage.getByRole('button', {name:'图的基本概念', exact:true}).tap();
+    await settle(page);
+    assert.equal(await modal.getAttribute('data-kg-sheet'), 'peek');
+    assert.equal(await title.innerText(), '图的基本概念');
+    assert.ok(await title.isVisible());
+    assert.equal(await detail.isVisible(), false, 'The collapsed sheet shows only the selected title');
+    assert.equal(await modal.locator('.kg-mobile-edge.is-related').count(), 0);
+    const selectedCamera = await camera();
+    const panel = modal.locator('.knowledge-graph-side'), collapsed = await panel.boundingBox();
+    assert.notEqual(await panel.evaluate(node => getComputedStyle(node).backgroundColor), 'rgba(0, 0, 0, 0)',
+      'The floating details use a panel surface above the graph');
+    await swipe(handle, -130, async () => {
+      assert.ok((await panel.boundingBox()).height > collapsed.height + 24, 'The sheet follows the finger before release');
+      assert.ok(await detail.isVisible(), 'The body appears while the user pulls the sheet up');
+    });
+    assert.equal(await modal.getAttribute('data-kg-sheet'), 'expanded');
+    assert.deepEqual(await camera(), selectedCamera, 'Expanding the sheet preserves the graph viewport and camera');
+    assert.ok(await detail.locator('button.graph-detail-term').count() >= 12, 'The sheet includes the real course relationships');
+    await swipe(detail, -95);
+    assert.ok(await detail.evaluate(node => node.scrollTop > 0), 'A finger swipe scrolls the expanded content');
+    assert.equal(await modal.getAttribute('data-kg-sheet'), 'expanded');
+    await swipe(title, 125);
+    assert.equal(await modal.getAttribute('data-kg-sheet'), 'peek');
+    await swipe(handle, 100);
+    assert.equal(await modal.getAttribute('data-kg-sheet'), null);
+    assert.deepEqual(await camera(), selectedCamera, 'Sheet gestures retain the graph camera');
+    await stage.getByRole('button', {name:'路径与连通性', exact:true}).tap();
+    await settle(page);
+    assert.equal(await modal.getAttribute('data-kg-sheet'), 'peek');
+    assert.equal(await title.innerText(), '路径与连通性');
+    await modal.locator('.kg-mobile-expand').click();
+    assert.equal(await modal.getAttribute('data-kg-sheet'), null);
+    assert.ok(await detail.isVisible(), 'Exiting the full view restores the inline details');
+    assert.equal(await title.innerText(), '路径与连通性');
+  } finally {
+    await cdp.detach();
+    await page.setViewportSize(viewport);
+    await settle(page);
+  }
+}
+
 async function checkFocusedFrame(node, label, keyboard = false) {
   const appearance = await node.evaluate(node => {
     const mobile = node.matches('.kg-mobile-node'), marker = mobile ? node : node.querySelector('rect');
@@ -201,6 +270,7 @@ async function onlineReference(browser, width, theme, available) {
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/online-graph-' + width + '-' + theme + '.png' });
     const expected = {};
     await fullGraph(page);
+    if (mobile(page) && theme === 'light') await checkMobileDetailSheet(page);
     for (const name of categories) {
       await category(page, name);
       await fullGraph(page);
@@ -631,6 +701,7 @@ async function runCase(browser, width, theme) {
     }
     assert.deepEqual(await frame(page).locator('#knowledgeGraphCategory option').allTextContents(), reference.categories);
     await fullGraph(page);
+    if (mobile(page) && theme === 'light') await checkMobileDetailSheet(page);
     for (const name of reference.categories) {
       await category(page, name);
       await fullGraph(page);

@@ -109,8 +109,9 @@ async function expectDestination(page, id, category, label) {
     label + ': history is visible with the normal toolbar and hidden with fullscreen chrome');
   assert.equal(await page.locator('#knowledgeGraphDetailWrap').evaluate(node=>node.hidden),false,
     label + ': all-knowledge mode activates node details');
-  assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),!fullscreen,
-    label + ': node details remain visible outside the full graph canvas');
+  assert.ok(await page.locator('#knowledgeGraphDetailWrap').isVisible(), label + ': the destination title is visible');
+  if (fullscreen) assert.equal(await page.locator('#knowledgeGraphModal').getAttribute('data-kg-sheet'), 'peek',
+    label + ': opening a relation from inline details reveals the destination preview');
   // Selection updates before the navigation frame scrolls and focuses the node.
   const destination = page.locator('#knowledgeGraphCanvas .selected[data-knowledge-node-id="' + id + '"]');
   await expect(destination, label + ': relation destination receives focus').toBeFocused();

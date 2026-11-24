@@ -78,7 +78,7 @@ function clampMobileGraphScale(value) {
 
 function updateKnowledgeGraphEdgeEmphasis(canvas, selectedNodeId) {
     if (!canvas) return;
-    canvas.querySelectorAll(".kg-edge,.kg-mobile-edge").forEach(edge => {
+    canvas.querySelectorAll(".kg-edge").forEach(edge => {
         const related = Boolean(selectedNodeId) && (
             edge.dataset.from === selectedNodeId
             || edge.dataset.to === selectedNodeId
@@ -101,7 +101,7 @@ function mount(host,options={}) {
  let category=categories.includes(options.category)?options.category:'全部';
  let knowledgeGraphSelectedNodeId=String(options.selectedId||allNodes[0]?.id||'');
  let knowledgeGraphDesktopScale=1,desktopFitted=true,destroyed=false,resizeFrame=0;
- let visibleNodes=[],fullscreenOrigin=null,mobileFullscreen=false;
+ let visibleNodes=[],fullscreenOrigin=null,mobileFullscreen=false,nodeSheet=null;
  const viewMemory=host._dmateGraphViewMemory||(host._dmateGraphViewMemory=new Map());
  const isMobileAppShell=()=>window.matchMedia('(max-width:760px)').matches;
  const knowledgeGraphNodeState=()=>({key:'neutral',label:'',fill:'#111827',stroke:'#475569',text:'#ffffff',badge:''});
@@ -156,13 +156,17 @@ function mount(host,options={}) {
   }
   root.DMateI18n?.translate(detail);
  }
- function selectKnowledgeGraphNode(id,sourceElement=null){
+ function selectKnowledgeGraphNode(id,sourceElement=null,{showSheet=Boolean(sourceElement),keepExpanded=false}={}){
   knowledgeGraphSelectedNodeId=String(id);
   for(const node of canvas.querySelectorAll('.kg-node-group,.kg-mobile-node')){
    const selected=node.dataset.nodeId===knowledgeGraphSelectedNodeId;node.classList.toggle('selected',selected);node.setAttribute('aria-pressed',String(selected));
    const rect=node.querySelector('rect');if(rect)rect.setAttribute('stroke-width',selected?'3':'2');
   }
   updateKnowledgeGraphEdgeEmphasis(canvas,knowledgeGraphSelectedNodeId);renderDetail();
+  if(showSheet&&isMobileAppShell()&&host.classList.contains('graph-fullscreen-view')){
+   nodeSheet||=root.DMateKnowledgeGraphSheet?.mount(host);
+   nodeSheet?.open({keepExpanded});
+  }
   options.onSelectionChange?.(allNodes.find(node=>String(node.id)===knowledgeGraphSelectedNodeId));
  }
  function navigateRelation(record){
@@ -170,7 +174,7 @@ function mount(host,options={}) {
   const targetCategory=categories.includes(record.category)?record.category:'全部';
   if(category!==targetCategory)setCategory(targetCategory);
   if(isMobileAppShell()&&!host.classList.contains('graph-fullscreen-view'))toggleKnowledgeGraphFullscreenView();
-  selectKnowledgeGraphNode(knowledgeGraphSelectedNodeId);
+  selectKnowledgeGraphNode(knowledgeGraphSelectedNodeId,null,{showSheet:true,keepExpanded:true});
   revealSelectedGraphNode({focus:true,nearest:true});
  }
  function revealSelectedGraphNode({focus=false,nearest=false}={}){
@@ -194,6 +198,7 @@ function mount(host,options={}) {
   }));
  }
  function restoreInline(){
+  nodeSheet?.close();
   host.classList.remove('graph-fullscreen-view');
   if(fullscreenOrigin){fullscreenOrigin.replaceWith(host);fullscreenOrigin=null;}
  }
@@ -227,7 +232,7 @@ function mount(host,options={}) {
   });
   const mobileGraph=isMobileAppShell();
   const viewKey=[mobileGraph?'mobile':'desktop',dmateUiLanguage(),visibleNodes.map(node=>node.id).join(',')].join('|');
-  renderDetail();root.DMateI18n?.translate(host);
+  renderDetail();nodeSheet?.sync();root.DMateI18n?.translate(host);
   const viewport=canvas.querySelector('.kg-mobile-viewport,.kg-desktop-viewport');
   const ready=()=>{if(!destroyed&&(!viewport||canvas.contains(viewport))){host.dataset.ready='true';host.dataset.graphReady='true';}};
   if(viewport)installKnowledgeGraphViewMemory(viewport,viewKey,viewMemory,mobileGraph,ready);
@@ -265,6 +270,7 @@ function mount(host,options={}) {
  document.addEventListener('keydown',event=>{
   if(event.key!=='Escape'||choice?.open||host.closest('#graphPanel')?.hidden||!host.getClientRects().length)return;
   if(document.querySelector('dialog[open],.modal:not(.hidden):not(#knowledgeGraphModal):not(#mobileChoiceModal)'))return;
+  if(nodeSheet?.close()){event.preventDefault();return;}
   if(host.classList.contains('graph-fullscreen-view')){event.preventDefault();toggleKnowledgeGraphFullscreenView();}
  },{signal});
  let lastFontScale=root.DMateKnowledgeGraphLabels.fontScale(document);
@@ -283,9 +289,9 @@ function mount(host,options={}) {
   if(reveal&&!visibleNodes.some(node=>String(node.id)===knowledgeGraphSelectedNodeId))setCategory(record.category);
   if(reveal&&isMobileAppShell()&&!host.classList.contains('graph-fullscreen-view'))toggleKnowledgeGraphFullscreenView();
   const node=canvas.querySelector(`[data-node-id="${CSS.escape(knowledgeGraphSelectedNodeId)}"]`);
-  selectKnowledgeGraphNode(knowledgeGraphSelectedNodeId,node);
+  selectKnowledgeGraphNode(knowledgeGraphSelectedNodeId,node,{showSheet:reveal});
   if(reveal)revealSelectedGraphNode();
- },destroy(){destroyed=true;disposeViews();fontObserver.disconnect();controller.abort();observer.disconnect();window.cancelAnimationFrame(resizeFrame);closeChoice();restoreInline();canvas.replaceChildren();delete host.dataset.ready;delete host.dataset.graphReady;}};
+ },destroy(){destroyed=true;disposeViews();fontObserver.disconnect();controller.abort();observer.disconnect();window.cancelAnimationFrame(resizeFrame);closeChoice();restoreInline();nodeSheet?.destroy();canvas.replaceChildren();delete host.dataset.ready;delete host.dataset.graphReady;}};
 // A responsive renderer has a different layout, so keep its own camera. The
 // cache outlives rebuilt DOM; scroll/zoom snapshots precede breakpoint changes.
 function installKnowledgeGraphViewMemory(viewport, key, memory, mobile, onReady) {

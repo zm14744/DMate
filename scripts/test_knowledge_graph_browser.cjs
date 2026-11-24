@@ -567,14 +567,22 @@ async function checkSelectionBorder(browser, theme) {
     await desktop.locator('.kg-node-group:not(.selected)').first().click();
     const desktopStroke = await desktop.locator('.kg-node-group.selected rect').evaluate(rect => getComputedStyle(rect).stroke);
     assert.equal(border.color, desktopStroke, theme + ': mobile border matches desktop selection stroke');
+    assert.equal(await desktop.locator('#knowledgeGraphModal').getAttribute('data-kg-sheet'), null);
+    assert.equal(await desktop.locator('.kg-sheet-handle:visible').count(), 0);
     for (const [page, selector] of [[mobile, '.kg-mobile-edge'], [desktop, '.kg-edge']]) {
       const edge = page.locator('#knowledgeGraphCanvas ' + selector).first();
       const source = await edge.getAttribute('data-from');
-      const stroke = () => edge.evaluate(path => getComputedStyle(path).stroke);
+      const stroke = () => edge.evaluate(path => {
+        const style = getComputedStyle(path);
+        return [style.stroke, style.strokeWidth, style.opacity];
+      });
       await page.locator('#knowledgeGraphCanvas [data-knowledge-node-id="' + source + '"]').click();
-      assert.equal(await stroke(), accent, theme + ': the selected concept highlights its relationship');
+      const selectedStyle = await stroke();
       await page.locator('#knowledgeGraphCanvas [data-knowledge-node-id="proof_direct_contradiction"]').click();
-      assert.notEqual(await stroke(), accent, theme + ': an unrelated selection clears the highlight');
+      const plainStyle = await stroke();
+      assert.notEqual(plainStyle[0], accent, theme + ': unrelated edges use the normal stroke');
+      if (page === mobile) assert.deepEqual(selectedStyle, plainStyle, theme + ': tapping a phone node preserves its edge styles');
+      else assert.equal(selectedStyle[0], accent, theme + ': desktop selection highlights its relationship');
     }
     if (process.env.KG_SCREENSHOT_DIR) {
       await mobile.screenshot({ path: process.env.KG_SCREENSHOT_DIR + '/graph-selection-after-390-' + theme + '.png' });

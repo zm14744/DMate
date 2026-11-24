@@ -1097,6 +1097,7 @@ let knowledgeGraphInitialized = false;
 let knowledgeGraphOpenRevision = 0;
 let knowledgeGraphOpenDataPromise = null;
 let knowledgeGraphMobileFullscreen = false;
+let knowledgeGraphNodeSheet = null;
 let knowledgeGraphScope = "current";
 let knowledgeGraphQuestionReference = null;
 let knowledgeGraphWrongQuestionReference = null;
@@ -21127,6 +21128,7 @@ function setKnowledgeGraphFullscreenView(enabled) {
     if (!modal) return;
 
     const next = Boolean(enabled);
+    if (!next) knowledgeGraphNodeSheet?.close();
     if (window.matchMedia('(max-width:760px)').matches) knowledgeGraphMobileFullscreen = next;
     modal.classList.toggle("graph-fullscreen-view", next);
 
@@ -21280,6 +21282,7 @@ async function openKnowledgeGraph() {
 
 function closeKnowledgeGraph() {
     ++knowledgeGraphOpenRevision;
+    knowledgeGraphNodeSheet?.close();
     restoreKnowledgeGraphAfterWrongView();
     knowledgeGraphRenderedQuestion = null;
     document.getElementById("knowledgeGraphHistory")?.replaceChildren();
@@ -21299,6 +21302,7 @@ function closeKnowledgeGraph() {
 }
 
 function renderKnowledgeGraphLoading(message) {
+    knowledgeGraphNodeSheet?.close();
     const canvas = document.getElementById(
         "knowledgeGraphCanvas"
     );
@@ -22020,16 +22024,23 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
     container.appendChild(section);
 }
 
-// 所有关系线始终存在，选中节点只改变相关线条的强调样式。
+// Edge emphasis belongs to the desktop graph. Phone taps open node details.
 function updateKnowledgeGraphEdgeEmphasis(canvas, selectedNodeId) {
     if (!canvas) return;
-    canvas.querySelectorAll(".kg-edge,.kg-mobile-edge").forEach(edge => {
+    canvas.querySelectorAll(".kg-edge").forEach(edge => {
         const related = Boolean(selectedNodeId) && (
             edge.dataset.from === selectedNodeId
             || edge.dataset.to === selectedNodeId
         );
         edge.classList.toggle("is-related", related);
     });
+}
+
+function openKnowledgeGraphNodeSheet(keepExpanded = false) {
+    const modal = document.getElementById("knowledgeGraphModal");
+    if (!modal?.classList.contains("graph-fullscreen-view") || !window.matchMedia("(max-width:760px)").matches) return;
+    knowledgeGraphNodeSheet ||= window.DMateKnowledgeGraphSheet?.mount(modal);
+    knowledgeGraphNodeSheet?.open({keepExpanded});
 }
 
 function navigateKnowledgeGraphRelation(nodeId) {
@@ -22060,8 +22071,11 @@ function navigateKnowledgeGraphRelation(nodeId) {
     if (window.matchMedia("(max-width:760px)").matches && !knowledgeGraphMobileFullscreen) {
         setKnowledgeGraphFullscreenView(true);
     }
-    if (reuseCanvas) selectKnowledgeGraphNode(target.id, existing);
-    else renderKnowledgeGraph();
+    if (reuseCanvas) selectKnowledgeGraphNode(target.id, existing, {keepSheetExpanded:true});
+    else {
+        renderKnowledgeGraph();
+        openKnowledgeGraphNodeSheet(true);
+    }
 
     // Preserve the current zoom; scroll only enough to reveal the target.
     requestAnimationFrame(() => {
@@ -22087,7 +22101,7 @@ function navigateKnowledgeGraphRelation(nodeId) {
     });
 }
 
-function selectKnowledgeGraphNode(nodeId, sourceElement = null) {
+function selectKnowledgeGraphNode(nodeId, sourceElement = null, {keepSheetExpanded = false} = {}) {
     knowledgeGraphSelectedNodeId = nodeId;
     knowledgeGraphSideMode = "detail";
 
@@ -22107,6 +22121,7 @@ function selectKnowledgeGraphNode(nodeId, sourceElement = null) {
     // 只刷新右侧/下方详情，不重建全部节点和连线。
     // 手机上点击节点时不会再出现整张图谱闪一下、卡一下。
     renderKnowledgeGraphSide({refreshHistory:false});
+    if (selected?.matches(".kg-mobile-node")) openKnowledgeGraphNodeSheet(keepSheetExpanded);
 }
 
 
@@ -22323,6 +22338,7 @@ function renderKnowledgeGraphSide({refreshHistory = true} = {}) {
         document.getElementById("knowledgeGraphHistory")?.replaceChildren();
         renderKnowledgeGraphDetail();
     }
+    knowledgeGraphNodeSheet?.sync();
 }
 
 function renderKnowledgeGraphDetail() {
