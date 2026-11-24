@@ -177,6 +177,39 @@ async function resize(page, kind, mode) {
   await ready(page, kind);
 }
 
+async function desktopGraphGeometry(page) {
+  const geometry = await page.locator('.kg-desktop-viewport').evaluate(viewport => {
+    const svg = viewport.querySelector('.kg-svg');
+    const transform = svg.getScreenCTM();
+    return {
+      zoom: Number(viewport.querySelector('.kg-desktop-zoom-surface').dataset.scale),
+      axes: [Math.hypot(transform.a, transform.b), Math.hypot(transform.c, transform.d)],
+      bounds: svg.getAttribute('viewBox'),
+      nodes: Array.from(svg.querySelectorAll('.kg-node-group'), node => {
+        const box = node.querySelector('rect');
+        return [node.getAttribute('transform'), box.getAttribute('width'), box.getAttribute('height')];
+      }),
+      edges: Array.from(svg.querySelectorAll('.kg-edge'), edge => edge.getAttribute('d'))
+    };
+  });
+  const {zoom, axes, ...shape} = geometry;
+  for (const axis of axes) near(axis, zoom, 'Desktop graph uses the same zoom on both axes', .0002);
+  return shape;
+}
+
+async function checkDesktopGraphReturn(page, label) {
+  const original = await desktopGraphGeometry(page);
+  await resize(page, 'graph', 'mobile');
+  await page.setViewportSize({ ...dimensions.desktop, width: 1024 });
+  await ready(page, 'graph');
+  const narrow = await desktopGraphGeometry(page);
+  assert.equal(narrow.bounds, original.bounds, label + ': desktop graph bounds survive a narrow return');
+  assert.deepEqual(narrow.nodes, original.nodes, label + ': node proportions and spacing are stable');
+  assert.deepEqual(narrow.edges, original.edges, label + ': curves keep their geometry');
+  await resize(page, 'graph', 'desktop');
+  assert.deepEqual(await desktopGraphGeometry(page), original, label + ': widening preserves the same desktop graph');
+}
+
 async function sameModeEdgeResize(page, mode, label) {
   await view(page, 'graph').evaluate(viewport => { viewport.scrollLeft = 1e7; viewport.scrollTop = 1e7; });
   await settle(page);
@@ -224,6 +257,7 @@ async function runCase(browser, kind, offline, first) {
   const label = (offline ? 'offline' : 'online') + '/' + kind + '/' + first + '-first';
   try {
     const initial = await firstFit(page, kind, label + '/' + first);
+    if (kind === 'graph' && first === 'desktop') await checkDesktopGraphReturn(page, label);
     const remembered = { [first]: await customize(page, kind, 0) };
     assert.notEqual(remembered[first].scale, initial.scale, label + ': first camera really changed');
     if (kind === 'graph') remembered[first] = await sameModeEdgeResize(page, first, label);

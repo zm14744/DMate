@@ -21689,48 +21689,22 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
         nodes, computeKnowledgeGraphLevels(nodes)
     );
 
-    const mobileGraphLayout = isMobileAppShell();
-    let nodeWidth = dmateUiLanguage() === "en" ? 190 : 132;
-    let nodeHeight = dmateUiLanguage() === "en" ? 78 : 58;
-    let horizontalGap = 74;
-    let verticalGap = 26;
-    let margin = 24;
-
-    if (mobileGraphLayout) {
-        const viewportWidth = Math.max(
-            320,
-            Math.min(Number(window.innerWidth) || 390, 760)
-        );
-        const columnCount = Math.max(columnKeys.length, 1);
-        const usableWidth = Math.max(280, viewportWidth - 40);
-
-        horizontalGap = columnCount <= 2 ? 26 : 18;
-        margin = 12;
-
-        const fittedWidth = Math.floor(
-            (
-                usableWidth
-                - margin * 2
-                - Math.max(columnCount - 1, 0) * horizontalGap
-            ) / columnCount
-        );
-
-        // 手机优先把常见 2~3 列图谱完整放进卡片；列数再多时
-        // 保持最低可读宽度，并只在图谱卡片内部横向滚动。
-        nodeWidth = Math.max(88, Math.min(118, fittedWidth));
-        nodeHeight = nodeWidth >= 108 ? 56 : 52;
-        verticalGap = 22;
-    }
+    // The desktop camera stores unscaled graph coordinates. Keep them stable
+    // across desktop viewport widths, including the narrow app shell.
+    const english = dmateUiLanguage() === "en";
+    const nodeWidth = english ? 190 : 132;
+    const horizontalGap = 74;
+    const verticalGap = 26;
+    const margin = 24;
 
     const labelPack = window.DMateKnowledgeGraphLabels.prepare(nodes, {
         label: node => dmateKnowledgeLabel(node.name),
         badge: node => dmateUiText(knowledgeGraphNodeState(node.name, context).badge || node.level || ""),
-        width: nodeWidth, minHeight: nodeHeight,
-        titleSize: mobileGraphLayout ? 14 : 12, weight: mobileGraphLayout ? 600 : 500,
-        badgeSize: mobileGraphLayout ? 11 : 10, badgeWeight: 500,
+        width: nodeWidth, minHeight: english ? 78 : 58,
+        titleSize: 12, weight: 500, badgeSize: 10, badgeWeight: 500,
         paddingX: 10, paddingY: 10, gap: 5
     });
-    nodeHeight = labelPack.height;
+    const nodeHeight = labelPack.height;
 
     const maxRows = Math.max(
         ...columnKeys.map(
