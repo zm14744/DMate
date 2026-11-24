@@ -8646,7 +8646,7 @@ function openWrongRetestReview(id) {
     });
     modal.classList.remove("hidden");
     modal.setAttribute("aria-hidden","false");
-    renderMath(list);
+    void renderVisibleMath(list.querySelectorAll(".wrong-retest-review-question,.wrong-retest-review-detail"));
 }
 function closeWrongRetestReview() {
     const modal = document.getElementById("wrongRetestReviewModal");
@@ -10652,13 +10652,8 @@ function renderWrongBook() {
 
         card.appendChild(actions);
         list.appendChild(card);
-
-        renderMath(question);
-        renderMath(feedback);
-        renderMath(note);
-        renderMath(answerDetails);
-        renderMath(analysisBox);
     }
+    void renderVisibleMath(list.querySelectorAll(".wrong-question,.wrong-feedback-body,.wrong-note-body,.wrong-answer-inner,.wrong-analysis-body"));
 }
 
 
@@ -11252,14 +11247,43 @@ async function mathEngineFor(target) {
     return engine;
 }
 
-async function renderMath(target) {
+async function renderMath(target, isCurrent) {
     try {
-        if (!await mathEngineFor(target)) return;
+        if (!await mathEngineFor(Array.isArray(target) ? target[0] : target)) return;
     } catch (error) {
         console.warn("MathJax 渲染失败：", error);
         return;
     }
-    return window.DMateMathMarkdown?.renderMath(target);
+    return window.DMateMathMarkdown?.renderMath(target, isCurrent);
+}
+
+const pendingMathSections = new WeakMap();
+const mathSourcePattern = /\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|(?<!\\)\$(?!\$)(?:\\.|[^$\n])+\$|\\(?:(?:begin|(?:eq)?ref)\{|\$)/;
+
+function renderVisibleMath(sections) {
+    // Set visibility in the insertion task. OCR panes can be reused before
+    // their previous typesetting completes, so only the latest call reveals them.
+    const operation = {};
+    const pending = [];
+    for (const section of sections) {
+        if (!section) continue;
+        if (mathSourcePattern.test(section.textContent)) {
+            pendingMathSections.set(section, operation);
+            section.classList.add("math-pending");
+            pending.push(section);
+        } else if (pendingMathSections.delete(section)) {
+            section.classList.remove("math-pending");
+        }
+    }
+    if (!pending.length) return Promise.resolve();
+    const owns = section => pendingMathSections.get(section) === operation;
+    return renderMath(pending, section => owns(section) && section.isConnected).finally(() => {
+        for (const section of pending) {
+            if (!owns(section)) continue;
+            pendingMathSections.delete(section);
+            section.classList.remove("math-pending");
+        }
+    });
 }
 
 
@@ -11753,6 +11777,7 @@ function createRenderedCopyStage(content) {
     stage.style.pointerEvents = "none";
     stage.appendChild(content);
     // Styles are applied to this export-only clone, not the visible content.
+    stage.querySelectorAll(".math-pending").forEach(node => node.classList.remove("math-pending"));
     stripClipboardControls(stage);
     flattenClipboardDetails(stage);
     stage.querySelectorAll(".difficulty-badge").forEach(node => node.remove());
@@ -15680,11 +15705,7 @@ function reviewRecognizedQuestion(file, data) {
         dialog.addEventListener("close", finish);
         try {
             dialog.showModal();
-            // MathJax needs a visible container to lay out formulas correctly.
-            // Use the site's existing renderer: no additional model or API call.
-            void renderMath(question).then(() => {
-                if (dialog.open) return renderMath(graph);
-            });
+            void renderVisibleMath([question, graph]);
             // Keep the dialog at its top after opening; the user can scroll
             // through the rendered results or select optional instructions.
         } catch (exception) {
@@ -18557,6 +18578,7 @@ function renderChat(preparedReply = null) {
         String(lastRenderedChatSessionId ?? "")
         !== String(session.id)
     );
+    const mathSections = [];
 
     for (
         let messageIndex = 0;
@@ -18595,6 +18617,7 @@ function renderChat(preparedReply = null) {
         if (message.role === "user") {
             content.textContent = message.text;
             content.style.whiteSpace = "pre-wrap";
+            mathSections.push(content);
         } else {
             const displayText = message.generatedExercise
                 ? hideGeneratedExerciseKnowledgePoints(prepareAiDisplayText(message.text), message.generatedTeaching)
@@ -18605,7 +18628,11 @@ function renderChat(preparedReply = null) {
             } else if (ready?.text === displayText) {
                 content.appendChild(ready.content);
             } else {
-                content.innerHTML = `<div class="ai-content math-pending">${markdownToHtml(displayText)}</div>`;
+                const answer = document.createElement("div");
+                answer.className = "ai-content";
+                answer.innerHTML = markdownToHtml(displayText);
+                content.appendChild(answer);
+                mathSections.push(answer);
             }
             div.dmateMessage = message;
             div.dmateRenderedText = displayText;
@@ -18766,12 +18793,9 @@ function renderChat(preparedReply = null) {
     }
 
     queueChatJumpControlsUpdate();
-    renderMath(chat).then(() => {
+    renderVisibleMath(mathSections).then(() => {
         // A newer history render or session switch owns the scroll position.
         if (renderChat.currentOperation !== renderOperation || getCurrent() !== session) return;
-        for (const content of chat.querySelectorAll(".ai-content.math-pending")) {
-            content.classList.remove("math-pending");
-        }
         // 公式渲染会改变消息高度，必须在排版完成后再恢复一次位置。
         // 否则长公式/矩阵会把当前视口“顶”到上方。
         if (shouldStickBottom) {
@@ -22107,7 +22131,7 @@ function renderKnowledgeGraphHistory(items) {
         card.append(preview, actions);
         list.append(card);
     }
-    renderMath(list);
+    void renderVisibleMath(list.querySelectorAll(".kg-history-preview"));
 }
 
 function setKnowledgeGraphSideMode(mode) {

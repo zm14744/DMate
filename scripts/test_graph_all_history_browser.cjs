@@ -21,6 +21,45 @@ async function openHistory(page) {
   await settle(page);
 }
 
+async function checkFirstMathPaint(page) {
+  const url = '**/tex-svg.js';
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  await page.route(url, async route => { await gate; await route.continue(); });
+  try {
+    await page.evaluate(() => {
+      sessions[0].messages.push({messageId:'first-history-math', role:'user',
+        text:'求集合 $A \\cup B$ 的大小。', manualIsQuestion:true});
+    });
+    const requested = page.waitForRequest(url);
+    await openHistory(page);
+    await requested;
+    const mathCard = page.locator(cards + '[data-message-id="first-history-math"]');
+    const preview = mathCard.locator('.kg-history-preview');
+    const plain = page.locator(cards + '[data-message-id="top-manual"] .kg-history-preview');
+    for (let visit = 0; visit < 2; visit++) {
+      if (visit) {
+        await page.locator('#knowledgeGraphFocusBtn').click();
+        await openHistory(page);
+      }
+      assert.equal(await preview.count(), 1);
+      assert.equal(await preview.isVisible(), false, 'Raw TeX stays hidden until typesetting completes');
+      assert.equal(await plain.isVisible(), true, 'Plain questions remain readable during the math download');
+      await mathCard.locator('[data-history-action="locate"]').click({trial:true});
+    }
+    release();
+    await preview.locator('mjx-container > svg').waitFor({state:'visible'});
+    assert.doesNotMatch(await preview.innerText(), /\$|\\cup/);
+  } finally {
+    release();
+    await page.unroute(url);
+    await page.evaluate(() => {
+      closeKnowledgeGraph();
+      sessions[0].messages = sessions[0].messages.filter(message => message.messageId !== 'first-history-math');
+    });
+  }
+}
+
 
 async function assertModeControls(page,mode,label,recentAvailable=true) {
   const selectors={full:'#knowledgeGraphFocusBtn',focus:'#knowledgeGraphScopeBtn',history:'#knowledgeGraphHistoryBtn'};
@@ -132,6 +171,7 @@ async function checkCase(browser,width,language) {
     await page.goto(baseURL,{waitUntil:'networkidle'});
     await page.waitForFunction(()=>!accountVerificationOperation);
     const fixture=await seedConversations(page);
+    if (width === 1440 && language === 'zh-CN') await checkFirstMathPaint(page);
     await page.evaluate(value=>DMateI18n.setLanguage(value,false),language);
     const sidebarOrder=await page.locator('#sessions>.session').evaluateAll(nodes=>nodes.map(node=>node.dataset.sessionId));
     assert.deepEqual(sidebarOrder,fixture.conversationOrder,label+': fixture sidebar order intentionally contradicts timestamps');

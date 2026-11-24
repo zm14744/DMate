@@ -152,7 +152,7 @@
         return result;
     }
 
-    function renderMath(target) {
+    function renderMath(target, isCurrent) {
         // Startup may still be loading TeX extensions on the first reply.
         // History, streamed previews and answer panels share one MathJax
         // document, so they must not typeset it concurrently.
@@ -160,7 +160,10 @@
             try {
                 await root.MathJax?.startup?.promise;
                 if (typeof root.MathJax?.typesetPromise !== 'function') return;
-                await root.MathJax.typesetPromise(target ? [target] : undefined);
+                const targets = Array.isArray(target) ? target : target ? [target] : undefined;
+                const current = isCurrent ? targets?.filter(isCurrent) : targets;
+                if (current?.length === 0) return;
+                await root.MathJax.typesetPromise(current);
             } catch (error) {
                 // A presentation failure must not discard a completed answer
                 // or be reported as a failed network connection.
