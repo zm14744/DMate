@@ -583,6 +583,12 @@
     const search = el("input", "dcn-search");
     search.type = "search"; search.placeholder = tr("搜索", "Search"); search.setAttribute("aria-label", tr("搜索", "Search")); search.value = state.noteQuery;
     const searchWrap = el("div", "dcn-search-wrap");
+    const searchIcon = window.DMateOfflineIcons?.create("search");
+    if (searchIcon) {
+      searchIcon.setAttribute("class", "dcn-search-icon");
+      searchIcon.setAttribute("data-icon", "search");
+      searchWrap.append(searchIcon);
+    }
     const searchClear = button("", "dcn-search-clear", () => {
       search.value = ""; state.noteQuery = ""; renderList(); search.focus({preventScroll:true});
     });

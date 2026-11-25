@@ -71,6 +71,55 @@
 .dcn-dialog.is-empty .dcn-list{grid-column:1/-1;display:grid;place-items:center;overflow:auto}
 .dcn-dialog.is-empty .dcn-list-empty{margin:0}
 
+.dcn-search-icon{display:none}
+@media(min-width:1101px){
+    .dcn-dialog:not(.is-empty) .dcn-content {
+        grid-template-columns:minmax(180px,260px) auto minmax(0,1fr);
+        grid-template-rows:auto minmax(0,1fr);
+        row-gap:12px;
+    }
+    .dcn-dialog:not(.is-empty) .dcn-sidebar {display:contents}
+    .dcn-dialog:not(.is-empty) .dcn-list {grid-area:1 / 1 / -1 / 2}
+    .dcn-dialog:not(.is-empty) .dcn-main {grid-area:2 / 2 / -1 / -1}
+    .dcn-dialog:not(.is-empty) :is(.dcn-selection,.dcn-new > .dmate-ui-label) {display:none}
+    .dcn-dialog:not(.is-empty) button.dcn-new {
+        --dm-control-bg:transparent;
+        --dm-control-hover-bg:transparent;
+        --dm-control-text:var(--text-secondary);
+        grid-area:1 / 2;
+        justify-content:center;
+        width:44px;
+        padding:0;
+        border:0;
+        border-radius:9px;
+        background:transparent;
+        color:var(--text-secondary);
+    }
+    .dcn-dialog:not(.is-empty) .dcn-search-wrap {
+        grid-area:1 / 3;
+        justify-self:end;
+        display:grid;
+        grid-template-columns:auto minmax(0,1fr);
+        align-items:center;
+        gap:8px;
+        width:min(100%,240px);
+        margin-right:5px;
+    }
+    .dcn-dialog:not(.is-empty) .dcn-search-icon {
+        display:block;
+        width:20px;
+        height:20px;
+        color:var(--text-secondary);
+        fill:none;
+        stroke:currentColor;
+        stroke-width:1.8;
+        stroke-linecap:round;
+        stroke-linejoin:round;
+        pointer-events:none;
+    }
+    .dcn-dialog:not(.is-empty) input.dcn-search::placeholder {opacity:0}
+}
+
 /* Stretch the input itself to the create button's height, not just its wrapper. */
 .dcn-dialog input.dcn-search { height:100%; }
 @layer dmate-search-controls {

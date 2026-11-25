@@ -37,14 +37,38 @@ async function checkNoteControlRow(panel) {
   const widths = viewport.width > 1100 ? [viewport.width] : [320, viewport.width, 768];
   for (const width of widths) {
     await page.setViewportSize({...viewport,width});
+    await settle(page);
     const row = await panel.evaluate(panel => {
       const shape = selector => {
         const element = panel.querySelector(selector), box = element.getBoundingClientRect(), css = getComputedStyle(element);
-        return {left:box.left,right:box.right,top:box.top,width:box.width,height:box.height,
-          radius:css.borderRadius,border:css.borderTopWidth,style:css.borderTopStyle};
+        return {left:box.left,right:box.right,top:box.top,bottom:box.bottom,width:box.width,height:box.height,
+          radius:css.borderRadius,border:css.borderTopWidth,style:css.borderTopStyle,background:css.backgroundColor};
       };
-      return {create:shape('.dcn-new'),search:shape('.dcn-search'),empty:panel.classList.contains('is-empty')};
+      const icon = selector => {
+        const svg = panel.querySelector(selector), box = svg.getBoundingClientRect(), css = getComputedStyle(svg);
+        return {width:box.width,height:box.height,stroke:css.stroke,strokeWidth:css.strokeWidth};
+      };
+      return {create:shape('.dcn-new'),search:shape('.dcn-search'),main:shape('.dcn-main'),
+        searchIcon:shape('.dcn-search-icon'),pen:icon('.dcn-new svg'),magnifier:icon('.dcn-search-icon'),
+        newText:panel.querySelector('.dcn-new').innerText,
+        selectedVisible:!!panel.querySelector('.dcn-selection')?.getClientRects().length,
+        empty:panel.classList.contains('is-empty')};
     });
+    if (!row.empty && width > 1100) {
+      assert.equal(row.newText,'');
+      assert.equal(row.selectedVisible,false);
+      assert.equal(row.create.border,'0px');
+      assert.equal(row.create.background,'rgba(0, 0, 0, 0)');
+      assert.equal(row.search.border,'1px');
+      assert.deepEqual(row.pen,row.magnifier,'Create and search use matching Lucide icon styles');
+      assert.ok(row.searchIcon.right < row.search.left,'The magnifier sits outside the input');
+      assert.ok(Math.abs(row.create.left-row.main.left)<1 && Math.abs(row.create.top-row.search.top)<1
+        && row.create.bottom < row.main.top && row.search.right <= row.main.right,
+      'Create and search align above the right editor');
+      continue;
+    }
+    assert.equal(row.newText,'新概念');
+    assert.equal(row.searchIcon.width,0);
     for (const key of ['radius','border','style']) assert.equal(row.create[key],row.search[key]);
     if (row.empty || width <= 680) {
       for (const key of ['top','height']) assert.ok(Math.abs(row.create[key]-row.search[key]) < 1,
@@ -57,7 +81,7 @@ async function checkNoteControlRow(panel) {
         width+': populated mobile notebook preserves its original two columns');
     } else {
       assert.ok(row.search.top >= row.create.top+row.create.height+9,
-        width+': populated desktop notebook stacks create and search');
+        width+': the tablet notebook stacks create and search');
       for (const key of ['left','width']) assert.ok(Math.abs(row.create[key]-row.search[key]) < 1,
         width+': stacked notebook controls share their '+key);
     }
@@ -84,14 +108,17 @@ async function onlineStyles(page,theme) {
   await page.locator('#appConfirmClose').click();
   await page.locator('#wrongBookClose').click();
   await page.evaluate(()=>{
-    learningState.conceptNotebook={notes:[{id:'style-note',title:'样式参考',content:'参考笔记',updatedAt:1}],deleted:{}};
+    learningState.conceptNotebook={notes:[],deleted:{}};
     initializeConceptNotebook();window.dmateConceptNotebook.open();
   });
   const notebook=page.locator('#conceptNotebookDialog');
   await notebook.waitFor({state:'visible'});
   await checkNoteControlRow(notebook);
+  await notebook.getByRole('button',{name:'新概念',exact:true}).click();
+  await notebook.locator('.dcn-title').fill('样式参考');
+  await notebook.locator('.dcn-original').fill('参考笔记');
+  await checkNoteControlRow(notebook);
   result.create=await style(notebook.locator('.dcn-new'));
-  assert.equal(await notebook.locator('.dcn-new').innerText(),'新概念');
   assert.equal(await notebook.locator('.dcn-original').getAttribute('aria-label'),'概念内容');
   assert.equal((await notebook.locator('.dcn-editor label').last().innerText()).trim(),'概念内容');
   result.remove=await circle(notebook.locator('.dcn-note-delete'));
@@ -203,7 +230,7 @@ async function exercise(page,reference,width) {
   await page.locator('.dcn-title').fill('集合笔记');await page.locator('.dcn-original').fill('保留我的原始推导：幂集含有所有子集');
   await page.waitForFunction(async()=>(await __offlineTestStore.all('notes')).some(row=>row.content.includes('原始推导')));
   const firstNote=(await records(page,'notes'))[0];
-  await page.mouse.move(0,0);await settle(page);assert.deepEqual(await style(page.locator('#addNote')),reference.create,'The original notebook create action has the online filled style');
+  await page.mouse.move(0,0);await settle(page);assert.deepEqual(await style(page.locator('#addNote')),reference.create,'The offline create action shares the online style');
   assert.deepEqual(await circle(page.locator('.dcn-note-delete')),reference.remove,'The notebook delete dot matches the online red circle');
   assert.equal(await page.locator('#notesPanel .dcn-note-select,#notesPanel input[type="checkbox"]').count(),0,'Offline note rows have no selection circles');
   assert.equal(await page.locator('#notesPanel .dcn-selection').count(),0,'Offline notes have no selected-count hint');
