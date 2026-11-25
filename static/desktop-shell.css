@@ -16,6 +16,21 @@ body[data-appearance-theme] :is(#desktopNewChatBtn,#mobileNewChatBtn) {
 }
 
 @media(min-width:1101px) {
+    :root {
+        --dmate-desktop-composer-padding-bottom:16px;
+        --dmate-desktop-composer-row-gap:6px;
+        --dmate-desktop-disclaimer-margin:8px;
+        --dmate-desktop-disclaimer-size:11px;
+        --dmate-desktop-disclaimer-line-height:1.5;
+    }
+    /* Use the docked composer's footer spacing on the welcome screen. */
+    :root:has(.center.chat-empty > .input-wrap:not([hidden])) {
+        --dmate-tool-window-bottom:calc(
+            var(--dmate-desktop-composer-padding-bottom) + var(--dmate-desktop-composer-row-gap)
+            + var(--dmate-desktop-disclaimer-margin)
+            + var(--dmate-desktop-disclaimer-size) * var(--dmate-desktop-disclaimer-line-height)
+        );
+    }
     body[data-appearance-theme] {
         --dmate-sidebar-width:280px;
         --dmate-reading-width:960px;
@@ -106,7 +121,14 @@ body[data-appearance-theme] :is(#desktopNewChatBtn,#mobileNewChatBtn) {
     body[data-appearance-theme] .center > #chat > .msg { max-width:85%; }
     body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) {
         flex:0 0 auto; width:min(100%,calc(var(--dmate-reading-width) + 48px)) !important;
-        margin:0 auto !important; padding:var(--dmate-mode-row-height) 24px 16px !important;
+        margin:0 auto !important;
+        padding:var(--dmate-mode-row-height) 24px var(--dmate-desktop-composer-padding-bottom) !important;
+        row-gap:var(--dmate-desktop-composer-row-gap);
+    }
+    body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap > .dmate-disclaimer {
+        margin-top:var(--dmate-desktop-disclaimer-margin);
+        font-size:var(--dmate-desktop-disclaimer-size);
+        line-height:var(--dmate-desktop-disclaimer-line-height);
     }
     body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap > .manual-question-mode { left:24px; }
     body[data-appearance-theme] .center.chat-empty > .input-wrap > .manual-question-mode { left:0; }

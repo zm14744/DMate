@@ -80,10 +80,11 @@ async function checkGraph(page) {
   assert.equal(borders.gutter,'auto','Hidden scrollbars reserve no gutter');
 }
 
-async function compareTools(page, offline, active, sizes) {
+async function compareTools(page, offline, active, sizes, previousFrames) {
   const reference = [];
-  let notebookTitle;
+  const frames = {}, notebookTitles = [];
   for (const tool of offline ? offlineTools : tools) {
+    frames[tool.name] = [];
     await page.setViewportSize(sizes[0]);
     const surface = await openTool(page,tool,offline);
     for (const [index,size] of sizes.entries()) {
@@ -97,23 +98,29 @@ async function compareTools(page, offline, active, sizes) {
       assert.ok(parseFloat(box.radius) > 0,label+' has rounded corners');
       if (reference[index]) compare(box,reference[index],label);
       else reference[index] = box;
+      frames[tool.name][index] = box;
+      if (previousFrames) {
+        const previous = previousFrames[tool.name][index];
+        compare(box,previous,label+' matches the same tool across conversation states');
+        assert.equal(box.paint,previous.paint,label+' keeps the same surface color');
+      }
       if (!offline) {
         if (active) {
           const composer = await page.locator('.center > .input-wrap > .input').boundingBox();
           near(box.y+box.height,composer.y+composer.height,label+' aligns with the conversation composer');
-        } else near(box.y+box.height,size.height-16,label+' uses the full-size welcome frame');
+        }
         const chrome = await titleBar(surface);
-        if (tool.name === 'notebook') notebookTitle = chrome;
-        else assert.deepEqual(chrome,notebookTitle,label+' shares the notebook title bar');
+        if (tool.name === 'notebook') notebookTitles[index] = chrome;
+        else assert.deepEqual(chrome,notebookTitles[index],label+' shares the notebook title bar');
       }
       if (tool.name === 'graph') await checkGraph(page);
     }
     if (!offline) await page.locator(tool.close).click();
   }
-  return reference;
+  return frames;
 }
 
-async function checkEdition(browser, offline) {
+async function checkEdition(browser, offline, theme) {
   const context = await browser.newContext({viewport:desktop,serviceWorkers:'block'});
   const page = await context.newPage(), unexpected = [];
   await page.route('**/auth/me', route => route.fulfill({json:{configured:true,authenticated:false}}));
@@ -128,6 +135,8 @@ async function checkEdition(browser, offline) {
     } else {
       await page.waitForFunction(() => !accountVerificationOperation);
       await page.locator('.center.chat-empty').waitFor();
+      await page.evaluate(theme => { appearanceSettings.mode=theme; applyAppearanceSettings({save:false}); },theme);
+      assert.equal(await page.locator('html').getAttribute('data-appearance-theme'),theme);
       const welcomeFrames = await compareTools(page,false,false,[desktop,narrow]);
       await page.evaluate(() => {
         newChat();
@@ -136,7 +145,9 @@ async function checkEdition(browser, offline) {
       });
       await page.locator('.center:not(.chat-empty) #chat .msg.user').waitFor();
       await page.waitForFunction(() => !document.querySelector('.center').dataset.composerMotion);
-      await compareTools(page,false,true,[desktop]);
+      const activeFrames = await compareTools(page,false,true,[desktop,narrow],welcomeFrames);
+      await page.setViewportSize(desktop);
+      await settle(page);
       const singleLine = await page.locator('.center > .input-wrap > .input').boundingBox();
       await page.locator('#text').fill('多行草稿\n用于测试输入框扩展\n窗口底边仍对齐');
       await settle(page);
@@ -147,10 +158,9 @@ async function checkEdition(browser, offline) {
       await page.evaluate(() => { currentId=null;renderAll(); });
       await page.locator('.center.chat-empty').waitFor();
       await page.waitForFunction(() => !document.querySelector('.center').dataset.composerMotion);
-      const notebook = tools[0], surface = await openTool(page,notebook,false);
-      await settle(page);
-      compare(await frame(surface),welcomeFrames[0],'Returning to welcome restores its large frame');
-      await page.locator(notebook.close).click();
+      await compareTools(page,false,false,[desktop,narrow],activeFrames);
+      await page.setViewportSize(desktop);
+      const notebook = tools[0];
       await page.locator('.center > .input-wrap').evaluate(node => { node.hidden=true; });
       const fallback = await openTool(page,notebook,false);
       await settle(page);
@@ -166,13 +176,16 @@ async function checkEdition(browser, offline) {
     await settle(page);
     await checkGraph(page);
     assert.deepEqual(unexpected,[]);
-    console.log('PASS '+(offline?'offline workspace frames':'online tool frames and title bars')+', responsive geometry and graph separator');
+    console.log('PASS '+(offline?'offline workspace frames':'online '+theme+' tool frames over welcome and active chat')+', responsive geometry and graph separator');
   } finally { await context.close(); }
 }
 
 (async () => {
   const browser = await chromium.launch({headless:true,ignoreDefaultArgs:['--hide-scrollbars'],
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? {executablePath:process.env.CHROMIUM_EXECUTABLE_PATH} : {})});
-  try { await checkEdition(browser,false); await checkEdition(browser,true); }
+  try {
+    for (const theme of ['dark','navy']) await checkEdition(browser,false,theme);
+    await checkEdition(browser,true);
+  }
   finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode=1; });
