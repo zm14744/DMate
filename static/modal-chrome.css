@@ -29,6 +29,18 @@
         inset:auto 0 var(--dmate-tool-window-bottom) 0;
         margin:0 auto;
     }
+
+    :is(#wrongBookModal,#knowledgeGraphModal,#learningReviewModal) > .modal-card > .modal-head,
+    #conceptNotebookDialog > .dcn-heading,
+    :is(#graphEditorDialog:has(.dmate-drawing-workspace),#drawingPanel) > .graph-editor-dialog-head {
+        flex:0 0 auto;
+        padding:14px 16px;
+        border-bottom:1px solid var(--surface-3)!important;
+        font:400 var(--font-base,16px)/normal var(--dmate-font-ui,system-ui);
+    }
+
+    /* The export buttons keep their hit area while matching the notebook's title row. */
+    #knowledgeGraphModal .graph-head-actions { height:20px; }
 }
 
 /* Share the wrong-book, learning-report and knowledge-graph header geometry.

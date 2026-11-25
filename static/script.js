@@ -13560,13 +13560,12 @@ function installChatJumpControls() {
     const inputWrap = center?.querySelector(":scope > .input-wrap");
     const composer = inputWrap?.querySelector(":scope > .input");
     const refreshLayout = () => {
-        // Every visible desktop capsule, including the welcome composer,
-        // supplies the same bottom anchor above any footer hints.
+        // Align to the conversation footer. The centered welcome capsule
+        // sits inside the space reserved for the full-size tool windows.
         if (!center?.dataset.composerMotion) {
             const capsuleBounds = composer?.getBoundingClientRect();
-            const bounds = window.innerWidth > 1100
-                ? capsuleBounds : null;
-            const bottom = bounds?.height ? `${Math.max(0, window.innerHeight - bounds.bottom)}px` : "";
+            const bottom = window.innerWidth > 1100 && !center?.classList.contains("chat-empty") && capsuleBounds?.height
+                ? `${Math.max(0, window.innerHeight - capsuleBounds.bottom)}px` : "";
             const style = document.documentElement.style;
             if (style.getPropertyValue("--dmate-tool-window-bottom") !== bottom) {
                 style.setProperty("--dmate-tool-window-bottom", bottom);

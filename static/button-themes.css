@@ -611,6 +611,12 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         line-height:1!important;
     }
     body[data-appearance-theme] #knowledgeGraphCopyBtn { justify-self:end; }
+    @media(min-width:1101px) {
+        /* Keep the export button's hit area inside the notebook-height title row. */
+        :is(#graphEditorDialog,#drawingPanel) > .graph-editor-dialog-head > .ddw-header-export {
+            margin-block:-6px!important;
+        }
+    }
     /* Match the floating mobile bar's capsule without clipping focus rings. */
     body[data-appearance-theme] #knowledgeGraphModal .kg-mobile-zoom-controls button {
         border-radius:999px!important;

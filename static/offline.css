@@ -369,7 +369,7 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
 
   /* These tools are inline pages, so center their common frame in the main
      column while retaining room for workspace navigation and safe scrolling. */
-  body.offline-workspace .offline-main > :is(#notesPanel,#mistakesPanel,#graphPanel,#drawingPanel) {
+  body.offline-workspace .offline-main > :is(#notesPanel,#mistakesPanel,#graphPanel,#drawingPanel,#questionsPanel,#conceptsPanel) {
     box-sizing:border-box;
     flex:0 1 auto;
     width:min(var(--dmate-tool-window-width,1160px),calc(100% - 48px));

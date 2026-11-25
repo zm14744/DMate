@@ -21,7 +21,7 @@
     };
     const update = (input, record) => {
         const label = text('搜索', 'Search'), clear = text('清空搜索', 'Clear search');
-        attribute(input, 'placeholder', label);
+        input.removeAttribute('placeholder');
         attribute(input, 'aria-label', label);
         attribute(record.button, 'aria-label', clear);
         attribute(record.button, 'title', clear);

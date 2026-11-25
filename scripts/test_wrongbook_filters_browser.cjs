@@ -94,6 +94,19 @@ async function oldestFirst(page) {
   }
 }
 
+async function checkEmptyCenter(message) {
+  assert.ok(await message.evaluate(node => {
+    const list = node.parentElement.getBoundingClientRect();
+    const panel = node.closest('.modal-card').getBoundingClientRect();
+    const contents = document.createRange();
+    contents.selectNodeContents(node);
+    const group = contents.getBoundingClientRect();
+    return Math.abs(panel.bottom-list.bottom) <= 2
+      && Math.abs(group.left+group.width/2-list.left-list.width/2) <= 1
+      && Math.abs(group.top+group.height/2-list.top-list.height/2) <= 1;
+  }), 'The empty icon and label are centered in the full content area below the toolbar');
+}
+
 async function runCase(browser, width) {
   const context = await browser.newContext({ viewport: { width, height: 900 }, timezoneId: 'UTC', serviceWorkers: 'block',
     ...(width <= 1100 ? { isMobile: true, hasTouch: true } : {}) });
@@ -120,11 +133,7 @@ async function runCase(browser, width) {
     assert.equal(await emptyBook.innerText(), '暂时没有错题');
     const emptyBookStyle = await emptyBook.locator('span').evaluate(promptStyle);
     assert.equal(await emptyBook.locator('svg').innerHTML(), await page.locator('#wrongBookBtn > svg').innerHTML());
-    assert.ok(await emptyBook.evaluate(el => {
-      const group = el.getBoundingClientRect(), list = el.parentElement.getBoundingClientRect();
-      return Math.abs(group.left + group.width / 2 - list.left - list.width / 2) <= 1
-        && Math.abs(group.top + group.height / 2 - list.top - list.height / 2) <= 1;
-    }), 'The empty book message is centered below the filters');
+    await checkEmptyCenter(emptyBook);
     await page.evaluate(() => DMateI18n.setLanguage('en', false));
     assert.equal(await emptyBook.innerText(), 'No mistakes yet');
     const englishEmptyBookStyle = await emptyBook.locator('span').evaluate(promptStyle);
@@ -132,7 +141,8 @@ async function runCase(browser, width) {
     await seed(page);
     await page.evaluate(() => openWrongBook());
     await page.locator('#wrongBookModal').waitFor({ state: 'visible' });
-    assert.equal(await page.locator('#wrongBookSearch').getAttribute('placeholder'), '搜索');
+    assert.equal(await page.locator('#wrongBookSearch').getAttribute('placeholder'), null);
+    assert.equal(await page.locator('#wrongBookSearch').getAttribute('aria-label'), '搜索');
     assert.deepEqual(await page.locator('[data-wrong-filter]').allTextContents(), ['待订正', '已订正']);
     assert.match(await page.locator('#wrongBookStats').innerText(), /共 4 道\s+待订正 2\s+已订正 2/);
     const firstCard = page.locator('#wrongBookList .wrong-card').first();
@@ -243,12 +253,14 @@ async function runCase(browser, width) {
 
     for (const [language, noMatches, noMistakes] of [['zh-CN', '无', '暂时没有错题'], ['en', 'None', 'No mistakes yet']]) {
       await page.evaluate(language => DMateI18n.setLanguage(language, false), language);
-      assert.equal(await page.locator('#wrongBookSearch').getAttribute('placeholder'), language === 'en' ? 'Search' : '搜索');
+      assert.equal(await page.locator('#wrongBookSearch').getAttribute('placeholder'), null);
+      assert.equal(await page.locator('#wrongBookSearch').getAttribute('aria-label'), language === 'en' ? 'Search' : '搜索');
       if (width <= 1100) await checkMobileFilterRow(page);
       await pending.click();
       await page.locator('#wrongBookSearch').fill('__no_matching_concept__');
       assert.equal(await emptyBook.innerText(), noMatches, 'No search match');
       assert.equal(await page.locator('#wrongBookList .wrong-empty svg').count(), 0, 'A filtered result is distinct from an empty book');
+      await checkEmptyCenter(emptyBook);
       await page.locator('#wrongBookSearch').fill('');
       for (const filter of ['pending', 'corrected']) {
         await page.evaluate(filter => {
@@ -257,6 +269,7 @@ async function runCase(browser, width) {
         await page.locator(`[data-wrong-filter="${filter}"]`).click();
         assert.equal(await emptyBook.innerText(), noMistakes, 'No ' + filter + ' records');
         assert.equal(await emptyBook.locator('svg').isVisible(), true, 'An empty status tab displays the Mistake Book icon');
+        await checkEmptyCenter(emptyBook);
       }
     }
     await page.evaluate(() => DMateI18n.setLanguage('zh-CN', false));

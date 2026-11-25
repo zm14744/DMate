@@ -34,6 +34,9 @@ async function navigate(page, panel) {
 }
 async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
   const page = panel.page(), viewport = page.viewportSize();
+  const search = panel.locator('.dcn-search');
+  assert.equal(await search.getAttribute('aria-label'), '搜索');
+  assert.equal(await search.evaluate(input => input.placeholder), '');
   const widths = viewport.width > 1100 ? [viewport.width] : [320, viewport.width, 768];
   let desktopColumns;
   for (const width of widths) {

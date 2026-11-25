@@ -33,17 +33,29 @@ function clearButton(input) {
 async function searchStyle(input) {
   return input.evaluate(input => {
     const css = getComputedStyle(input), wrapper = getComputedStyle(input.parentElement);
+    const sample = document.createElement('span');
+    sample.hidden = true;
+    sample.style.cssText = 'background-color:var(--surface-1);color:var(--border-strong)';
+    input.parentElement.append(sample);
+    const surface = getComputedStyle(sample).backgroundColor, borderColor = getComputedStyle(sample).color;
+    sample.remove();
     return { background: css.backgroundColor, image: css.backgroundImage,
       border: css.borderTopStyle, width: css.borderTopWidth, color: css.borderTopColor,
-      radius: css.borderTopLeftRadius, shadow: css.boxShadow,
+      radius: css.borderTopLeftRadius, shadow: css.boxShadow, surface, borderColor,
       wrapperBorder: [wrapper.borderTopWidth, wrapper.borderRightWidth, wrapper.borderBottomWidth, wrapper.borderLeftWidth] };
   });
 }
 
-async function checkSearch(input, expectedStyle, placeholder = '搜索') {
+async function checkSearchLabel(input, label) {
+  await input.and(input.page().getByRole('searchbox', { name: label, exact: true })).waitFor();
+  assert.equal(await input.getAttribute('aria-label'), label);
+  assert.equal(await input.evaluate(node => node.placeholder), '', 'Search fields have no placeholder text');
+}
+
+async function checkSearch(input, expectedStyle) {
   await input.waitFor({ state: 'visible' });
   await input.page().waitForFunction(input => input.classList.contains('dmate-search-input'), await input.elementHandle());
-  assert.equal(await input.getAttribute('placeholder'), placeholder);
+  await checkSearchLabel(input, '搜索');
   const wrapper = input.locator('xpath=..');
   assert.equal(await wrapper.locator('button').count(), 1, 'Exactly one clear button, including legacy controls');
   assert.equal(await clearButton(input).count(), 1);
@@ -67,6 +79,10 @@ async function checkSearch(input, expectedStyle, placeholder = '搜索') {
   const actual = await searchStyle(input);
   assert.equal(actual.border, 'solid');
   assert.equal(actual.width, '1px');
+  assert.equal(actual.background, actual.surface, 'Search uses the theme’s flat surface');
+  assert.equal(actual.color, actual.borderColor, 'Search uses the strong theme border');
+  assert.equal(actual.image, 'none');
+  assert.equal(actual.shadow, 'none');
   assert.equal(actual.radius, '999px', 'Search retains the pill shape at every viewport');
   assert.deepEqual(actual.wrapperBorder, ['0px', '0px', '0px', '0px'], 'Only the input paints a border');
   if (expectedStyle) assert.deepEqual(actual, expectedStyle, 'Remaining searches use the shared surface');
@@ -184,6 +200,8 @@ async function offlineSearches(page) {
   await expectClear(notebook, false);
   await notebook.fill('__missing_local_note__');
   await clearSearch(notebook);
+  await page.evaluate(() => window.DMateI18n.setLanguage('en', false));
+  await checkSearchLabel(notebook, 'Search');
   await noOverflow(page, 'Offline notebook search');
   return reference;
 }
@@ -206,7 +224,7 @@ async function onlineSearches(page, reference) {
   await wrong.fill('No matching saved exercise');
   await clearSearch(wrong);
   await page.evaluate(() => window.DMateI18n.setLanguage('en', false));
-  await page.waitForFunction(() => document.getElementById('wrongBookSearch').placeholder === 'Search');
+  await checkSearchLabel(wrong, 'Search');
   await wrong.fill('English search');
   await clearSearch(wrong);
   await page.locator('#wrongBookClose').click();
@@ -214,11 +232,7 @@ async function onlineSearches(page, reference) {
   await toolsEntry(page, 'conceptNotebookBtn');
   await page.locator('#conceptNotebookDialog').waitFor({ state: 'visible' });
   const notebook = page.locator('#conceptNotebookDialog .dcn-search');
-  const notebookStyle = await checkSearch(notebook, wrongStyle);
-  const composer = await searchStyle(page.locator('.center > .input-wrap > .input'));
-  for (const key of ['background', 'image', 'color', 'shadow']) {
-    assert.equal(notebookStyle[key], composer[key], 'Notebook and wrong-book searches share the composer ' + key);
-  }
+  await checkSearch(notebook, wrongStyle);
   assert.ok((await clearButton(notebook).getAttribute('class')).includes('dcn-search-clear'), 'Reuse notebook clear control');
   await expectClear(notebook, false);
   for (const name of ['Alpha Graph', 'Beta Logic']) {
@@ -232,7 +246,7 @@ async function onlineSearches(page, reference) {
   await clearSearch(notebook);
   assert.equal(await page.locator('.dcn-list .dcn-note').count(), 2);
   await page.evaluate(() => window.DMateI18n.setLanguage('en', false));
-  await page.waitForFunction(() => document.querySelector('.dcn-search').placeholder === 'Search');
+  await checkSearchLabel(notebook, 'Search');
   await notebook.fill('__missing_note__');
   assert.equal(await page.locator('.dcn-list .dcn-note').count(), 0);
   assert.equal((await page.locator('.dcn-list-empty').innerText()).trim(), 'None',

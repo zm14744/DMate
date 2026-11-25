@@ -1,5 +1,4 @@
-/* Search fields share the notebook's composer surface and leading magnifier.
-   Their wrappers continue to size each field in its own layout. */
+/* Search fields share a capsule shape and leading magnifier. */
 @layer dmate-search-controls {
     body[data-appearance-theme] :is(.dmate-search-wrap,.wrong-search-wrap,.dcn-search-wrap) {
         position:relative;
@@ -22,11 +21,11 @@
         min-height:38px;
         margin:0!important;
         padding:9px 40px 9px 42px!important;
-        border:1px solid var(--dmate-composer-border,var(--border-strong))!important;
+        border:1px solid var(--border-strong)!important;
         border-radius:999px!important;
-        background-color:var(--dmate-composer-bg,var(--surface-2))!important;
-        background-image:var(--dmate-composer-image,none)!important;
-        box-shadow:var(--dmate-composer-shadow,none)!important;
+        background-color:var(--surface-1)!important;
+        background-image:none!important;
+        box-shadow:none!important;
         color:var(--text-primary)!important;
         -webkit-text-fill-color:currentColor!important;
         font-family:var(--dmate-font-ui);
@@ -46,10 +45,6 @@
         stroke-linecap:round;
         stroke-linejoin:round;
         pointer-events:none;
-    }
-    body[data-appearance-theme] :is(.dmate-search-wrap,.wrong-search-wrap,.dcn-search-wrap) > input::placeholder {
-        color:var(--text-muted);
-        opacity:1;
     }
     body[data-appearance-theme] :is(.dmate-search-wrap,.wrong-search-wrap,.dcn-search-wrap) > input:focus-visible {
         border-color:var(--dm-selected-ring,var(--text-primary))!important;

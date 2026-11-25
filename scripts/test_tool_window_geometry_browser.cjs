@@ -12,6 +12,10 @@ const tools = [
   { name:'graph', button:'#knowledgeGraphBtn', online:'#knowledgeGraphModal > .graph-modal-card', offline:'#graphPanel .graph-modal-card', close:'#knowledgeGraphClose' },
   { name:'drawing', button:'#graphDrawingBtn', online:'#graphEditorDialog', offline:'#drawingPanel', close:'#graphEditorClose' }
 ];
+const offlineTools = [tools[1], tools[0], tools[2], tools[3],
+  { name:'concepts', button:'.offline-nav-item[data-panel="concepts"]', offline:'#conceptsPanel' },
+  { name:'questions', button:'.offline-nav-item[data-panel="questions"]', offline:'#questionsPanel' }
+];
 
 const near = (actual, expected, label) => assert.ok(Math.abs(actual-expected) <= 1, label + ': ' + actual + ' vs ' + expected);
 async function settle(page) {
@@ -43,6 +47,19 @@ async function frame(surface) {
   });
 }
 
+async function titleBar(surface) {
+  return surface.locator(':scope > :is(.dcn-heading,.modal-head,.graph-editor-dialog-head)').evaluate(head => {
+    const box = head.getBoundingClientRect(), title = head.firstElementChild;
+    const close = head.querySelector('.dcn-close,.modal-close-dot,.graph-editor-close-dot').getBoundingClientRect();
+    const font = getComputedStyle(title), edge = getComputedStyle(head);
+    return {height:box.height, titleInset:title.getBoundingClientRect().left-box.left,
+      closeInset:box.right-close.right, closeSize:[close.width,close.height],
+      closeCenter:close.top+close.height/2-box.top,
+      font:[font.fontFamily,font.fontSize,font.fontWeight,font.lineHeight],
+      border:[edge.borderBottomWidth,edge.borderBottomColor]};
+  });
+}
+
 function compare(actual, expected, label) {
   for (const key of ['x','y','width','height']) near(actual[key],expected[key],label+'/'+key);
   assert.equal(actual.radius,expected.radius,label+'/corner radius');
@@ -65,25 +82,29 @@ async function checkGraph(page) {
 
 async function compareTools(page, offline, active, sizes) {
   const reference = [];
-  for (const tool of tools) {
+  let notebookTitle;
+  for (const tool of offline ? offlineTools : tools) {
     await page.setViewportSize(sizes[0]);
     const surface = await openTool(page,tool,offline);
     for (const [index,size] of sizes.entries()) {
       await page.setViewportSize(size);
       await settle(page);
       const box = await frame(surface), label = [offline ? 'offline' : active ? 'chat' : 'welcome',tool.name,size.width].join('/');
-      const composer = offline ? null : await page.locator('.center > .input-wrap > .input').boundingBox();
-      const availableHeight = composer ? composer.y+composer.height : size.height;
       assert.notEqual(box.paint,'rgba(0, 0, 0, 0)',label+' measures a painted surface');
-      assert.ok(box.width > size.width * .6 && box.height > availableHeight * .7,label+' uses the available workspace');
+      assert.ok(box.width > size.width * .6,label+' uses a large desktop frame');
+      near(box.height,Math.min(size.height*.88,920),label+' retains the full window height');
       assert.ok(box.x >= 0 && box.y >= 0 && box.x+box.width <= size.width+1 && box.y+box.height <= size.height+1,label+' fits the screen');
       assert.ok(parseFloat(box.radius) > 0,label+' has rounded corners');
       if (reference[index]) compare(box,reference[index],label);
       else reference[index] = box;
       if (!offline) {
-        assert.ok(composer,label+' has a visible composer');
-        const bottom = box.y + box.height;
-        near(bottom,composer.y+composer.height,label+' aligns with the composer capsule');
+        if (active) {
+          const composer = await page.locator('.center > .input-wrap > .input').boundingBox();
+          near(box.y+box.height,composer.y+composer.height,label+' aligns with the conversation composer');
+        } else near(box.y+box.height,size.height-16,label+' uses the full-size welcome frame');
+        const chrome = await titleBar(surface);
+        if (tool.name === 'notebook') notebookTitle = chrome;
+        else assert.deepEqual(chrome,notebookTitle,label+' shares the notebook title bar');
       }
       if (tool.name === 'graph') await checkGraph(page);
     }
@@ -128,13 +149,13 @@ async function checkEdition(browser, offline) {
       await page.waitForFunction(() => !document.querySelector('.center').dataset.composerMotion);
       const notebook = tools[0], surface = await openTool(page,notebook,false);
       await settle(page);
-      compare(await frame(surface),welcomeFrames[0],'Returning to welcome restores its centered-composer frame');
+      compare(await frame(surface),welcomeFrames[0],'Returning to welcome restores its large frame');
       await page.locator(notebook.close).click();
       await page.locator('.center > .input-wrap').evaluate(node => { node.hidden=true; });
       const fallback = await openTool(page,notebook,false);
       await settle(page);
       const hiddenFrame = await frame(fallback);
-      near(hiddenFrame.y+hiddenFrame.height,desktop.height-16,'Only a hidden composer uses the lower workspace fallback');
+      near(hiddenFrame.y+hiddenFrame.height,desktop.height-16,'A hidden composer keeps the full-size frame');
       await page.locator(notebook.close).click();
       await page.locator('.center > .input-wrap').evaluate(node => { node.hidden=false; });
       await settle(page);
@@ -145,7 +166,7 @@ async function checkEdition(browser, offline) {
     await settle(page);
     await checkGraph(page);
     assert.deepEqual(unexpected,[]);
-    console.log('PASS '+(offline?'offline':'online')+' four tool frames, responsive geometry and graph separator');
+    console.log('PASS '+(offline?'offline workspace frames':'online tool frames and title bars')+', responsive geometry and graph separator');
   } finally { await context.close(); }
 }
 

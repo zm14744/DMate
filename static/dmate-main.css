@@ -771,6 +771,12 @@ body[data-appearance-theme="light"] #sendBtn.ai-stop-button:hover {
     place-items:center;
 }
 
+#wrongBookModal #wrongBookList:has(> .wrong-empty:only-child) {
+    flex:1 1 auto;
+    min-height:0;
+    place-content:safe center;
+}
+
 #wrongRetestReviewList:has(> .learning-review-empty:only-child) {
     padding-block:20px;
 }

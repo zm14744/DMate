@@ -581,7 +581,7 @@
       "stroke-linecap":"round","stroke-linejoin":"round","data-icon":"square-pen"})) createIcon.setAttribute(name, value);
     create.id = "addNote";
     const search = el("input", "dcn-search");
-    search.type = "search"; search.placeholder = tr("搜索", "Search"); search.setAttribute("aria-label", tr("搜索", "Search")); search.value = state.noteQuery;
+    search.type = "search"; search.setAttribute("aria-label", tr("搜索", "Search")); search.value = state.noteQuery;
     const searchWrap = el("div", "dcn-search-wrap");
     const searchClear = button("", "dcn-search-clear", () => {
       search.value = ""; state.noteQuery = ""; renderList(); search.focus({preventScroll:true});
