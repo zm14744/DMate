@@ -50,7 +50,12 @@
     }
     for (const [name, value, suffix] of [['Mask',settings.mask,'%'],['Blur',settings.blur,'px'],
       ['Panel',settings.panelOpacity,'%'],['Bubble',settings.bubbleOpacity,'%']]) {
-      if ($('appearance' + name + 'Range')) $('appearance' + name + 'Range').value = String(value);
+      const range = $('appearance' + name + 'Range');
+      if (range) {
+        range.value = String(value);
+        const progress = (range.valueAsNumber - Number(range.min)) / (Number(range.max) - Number(range.min));
+        range.style.setProperty('--appearance-range-progress', `${progress * 100}%`);
+      }
       if ($('appearance' + name + 'Value')) $('appearance' + name + 'Value').textContent = value + suffix;
     }
     const preview = $('appearanceBackgroundPreview');

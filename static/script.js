@@ -454,7 +454,11 @@ function syncAppearanceControls() {
         const range = document.getElementById(rangeId);
         const output = document.getElementById(valueId);
 
-        if (range) range.value = String(value);
+        if (range) {
+            range.value = String(value);
+            const progress = (range.valueAsNumber - Number(range.min)) / (Number(range.max) - Number(range.min));
+            range.style.setProperty("--appearance-range-progress", `${progress * 100}%`);
+        }
         if (output) output.textContent = `${value}${suffix}`;
     }
 

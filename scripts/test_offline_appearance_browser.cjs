@@ -56,6 +56,7 @@ async function appearance(page) {
   });
 }
 async function appearanceControls(page) {
+  await checkSliders(page);
   assert.equal(await page.locator('#appearanceModal [data-appearance-font]').count(), 0);
   assert.deepEqual(await page.locator('#appearanceModal [data-appearance-mode]').evaluateAll(nodes =>
     nodes.map(node => node.dataset.appearanceMode).sort()), ['dark', 'navy']);
@@ -131,6 +132,43 @@ async function surfacePixel(page,locator,{left=7,top}={}) {
   // A one-pixel first scanline has no left/up pixel; every PNG filter's
   // predictor is zero, so these bytes are the actual visible RGB.
   return [...inflateSync(Buffer.concat(chunks)).subarray(1,4)];
+}
+
+async function checkSliders(page) {
+  const sliders=page.locator('#appearanceModal input[type="range"]'), bubble=page.locator('#appearanceBubbleRange');
+  const checkProgress=async()=> {
+    const values=await sliders.evaluateAll(nodes=>nodes.map(node=>({
+      id:node.id, progress:getComputedStyle(node).getPropertyValue('--appearance-range-progress').trim(),
+      expected:100*(node.valueAsNumber-Number(node.min))/(Number(node.max)-Number(node.min))
+    })));
+    assert.equal(values.length,4);
+    for(const {id,progress,expected} of values) {
+      assert.ok(progress.endsWith('%') && Math.abs(parseFloat(progress)-expected)<.001,id+' normalizes its fill between min and max');
+    }
+  };
+  assert.equal(await bubble.inputValue(),String(profile.bubbleOpacity));
+  await checkProgress();
+  for(const [accent,color] of [['purple',[139,92,246]],['blue',[59,130,246]]]) {
+    await page.locator('[data-appearance-accent="'+accent+'"]').click();
+    await bubble.scrollIntoViewIfNeeded();
+    await settlePalette(page);
+    const box=await bubble.boundingBox(), fraction=await bubble.evaluate(node=>
+      (node.valueAsNumber-Number(node.min))/(Number(node.max)-Number(node.min)));
+    const thumbX=box.height/2+fraction*(box.width-box.height);
+    assert.deepEqual(await surfacePixel(page,bubble,{left:thumbX/2}),color,accent+' fills the selected part of the slider');
+    assert.deepEqual(await surfacePixel(page,bubble,{left:(thumbX+box.width)/2}),[59,59,59],accent+' leaves the remaining rail neutral');
+    assert.deepEqual(await surfacePixel(page,bubble,{left:thumbX,top:box.height/5}),color,accent+' paints the thumb above the track');
+  }
+  await bubble.press('ArrowRight');
+  assert.equal(await bubble.inputValue(),String(profile.bubbleOpacity+1));
+  assert.ok(await bubble.evaluate(node=>node===document.activeElement && node.matches(':focus-visible')),
+    'The slider retains keyboard focus after an arrow-key adjustment');
+  await checkProgress();
+  await page.locator('#appearanceClose').click();
+  await openAppearance(page);
+  assert.equal(await bubble.inputValue(),String(profile.bubbleOpacity),'Cancelling restores the previous slider value');
+  assert.equal(await bubble.evaluate(node=>getComputedStyle(node).accentColor),'rgb(139, 92, 246)','Cancelling restores the saved purple accent');
+  await checkProgress();
 }
 
 async function sharedThemeSurfaces(browser,width,offline) {
