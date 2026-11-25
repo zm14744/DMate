@@ -414,15 +414,13 @@ option {
 /* 图片识别中的撤销按钮：与会话删除按钮一致，使用纯红色圆点。 */
 /* AI 正在思考/输出时，将发送钮原位切换为可取消的停止钮。 */
 #sendBtn.ai-stop-button,
-body[data-appearance-theme="light"] #sendBtn.ai-stop-button,
 body[data-appearance-theme="dark"] #sendBtn.ai-stop-button {
     background:#dc2626 !important;
     color:#fff !important;
     cursor:pointer !important;
     opacity:1 !important;
 }
-#sendBtn.ai-stop-button:hover,
-body[data-appearance-theme="light"] #sendBtn.ai-stop-button:hover {
+#sendBtn.ai-stop-button:hover {
     background:#b91c1c !important;
 }
 #sendBtn.ai-stop-button:focus-visible {
@@ -2297,31 +2295,7 @@ body[data-appearance-theme] {
     --dmate-chat-background-rgb:var(--surface-0-rgb);
 }
 
-/* The same light palette serves the first paint, body and top-level dialogs. */
-:root[data-appearance-theme="light"],
-body[data-appearance-theme="light"] {
-    --surface-0:#f5f5f7;
-    --surface-0-rgb:245,245,247;
-    --surface-1:rgba(var(--surface-1-rgb),var(--panel-alpha));
-    --surface-1-rgb:239,239,242;
-    --surface-2:rgba(var(--surface-2-rgb),var(--panel-alpha));
-    --surface-2-rgb:255,255,255;
-    --surface-3:rgba(var(--surface-3-rgb),var(--panel-alpha));
-    --surface-3-rgb:232,232,237;
-    --surface-4:rgba(var(--surface-4-rgb),var(--panel-alpha));
-    --surface-4-rgb:209,209,214;
 
-    --border-strong:#d1d1d6;
-    --border-mid:#b9b9c0;
-    --text-strong:#1d1d1f;
-    --text-primary:#1d1d1f;
-    --text-secondary:#424245;
-    --text-muted:#5e5e63;
-    --text-subtle:#68686d;
-    --accent-text:var(--text-primary);
-    --background-mask-rgb:var(--surface-0-rgb);
-    color-scheme:light;
-}
 
 .appearance-background-layer,
 .appearance-mask-layer {
@@ -2410,11 +2384,6 @@ body.has-custom-background .input {
 .learning-review-actions button,
 .graph-status-pill.focus {
     color:#fff;
-}
-
-body[data-appearance-theme="light"] .msg-actions button {
-    background:rgba(255,255,255,.58);
-    color:var(--text-muted);
 }
 
 /* 黄色状态始终使用深色文字，不随明暗模式变化。 */
@@ -4167,35 +4136,6 @@ body[data-appearance-theme="dark"] {
     color-scheme:dark;
 }
 
-:root[data-appearance-theme="light"] body,
-body[data-appearance-theme="light"] {
-    background:rgb(var(--surface-0-rgb)) !important;
-    color:var(--text-strong);
-}
-
-body[data-appearance-theme="light"]:not(.has-custom-background) .layout,
-body[data-appearance-theme="light"]:not(.has-custom-background) .center {
-    background:rgb(var(--surface-0-rgb));
-}
-body[data-appearance-theme="light"].has-custom-background .layout {
-    background:rgba(var(--surface-0-rgb),var(--workspace-alpha)) !important;
-}
-body[data-appearance-theme="light"].has-custom-background .center {
-    background:transparent !important;
-}
-
-body[data-appearance-theme="light"] .mobile-topbar,
-body[data-appearance-theme="light"] .left,
-body[data-appearance-theme="light"] .right {
-    background:rgba(var(--surface-1-rgb),.99) !important;
-}
-
-body[data-appearance-theme="light"] .modal-card,
-body[data-appearance-theme="light"] .ocr-review-dialog {
-    background:rgba(255,255,255,.98) !important;
-    color:var(--text-primary) !important;
-}
-
 /* 防止部分安卓浏览器的强制深色把主题色圆点改成近黑色。 */
 .appearance-swatch {
     forced-color-adjust:none;
@@ -4204,7 +4144,6 @@ body[data-appearance-theme="light"] .ocr-review-dialog {
 }
 .appearance-swatch[data-appearance-accent="blue"] { background-color:#3b82f6 !important; }
 .appearance-swatch[data-appearance-accent="purple"] { background-color:#8b5cf6 !important; }
-.appearance-swatch[data-appearance-accent="teal"] { background-color:#14b8a6 !important; }
 
 /* 背景缩略图可以直接点开查看原图。 */
 .appearance-background-preview[data-has-background="true"] {
@@ -4286,16 +4225,6 @@ body[data-appearance-theme="light"] .ocr-review-dialog {
     fill:#cbd5e1 !important;
     color:#cbd5e1 !important;
     font-family:var(--dmate-font-ui) !important;
-}
-body[data-appearance-theme="light"] .kg-node-label,
-:root[data-appearance-theme="light"] .kg-node-label {
-    fill:var(--text-strong) !important;
-    color:var(--text-strong) !important;
-}
-body[data-appearance-theme="light"] .kg-node-badge,
-:root[data-appearance-theme="light"] .kg-node-badge {
-    fill:var(--text-secondary) !important;
-    color:var(--text-secondary) !important;
 }
 
 /* 手机图谱保留完整 SVG 尺寸，通过画布滚动查看，不再把节点文字压没。 */
@@ -4379,7 +4308,7 @@ body[data-appearance-theme="light"] .kg-node-badge,
 
 
 /* =========================================================
-   2026-10-03 移动端第二轮：图谱 / 浅色 / 外观入口 / 手势视觉
+   2026-10-03 移动端第二轮：图谱 / 外观入口 / 手势视觉
    ========================================================= */
 
 /* 外观入口：使用几何中心严格对齐的 SVG 半明半暗圆，避免中线偏移。 */
@@ -4420,73 +4349,11 @@ body[data-appearance-theme="light"] .kg-node-badge,
     margin-top:8px !important;
 }
 
-/* 显式 light-only：阻止部分安卓浏览器“强制网页深色”再次把浅色主题染黑。 */
-:root[data-appearance-theme="light"],
-:root[data-appearance-theme="light"] body,
-body[data-appearance-theme="light"] {
-    color-scheme:only light !important;
-}
 
-/* 浅色模式直接给主要工作区明确的浅色表面，不再只依赖 CSS 变量继承。 */
-:root[data-appearance-theme="light"] body:not(.has-custom-background),
-body[data-appearance-theme="light"]:not(.has-custom-background) {
-    background:rgb(var(--surface-0-rgb)) !important;
-}
-:root[data-appearance-theme="light"] body:not(.has-custom-background) .layout,
-:root[data-appearance-theme="light"] body:not(.has-custom-background) .center,
-body[data-appearance-theme="light"]:not(.has-custom-background) .layout,
-body[data-appearance-theme="light"]:not(.has-custom-background) .center {
-    background:rgb(var(--surface-0-rgb)) !important;
-}
-:root[data-appearance-theme="light"] .mobile-topbar,
-:root[data-appearance-theme="light"] .left,
-:root[data-appearance-theme="light"] .right,
-body[data-appearance-theme="light"] .mobile-topbar,
-body[data-appearance-theme="light"] .left,
-body[data-appearance-theme="light"] .right {
-    background:rgb(var(--surface-1-rgb)) !important;
-    color:var(--text-strong) !important;
-}
-:root[data-appearance-theme="light"] .modal-card,
-:root[data-appearance-theme="light"] .appearance-card,
-:root[data-appearance-theme="light"] .ocr-review-dialog,
-body[data-appearance-theme="light"] .modal-card,
-body[data-appearance-theme="light"] .appearance-card,
-body[data-appearance-theme="light"] .ocr-review-dialog {
-    background:#ffffff !important;
-    color:var(--text-primary) !important;
-}
-:root[data-appearance-theme="light"] .appearance-section,
-:root[data-appearance-theme="light"] .appearance-background-preview,
-:root[data-appearance-theme="light"] .input,
-:root[data-appearance-theme="light"] .right #info,
-:root[data-appearance-theme="light"] .right .learning-summary,
-body[data-appearance-theme="light"] .appearance-section,
-body[data-appearance-theme="light"] .appearance-background-preview,
-body[data-appearance-theme="light"] .input,
-body[data-appearance-theme="light"] .right #info,
-body[data-appearance-theme="light"] .right .learning-summary {
-    background:#ffffff !important;
-    color:var(--text-secondary) !important;
-}
-:root[data-appearance-theme="light"] .appearance-segmented button,
-:root[data-appearance-theme="light"] .appearance-background-actions button,
-:root[data-appearance-theme="light"] .appearance-footer button,
-body[data-appearance-theme="light"] .appearance-segmented button,
-body[data-appearance-theme="light"] .appearance-background-actions button,
-body[data-appearance-theme="light"] .appearance-footer button {
-    background:rgb(var(--surface-3-rgb)) !important;
-    color:var(--text-secondary) !important;
-    border-color:var(--border-strong) !important;
-}
-:root[data-appearance-theme="light"] .appearance-segmented button.active,
-body[data-appearance-theme="light"] .appearance-segmented button.active {
-    background:rgba(var(--accent-rgb),.13) !important;
-    color:var(--text-strong) !important;
-    border-color:var(--accent) !important;
-}
 
-/* 主题色圆点使用多重填充，避免安卓强制深色把青绿改成近黑。 */
+
+
+/* 主题色圆点使用多重填充，保持浏览器中的蓝色与紫色一致。 */
 .appearance-swatch[data-appearance-accent="blue"] {
     background:#3b82f6 !important;
     background-image:linear-gradient(#3b82f6,#3b82f6) !important;
@@ -4497,14 +4364,8 @@ body[data-appearance-theme="light"] .appearance-segmented button.active {
     background-image:linear-gradient(#8b5cf6,#8b5cf6) !important;
     box-shadow:inset 0 0 0 999px #8b5cf6,0 0 0 1px var(--border-strong) !important;
 }
-.appearance-swatch[data-appearance-accent="teal"] {
-    background:#14b8a6 !important;
-    background-image:linear-gradient(#14b8a6,#14b8a6) !important;
-    box-shadow:inset 0 0 0 999px #14b8a6,0 0 0 1px var(--border-strong) !important;
-}
 .appearance-swatch.active[data-appearance-accent="blue"],
-.appearance-swatch.active[data-appearance-accent="purple"],
-.appearance-swatch.active[data-appearance-accent="teal"] {
+.appearance-swatch.active[data-appearance-accent="purple"] {
     outline:3px solid var(--accent) !important;
     outline-offset:3px !important;
 }
@@ -4595,7 +4456,7 @@ body[data-appearance-theme="light"] .appearance-segmented button.active {
 
 
 /* =========================================================
-   2026-10-03 手机图谱比例 + 真浅色最终覆盖
+   2026-10-03 手机图谱比例
    ========================================================= */
 
 /* 手机图谱：不允许 SVG 直接画出卡片边界。 */
@@ -4653,125 +4514,12 @@ body[data-appearance-theme="light"] .appearance-segmented button.active {
     }
 }
 
-/*
- * 手机浏览器（尤其某些安卓浏览器）会在自己的“深色网页”功能下
- * 二次改写 background-color。浅色模式这里改用实体渐变背景层，颜色
- * 完全沿用桌面浅色主题，使移动端与桌面外观窗口保持一致。
- */
-:root[data-appearance-theme="light"],
-:root[data-appearance-theme="light"] body,
-body[data-appearance-theme="light"] {
-    color-scheme:only light !important;
-    forced-color-adjust:none !important;
-}
 
-:root[data-appearance-theme="light"] body:not(.has-custom-background),
-body[data-appearance-theme="light"]:not(.has-custom-background) {
-    background-color:rgb(var(--surface-0-rgb)) !important;
-    background-image:linear-gradient(rgb(var(--surface-0-rgb)),rgb(var(--surface-0-rgb))) !important;
-    color:var(--text-strong) !important;
-}
-
-:root[data-appearance-theme="light"] body:not(.has-custom-background) .layout,
-:root[data-appearance-theme="light"] body:not(.has-custom-background) .center,
-body[data-appearance-theme="light"]:not(.has-custom-background) .layout,
-body[data-appearance-theme="light"]:not(.has-custom-background) .center {
-    background-color:rgb(var(--surface-0-rgb)) !important;
-    background-image:linear-gradient(rgb(var(--surface-0-rgb)),rgb(var(--surface-0-rgb))) !important;
-}
-
-:root[data-appearance-theme="light"] .appearance-card,
-body[data-appearance-theme="light"] .appearance-card,
-:root[data-appearance-theme="light"] .modal-card,
-body[data-appearance-theme="light"] .modal-card,
-:root[data-appearance-theme="light"] .ocr-review-dialog,
-body[data-appearance-theme="light"] .ocr-review-dialog {
-    background-color:#ffffff !important;
-    background-image:linear-gradient(#ffffff,#ffffff) !important;
-    color:var(--text-primary) !important;
-}
-
-:root[data-appearance-theme="light"] .modal-head,
-body[data-appearance-theme="light"] .modal-head,
-:root[data-appearance-theme="light"] .appearance-body,
-body[data-appearance-theme="light"] .appearance-body,
-:root[data-appearance-theme="light"] .appearance-footer,
-body[data-appearance-theme="light"] .appearance-footer,
-:root[data-appearance-theme="light"] .appearance-section,
-body[data-appearance-theme="light"] .appearance-section {
-    background-color:#ffffff !important;
-    background-image:linear-gradient(#ffffff,#ffffff) !important;
-    color:var(--text-primary) !important;
-    border-color:var(--border-strong) !important;
-}
-
-:root[data-appearance-theme="light"] .appearance-section-title,
-body[data-appearance-theme="light"] .appearance-section-title,
-:root[data-appearance-theme="light"] .appearance-slider-row,
-body[data-appearance-theme="light"] .appearance-slider-row,
-:root[data-appearance-theme="light"] .appearance-slider-value,
-body[data-appearance-theme="light"] .appearance-slider-value {
-    color:var(--text-muted) !important;
-    -webkit-text-fill-color:var(--text-muted) !important;
-}
-
-:root[data-appearance-theme="light"] .appearance-segmented button,
-body[data-appearance-theme="light"] .appearance-segmented button,
-:root[data-appearance-theme="light"] .appearance-background-actions button:not(.primary),
-body[data-appearance-theme="light"] .appearance-background-actions button:not(.primary),
-:root[data-appearance-theme="light"] .appearance-footer button:not(.primary),
-body[data-appearance-theme="light"] .appearance-footer button:not(.primary) {
-    background-color:rgb(var(--surface-3-rgb)) !important;
-    background-image:linear-gradient(rgb(var(--surface-3-rgb)),rgb(var(--surface-3-rgb))) !important;
-    border-color:var(--border-strong) !important;
-    color:var(--text-secondary) !important;
-    -webkit-text-fill-color:var(--text-secondary) !important;
-}
-
-:root[data-appearance-theme="light"] .appearance-segmented button.active,
-body[data-appearance-theme="light"] .appearance-segmented button.active {
-    background-color:#dbeafe !important;
-    background-image:linear-gradient(#dbeafe,#dbeafe) !important;
-    border-color:var(--accent) !important;
-    color:var(--text-strong) !important;
-    -webkit-text-fill-color:var(--text-strong) !important;
-}
-
-:root[data-appearance-theme="light"] .appearance-background-preview,
-body[data-appearance-theme="light"] .appearance-background-preview {
-    background-color:#ffffff !important;
-    background-image:linear-gradient(#ffffff,#ffffff) !important;
-    border-color:var(--border-strong) !important;
-    color:var(--text-muted) !important;
-    -webkit-text-fill-color:var(--text-muted) !important;
-}
-
-:root[data-appearance-theme="light"] .mobile-topbar,
-:root[data-appearance-theme="light"] .left,
-:root[data-appearance-theme="light"] .right,
-body[data-appearance-theme="light"] .mobile-topbar,
-body[data-appearance-theme="light"] .left,
-body[data-appearance-theme="light"] .right {
-    background-color:rgb(var(--surface-1-rgb)) !important;
-    background-image:linear-gradient(rgb(var(--surface-1-rgb)),rgb(var(--surface-1-rgb))) !important;
-    color:var(--text-strong) !important;
-}
-
-:root[data-appearance-theme="light"] .input,
-body[data-appearance-theme="light"] .input,
-:root[data-appearance-theme="light"] .input input,
-body[data-appearance-theme="light"] .input input {
-    background-color:#ffffff !important;
-    background-image:linear-gradient(#ffffff,#ffffff) !important;
-    color:var(--text-primary) !important;
-    -webkit-text-fill-color:var(--text-primary) !important;
-    border-color:var(--border-strong) !important;
-}
 
 
 
 /* =========================================================
-   2026-10-03 手机最终兜底：真正浅色 + 手机停用知识图谱
+   2026-10-03 手机知识图谱入口兜底
    ========================================================= */
 @media (max-width:760px) {
     /* 手机端知识图谱暂不提供，避免继续展示不可读/溢出的 SVG。桌面和平板不受影响。 */
@@ -4779,264 +4527,13 @@ body[data-appearance-theme="light"] .input input {
         display:none !important;
     }
 
-    /*
-     * 某些安卓浏览器会强制把 CSS 浅色重新染成深色。
-     * 这里把浅色表面改成“实体图片背景 + 明确文字色”，尽量绕过自动深色算法。
-     */
-    html[data-appearance-theme="light"],
-    html[data-appearance-theme="light"] body,
-    body[data-appearance-theme="light"] {
-        color-scheme:light !important;
-        forced-color-adjust:none !important;
-        background-color:rgb(var(--surface-0-rgb)) !important;
-        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23eef3f8'/%3E%3C/svg%3E") !important;
-        color:var(--text-strong) !important;
-        -webkit-text-fill-color:currentColor;
-    }
 
-    html[data-appearance-theme="light"] body:not(.has-custom-background) .layout,
-    html[data-appearance-theme="light"] body:not(.has-custom-background) .center,
-    body[data-appearance-theme="light"]:not(.has-custom-background) .layout,
-    body[data-appearance-theme="light"]:not(.has-custom-background) .center,
-    body[data-appearance-theme="light"]:not(.has-custom-background) .chat,
-    body[data-appearance-theme="light"]:not(.has-custom-background) .input-wrap {
-        background-color:rgb(var(--surface-0-rgb)) !important;
-        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23eef3f8'/%3E%3C/svg%3E") !important;
-        color:var(--text-strong) !important;
-    }
-
-    html[data-appearance-theme="light"] .mobile-topbar,
-    html[data-appearance-theme="light"] .left,
-    html[data-appearance-theme="light"] .right,
-    body[data-appearance-theme="light"] .mobile-topbar,
-    body[data-appearance-theme="light"] .left,
-    body[data-appearance-theme="light"] .right {
-        background-color:rgb(var(--surface-1-rgb)) !important;
-        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23f8fafc'/%3E%3C/svg%3E") !important;
-        color:var(--text-strong) !important;
-        border-color:var(--border-strong) !important;
-    }
-
-    html[data-appearance-theme="light"] .appearance-card,
-    html[data-appearance-theme="light"] .appearance-body,
-    html[data-appearance-theme="light"] .appearance-footer,
-    html[data-appearance-theme="light"] .appearance-card .modal-head,
-    body[data-appearance-theme="light"] .appearance-card,
-    body[data-appearance-theme="light"] .appearance-body,
-    body[data-appearance-theme="light"] .appearance-footer,
-    body[data-appearance-theme="light"] .appearance-card .modal-head {
-        background-color:#ffffff !important;
-        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23ffffff'/%3E%3C/svg%3E") !important;
-        color:var(--text-primary) !important;
-        border-color:var(--border-strong) !important;
-    }
-
-    html[data-appearance-theme="light"] .appearance-section,
-    body[data-appearance-theme="light"] .appearance-section {
-        background:transparent !important;
-        color:var(--text-primary) !important;
-        border-color:var(--border-strong) !important;
-    }
-
-    html[data-appearance-theme="light"] .appearance-section-title,
-    html[data-appearance-theme="light"] .appearance-slider-row,
-    html[data-appearance-theme="light"] .appearance-slider-value,
-    body[data-appearance-theme="light"] .appearance-section-title,
-    body[data-appearance-theme="light"] .appearance-slider-row,
-    body[data-appearance-theme="light"] .appearance-slider-value {
-        color:var(--text-muted) !important;
-        -webkit-text-fill-color:var(--text-muted) !important;
-    }
-
-    html[data-appearance-theme="light"] .appearance-segmented button,
-    html[data-appearance-theme="light"] .appearance-background-actions button:not(.primary),
-    html[data-appearance-theme="light"] .appearance-footer button:not(.primary),
-    body[data-appearance-theme="light"] .appearance-segmented button,
-    body[data-appearance-theme="light"] .appearance-background-actions button:not(.primary),
-    body[data-appearance-theme="light"] .appearance-footer button:not(.primary) {
-        -webkit-appearance:none !important;
-        appearance:none !important;
-        background-color:rgb(var(--surface-3-rgb)) !important;
-        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23e2e8f0'/%3E%3C/svg%3E") !important;
-        border-color:var(--border-strong) !important;
-        color:var(--text-secondary) !important;
-        -webkit-text-fill-color:var(--text-secondary) !important;
-        filter:none !important;
-    }
-
-    html[data-appearance-theme="light"] .appearance-segmented button.active,
-    body[data-appearance-theme="light"] .appearance-segmented button.active {
-        background-color:#dbeafe !important;
-        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23dbeafe'/%3E%3C/svg%3E") !important;
-        border-color:var(--accent) !important;
-        color:var(--text-strong) !important;
-        -webkit-text-fill-color:var(--text-strong) !important;
-    }
-
-    html[data-appearance-theme="light"] .appearance-background-preview,
-    body[data-appearance-theme="light"] .appearance-background-preview {
-        background-color:#ffffff !important;
-        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23ffffff'/%3E%3C/svg%3E") !important;
-        border-color:var(--border-strong) !important;
-        color:var(--text-muted) !important;
-        -webkit-text-fill-color:var(--text-muted) !important;
-    }
-
-    html[data-appearance-theme="light"] .input,
-    html[data-appearance-theme="light"] .input input,
-    body[data-appearance-theme="light"] .input,
-    body[data-appearance-theme="light"] .input input,
-    body[data-appearance-theme="light"] .ai,
-    body[data-appearance-theme="light"] .session,
-    body[data-appearance-theme="light"] .right #info,
-    body[data-appearance-theme="light"] .right .learning-summary {
-        background-color:#ffffff !important;
-        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23ffffff'/%3E%3C/svg%3E") !important;
-        color:var(--text-primary) !important;
-        -webkit-text-fill-color:var(--text-primary) !important;
-        border-color:var(--border-strong) !important;
-    }
-
-    body[data-appearance-theme="light"] .mobile-topbar button,
-    body[data-appearance-theme="light"] .mobile-topbar-title,
-    body[data-appearance-theme="light"] .left,
-    body[data-appearance-theme="light"] .right,
-    body[data-appearance-theme="light"] .panel-heading-row,
-    body[data-appearance-theme="light"] .learning-title {
-        color:var(--text-primary) !important;
-        -webkit-text-fill-color:var(--text-primary) !important;
-    }
 }
 
 
-/* =========================================================
-   2026-10-03 浅色主题统一：移动端严格跟随桌面浅色
-   使用实体 PNG 色块抵抗部分安卓浏览器的强制网页深色。
-   ========================================================= */
-@media (max-width:1100px) {
-    html[data-appearance-theme="light"],
-    html[data-appearance-theme="light"] body,
-    body[data-appearance-theme="light"] {
-        color-scheme:only light !important;
-        forced-color-adjust:none !important;
-        color:var(--text-strong) !important;
-        -webkit-text-fill-color:currentColor;
-    }
 
-    html[data-appearance-theme="light"] body:not(.has-custom-background),
-    body[data-appearance-theme="light"]:not(.has-custom-background),
-    html[data-appearance-theme="light"] body:not(.has-custom-background) .layout,
-    html[data-appearance-theme="light"] body:not(.has-custom-background) .center,
-    html[data-appearance-theme="light"] body:not(.has-custom-background) .chat,
-    html[data-appearance-theme="light"] body:not(.has-custom-background) .input-wrap,
-    body[data-appearance-theme="light"]:not(.has-custom-background) .layout,
-    body[data-appearance-theme="light"]:not(.has-custom-background) .center,
-    body[data-appearance-theme="light"]:not(.has-custom-background) .chat,
-    body[data-appearance-theme="light"]:not(.has-custom-background) .input-wrap {
-        background-color:rgb(var(--surface-0-rgb)) !important;
-        background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8+vU7AwMDEwMDAwMDAwAitALlox9OIAAAAABJRU5ErkJggg==") !important;
-        color:var(--text-strong) !important;
-    }
 
-    html[data-appearance-theme="light"] .mobile-topbar,
-    html[data-appearance-theme="light"] .left,
-    html[data-appearance-theme="light"] .right,
-    body[data-appearance-theme="light"] .mobile-topbar,
-    body[data-appearance-theme="light"] .left,
-    body[data-appearance-theme="light"] .right {
-        background-color:rgb(var(--surface-1-rgb)) !important;
-        background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGN8//4TAwMDEwMDAwMDAwAh5wLUIcM4ggAAAABJRU5ErkJggg==") !important;
-        color:var(--text-strong) !important;
-        border-color:var(--border-strong) !important;
-    }
 
-    html[data-appearance-theme="light"] .modal-card,
-    html[data-appearance-theme="light"] .appearance-card,
-    html[data-appearance-theme="light"] .ocr-review-dialog,
-    html[data-appearance-theme="light"] .appearance-body,
-    html[data-appearance-theme="light"] .appearance-footer,
-    html[data-appearance-theme="light"] .appearance-card .modal-head,
-    body[data-appearance-theme="light"] .modal-card,
-    body[data-appearance-theme="light"] .appearance-card,
-    body[data-appearance-theme="light"] .ocr-review-dialog,
-    body[data-appearance-theme="light"] .appearance-body,
-    body[data-appearance-theme="light"] .appearance-footer,
-    body[data-appearance-theme="light"] .appearance-card .modal-head {
-        background-color:#ffffff !important;
-        background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8//8/AwMDEwMDAwMDAwAkBgMB/DXemwAAAABJRU5ErkJggg==") !important;
-        color:var(--text-primary) !important;
-        border-color:var(--border-strong) !important;
-    }
-
-    html[data-appearance-theme="light"] .appearance-segmented button,
-    html[data-appearance-theme="light"] .appearance-background-actions button:not(.primary),
-    html[data-appearance-theme="light"] .appearance-footer button:not(.primary),
-    body[data-appearance-theme="light"] .appearance-segmented button,
-    body[data-appearance-theme="light"] .appearance-background-actions button:not(.primary),
-    body[data-appearance-theme="light"] .appearance-footer button:not(.primary),
-    body[data-appearance-theme="light"] .learning-actions button,
-    body[data-appearance-theme="light"] .left > .btn {
-        background-color:rgb(var(--surface-3-rgb)) !important;
-        background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGN88eItAwMDEwMDAwMDAwAhAQLBq48glgAAAABJRU5ErkJggg==") !important;
-        color:var(--text-secondary) !important;
-        -webkit-text-fill-color:var(--text-secondary) !important;
-        border-color:var(--border-strong) !important;
-    }
-
-    html[data-appearance-theme="light"] .appearance-segmented button.active,
-    body[data-appearance-theme="light"] .appearance-segmented button.active,
-    body[data-appearance-theme="light"] .session.active {
-        background-color:#dbeafe !important;
-        background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGO8/eofAwMDEwMDAwMDAwAhKwLHLH4k+QAAAABJRU5ErkJggg==") !important;
-        color:var(--text-primary) !important;
-        -webkit-text-fill-color:var(--text-primary) !important;
-        border-color:var(--accent) !important;
-    }
-
-    html[data-appearance-theme="light"] .appearance-background-preview,
-    html[data-appearance-theme="light"] .input,
-    html[data-appearance-theme="light"] .input input,
-    body[data-appearance-theme="light"] .appearance-background-preview,
-    body[data-appearance-theme="light"] .input,
-    body[data-appearance-theme="light"] .input input,
-    body[data-appearance-theme="light"] .session,
-    body[data-appearance-theme="light"] .right #info,
-    body[data-appearance-theme="light"] .right .learning-summary {
-        background-color:#ffffff !important;
-        background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8//8/AwMDEwMDAwMDAwAkBgMB/DXemwAAAABJRU5ErkJggg==") !important;
-        color:var(--text-primary) !important;
-        -webkit-text-fill-color:var(--text-primary) !important;
-        border-color:var(--border-strong) !important;
-    }
-
-    body[data-appearance-theme="light"] .ai {
-        background-color:rgb(var(--surface-3-rgb)) !important;
-        background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGN88eItAwMDEwMDAwMDAwAhAQLBq48glgAAAABJRU5ErkJggg==") !important;
-        color:var(--text-primary) !important;
-        -webkit-text-fill-color:var(--text-primary) !important;
-    }
-
-    body[data-appearance-theme="light"] .mobile-topbar button,
-    body[data-appearance-theme="light"] .mobile-topbar-title,
-    body[data-appearance-theme="light"] .panel-heading-row,
-    body[data-appearance-theme="light"] .learning-title,
-    body[data-appearance-theme="light"] .appearance-section-title,
-    body[data-appearance-theme="light"] .appearance-slider-row,
-    body[data-appearance-theme="light"] .appearance-slider-value {
-        color:var(--text-secondary) !important;
-        -webkit-text-fill-color:var(--text-secondary) !important;
-    }
-}
-
-/* 桌面浅色下两个主操作按钮始终保持蓝底白字。 */
-@media (min-width:1101px) {
-    body[data-appearance-theme="light"] #imageBtn,
-    body[data-appearance-theme="light"] #sendBtn {
-        background:var(--accent) !important;
-        color:#ffffff !important;
-        -webkit-text-fill-color:#ffffff !important;
-    }
-}
 
 
 /* =========================================================
@@ -5099,10 +4596,6 @@ body[data-appearance-theme="light"] .input input {
     :root,
     body {
         --kg-mobile-viewport-bg:rgba(var(--surface-0-rgb), .96);
-    }
-
-    body[data-appearance-theme="light"] {
-        --kg-mobile-viewport-bg:rgba(255,255,255,.98);
     }
 
     body.has-custom-background {
@@ -5853,16 +5346,7 @@ body[data-appearance-theme="light"] .input input {
     background:rgba(127,29,29,.18);
     color:#fca5a5;
 }
-/* 浅色主题中危险操作也要有足够文字对比度；保持深色外观不变。 */
-body[data-appearance-theme="light"] #accountDeleteOpen.account-delete {
-    background:#fff1f2;
-    border-color:#ef4444;
-    color:#991b1b;
-    -webkit-text-fill-color:#991b1b;
-}
-body[data-appearance-theme="light"] #accountDeleteOpen.account-delete:hover {
-    background:#ffe4e6;
-}
+
 
 /* 账号界面自己的显隐必须明确生效：
    - 注册/登录成功后隐藏登录表单、立即显示已登录视图；
@@ -6104,20 +5588,11 @@ body[data-appearance-theme="light"] #accountDeleteOpen.account-delete:hover {
 }
 
 /* =========================================================
-   DMate v6.4：白色 / 黑色 / 蓝色三套主题。
+   DMate v6.4：黑色 / 蓝色两套主题。
    黑色主题按 ChatGPT 式层级处理：
    两侧更深，中间主工作区稍亮，输入框再提一层。
    重点是“同属黑色系但有明确深浅”，而不是整页一块黑。
    ========================================================= */
-.appearance-segmented.modes {
-    grid-template-columns:repeat(4, minmax(0, 1fr));
-}
-
-@media (max-width:520px) {
-    .appearance-segmented.modes {
-        grid-template-columns:repeat(2, minmax(0, 1fr));
-    }
-}
 
 :root[data-appearance-theme="dark"],
 body[data-appearance-theme="dark"] {
@@ -6539,18 +6014,6 @@ body[data-appearance-theme="dark"] .appearance-footer button:not(.primary):hover
         background:transparent !important;
     }
 
-    body[data-appearance-theme="light"]:not(.has-custom-background) .input-wrap {
-        background:rgb(var(--surface-0-rgb)) !important;
-    }
-    body[data-appearance-theme="light"] .input {
-        background:#ffffff !important;
-        border-color:var(--border-strong) !important;
-    }
-    body[data-appearance-theme="light"] .input input {
-        background:transparent !important;
-        border:0 !important;
-    }
-
     body[data-appearance-theme="navy"] .input {
         border-color:rgba(148,163,184,.30) !important;
         box-shadow:none !important;
@@ -6582,10 +6045,8 @@ body[data-appearance-theme="dark"] .appearance-footer button:not(.primary):hover
     }
 }
 
-/* 桌面端白色 / 蓝色：输入区域与聊天区域自然衔接，不再出现分界线。 */
+/* 桌面端蓝色：输入区域与聊天区域自然衔接，不再出现分界线。 */
 @media (min-width:1101px) {
-    body[data-appearance-theme="light"]:not(.has-custom-background) .input-wrap,
-    body[data-appearance-theme="light"]:not(.has-custom-background) .input,
     body[data-appearance-theme="navy"]:not(.has-custom-background) .input-wrap,
     body[data-appearance-theme="navy"]:not(.has-custom-background) .input {
         border-top:0 !important;
@@ -6661,8 +6122,7 @@ body[data-appearance-theme="dark"]:not(.has-custom-background) .input-wrap {
 body[data-appearance-theme="dark"] .left { border-right-color:#181818 !important; }
 body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important; }
 
-/* 移动端：三套主题只换颜色，不再各自改变输入框尺寸、上下留白或位置。
-   以白色主题当前尺寸为基准，外胶囊四边完全一致。 */
+/* 移动端：各主题只换颜色，不再各自改变输入框尺寸、上下留白或位置。 */
 @media (max-width:1100px) {
     .mobile-topbar {
         grid-template-columns:84px minmax(0,1fr) 84px !important;
@@ -6712,14 +6172,6 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         margin:0 !important;
     }
 
-    body[data-appearance-theme="light"]:not(.has-custom-background) .input-wrap {
-        background:rgb(var(--surface-0-rgb)) !important;
-    }
-    body[data-appearance-theme="light"] .input {
-        background:#ffffff !important;
-        border-color:var(--border-strong) !important;
-    }
-
     body[data-appearance-theme="navy"]:not(.has-custom-background) .input-wrap {
         background:var(--surface-0) !important;
     }
@@ -6758,17 +6210,15 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
     }
 }
 
-/* 桌面白色 / 蓝色：只去掉输入区与聊天区之间的分界线，不改变它们原有形态。 */
+/* 桌面蓝色：只去掉输入区与聊天区之间的分界线，不改变原有形态。 */
 @media (min-width:1101px) {
-    body[data-appearance-theme="light"]:not(.has-custom-background) .input-wrap,
-    body[data-appearance-theme="light"]:not(.has-custom-background) .input,
     body[data-appearance-theme="navy"]:not(.has-custom-background) .input-wrap,
     body[data-appearance-theme="navy"]:not(.has-custom-background) .input {
         border-top:0 !important;
         box-shadow:none !important;
     }
 
-    /* 桌面黑色单独保持 GPT 式输入胶囊，不跟白色 / 蓝色做成一条平面栏。 */
+    /* 桌面黑色单独保持 GPT 式输入胶囊。 */
     body[data-appearance-theme="dark"]:not(.has-custom-background) .input-wrap {
         background:#0d0d0d !important;
         padding:10px 14px 14px !important;
@@ -6798,25 +6248,12 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
 
 /* =========================================================
    DMate v6.8：桌面输入区纠正
-   - 白色 / 蓝色：输入区外层与聊天区同色，去掉横向分隔感；保留桌面输入控件原形态。
+   - 蓝色：输入区外层与聊天区同色，去掉横向分隔感；保留桌面输入控件原形态。
    - 黑色：撤销 v6.7 的桌面“移动端式胶囊”，恢复 v6.6 的桌面输入结构。
    - 仅作用于桌面，不改变移动端已经统一好的输入框几何。
    ========================================================= */
 @media (min-width:1101px) {
-    /* 白色：聊天区和整个输入承载区使用同一背景，只保留真正的文本输入框。 */
-    body[data-appearance-theme="light"]:not(.has-custom-background) .input-wrap,
-    body[data-appearance-theme="light"]:not(.has-custom-background) .input {
-        background:rgb(var(--surface-0-rgb)) !important;
-        background-image:none !important;
-        border-top:0 !important;
-        box-shadow:none !important;
-    }
-    body[data-appearance-theme="light"] .input input {
-        background:#ffffff !important;
-        border:1px solid var(--border-strong) !important;
-        border-radius:8px !important;
-        box-shadow:none !important;
-    }
+
 
     /* 蓝色：同样把下方整条输入承载区并回聊天区，不改变桌面控件尺寸。 */
     body[data-appearance-theme="navy"]:not(.has-custom-background) .input-wrap,
@@ -6867,8 +6304,7 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
 
 /* =========================================================
    DMate v6.11：自定义背景下的桌面输入区连续化
-   - 三种主题的输入承载区都直接透出同一张背景图，不再形成横向分隔带。
-   - 浅色主题不再被旧的强制白色背景覆盖；只保留真正的文本输入框为白色。
+   - 各主题的输入承载区都直接透出同一张背景图，不再形成横向分隔带。
    - 不改变移动端输入胶囊几何，也不改变无自定义背景时的桌面布局。
    ========================================================= */
 @media (min-width:1101px) {
@@ -6892,13 +6328,7 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         -webkit-backdrop-filter:none !important;
     }
 
-    /* 浅色主题此前被强制白底规则盖住；这里仅让真正的输入框保持可读白底。 */
-    body[data-appearance-theme="light"].has-custom-background .input input {
-        background:rgba(255,255,255,.94) !important;
-        background-image:none !important;
-        border:1px solid color-mix(in srgb,var(--border-strong) 92%,transparent) !important;
-        box-shadow:none !important;
-    }
+
 
     /* 黑色 / 蓝色仍保留各自原有的真正输入框样式，仅移除外层分隔带。 */
     body[data-appearance-theme="dark"].has-custom-background .input input {
@@ -7433,18 +6863,13 @@ dialog#mobileChoiceModal[data-positioning]::backdrop { visibility:hidden!importa
     border-color:var(--accent);
     border-width:3px;
 }
-/* Graph nodes always use dark fills, including in the light appearance.
-   Keep their labels light instead of inheriting the light page text palette. */
-#knowledgeGraphModal .kg-svg .kg-node-label,
-body[data-appearance-theme="light"] #knowledgeGraphModal .kg-svg .kg-node-label,
-:root[data-appearance-theme="light"] #knowledgeGraphModal .kg-svg .kg-node-label {
+/* Graph nodes use dark fills; keep their labels bright for contrast. */
+#knowledgeGraphModal .kg-svg .kg-node-label {
     fill:#f8fafc !important;
     color:#f8fafc !important;
     paint-order:normal;
 }
-#knowledgeGraphModal .kg-svg .kg-node-badge,
-body[data-appearance-theme="light"] #knowledgeGraphModal .kg-svg .kg-node-badge,
-:root[data-appearance-theme="light"] #knowledgeGraphModal .kg-svg .kg-node-badge {
+#knowledgeGraphModal .kg-svg .kg-node-badge {
     fill:#e2e8f0 !important;
     color:#e2e8f0 !important;
 }
@@ -7453,10 +6878,6 @@ body[data-appearance-theme="light"] #knowledgeGraphModal .kg-svg .kg-node-badge,
 body[data-appearance-theme="dark"] #knowledgeGraphModal,
 :root[data-appearance-theme="dark"] #knowledgeGraphModal {
     --kg-link-stroke:#a3b5cf;
-}
-body[data-appearance-theme="light"] #knowledgeGraphModal,
-:root[data-appearance-theme="light"] #knowledgeGraphModal {
-    --kg-link-stroke:#788ca8;
 }
 #knowledgeGraphModal :is(.kg-edge,.kg-mobile-edge) {
     fill:none;
@@ -7470,22 +6891,10 @@ body[data-appearance-theme="light"] #knowledgeGraphModal,
 
 /* =========================================================
    2026-10-12 外观统一修复：
-   - 三种主题统一外观弹窗与输入区几何；
-   - 浅色主题提升红/绿/白文本的对比度；
+   - 各主题统一外观弹窗与输入区几何；
    - 自定义背景下保持同一套半透明玻璃质感；
    - 桌面与移动端共用一致的底部输入区形状。
    ========================================================= */
-body[data-appearance-theme="light"] {
-    --dm-success-text:#15803d;
-    --dm-success-soft:rgba(21,128,61,.14);
-    --dm-danger-text:#b91c1c;
-    --dm-danger-soft:rgba(185,28,28,.12);
-    --dm-warning-text:#b45309;
-    --dm-warning-soft:rgba(180,83,9,.14);
-    --dm-frost-panel:rgba(255,255,255,.72);
-    --dm-frost-panel-strong:rgba(255,255,255,.84);
-    --dm-frost-border:rgba(142,142,147,.30);
-}
 
 body[data-appearance-theme="dark"] {
     --dm-success-text:#86efac;
@@ -7511,7 +6920,7 @@ body[data-appearance-theme="navy"] {
     --dm-frost-border:rgba(96,165,250,.18);
 }
 
-/* 浅色主题下的绿色 / 红色 / 浅色文字全部改成可读配色。 */
+/* 成功、危险与警告状态沿用各主题的语义配色。 */
 .wrong-status.corrected {
     color:var(--dm-success-text) !important;
 }
@@ -7533,7 +6942,7 @@ body[data-appearance-theme="navy"] {
     box-shadow:0 0 0 2px var(--dm-success-soft) !important;
 }
 
-/* 外观弹窗与其它模态统一成半透明玻璃卡片，三种主题几何一致。 */
+/* 外观弹窗与其它模态统一成半透明玻璃卡片，各主题几何一致。 */
 body[data-appearance-theme] .appearance-card,
 body[data-appearance-theme] .ocr-review-dialog,
 body[data-appearance-theme] .modal-card {
@@ -7576,7 +6985,7 @@ body[data-appearance-theme] .appearance-section-title {
     -webkit-text-fill-color:var(--text-secondary) !important;
 }
 
-/* 自定义背景时也保持同一套玻璃效果，不让浅色主题变成纯白板。 */
+/* 自定义背景时也保持同一套玻璃效果。 */
 body.has-custom-background[data-appearance-theme] .appearance-card,
 body.has-custom-background[data-appearance-theme] .ocr-review-dialog,
 body.has-custom-background[data-appearance-theme] .modal-card,
@@ -7673,15 +7082,9 @@ body[data-appearance-theme] #ocrCancelBtn {
     margin:0 2px !important;
 }
 
-/* 浅色主题的输入与状态按钮避免“白字浅底”问题。 */
-body[data-appearance-theme="light"] .input button.secondary,
-body[data-appearance-theme="light"] .msg-actions button,
-body[data-appearance-theme="light"] .appearance-background-actions button:not(.primary),
-body[data-appearance-theme="light"] .appearance-footer button:not(.primary) {
-    color:var(--text-secondary) !important;
-}
 
-/* 手机与平板继续沿用相同几何，不再让浅色模式单独走另一套图形。 */
+
+/* 手机与平板继续沿用相同几何。 */
 @media (max-width:1100px) {
     body[data-appearance-theme] .input-wrap {
         width:100%;
@@ -7696,7 +7099,7 @@ body[data-appearance-theme="light"] .appearance-footer button:not(.primary) {
 /* =========================================================
    2026-10-12 桌面输入区恢复（仅 >1100px）：
    恢复桌面原来的通栏输入结构，去除上一版误加的大胶囊；
-   三种主题只换配色，不改变尺寸、间距、圆角和按钮形状。
+   各主题只换配色，不改变尺寸、间距、圆角和按钮形状。
    手机/平板 <=1100px 的输入胶囊保持原样。
    ========================================================= */
 @media (min-width:1101px) {
@@ -7753,14 +7156,6 @@ body[data-appearance-theme="light"] .appearance-footer button:not(.primary) {
         -webkit-text-fill-color:var(--text-primary) !important;
         box-shadow:none !important;
         outline:none !important;
-    }
-
-    body[data-appearance-theme="light"] .input input,
-    body[data-appearance-theme="light"] .input input:hover,
-    body[data-appearance-theme="light"] .input input:focus,
-    body[data-appearance-theme="light"].has-custom-background .input input {
-        background:rgba(255,255,255,.94) !important;
-        border-color:var(--border-strong) !important;
     }
     body[data-appearance-theme="dark"] .input input,
     body[data-appearance-theme="dark"] .input input:hover,
@@ -7869,46 +7264,9 @@ body[data-appearance-theme] #ocrCancelBtn:not([hidden]) {
 .input-wrap[data-busy-mode="answering"] #imageBtn { display:none !important; }
 
 
-/* 2026-10-12：三主题统一识图/停止按键与浅色可读性。 */
-/* 选中的考试知识点和文字复制按钮：浅色主题用深色，不再使用淡蓝或浅灰。 */
-body[data-appearance-theme="light"] .wrong-meta-row.focus .wrong-meta-label {
-    color:#1d4ed8 !important;
-    -webkit-text-fill-color:#1d4ed8 !important;
-}
-body[data-appearance-theme="light"] .wrong-meta-row:not(.focus) .wrong-meta-label {
-    color:var(--text-secondary) !important;
-}
-body[data-appearance-theme="light"] .wrong-meta-row:not(.focus) .wrong-meta-value {
-    color:var(--text-secondary) !important;
-}
-body[data-appearance-theme="light"] .wrong-actions .rich-copy-smart,
-body[data-appearance-theme="light"] .msg-actions .rich-copy-smart {
-    color:var(--text-secondary) !important;
-    -webkit-text-fill-color:var(--text-secondary) !important;
-    background:rgba(var(--surface-3-rgb),.90) !important;
-    border-color:var(--border-mid) !important;
-}
-body[data-appearance-theme="light"] .wrong-actions .rich-copy-smart:disabled,
-body[data-appearance-theme="light"] .msg-actions .rich-copy-smart:disabled {
-    color:var(--text-secondary) !important;
-    -webkit-text-fill-color:var(--text-secondary) !important;
-    opacity:1 !important;
-}
-/* OCR / AI 锁定状态说明也是浅蓝字问题的一部分。 */
-body[data-appearance-theme="light"] .input-lock-hint {
-    color:#1d4ed8 !important;
-    -webkit-text-fill-color:#1d4ed8 !important;
-}
-body[data-appearance-theme="light"] .wrong-status.corrected,
-body[data-appearance-theme="light"] .wrong-status.passed {
-    color:#15803d !important;
-    -webkit-text-fill-color:#15803d !important;
-}
-body[data-appearance-theme="light"] .wrong-status:not(.corrected):not(.passed),
-body[data-appearance-theme="light"] .wrong-actions button.danger {
-    color:#b91c1c !important;
-    -webkit-text-fill-color:#b91c1c !important;
-}
+/* 2026-10-12：统一识图与停止按键。 */
+
+
 /* 识图与思考阶段使用相同的红色实心圆，没有白色方块。 */
 body[data-appearance-theme] .input-wrap #ocrCancelBtn:not([hidden]),
 body[data-appearance-theme] .input-wrap #sendBtn.ai-stop-button:not([hidden]) {
@@ -8037,18 +7395,7 @@ body[data-appearance-theme] #wrongBookModal .wrong-empty {
 }
 
 
-/* 2026-10-12 小幅加深浅色主题错题本控件底色；不改字体颜色。 */
-body[data-appearance-theme="light"] #wrongBookModal .wrong-filters button:not(.active),
-body[data-appearance-theme="light"] #wrongBookModal .wrong-tools input,
-body[data-appearance-theme="light"] #wrongBookModal .wrong-tools select,
-body[data-appearance-theme="light"] #wrongBookModal .wrong-tools button {
-    background-color:rgb(var(--surface-3-rgb)) !important;
-    background-image:none !important;
-}
-body[data-appearance-theme="light"] #wrongBookModal .wrong-filters button:not(.active):hover,
-body[data-appearance-theme="light"] #wrongBookModal .wrong-tools button:hover {
-    background-color:rgb(var(--surface-4-rgb)) !important;
-}
+
 
 
 /* OCR 核对页：紧凑原生圆点单选，沿用当前明暗主题。 */
@@ -8361,23 +7708,7 @@ body[data-appearance-theme] .input .image-picker-wrap > #imageInput,
     }
 }
 
-/* 2026-10-21: light mobile drawer matches dark mode's borderless session list.
-   Do not remove the outlined 'new conversation' or footer action buttons. */
-body[data-appearance-theme="light"] .left #sessions .session,
-:root[data-appearance-theme="light"] .left #sessions .session {
-    border-color:transparent !important;
-    box-shadow:none !important;
-}
-body[data-appearance-theme="light"] .left #sessions .session:not(.active),
-:root[data-appearance-theme="light"] .left #sessions .session:not(.active) {
-    background:transparent !important;
-    background-image:none !important;
-}
-body[data-appearance-theme="light"] .left #sessions .session.active,
-:root[data-appearance-theme="light"] .left #sessions .session.active {
-    border-color:transparent !important;
-    box-shadow:none !important;
-}
+
 
 /* All themes: selected conversation is one uninterrupted rounded card.
    Preserve the selected background color, remove the separate left accent

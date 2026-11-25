@@ -277,7 +277,7 @@ async function checkReturnPreservesView(browser, width) {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
     // Camera restoration belongs to an existing conversation. Closing a graph
     // over the landing page intentionally resets it to all knowledge.
-    await page.evaluate(() => newChat());
+    await page.evaluate(() => { appearanceSettings.mode = 'navy'; applyAppearanceSettings({save:false}); newChat(); });
     await openFullGraph(page);
     if (mobile) await settleGraph(page);
     else await page.waitForSelector(viewSelector);
@@ -304,10 +304,12 @@ async function checkReturnPreservesView(browser, width) {
       await page.evaluate(type => (type === 'visibilitychange' ? document : window).dispatchEvent(new Event(type)), type);
       await checkPreserved(width + '/' + type);
     }
-    // A real system theme change should update CSS without resetting the graph.
-    await page.emulateMedia({ colorScheme: 'dark' });
-    await page.waitForFunction(() => document.documentElement.dataset.appearanceTheme === 'dark');
-    await checkPreserved(width + '/system theme');
+    for (const colorScheme of ['dark', 'light']) {
+      await page.emulateMedia({ colorScheme });
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      assert.equal(await page.locator('html').getAttribute('data-appearance-theme'), 'navy');
+      await checkPreserved(width + '/OS ' + colorScheme);
+    }
 
     // Open the real lesson link in its popup, substituting only the external page.
     if (mobile) await expandGraphDetails(page);
@@ -716,7 +718,7 @@ async function checkNodeGestures(browser, width) {
     for (const width of [1440, 390]) await checkReturnPreservesView(browser, width);
     for (const width of [1440, 820, 390]) await checkPanelPresentation(browser, width);
     for (const width of [390, 620]) await checkNodeGestures(browser, width);
-    for (const theme of ['light', 'dark', 'navy']) await checkSelectionBorder(browser, theme);
+    for (const theme of ['dark', 'navy']) await checkSelectionBorder(browser, theme);
     for (const width of [390, 620]) await mobileCase(browser, width);
     const page = await browser.newPage({ viewport: { width: 820, height: 844 } });
     try {

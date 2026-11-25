@@ -5,19 +5,18 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const text = value => window.DMateI18n?.t?.(value) ?? value;
-  const defaults = Object.freeze({ mode:'system', accent:'blue',
+  const defaults = Object.freeze({ mode:'dark', accent:'blue',
     backgroundFit:'cover', mask:35, blur:0, panelOpacity:100, bubbleOpacity:100 });
   const accents = {
     blue:['#3b82f6','59,130,246','#2563eb','#1d4ed8','#60a5fa','#93c5fd'],
-    purple:['#8b5cf6','139,92,246','#7c3aed','#6d28d9','#a78bfa','#c4b5fd'],
-    teal:['#14b8a6','20,184,166','#0d9488','#0f766e','#5eead4','#99f6e4']
+    purple:['#8b5cf6','139,92,246','#7c3aed','#6d28d9','#a78bfa','#c4b5fd']
   };
   const clamp = (value, min, max, fallback) => Number.isFinite(Number(value))
     ? Math.min(max, Math.max(min, Number(value))) : fallback;
   function normalize(value) {
     const source = value && typeof value === 'object' ? value : {};
     return {
-      mode:['system','light','dark','navy'].includes(source.mode) ? source.mode : defaults.mode,
+      mode:['dark','navy'].includes(source.mode) ? source.mode : defaults.mode,
       accent:Object.hasOwn(accents, source.accent) ? source.accent : defaults.accent,
       backgroundFit:['cover','contain'].includes(source.backgroundFit) ? source.backgroundFit : defaults.backgroundFit,
       mask:clamp(source.mask,0,70,defaults.mask), blur:clamp(source.blur,0,12,defaults.blur),
@@ -41,12 +40,6 @@
     return message;
   }
 
-  function resolvedTheme() {
-    if (settings.mode !== 'system') return settings.mode;
-    const native = window.__DMATE_NATIVE_SYSTEM_THEME__;
-    if (native === 'light' || native === 'dark') return native;
-    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  }
   function syncControls() {
     for (const [attribute, value] of [['mode',settings.mode],['accent',settings.accent],['fit',settings.backgroundFit]]) {
       document.querySelectorAll('[data-appearance-' + attribute + ']').forEach(button => {
@@ -84,13 +77,13 @@
   }
   function paint() {
     const root = document.documentElement, body = document.body;
-    const theme = resolvedTheme(), accent = accents[settings.accent], alpha = settings.panelOpacity / 100;
+    const theme = settings.mode, accent = accents[settings.accent], alpha = settings.panelOpacity / 100;
     root.dataset.appearanceTheme = body.dataset.appearanceTheme = theme;
-    root.style.backgroundColor = {light:'#f5f5f7',dark:'#0d0d0d',navy:'#0f172a'}[theme];
-    root.style.colorScheme = body.style.colorScheme = theme === 'light' ? 'only light' : 'dark';
-    document.querySelector('meta[name="color-scheme"]')?.setAttribute('content',theme === 'light' ? 'only light' : 'dark');
-    document.querySelector('meta[name="supported-color-schemes"]')?.setAttribute('content',theme === 'light' ? 'light' : 'dark');
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',theme === 'light' ? '#f5f5f7' : theme === 'navy' ? '#0f172a' : '#171717');
+    root.style.backgroundColor = {dark:'#0d0d0d',navy:'#0f172a'}[theme];
+    root.style.colorScheme = body.style.colorScheme = 'dark';
+    document.querySelector('meta[name="color-scheme"]')?.setAttribute('content','dark');
+    document.querySelector('meta[name="supported-color-schemes"]')?.setAttribute('content','dark');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',theme === 'navy' ? '#0f172a' : '#171717');
     const values = {
       '--accent':accent[0], '--accent-rgb':accent[1], '--accent-deep':accent[2],
       '--accent-deeper':accent[3], '--accent-soft':accent[4], '--accent-pale':accent[5],
@@ -270,12 +263,6 @@
         else if (!event.shiftKey && (index === -1 || index === controls.length-1)) { event.preventDefault(); controls[0].focus(); }
       }
     },true);
-    const systemChange = () => { if (settings.mode === 'system') paint(); };
-    const media = window.matchMedia?.('(prefers-color-scheme: dark)');
-    if (media?.addEventListener) media.addEventListener('change',systemChange); else media?.addListener?.(systemChange);
-    window.addEventListener('dmate:native-system-theme',systemChange);
-    window.addEventListener('pageshow',systemChange); window.addEventListener('focus',systemChange);
-    document.addEventListener('visibilitychange',() => { if (!document.hidden) systemChange(); });
     window.addEventListener('offline:appearance-applied',event => {
       if (pending) apply(event.detail?.settings || settings, backgroundMode === 'remove' ? null : visualBlob);
     });

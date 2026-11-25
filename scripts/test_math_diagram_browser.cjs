@@ -89,7 +89,7 @@ async function passiveGenerationPanel(page, mock, guideRequests, initial, langua
   assert.equal(await page.locator('.ddw-ai-requirement').getAttribute('required'), '');
   assert.equal(await page.locator('[data-drawing-guide]').count(), 0, 'Generation and guidance have separate submit actions');
   const originalTheme = await page.evaluate(() => [document.documentElement.dataset.appearanceTheme, document.body.dataset.appearanceTheme]);
-  for (const theme of ['light', 'dark', 'navy']) {
+  for (const theme of ['dark', 'navy']) {
     await page.evaluate(value => { document.documentElement.dataset.appearanceTheme = document.body.dataset.appearanceTheme = value; }, theme);
     const disabledStyle = await panelStyle(page, '[data-math-diagram-generate]');
     const composerStyle = await page.locator('#sendBtn').evaluate(button => ({

@@ -51,21 +51,25 @@ async function checkIcon(button, name, size) {
 }
 
 async function drawingPaint(page, fieldBackground, theme, offline) {
-  if (theme === 'light') {
-    const paletteControls = [page.locator('.dge-tool-palette > summary'),
-      page.locator('.ddw-side-actions > button').nth(0), page.locator('.ddw-side-actions > button').nth(1)];
-    const palettePaint = control => control.evaluate(node => Object.fromEntries(
-      ['backgroundColor','backgroundImage','borderTopColor','color'].map(key => [key,getComputedStyle(node)[key]])));
+  const tools = page.locator('.dge-tool-palette > summary'), actions = page.locator('.ddw-side-actions > button');
+  const paint = control => control.evaluate(node => Object.fromEntries(
+    ['backgroundColor','backgroundImage','borderTopColor','color'].map(key => [key,getComputedStyle(node)[key]])));
+  await page.mouse.move(0,0); await settle(page);
+  const settings = await paint(actions.nth(0)), toolbar = await paint(tools);
+  assert.deepEqual(await paint(actions.nth(1)), settings, theme + ': drawing settings and graph information share their palette');
+  const luminance = color => color.match(/[\d.]+/g).slice(0, 3).reduce((total, channel, i) => {
+    const value = Number(channel) / 255;
+    return total + [0.2126, 0.7152, 0.0722][i] * (value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
+  }, 0);
+  for (const control of [toolbar, settings]) assert.ok(
+    (luminance(control.color) + .05) / (luminance(control.backgroundColor) + .05) >= 4.5,
+    theme + ': canvas control labels remain legible on their dark surfaces');
+  if (!mobile(page)) {
+    await actions.nth(0).hover(); await settle(page);
+    const hovered = await paint(actions.nth(0));
+    await actions.nth(1).hover(); await settle(page);
+    assert.deepEqual(await paint(actions.nth(1)), hovered, 'Both canvas actions share hover colors');
     await page.mouse.move(0,0); await settle(page);
-    const expectedPalette = await palettePaint(paletteControls[1]);
-    for (const control of paletteControls) assert.deepEqual(await palettePaint(control),expectedPalette,
-      'Drawing tools, drawing settings and graph information share the same light-theme palette');
-    if (!mobile(page)) {
-      const hovered = [];
-      for (const control of paletteControls) { await control.hover(); await settle(page); hovered.push(await palettePaint(control)); }
-      for (const paint of hovered) assert.deepEqual(paint,hovered[0], 'All three drawing controls share hover colors');
-      await page.mouse.move(0,0); await settle(page);
-    }
   }
   const controls = await page.locator('.dge-view-controls').evaluate(node => {
     const css = getComputedStyle(node), minus = node.querySelector('[data-overlay-tool="zoom-out"]').getBoundingClientRect();
@@ -158,7 +162,7 @@ async function safeHistoryDelete(page, name, offline) {
       'backgroundColor','backgroundImage','boxShadow','filter'].map(key => [key, getComputedStyle(button)[key]])));
   const original = await page.evaluate(() => [document.documentElement.dataset.appearanceTheme, document.body.dataset.appearanceTheme]);
   try {
-    for (const theme of ['light','dark','navy']) {
+    for (const theme of ['dark','navy']) {
       await page.evaluate(theme => [document.documentElement,document.body].forEach(node => { node.dataset.appearanceTheme = theme; }), theme);
       await page.mouse.move(0,0); await settle(page);
       const expected = await paint(reference);
@@ -310,7 +314,7 @@ async function runCase(browser, width, theme, offline) {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
-    for (const [width, theme] of [[1440, 'light'], [390, 'dark'], [320, 'dark']]) for (const offline of [false, true]) await runCase(browser, width, theme, offline);
+    for (const [width, theme] of [[1440, 'navy'], [390, 'dark'], [320, 'dark']]) for (const offline of [false, true]) await runCase(browser, width, theme, offline);
     const context = await browser.newContext({ viewport: { width: 820, height: 900 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
     try {
       const page = await context.newPage(); await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });

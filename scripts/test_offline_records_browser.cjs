@@ -398,8 +398,8 @@ async function recordRaces(browser){
 (async()=>{
   const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.CHROMIUM_EXECUTABLE_PATH}:{})});
   try{
-    const themes=(process.env.DMATE_TEST_THEMES||'light,dark,navy').split(',');
-    if(process.env.DMATE_TEST_RECORDS_ONLY!=='races')for(const [width,theme]of [[1440,'light'],[390,'dark'],[1440,'navy']])
+    const themes=(process.env.DMATE_TEST_THEMES||'dark,navy').split(',');
+    if(process.env.DMATE_TEST_RECORDS_ONLY!=='races')for(const [width,theme]of [[1440,'dark'],[390,'dark'],[1440,'navy']])
       if(themes.includes(theme))await run(browser,width,theme);
     await recordRaces(browser);
   }

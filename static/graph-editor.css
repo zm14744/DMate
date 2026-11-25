@@ -284,7 +284,6 @@
 .dge-scan-only .dge-tool-palette .dge-overlay-tools button,.dge-scan-only .dge-tool-palette .dge-overlay-tools select{width:auto;max-width:none;white-space:nowrap;flex:0 0 auto;padding:6px 9px}
 .dge-scan-only .dge-overlay-tools .dgs-source-status{position:absolute!important;width:1px!important;height:1px!important;min-height:0!important;overflow:hidden;clip-path:inset(50%)}
 .dge-scan-only .dge-overlay-viewport{flex:1;height:auto;min-height:0;max-height:none;border:1px solid var(--dge-border);border-radius:12px}
-body[data-appearance-theme="light"] .dge-scan-only .dge-overlay-stage{background:#000}
 .dge-scan-only .dge-overlay-bbox,.dge-scan-only .dge-overlay-polygon,.dge-scan-only .dge-overlay-text-region,.dge-scan-only .dge-overlay-selection,.dge-scan-only .dge-freehand-draft{stroke-width:1px;fill:none;opacity:.9;stroke-dasharray:5 4}
 .dge-scan-only .dge-overlay-text-region{stroke:#d97706}
 .dge-scan-only .dge-frame-hit.is-current{stroke-width:2px;opacity:1}

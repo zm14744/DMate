@@ -1242,6 +1242,8 @@
     delete next.fontSize;
     for (const key of ["mode","accent","panelOpacity","bubbleOpacity","backgroundFit","blur","mask"])
       if (Object.hasOwn(patch,key)) next[key] = patch[key];
+    const normalized = window.DMateOfflineAppearance?.normalize(next);
+    if (normalized) { next.mode = normalized.mode; next.accent = normalized.accent; }
     const value = {...saved,id:"appearance",settings:next,updatedAt:stamp()};
     if (changes?.removeBackground) delete value.backgroundBlob;
     else if (changes?.backgroundBlob instanceof Blob) value.backgroundBlob = changes.backgroundBlob;

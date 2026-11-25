@@ -5,16 +5,15 @@
   const script = document.currentScript;
   const scope = script?.dataset.scope || 'online', owner = script?.dataset.owner || '';
   const offlineKey = 'dmate:offline:appearance-paint:v1';
-  const defaults = {mode:'system',accent:'blue',backgroundFit:'cover',mask:35,blur:0,panelOpacity:100,bubbleOpacity:100};
+  const defaults = {mode:'dark',accent:'blue',backgroundFit:'cover',mask:35,blur:0,panelOpacity:100,bubbleOpacity:100};
   const accents = {
     blue:['#3b82f6','59,130,246','#2563eb','#1d4ed8','#60a5fa','#93c5fd'],
-    purple:['#8b5cf6','139,92,246','#7c3aed','#6d28d9','#a78bfa','#c4b5fd'],
-    teal:['#14b8a6','20,184,166','#0d9488','#0f766e','#5eead4','#99f6e4']
+    purple:['#8b5cf6','139,92,246','#7c3aed','#6d28d9','#a78bfa','#c4b5fd']
   };
   const number = (value,min,max,fallback) => Number.isFinite(Number(value)) ? Math.min(max,Math.max(min,Number(value))) : fallback;
   function normalize(value) {
     const source = value || {};
-    return {mode:['system','light','dark','navy'].includes(source.mode) ? source.mode : defaults.mode,
+    return {mode:['dark','navy'].includes(source.mode) ? source.mode : defaults.mode,
       accent:Object.hasOwn(accents,source.accent) ? source.accent : defaults.accent,
       backgroundFit:['cover','contain'].includes(source.backgroundFit) ? source.backgroundFit : defaults.backgroundFit,
       mask:number(source.mask,0,70,35),blur:number(source.blur,0,12,0),
@@ -30,12 +29,10 @@
   let picture = null, epoch = 0, task = Promise.resolve();
   function paint() {
     const root = document.documentElement, body = document.body;
-    const native = window.__DMATE_NATIVE_SYSTEM_THEME__;
-    const theme = settings.mode !== 'system' ? settings.mode : ['light','dark'].includes(native) ? native
-      : window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    const theme = settings.mode;
     root.dataset.appearanceTheme = theme;
-    root.style.colorScheme = theme === 'light' ? 'only light' : 'dark';
-    root.style.backgroundColor = {light:'#f5f5f7',dark:'#0d0d0d',navy:'#0f172a'}[theme];
+    root.style.colorScheme = 'dark';
+    root.style.backgroundColor = {dark:'#0d0d0d',navy:'#0f172a'}[theme];
     const accent = accents[settings.accent], alpha = settings.panelOpacity/100;
     const values = {'--accent':accent[0],'--accent-rgb':accent[1],'--accent-deep':accent[2],
       '--accent-deeper':accent[3],'--accent-soft':accent[4],'--accent-pale':accent[5],
@@ -47,8 +44,8 @@
     for (const [key,value] of Object.entries(values)) root.style.setProperty(key,String(value));
     if (body) {body.dataset.appearanceTheme = theme;body.style.colorScheme = root.style.colorScheme;}
     document.querySelector('meta[name="color-scheme"]')?.setAttribute('content',root.style.colorScheme);
-    document.querySelector('meta[name="supported-color-schemes"]')?.setAttribute('content',theme === 'light' ? 'light' : 'dark');
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',{light:'#f5f5f7',dark:'#171717',navy:'#0f172a'}[theme]);
+    document.querySelector('meta[name="supported-color-schemes"]')?.setAttribute('content','dark');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',{dark:'#171717',navy:'#0f172a'}[theme]);
     const layer = document.getElementById('appearanceBackgroundLayer');
     if (picture && layer && body) {layer.style.backgroundImage = 'url("'+picture.url+'")';body.classList.add('has-custom-background');}
   }

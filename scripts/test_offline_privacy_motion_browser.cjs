@@ -212,7 +212,7 @@ async function assertLayout(page) {
   for (const viewport of [{width:1440,height:900},{width:390,height:844},
     {width:844,height:390},{width:240,height:700}]) {
     await page.setViewportSize(viewport);
-    for (const theme of ['dark','light','navy']) {
+    for (const theme of ['dark','navy']) {
       const result = await page.evaluate(theme => {
         document.documentElement.dataset.appearanceTheme = theme;
         document.body.dataset.appearanceTheme = theme;
@@ -227,8 +227,8 @@ async function assertLayout(page) {
           fallbackVisible:[...cover.querySelectorAll('img')].some(img => getComputedStyle(img).display !== 'none')};
       },theme);
       const label = viewport.width+'x'+viewport.height+' '+theme;
-      assert.equal(result.stroke,theme === 'light' ? 'rgb(0, 0, 0)' : 'rgb(255, 255, 255)',label+': theme ink follows original logo');
-      assert.equal(result.background,{dark:'rgb(13, 13, 13)',light:'rgb(245, 245, 247)',navy:'rgb(15, 23, 42)'}[theme],label+': theme background remains intact');
+      assert.equal(result.stroke,'rgb(255, 255, 255)',label+': theme ink follows original logo');
+      assert.equal(result.background,{dark:'rgb(13, 13, 13)',navy:'rgb(15, 23, 42)'}[theme],label+': theme background remains intact');
       assert.equal(result.overflow,false,label+': no horizontal overflow');
       assert.equal(result.eyeInside,true,label+': the reveal button stays inside the viewport');
       assert.equal(result.fallbackVisible,false,label+': the fallback does not overlap the growing logo');
@@ -302,7 +302,7 @@ async function assertLayout(page) {
       await revealInterface(page);
       assert.equal(await page.locator('#offlinePrivacyCover').evaluate(node => node.open),false,'The mobile eye still reveals after resize and theme changes');
       assert.deepEqual(errors,[],'Animation and resizing raise no page errors');
-      console.log('PASS desktop, narrow mobile and landscape geometry across all three themes');
+      console.log('PASS desktop, narrow mobile and landscape geometry across both themes');
     } finally {await context.close();}
 
     const reduced = await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce'});

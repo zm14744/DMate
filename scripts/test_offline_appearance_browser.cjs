@@ -57,6 +57,10 @@ async function appearance(page) {
 }
 async function appearanceControls(page) {
   assert.equal(await page.locator('#appearanceModal [data-appearance-font]').count(), 0);
+  assert.deepEqual(await page.locator('#appearanceModal [data-appearance-mode]').evaluateAll(nodes =>
+    nodes.map(node => node.dataset.appearanceMode).sort()), ['dark', 'navy']);
+  assert.deepEqual(await page.locator('#appearanceModal [data-appearance-accent]').evaluateAll(nodes =>
+    nodes.map(node => node.dataset.appearanceAccent).sort()), ['blue', 'purple']);
   const separators = await page.locator('#appearanceModal').evaluate(dialog => [
     ...[...dialog.querySelectorAll('.modal-head, .appearance-section')].map(node => getComputedStyle(node).borderBottomWidth),
     ...[...dialog.querySelectorAll('.appearance-apply-hint, .appearance-footer')].map(node => getComputedStyle(node).borderTopWidth)
@@ -150,7 +154,7 @@ async function sharedThemeSurfaces(browser,width,offline) {
       newChat();getCurrent().name='主题验证';getCurrent().nameSource='user';
       getCurrent().messages=[{role:'user',text:'颜色验证'},{role:'ai',text:'这是一段普通讲解。'}];renderChat();
     });
-    for(const [mode,expected] of [['light',[245,245,247]],['dark',[13,13,13]],['navy',[15,23,42]]]){
+    for(const [mode,expected] of [['dark',[13,13,13]],['navy',[15,23,42]]]){
       await page.evaluate(async({mode,offline})=>{
         if(offline)await DMateOfflineAppearance.apply({...DMateOfflineAppearance.getSettings(),mode,panelOpacity:100},null);
         else{clearAppearanceBackgroundVisual();appearanceSettings={...APPEARANCE_DEFAULTS,mode,panelOpacity:100};applyAppearanceSettings({save:true});}
@@ -159,13 +163,15 @@ async function sharedThemeSurfaces(browser,width,offline) {
       const base=await surfacePixel(page,page.locator(offline?'#offlineMain':'#chat'),{left:null,...(offline?{top:3}:{})});
       assert.deepEqual(base,expected,edition+'/'+width+'/'+mode+': actual visible workspace color');
       const modalColor=mode==='dark'?[34,34,34]:base;
-      if(mode==='light'){
+      if(mode==='dark'){
         const opener=page.locator(offline?(width<=1100?'#offlineNavToggle':'#offlineDesktopSidebarOpen')
           :(width<=1100?'#mobileNavBtn':'#desktopSidebarOpen'));
         if(await opener.getAttribute('aria-expanded')!=='true')await opener.click();
         await settlePalette(page);
-        assert.deepEqual(await surfacePixel(page,page.locator(offline?'#offlineSidebar':'#conversationSidebar')),
-          [235,235,239],edition+'/'+width+': light sidebar has the shared subtle gray shade');
+        const sidebar=page.locator(offline?'#offlineSidebar':'#conversationSidebar');
+        const sidebarPaint=await paint(sidebar);
+        assert.equal(sidebarPaint.alpha,1);
+        assert.deepEqual(await surfacePixel(page,sidebar),sidebarPaint.rgb,edition+'/'+width+': visible sidebar pixels match its theme');
         if(width<=1100){
           if(offline)await page.locator('#offlineNavClose').click();
           else await page.evaluate(()=>closeMobileShellDrawers());
@@ -196,7 +202,7 @@ async function sharedThemeSurfaces(browser,width,offline) {
       await page.locator('#appearanceClose').click();
       await page.waitForFunction(()=>document.documentElement.style.getPropertyValue('--panel-alpha').trim()==='1');
     }
-    console.log('PASS '+edition+' '+width+': actual chat/sidebar pixels, shared modal/native colors and live panel opacity across three themes');
+    console.log('PASS '+edition+' '+width+': actual chat/sidebar pixels, shared modal/native colors and live panel opacity across both themes');
   }finally{await context.close();}
 }
 
@@ -277,7 +283,7 @@ async function sharedThemeSurfaces(browser,width,offline) {
     // Fail only this isolated context's appearance write, then retry through
     // the real controls. The failed draft must remain editable and uncommitted.
     await openAppearance(page);
-    await page.locator('[data-appearance-accent="teal"]').click();
+    await page.locator('[data-appearance-accent="blue"]').click();
     await page.evaluate(() => { window.__failOfflineAppearanceSave = true; });
     await page.locator('#appearanceDone').click();
     await page.locator('.dmate-delete-confirm[open]').waitFor({ state:'visible' });
@@ -290,7 +296,7 @@ async function sharedThemeSurfaces(browser,width,offline) {
     await page.locator('#appearanceDone').click();
     await page.locator('#appearanceModal').waitFor({ state:'hidden' });
     await page.reload({ waitUntil:'networkidle' }); await ready(page);
-    assert.equal(await page.evaluate(() => window.DMateOfflineAppearance.getSettings().accent), 'teal');
+    assert.equal(await page.evaluate(() => window.DMateOfflineAppearance.getSettings().accent), 'blue');
     assert.equal(await page.evaluate(() => document.body.classList.contains('has-custom-background')), true);
     assert.deepEqual(errors, [], 'Appearance interactions must not produce page errors');
     console.log('PASS failed storage preserves the draft and wallpaper; retry persists successfully');

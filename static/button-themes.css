@@ -12,13 +12,6 @@ body[data-appearance-theme] {
     --dm-filled-font-weight:400;
     --dm-filled-line-height:normal;
 }
-body[data-appearance-theme="light"] {
-    --dm-control-bg:#e8e8ed;
-    --dm-control-hover-bg:#dddde3;
-    --dm-control-border:var(--border-strong);
-    --dm-control-hover-border:var(--border-mid);
-    --dm-control-text:var(--text-secondary);
-}
 body[data-appearance-theme="navy"] {
     --dm-control-bg:#1f2937;
     --dm-control-hover-bg:#30405a;
@@ -36,11 +29,6 @@ body[data-appearance-theme="dark"] {
 
 
 /* Shared neutral selection palette, matching the active conversation. */
-body[data-appearance-theme="light"] {
-    --dm-selected-bg:#e0e0e6;
-    --dm-selected-hover:#d9d9df;
-    --dm-selected-ring:#77777f;
-}
 body[data-appearance-theme="dark"] {
     --dm-selected-bg:#3d3d3d;
     --dm-selected-hover:#494949;
@@ -52,28 +40,8 @@ body[data-appearance-theme="navy"] {
     --dm-selected-ring:#94a3b8;
 }
 
-/* A named important layer supersedes old theme/mobile !important fills,
-   including the light-theme PNG that otherwise masks hover colors. */
+/* A named important layer supersedes old theme/mobile !important fills. */
 @layer dmate-button-themes {
-    /* Separate the light conversation rail and its actions from the canvas. */
-    @media(min-width:1101px) {
-        /* The notebook's creation action follows the sidebar's New chat palette. */
-        body[data-appearance-theme="light"]:not(.has-custom-background) :is(#conceptNotebookDialog,#notesPanel) .dcn-new {
-            --dm-control-bg:var(--surface-2);
-            --dm-control-hover-bg:var(--surface-3);
-            --dm-control-border:var(--border-strong);
-            --dm-control-hover-border:var(--border-mid);
-        }
-        body[data-appearance-theme="light"]:not(.has-custom-background) .left {
-            --dm-control-bg:var(--surface-2);
-            --dm-control-hover-bg:var(--surface-3);
-            --dm-control-border:var(--border-strong);
-            --dm-control-hover-border:var(--border-mid);
-            background-image:none!important;
-            border-right:1px solid var(--border-strong)!important;
-        }
-    }
-
     body[data-appearance-theme] :is(button,.download-actions > a):not(:is(
         #sendBtn,#imageBtn,#voiceInputBtn,#ocrCancelBtn,
         #downloadAppBtn,#accountBtn,#exportDataBtn,#offlineWorkspaceBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn,
@@ -132,10 +100,10 @@ body[data-appearance-theme="navy"] {
         border-style:solid!important;
     }
     @media(min-width:1101px) {
-        body[data-appearance-theme]:is([data-appearance-theme="light"],[data-appearance-theme="navy"]) .left {
+        body[data-appearance-theme]:is([data-appearance-theme="navy"]) .left {
             border-right:1px solid transparent!important;
         }
-        body[data-appearance-theme]:is([data-appearance-theme="light"],[data-appearance-theme="navy"]) .right {
+        body[data-appearance-theme]:is([data-appearance-theme="navy"]) .right {
             border-left:1px solid transparent!important;
         }
     }
@@ -211,12 +179,7 @@ body[data-appearance-theme="navy"] {
         text-align:left !important;
     }
 
-    /* Only interaction shows a surface; light / dark / navy each have a
-       restrained but distinguishable hover and pressed state. */
-    body[data-appearance-theme="light"] {
-        --dm-nav-hover:color-mix(in srgb,var(--text-primary) 10%,transparent);
-        --dm-nav-pressed:color-mix(in srgb,var(--text-primary) 16%,transparent);
-    }
+    /* Interaction shows a restrained hover and pressed surface in each theme. */
     body[data-appearance-theme="dark"] {
         --dm-nav-hover:rgba(255,255,255,.09);
         --dm-nav-pressed:rgba(255,255,255,.14);
@@ -252,7 +215,7 @@ body[data-appearance-theme="navy"] {
     body[data-appearance-theme] { --dm-control-transition:none; }
 }
 
-/* Lucide outline icons: one geometry across light / dark / navy.
+/* Lucide outline icons: one geometry across the supported themes.
    Source artwork: https://lucide.dev/ (ISC; download is Feather-derived MIT).
    The original licenses are distributed as static/lucide-icons-LICENSE.txt. */
 body[data-appearance-theme] :is(
@@ -338,7 +301,7 @@ body[data-appearance-theme] #accountBtn.is-syncing .account-entry-icon {
         color:var(--text-primary) !important;
         -webkit-text-fill-color:var(--text-primary) !important;
     }
-    /* Swatch center keeps its real blue/purple/teal color: only the selection
+    /* Swatch center keeps its chosen accent color: only the selection
        ring becomes neutral, without an accent-colored glow. */
     body[data-appearance-theme] .appearance-swatch.active {
         outline:3px solid var(--dm-selected-ring) !important;

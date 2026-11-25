@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-appearance-theme="light" data-desktop-sidebar="collapsed">
+<html lang="zh-CN" data-appearance-theme="dark" data-desktop-sidebar="collapsed">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -13,9 +13,9 @@
  * 页面内部切换统一使用显式按钮与横向手势，不再主动修改 history。
  */
 </script>
-<meta name="color-scheme" content="only light">
-<meta name="supported-color-schemes" content="light">
-<meta name="theme-color" content="#f5f5f7">
+<meta name="color-scheme" content="dark">
+<meta name="supported-color-schemes" content="dark">
+<meta name="theme-color" content="#171717">
 <script src="/static/guest-session.js?v={{ dmate_web_revision }}"></script>
 <script id="dmateAppearanceBootstrap" src="/static/appearance-bootstrap.js?v={{ dmate_web_revision }}" data-scope="online" data-owner="{{ dmate_initial_appearance_owner or '' }}"></script>
 <meta name="application-name" content="DMate">
@@ -309,7 +309,7 @@ button:focus-visible, summary:focus-visible, [role="button"]:focus-visible { fil
 <link rel="stylesheet" href="/static/scrollbars.css?v={{ dmate_web_revision }}">
 </head>
 
-<body data-appearance-theme="light" data-platform-android="{{ '1' if is_android else '0' }}" data-platform-ios="{{ '1' if is_ios else '0' }}" data-dmate-android-app="{{ '1' if is_dmate_android_app else '0' }}" data-dmate-desktop-app="{{ '1' if is_dmate_desktop_app else '0' }}">
+<body data-appearance-theme="dark" data-platform-android="{{ '1' if is_android else '0' }}" data-platform-ios="{{ '1' if is_ios else '0' }}" data-dmate-android-app="{{ '1' if is_dmate_android_app else '0' }}" data-dmate-desktop-app="{{ '1' if is_dmate_desktop_app else '0' }}">
 <script id="dmateAppearanceBodyBootstrap">
 document.body.dataset.appearanceTheme = document.documentElement.dataset.appearanceTheme;
 document.body.style.colorScheme = document.documentElement.style.colorScheme;
@@ -553,9 +553,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 
             <div class="appearance-section">
                 <div class="appearance-section-title">显示模式</div>
-                <div class="appearance-segmented modes">
-                    <button type="button" data-appearance-mode="system">跟随系统</button>
-                    <button type="button" data-appearance-mode="light">白色</button>
+                <div class="appearance-segmented two">
                     <button type="button" data-appearance-mode="dark">黑色</button>
                     <button type="button" data-appearance-mode="navy" data-i18n-en="Navy">蓝色</button>
                 </div>
@@ -566,7 +564,6 @@ window.DMATE_CLIENT_CONFIG = {{ {
                 <div class="appearance-swatches" aria-label="主题色">
                     <button class="appearance-swatch" type="button" data-appearance-accent="blue" aria-label="蓝色" style="background:#3b82f6"></button>
                     <button class="appearance-swatch" type="button" data-appearance-accent="purple" aria-label="紫色" style="background:#8b5cf6"></button>
-                    <button class="appearance-swatch" type="button" data-appearance-accent="teal" aria-label="青绿色" style="background:#14b8a6"></button>
                 </div>
             </div>
 
@@ -1510,50 +1507,6 @@ html[data-ui-language="en"] .learning-review-section-title {
         body[data-appearance-theme] #learningToolsPanel > .learning-panel > .panel-heading-row.learning-title {
             display:flex !important;
         }
-    }
-}
-</style>
-
-<style id="dmateLightWorkspaceSidebarSwap">
-/* Light theme surface hierarchy: bright conversation workspace, muted navigation rail.
-   Match the specificity of the existing root/body theme rules so this swap wins
-   over the legacy light-theme backgrounds instead of merely appending a weaker rule. */
-:root[data-appearance-theme="light"] body:not(.has-custom-background),
-body[data-appearance-theme="light"]:not(.has-custom-background) {
-    background:var(--surface-0) !important;
-}
-:root[data-appearance-theme="light"] body:not(.has-custom-background) .layout,
-:root[data-appearance-theme="light"] body:not(.has-custom-background) .center,
-:root[data-appearance-theme="light"] body:not(.has-custom-background) .chat,
-:root[data-appearance-theme="light"] body:not(.has-custom-background) .input-wrap,
-body[data-appearance-theme="light"]:not(.has-custom-background) .layout,
-body[data-appearance-theme="light"]:not(.has-custom-background) .center,
-body[data-appearance-theme="light"]:not(.has-custom-background) .chat,
-body[data-appearance-theme="light"]:not(.has-custom-background) .input-wrap {
-    background:var(--surface-0) !important;
-}
-:root[data-appearance-theme="light"] body:not(.has-custom-background) .left,
-:root[data-appearance-theme="light"] body:not(.has-custom-background) .mobile-topbar,
-body[data-appearance-theme="light"]:not(.has-custom-background) .left,
-body[data-appearance-theme="light"]:not(.has-custom-background) .mobile-topbar {
-    background:var(--surface-1) !important;
-    color:var(--text-strong) !important;
-}
-@media (min-width:1101px) {
-    :root[data-appearance-theme="light"] body:not(.has-custom-background) .left,
-    body[data-appearance-theme="light"]:not(.has-custom-background) .left {
-        border-right:1px solid var(--border-strong) !important;
-    }
-}
-@media (max-width:1100px) {
-    :root[data-appearance-theme="light"] body:not(.has-custom-background) .left,
-    body[data-appearance-theme="light"]:not(.has-custom-background) .left {
-        border-right:0 !important;
-        border-bottom-color:var(--border-strong) !important;
-    }
-    :root[data-appearance-theme="light"] body:not(.has-custom-background) .mobile-topbar,
-    body[data-appearance-theme="light"]:not(.has-custom-background) .mobile-topbar {
-        border-bottom-color:var(--border-strong) !important;
     }
 }
 </style>

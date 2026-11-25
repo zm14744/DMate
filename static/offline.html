@@ -3,31 +3,31 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f5f5f7">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#171717">
 <!-- DMATE_CURRENT_ONLINE_FAVICON -->
 <title>DMate - 离散数学智能辅学系统</title>
-<script src="/static/appearance-bootstrap.js?v=3" data-scope="offline"></script>
+<script src="/static/appearance-bootstrap.js?v=4" data-scope="offline"></script>
 <script defer src="/static/offline-vault.js?v=2"></script>
 <script defer src="/static/offline-appearance-preload.js?v=1"></script>
-<link rel="stylesheet" href="/static/dmate-main.css?v=88">
+<link rel="stylesheet" href="/static/dmate-main.css?v=89">
 
-<link rel="stylesheet" href="/static/graph-editor.css?v=27">
-<link rel="stylesheet" href="/static/drawing-workspace.css?v=56">
+<link rel="stylesheet" href="/static/graph-editor.css?v=28">
+<link rel="stylesheet" href="/static/drawing-workspace.css?v=57">
 <link rel="stylesheet" href="/static/modal-chrome.css">
 <link rel="stylesheet" href="/static/concept-notebook.css?v=9">
 <link rel="stylesheet" href="/static/ai-answer-renderer.css?v=22">
 <link rel="stylesheet" href="/static/red-circle-controls.css">
 <link rel="stylesheet" href="/static/ui-tooltip.css">
 <link rel="stylesheet" href="/static/appearance-panels.css">
-<link rel="stylesheet" href="/static/dmate-shared-overrides.css?v=24">
+<link rel="stylesheet" href="/static/dmate-shared-overrides.css?v=25">
 <link rel="stylesheet" href="/static/search-controls.css?v=29">
 <link rel="stylesheet" href="/static/textarea-autosize.css?v=1">
-<link rel="stylesheet" href="/static/button-themes.css?v=69">
+<link rel="stylesheet" href="/static/button-themes.css?v=70">
 <link rel="stylesheet" href="/static/offline-knowledge-graph.css?v=56">
 <link rel="stylesheet" href="/static/knowledge-graph-sheet.css?v=5">
-<link rel="stylesheet" href="/static/offline.css?v=73">
-<link rel="stylesheet" href="/static/select-controls.css?v=43">
+<link rel="stylesheet" href="/static/offline.css?v=74">
+<link rel="stylesheet" href="/static/select-controls.css?v=44">
 <link rel="stylesheet" href="/static/scrollbars.css?v=25">
 <script defer src="/static/mobile-select.js?v=26"></script>
 <script defer src="/static/search-controls.js?v=29"></script>
@@ -51,11 +51,11 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/ui-tooltip.js?v=50"></script>
 <script defer src="/static/guest-session.js?v=53"></script>
 <script defer src="/static/offline-interface-state.js?v=1"></script>
-<script defer src="/static/language-catalog.js?v=72"></script>
+<script defer src="/static/language-catalog.js?v=73"></script>
 <script defer src="/static/language-knowledge.js"></script>
 <script defer src="/static/language.js?v=59"></script>
 <script defer src="/static/modal-text.js?v=53"></script>
-<script defer src="/static/offline-appearance.js?v=12"></script>
+<script defer src="/static/offline-appearance.js?v=13"></script>
 <script defer src="/static/offline-privacy-motion.js?v=4"></script>
 <script defer src="/static/offline-shell.js?v=42"></script>
 <script defer src="/static/knowledge-graph-labels.js?v=22"></script>
@@ -67,10 +67,10 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <script defer src="/static/offline-backup.js?v=3"></script>
 <script defer src="/static/backup-download.js?v=1"></script>
 <script defer src="/static/offline-entry.js?v=50"></script>
-<script defer src="/static/offline.js?v=79"></script>
+<script defer src="/static/offline.js?v=80"></script>
 </head>
 <body class="offline-workspace offline-content-hidden">
-<script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"light";</script>
+<script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"dark";</script>
 <div id="appearanceBackgroundLayer" class="appearance-background-layer" aria-hidden="true"></div>
 <div class="appearance-mask-layer" aria-hidden="true"></div>
 
@@ -253,8 +253,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 <dialog id="offlinePrivacyCover" aria-label="DMate 防窥界面" tabindex="-1">
   <button id="offlinePrivacyRestore" class="offline-icon-button offline-privacy-toggle" type="button" aria-label="显示界面" autofocus></button>
   <div class="offline-privacy-mark" role="img" aria-label="DMate">
-    <img class="offline-privacy-mark-black" src="/static/icons/dmate-tab-black-v52.svg" width="256" height="256" alt="" draggable="false">
-    <img class="offline-privacy-mark-white" src="/static/icons/dmate-tab-white-v52.svg" width="256" height="256" alt="" draggable="false">
+    <img src="/static/icons/dmate-tab-white-v52.svg" width="256" height="256" alt="" draggable="false">
   </div>
 </dialog>
 
@@ -300,9 +299,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
 
             <div class="appearance-section">
                 <div class="appearance-section-title">显示模式</div>
-                <div class="appearance-segmented modes">
-                    <button type="button" data-appearance-mode="system">跟随系统</button>
-                    <button type="button" data-appearance-mode="light">白色</button>
+                <div class="appearance-segmented two">
                     <button type="button" data-appearance-mode="dark">黑色</button>
                     <button type="button" data-appearance-mode="navy" data-i18n-en="Navy">蓝色</button>
                 </div>
@@ -313,7 +310,6 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
                 <div class="appearance-swatches" aria-label="主题色">
                     <button class="appearance-swatch" type="button" data-appearance-accent="blue" aria-label="蓝色" style="background:#3b82f6"></button>
                     <button class="appearance-swatch" type="button" data-appearance-accent="purple" aria-label="紫色" style="background:#8b5cf6"></button>
-                    <button class="appearance-swatch" type="button" data-appearance-accent="teal" aria-label="青绿色" style="background:#14b8a6"></button>
                 </div>
             </div>
 

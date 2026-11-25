@@ -19,10 +19,6 @@ body[data-appearance-theme] {
     --dmate-composer-border:var(--border-strong,#cbd5e1);
     --dmate-composer-radius:28px;
 }
-body[data-appearance-theme="light"] {
-    --dmate-composer-border:color-mix(in srgb,var(--text-muted,#86868b) 24%,transparent);
-    --dmate-composer-shadow:0 4px 16px rgba(0,0,0,.055),0 1px 3px rgba(0,0,0,.025);
-}
 body[data-appearance-theme="dark"] {
     --dmate-composer-shadow:0 5px 18px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.035);
 }
@@ -88,23 +84,9 @@ body[data-appearance-theme="navy"] {
         background-image:none!important;
     }
 
-    /* Keep a subtle cool gray separation from the light workspace. */
-    body[data-appearance-theme="light"] .left {
-        --dmate-sidebar-rgb:235,235,239;
-    }
-    body[data-appearance-theme="light"]:not(.has-custom-background) .left {
-        background-color:rgb(var(--dmate-sidebar-rgb))!important;
-        background-image:none!important;
-        border-right-color:transparent!important;
-    }
-    body[data-appearance-theme="light"] .left :is(.session.active,.offline-nav-item.active) {
-        --dm-selected-bg:#d1d1d6;
-    }
-
     @media(max-width:1100px) {
         /* Mobile drawers share the page's theme base, keeping opacity adjustable. */
         body[data-appearance-theme] { --dm-mobile-background-rgb:15,23,42; }
-        body[data-appearance-theme="light"] { --dm-mobile-background-rgb:var(--surface-1-rgb); }
         body[data-appearance-theme="dark"] { --dm-mobile-background-rgb:13,13,13; }
         body[data-appearance-theme] :is(#conversationSidebar,#learningToolsPanel) {
             background-color:rgba(var(--dmate-sidebar-rgb,var(--dm-mobile-background-rgb)),var(--panel-alpha))!important;
@@ -204,14 +186,6 @@ body[data-appearance-theme="navy"] {
     body[data-appearance-theme] .wrong-empty {
         border:0!important;
         box-shadow:none!important;
-    }
-
-    @media(min-width:1101px) {
-        body[data-appearance-theme="light"] #learningReviewModal :is(
-            .modal-head,.learning-review-actions
-        ) {
-            border-color:var(--border-mid)!important;
-        }
     }
 
     /* Toolbars embedded in a floating panel share its background. Separate

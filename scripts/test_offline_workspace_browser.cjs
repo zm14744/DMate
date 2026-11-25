@@ -256,7 +256,7 @@ async function noOverflow(page, panel) {
     const bounds = node.getBoundingClientRect();
     return { viewport: innerWidth, document: document.documentElement.scrollWidth,
       mainLeft: main.left, mainRight: main.right, panelWidth: node.clientWidth, panelScroll: node.scrollWidth,
-      panelTop: bounds.top - main.top, marginTop: parseFloat(getComputedStyle(node).marginTop),
+      panelTop: bounds.top - main.top, panelBottomGap:main.bottom - bounds.bottom, marginTop: parseFloat(getComputedStyle(node).marginTop),
       top: bounds.top, bottom: bounds.bottom, viewportHeight: innerHeight,
       outerOverflow: getComputedStyle(node).overflowY, outerHeight: node.clientHeight, outerScroll: node.scrollHeight,
       panes: ['concepts', 'questions'].includes(id) ? [...node.querySelectorAll(id === 'concepts'
@@ -267,7 +267,11 @@ async function noOverflow(page, panel) {
   assert.ok(state.document <= state.viewport + 1, panel + ': page overflows horizontally: ' + JSON.stringify(state));
   assert.ok(state.mainLeft >= -1 && state.mainRight <= state.viewport + 1, panel + ': workspace outside viewport');
   assert.ok(state.panelScroll <= state.panelWidth + 1, panel + ': panel overflows outside its own controls');
-  assert.ok(Math.abs(state.panelTop - state.marginTop) <= 2, panel + ': no empty header row precedes the content: ' + JSON.stringify(state));
+  if (state.viewport > 1100) {
+    assert.ok(Math.abs(state.panelTop - state.panelBottomGap) <= 2, panel + ': desktop tool window is centered vertically: ' + JSON.stringify(state));
+  } else {
+    assert.ok(Math.abs(state.panelTop - state.marginTop) <= 2, panel + ': no empty header row precedes the content: ' + JSON.stringify(state));
+  }
   if (['concepts', 'questions'].includes(panel)) {
     assert.ok(['hidden', 'clip'].includes(state.outerOverflow), panel + ': the outer panel is not a scroll owner');
     assert.ok(state.outerScroll <= state.outerHeight + 1, panel + ': independent panes fit their outer panel');
@@ -316,14 +320,14 @@ async function appearanceControls(page, width, theme, reference) {
   await openAppearance();
   const dialog = page.locator('#appearanceModal');
   await dialog.waitFor();
-  assert.equal(await dialog.locator('[data-appearance-mode]').count(), 4, 'All four theme choices are available');
-  assert.equal(await dialog.locator('[data-appearance-accent]').count(), 3, 'All accent choices are available');
+  assert.deepEqual(await dialog.locator('[data-appearance-mode]').evaluateAll(nodes => nodes.map(node => node.dataset.appearanceMode).sort()), ['dark', 'navy']);
+  assert.deepEqual(await dialog.locator('[data-appearance-accent]').evaluateAll(nodes => nodes.map(node => node.dataset.appearanceAccent).sort()), ['blue', 'purple']);
   assert.equal(await dialog.locator('[data-appearance-font]').count(), 0, 'Appearance uses the standard text size');
   assert.equal(await dialog.locator('[data-appearance-fit]').count(), 2, 'Both wallpaper fit modes are available');
   for (const id of ['appearanceMaskRange', 'appearanceBlurRange', 'appearancePanelRange', 'appearanceBubbleRange']) {
     await dialog.locator('#' + id).waitFor({ state: 'visible' });
   }
-  const alternate = theme === 'dark' ? 'light' : 'dark';
+  const alternate = theme === 'dark' ? 'navy' : 'dark';
   await dialog.locator('[data-appearance-mode="' + alternate + '"]').click();
   await page.waitForFunction(value => document.documentElement.dataset.appearanceTheme === value, alternate);
   await page.locator('#appearanceClose').click();
@@ -675,9 +679,10 @@ async function drawing(page, reference) {
   assert.equal(await page.locator('#offlineDrawingTitle').innerText(), '绘图');
   const actualOuter=await drawingShellStyle(page, '#drawingPanel');
   assert.ok(parseFloat(actualOuter.shell.borderRadius)>0,'The embedded offline drawing panel retains rounded corners');
-  const expectedOuter={...reference.outer,shell:{...reference.outer.shell,borderRadius:actualOuter.shell.borderRadius}};
+  const panelSurface=await page.locator('#questionsPanel').evaluate(node=>getComputedStyle(node).backgroundColor);
+  const expectedOuter={...reference.outer,shell:{...reference.outer.shell,backgroundColor:panelSurface,borderRadius:actualOuter.shell.borderRadius}};
   assert.deepEqual(actualOuter, expectedOuter,
-    'Drawing retains shared background, outline, typography and padding in its rounded embedded panel');
+    'Drawing uses the offline panel surface and shares outline, typography and padding with the online editor');
   assert.equal(await page.locator('#drawingPanel .offline-intro').count(), 0, 'The old standalone drawing introduction is removed');
   assert.equal(await workspace.getByRole('button', { name: /AI指导|上传|AI生成/ }).count(), 0);
   assert.equal(await workspace.locator('.ddw-ai-requirement,.ddw-ai-label,.ddw-ai-actions,.ddw-ai-answer,'
@@ -949,8 +954,8 @@ async function runCase(browser, width, theme) {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
-    const themes = (process.env.DMATE_TEST_THEMES || 'light,dark,navy').split(',');
-    assert.ok(themes.length && themes.every(theme => ['light', 'dark', 'navy'].includes(theme)), 'Supported theme selection');
+    const themes = (process.env.DMATE_TEST_THEMES || 'dark,navy').split(',');
+    assert.ok(themes.length && themes.every(theme => ['dark', 'navy'].includes(theme)), 'Supported theme selection');
     for (const theme of themes) {
       // Each viewport owns its browser context, service-worker target and screenshots.
       const cases = await Promise.allSettled([1440, 390].map(width => runCase(browser, width, theme)));

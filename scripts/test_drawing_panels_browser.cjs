@@ -227,7 +227,7 @@ async function borderlessButtons(page, mobile) {
   const selector = '.ddw-page-actions>button:not(.ddw-upload-button),.ddw-editor>.dge-topline>button,.ddw-editor .dge-view-controls>button';
   const original = await page.evaluate(() => [document.documentElement.dataset.appearanceTheme, document.body.dataset.appearanceTheme]);
   try {
-    for (const theme of ['light', 'dark']) {
+    for (const theme of ['navy', 'dark']) {
       await page.evaluate(theme => { document.documentElement.dataset.appearanceTheme = document.body.dataset.appearanceTheme = theme; }, theme);
       await page.mouse.move(0, 0); await settle(page);
       const borders = await page.locator(selector).evaluateAll(nodes => nodes.map(node => {
@@ -479,7 +479,7 @@ async function headerExportChecks(page, label, offline = false) {
       await new Promise(resolve => { window.finishHeaderExport = resolve; });
       return {destination:'download'};
     };
-    document.body.dataset.appearanceTheme = 'light';
+    document.body.dataset.appearanceTheme = 'navy';
     return theme;
   });
   try {
@@ -492,8 +492,8 @@ async function headerExportChecks(page, label, offline = false) {
         read('.dge-overlay-svg marker path', 'fill'), read('.dge-overlay-label', 'fill')
       ];
     });
-    assert.deepEqual(canvasPaint, ['rgb(0, 0, 0)', 'rgb(0, 0, 0)',
-      'rgb(255, 255, 255)', 'rgb(255, 255, 255)', '1', 'rgb(255, 255, 255)', 'rgb(255, 255, 255)']);
+    assert.deepEqual(canvasPaint, ['rgb(255, 255, 255)', 'rgb(255, 255, 255)',
+      'rgb(17, 24, 39)', 'rgb(17, 24, 39)', '0.8', 'rgb(17, 24, 39)', 'rgb(17, 24, 39)']);
     for (const index of [0, 1]) {
       if (index) {
         await (await history(page)).getByText(names[index], {exact:true}).click();

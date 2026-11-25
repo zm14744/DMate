@@ -242,7 +242,7 @@ async function runCase(browser, width, theme) {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
-    for (const width of [390, 620, 820]) for (const theme of ['light', 'dark', 'navy']) await runCase(browser, width, theme);
-    for (const theme of ['light','dark','navy']) await checkDesktopInfo(browser,theme);
+    for (const width of [390, 620, 820]) for (const theme of ['dark', 'navy']) await runCase(browser, width, theme);
+    for (const theme of ['dark','navy']) await checkDesktopInfo(browser,theme);
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

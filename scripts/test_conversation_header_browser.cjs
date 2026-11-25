@@ -279,28 +279,31 @@ async function notebookAiActions(page, newButton) {
 }
 
 async function notebookButton(page) {
+  const compact = mobile(page);
   await sidebar(page, true);
   const source = page.locator('#newChatBtn');
-  await page.mouse.move(0, 0); await page.locator(mobile(page) ? '#mobileNavClose' : '#desktopSidebarToggle').focus();
+  await page.mouse.move(0, 0); await page.locator(compact ? '#mobileNavClose' : '#desktopSidebarToggle').focus();
   await settle(page);
-  const idle = await notebookStyle(source);
-  let hovered;
-  if (!mobile(page)) { await source.hover(); await settle(page); hovered = await notebookStyle(source); }
+  const idle = compact ? await notebookStyle(source) : null;
   await sidebar(page, false);
-  await page.locator(mobile(page) ? '#mobileToolsBtn' : '#desktopToolsBtn').click();
+  await page.locator(compact ? '#mobileToolsBtn' : '#desktopToolsBtn').click();
   await page.locator('#conceptNotebookBtn').click();
   await page.locator('#conceptNotebookDialog').waitFor({ state: 'visible' });
   const button = page.locator('#conceptNotebookDialog .dcn-sidebar > .dcn-new');
-  assert.equal(await button.innerText(), '新概念');
+  assert.equal(await button.innerText(), compact ? '新概念' : '');
+  assert.equal(await button.getAttribute('aria-label'), '新概念');
   const paths = locator => locator.locator('svg[data-icon="square-pen"] > path').evaluateAll(nodes => nodes.map(node => node.getAttribute('d')));
   const matchedPaths = await paths(source);
   assert.equal(matchedPaths.length, 2);
   assert.deepEqual(await paths(button), matchedPaths, 'Both creation buttons use the same square-pen icon');
-  assert.equal(await button.evaluate(node => getComputedStyle(node).justifyContent), 'flex-start');
+  assert.equal(await button.evaluate(node => getComputedStyle(node).justifyContent), compact ? 'flex-start' : 'center');
   await page.mouse.move(0, 0); await page.locator('#conceptNotebookTitle').focus(); await settle(page);
-  assert.deepEqual(await notebookStyle(button), idle, 'New concept matches the new-conversation button surface and typography');
-  if (!mobile(page)) { await button.hover(); await settle(page);
-    assert.deepEqual(await notebookStyle(button), hovered, 'New concept shares new-conversation hover feedback'); }
+  if (compact) assert.deepEqual(await notebookStyle(button), idle, 'Mobile New concept matches the new-conversation button');
+  else {
+    const paint = await notebookStyle(button);
+    assert.equal(paint.backgroundColor, 'rgba(0, 0, 0, 0)');
+    assert.equal(paint.borderTopWidth, '0px');
+  }
   const before = await page.locator('#conceptNotebookDialog .dcn-note').count();
   await button.click();
   assert.equal(await page.locator('#conceptNotebookDialog .dcn-note').count(), before + 1, 'New concept still creates an editable notebook entry');
@@ -308,7 +311,8 @@ async function notebookButton(page) {
   await notebookAiActions(page, button);
   const savedTitle = await page.locator('#conceptNotebookDialog .dcn-title').inputValue();
   await language(page, 'en');
-  assert.equal(await button.innerText(), 'New concept');
+  assert.equal(await button.innerText(), compact ? 'New concept' : '');
+  assert.equal(await button.getAttribute('aria-label'), 'New concept');
   assert.equal(await page.locator('#conceptNotebookDialog .dcn-title').inputValue(), savedTitle, 'Language changes preserve concept content');
   await language(page, 'zh-CN');
   await page.locator('#conceptNotebookDialog .dcn-close').first().click();
@@ -342,6 +346,6 @@ async function runCase(browser, width, theme) {
   try {
     const widths = process.env.DMATE_TEST_WIDTHS ? process.env.DMATE_TEST_WIDTHS.split(',').map(Number) : [390, 820, 1440];
     assert.ok(widths.length && widths.every(width => [390, 820, 1440].includes(width)), 'Use supported navigation test widths');
-    for (const width of widths) for (const theme of ['dark', 'light', 'navy']) await runCase(browser, width, theme);
+    for (const width of widths) for (const theme of ['dark', 'navy']) await runCase(browser, width, theme);
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

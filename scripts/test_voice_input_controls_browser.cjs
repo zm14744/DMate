@@ -230,7 +230,7 @@ async function runCase(browser, width, theme, reducedMotion = 'no-preference') {
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
     for (const width of (process.env.DMATE_TEST_WIDTHS || '390,1440').split(',').map(Number))
-      for (const theme of (process.env.DMATE_TEST_THEMES || 'dark,light,navy').split(','))
+      for (const theme of (process.env.DMATE_TEST_THEMES || 'dark,navy').split(','))
         await runCase(browser, width, theme, process.env.DMATE_TEST_MOTION || 'no-preference');
     if (!process.env.DMATE_TEST_WIDTHS) await runCase(browser, 390, 'dark', 'reduce');
   } finally { await browser.close(); }

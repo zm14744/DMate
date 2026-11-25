@@ -342,7 +342,7 @@ async function disconnectedCase(browser) {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
-    for (const [width, theme] of [[390, 'light'], [820, 'dark'], [1440, 'light']]) {
+    for (const [width, theme] of [[390, 'navy'], [820, 'dark'], [1440, 'navy']]) {
       await onlineCase(browser, width, theme);
       await offlineCase(browser, width, theme);
     }

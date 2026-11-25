@@ -15,7 +15,7 @@ include!(concat!(env!("OUT_DIR"), "/dmate_offline_assets.rs"));
 const HOST: &str = "dmate.zeabur.app";
 const ORIGIN: &str = "https://dmate.zeabur.app";
 const SCHEME: &str = "dmate-offline";
-const START_HTML: &[u8] = b"<!doctype html><meta charset=utf-8><meta name=color-scheme content='light dark'><title>DMate</title>";
+const START_HTML: &[u8] = b"<!doctype html><meta charset=utf-8><meta name=color-scheme content=dark><title>DMate</title><style>html{color-scheme:dark;background:#171717;color:#f3f4f6}</style>";
 
 fn offline_document(url: &Url) -> bool {
     url.scheme() == "https"

@@ -275,7 +275,7 @@ async function onlineReference(browser, width, theme, available) {
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/online-graph-' + width + '-' + theme + '.png' });
     const expected = {};
     await readyGraph(page);
-    if (mobile(page) && theme === 'light') await checkMobileDetailSheet(page);
+    if (mobile(page) && theme === 'navy') await checkMobileDetailSheet(page);
     for (const name of categories) {
       await category(page, name);
       await readyGraph(page);
@@ -697,7 +697,7 @@ async function runCase(browser, width, theme) {
     }
     assert.deepEqual(await frame(page).locator('#knowledgeGraphCategory option').allTextContents(), reference.categories);
     await readyGraph(page);
-    if (mobile(page) && theme === 'light') await checkMobileDetailSheet(page);
+    if (mobile(page) && theme === 'navy') await checkMobileDetailSheet(page);
     for (const name of reference.categories) {
       await category(page, name);
       await readyGraph(page);
@@ -735,6 +735,6 @@ async function runCase(browser, width, theme) {
   const browser = await chromium.launch({ headless: true,
     ignoreDefaultArgs:['--hide-scrollbars'],
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
-  try { for (const width of [1440, 390]) for (const theme of ['light', 'dark']) await runCase(browser, width, theme); }
+  try { for (const width of [1440, 390]) for (const theme of ['navy', 'dark']) await runCase(browser, width, theme); }
   finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

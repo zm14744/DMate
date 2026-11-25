@@ -4,6 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const { expandGraphDetails } = require('./knowledge-graph-touch-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const question = '设整数 n 为奇数，证明 n 的平方也是奇数。';
 const settle = page => page.evaluate(async () => {
@@ -54,10 +55,11 @@ const buttonPaint = locator => locator.evaluate(node => {
 async function graphReference(page) {
   await toolsEntry(page, 'knowledgeGraphBtn');
   await page.waitForFunction(() => knowledgeGraphInitialized && Boolean(knowledgeGraphData));
-  await page.evaluate(() => {
-    selectKnowledgeGraphDisplayMode('full');
-    selectKnowledgeGraphNode('logic_truth');
-  });
+  await page.evaluate(() => selectKnowledgeGraphDisplayMode('full'));
+  if (page.viewportSize().width <= 760) {
+    await page.locator('#knowledgeGraphModal .kg-mobile-node[data-knowledge-node-id="logic_truth"]').click();
+    await expandGraphDetails(page);
+  } else await page.evaluate(() => selectKnowledgeGraphNode('logic_truth'));
   await page.locator('.graph-detail-field-label').first().waitFor();
   const heading = await fontStyle(page.locator('.graph-detail-field-label').first());
   assert.equal(heading.size, '14px'); assert.equal(heading.weight, '600');
@@ -299,6 +301,6 @@ async function runCase(browser, width, theme) {
   try {
     const widths = process.env.DMATE_TEST_WIDTHS ? process.env.DMATE_TEST_WIDTHS.split(',').map(Number) : [390, 1440];
     assert.ok(widths.length && widths.every(width => [390, 1440].includes(width)), 'Use supported desktop/mobile test widths');
-    for (const width of widths) for (const theme of ['dark', 'light', 'navy']) await runCase(browser, width, theme);
+    for (const width of widths) for (const theme of ['dark', 'navy']) await runCase(browser, width, theme);
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

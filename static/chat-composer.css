@@ -17,10 +17,6 @@ body[data-appearance-theme] .center.chat-empty > .input-wrap:not([hidden]) {
        for the keyboard; the center already follows its visible height. */
 }
 
-body[data-appearance-theme="light"] {
-    --dmate-popover-shadow-rgb:0,0,0;
-}
-
 /* Desktop-style segmented control: a flat, wider selection above a lower track. */
 body[data-appearance-theme] .interaction-mode-switch {
     --dmate-mode-track-bg:#ececec;

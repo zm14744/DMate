@@ -156,8 +156,8 @@ async function run(browser,width,theme,language='zh-CN') {
   const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.CHROMIUM_EXECUTABLE_PATH}:{})});
   try {
     for(const width of [1440,390]) {
-      for(const theme of ['light','dark','navy'])await run(browser,width,theme);
-      await run(browser,width,'light','en');
+      for(const theme of ['dark','navy'])await run(browser,width,theme);
+      await run(browser,width,'navy','en');
     }
   } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
