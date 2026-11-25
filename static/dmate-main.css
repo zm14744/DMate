@@ -1742,7 +1742,7 @@ input[type="search"]::-webkit-search-cancel-button {
 .learning-review-empty,
 #knowledgeGraphCanvas > .kg-empty,
 #knowledgeGraphHistory > .graph-detail-empty,
-#knowledgeGraphDetailTitle[hidden] + #knowledgeGraphDetail > .graph-detail-empty {
+#knowledgeGraphDetailTitle[hidden] + #knowledgeGraphDetail > .graph-detail-empty:not(.kg-node-empty) {
     background:transparent;
     color:var(--text-muted);
     font-size:var(--font-small);
@@ -2127,6 +2127,13 @@ input[type="search"]::-webkit-search-cancel-button {
 #knowledgeGraphDetailTitle[hidden] + #knowledgeGraphDetail > .graph-detail-empty {
     margin:0;
     text-align:center;
+}
+
+#knowledgeGraphDetail > .kg-node-empty {
+    background:transparent;
+    font-size:calc(22px * var(--font-scale));
+    font-weight:500;
+    line-height:1.3;
 }
 
 @media(max-width:760px) {

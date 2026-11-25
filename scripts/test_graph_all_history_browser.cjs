@@ -215,7 +215,14 @@ async function checkCase(browser,width,language) {
     });
     assert.ok(positioned, label+': the enlarged decorative icon sits above the prompt');
     assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),!mobile,label+': only desktop shows a separate empty detail pane');
-    if (!mobile) assert.equal(await page.locator('#knowledgeGraphDetail').innerText(),language === 'en' ? 'No nodes yet' : '暂无节点');
+    if (!mobile) {
+      const emptyDetail = page.locator('#knowledgeGraphDetail > .kg-node-empty');
+      assert.equal(await emptyDetail.innerText(),language === 'en' ? 'No nodes yet' : '暂无节点');
+      assert.deepEqual(await emptyDetail.evaluate(el => {
+        const {fontSize, fontWeight} = getComputedStyle(el);
+        return {fontSize, fontWeight};
+      }), {fontSize:'22px',fontWeight:'500'}, label+': the empty node label has its own typography');
+    }
     assert.equal(await page.locator('#knowledgeGraphDetail svg').count(),0,label+': empty details contain no icon');
     assert.equal(await page.locator('#knowledgeGraphSideTabs').isVisible(),true,label+': empty historical details keep both sidebar tabs accessible');
     assert.deepEqual(await page.evaluate(()=>knowledgeGraphDisplayedNodes().map(node=>node.id)),[],label+': unselected historical details never fall back to a full course graph');
