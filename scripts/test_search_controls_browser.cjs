@@ -47,15 +47,27 @@ async function checkSearch(input, expectedStyle, placeholder = '搜索') {
   const wrapper = input.locator('xpath=..');
   assert.equal(await wrapper.locator('button').count(), 1, 'Exactly one clear button, including legacy controls');
   assert.equal(await clearButton(input).count(), 1);
+  const icon = wrapper.locator(':scope > svg.dmate-search-icon');
+  assert.equal(await icon.count(), 1, 'Dynamically mounted controls get exactly one magnifier');
+  assert.equal(await icon.getAttribute('aria-hidden'), 'true');
+  const geometry = await input.evaluate(node => {
+    const svg = node.parentElement.querySelector('.dmate-search-icon');
+    const icon = svg.getBoundingClientRect(), field = node.getBoundingClientRect(), css = getComputedStyle(node);
+    return {width:icon.width, height:icon.height, stroke:parseFloat(getComputedStyle(svg).strokeWidth),
+      inset:icon.left-field.left, center:icon.top+icon.height/2-field.top-field.height/2,
+      start:parseFloat(css.paddingInlineStart), end:parseFloat(css.paddingInlineEnd)};
+  });
+  assert.deepEqual([geometry.width,geometry.height,geometry.stroke], [20,20,1.8]);
+  assert.deepEqual([geometry.start,geometry.end], [42,40], 'The input reserves room for both icons');
+  assert.ok(geometry.inset > 0 && geometry.inset+geometry.width <= geometry.start && Math.abs(geometry.center) < 1,
+    'The search icon is centered inside the leading padding');
+  // A dialog may autofocus its search. Compare idle materials after focus styles settle.
+  await input.evaluate(node => node.blur());
+  await settle(input.page());
   const actual = await searchStyle(input);
   assert.equal(actual.border, 'solid');
   assert.equal(actual.width, '1px');
-  assert.ok(parseFloat(actual.radius) >= 8, 'Search uses a rounded input');
-  const usesComposerStyle = !isMobile(input.page()) && await input.evaluate(node => node.classList.contains('dcn-search'));
-  if (!usesComposerStyle) {
-    assert.equal(actual.image, 'none');
-    assert.equal(actual.shadow, 'none');
-  }
+  assert.equal(actual.radius, '999px', 'Search retains the pill shape at every viewport');
   assert.deepEqual(actual.wrapperBorder, ['0px', '0px', '0px', '0px'], 'Only the input paints a border');
   if (expectedStyle) assert.deepEqual(actual, expectedStyle, 'Remaining searches use the shared surface');
   return actual;
@@ -188,9 +200,7 @@ async function toolsEntry(page, id) {
 async function onlineSearches(page, reference) {
   await toolsEntry(page, 'wrongBookBtn');
   const wrong = page.locator('#wrongBookSearch');
-  const { radius: notebookRadiusReference, ...referenceSurface } = reference;
-  const { radius: wrongRadius, ...wrongSurface } = await checkSearch(wrong);
-  if (isMobile(page)) assert.deepEqual(wrongSurface, referenceSurface, 'Mobile notebook and wrong-book searches share the same paint');
+  const wrongStyle = await checkSearch(wrong, reference);
   await expectClear(wrong, false);
   assert.equal(await clearButton(wrong).getAttribute('id'), 'wrongBookSearchClear', 'Reuse the original wrong-book clear control');
   await wrong.fill('No matching saved exercise');
@@ -204,13 +214,10 @@ async function onlineSearches(page, reference) {
   await toolsEntry(page, 'conceptNotebookBtn');
   await page.locator('#conceptNotebookDialog').waitFor({ state: 'visible' });
   const notebook = page.locator('#conceptNotebookDialog .dcn-search');
-  const notebookStyle = await checkSearch(notebook, reference);
-  if (!isMobile(page)) {
-    const composer = await searchStyle(page.locator('.center > .input-wrap > .input'));
-    for (const key of ['background', 'image', 'color', 'shadow']) {
-      assert.equal(notebookStyle[key], composer[key], 'Desktop notebook shares the composer ' + key);
-    }
-    assert.equal(notebookStyle.radius, '999px');
+  const notebookStyle = await checkSearch(notebook, wrongStyle);
+  const composer = await searchStyle(page.locator('.center > .input-wrap > .input'));
+  for (const key of ['background', 'image', 'color', 'shadow']) {
+    assert.equal(notebookStyle[key], composer[key], 'Notebook and wrong-book searches share the composer ' + key);
   }
   assert.ok((await clearButton(notebook).getAttribute('class')).includes('dcn-search-clear'), 'Reuse notebook clear control');
   await expectClear(notebook, false);

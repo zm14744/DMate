@@ -140,6 +140,11 @@ body[data-appearance-theme] .msg.user {
     box-shadow:none !important;
     color:var(--text-primary) !important;
 }
+/* Match the actual capsule edge, including native scrollbar gutters and the
+   capsule's centered maximum width, without changing transcript text padding. */
+body[data-appearance-theme] .center:has(> .input-wrap:not([hidden])) > #chat > .msg.user {
+    margin-right:var(--dmate-user-message-right-inset,0px) !important;
+}
 body[data-appearance-theme] .msg.user > .msg-bubble {
     box-sizing:border-box;
     width:fit-content;

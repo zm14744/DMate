@@ -72,7 +72,6 @@
     .dcn-dialog.is-empty .dcn-list{grid-column:1/-1;display:grid;place-items:center;overflow:auto}
 }
 
-.dcn-search-icon{display:none}
 @media(min-width:1101px){
     .dcn-dialog .dcn-content {
         grid-template-columns:minmax(180px,260px) auto minmax(0,1fr);
@@ -110,43 +109,10 @@
         width:min(100%,240px);
         margin-right:5px;
     }
-    .dcn-dialog .dcn-search-icon {
-        display:block;
-        position:absolute;
-        inset-inline-start:14px;
-        top:50%;
-        transform:translateY(-50%);
-        width:20px;
-        height:20px;
-        color:var(--text-secondary);
-        fill:none;
-        stroke:currentColor;
-        stroke-width:1.8;
-        stroke-linecap:round;
-        stroke-linejoin:round;
-        pointer-events:none;
-    }
 }
 
 /* Stretch the input itself to the create button's height, not just its wrapper. */
 .dcn-dialog input.dcn-search { height:100%; }
-@layer dmate-search-controls {
-    body[data-appearance-theme] .dcn-sidebar .dcn-search-wrap > input {
-        border-radius:var(--dcn-control-radius)!important;
-    }
-    @media(min-width:1101px){
-        body[data-appearance-theme] .dcn-dialog .dcn-search-wrap > input.dcn-search {
-            padding-inline-start:42px!important;
-            border-radius:999px!important;
-            background-color:var(--dmate-composer-bg,var(--surface-2))!important;
-            background-image:var(--dmate-composer-image,none)!important;
-            box-shadow:var(--dmate-composer-shadow,none)!important;
-        }
-        body[data-appearance-theme] .dcn-dialog .dcn-search-wrap > input.dcn-search:not(:focus-visible) {
-            border-color:var(--dmate-composer-border,var(--border-strong))!important;
-        }
-    }
-}
 
 /* The close control stays in the fixed header; only content scrolls. */
 .dcn-dialog button.dcn-close,.dcn-confirm button.dcn-close{display:block;flex:0 0 20px;width:20px;min-width:20px;max-width:20px;height:20px;min-height:20px;max-height:20px;padding:0;border:0;border-radius:50%;background:#ef4444;color:transparent;font-size:0;line-height:0;cursor:pointer}

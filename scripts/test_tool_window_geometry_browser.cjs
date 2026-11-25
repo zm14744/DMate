@@ -72,23 +72,24 @@ async function compareTools(page, offline, active, sizes) {
       await page.setViewportSize(size);
       await settle(page);
       const box = await frame(surface), label = [offline ? 'offline' : active ? 'chat' : 'welcome',tool.name,size.width].join('/');
+      const composer = offline ? null : await page.locator('.center > .input-wrap > .input').boundingBox();
+      const availableHeight = composer ? composer.y+composer.height : size.height;
       assert.notEqual(box.paint,'rgba(0, 0, 0, 0)',label+' measures a painted surface');
-      assert.ok(box.width > size.width * .6 && box.height > size.height * .7,label+' uses a large frame');
+      assert.ok(box.width > size.width * .6 && box.height > availableHeight * .7,label+' uses the available workspace');
       assert.ok(box.x >= 0 && box.y >= 0 && box.x+box.width <= size.width+1 && box.y+box.height <= size.height+1,label+' fits the screen');
       assert.ok(parseFloat(box.radius) > 0,label+' has rounded corners');
       if (reference[index]) compare(box,reference[index],label);
       else reference[index] = box;
       if (!offline) {
-        const composer = await page.locator('.center > .input-wrap > .input').boundingBox();
         assert.ok(composer,label+' has a visible composer');
         const bottom = box.y + box.height;
-        if (active) near(bottom,composer.y+composer.height,label+' aligns with the composer capsule');
-        else assert.ok(bottom > composer.y+composer.height+24,label+' extends below the centered welcome composer');
+        near(bottom,composer.y+composer.height,label+' aligns with the composer capsule');
       }
       if (tool.name === 'graph') await checkGraph(page);
     }
     if (!offline) await page.locator(tool.close).click();
   }
+  return reference;
 }
 
 async function checkEdition(browser, offline) {
@@ -106,7 +107,7 @@ async function checkEdition(browser, offline) {
     } else {
       await page.waitForFunction(() => !accountVerificationOperation);
       await page.locator('.center.chat-empty').waitFor();
-      await compareTools(page,false,false,[desktop]);
+      const welcomeFrames = await compareTools(page,false,false,[desktop,narrow]);
       await page.evaluate(() => {
         newChat();
         getCurrent().messages.push({messageId:'geometry-message',role:'user',text:'窗口尺寸测试',manualIsQuestion:false,createdAt:Date.now()});
@@ -114,8 +115,29 @@ async function checkEdition(browser, offline) {
       });
       await page.locator('.center:not(.chat-empty) #chat .msg.user').waitFor();
       await page.waitForFunction(() => !document.querySelector('.center').dataset.composerMotion);
+      await compareTools(page,false,true,[desktop]);
+      const singleLine = await page.locator('.center > .input-wrap > .input').boundingBox();
       await page.locator('#text').fill('多行草稿\n用于测试输入框扩展\n窗口底边仍对齐');
+      await settle(page);
+      const expanded = await page.locator('.center > .input-wrap > .input').boundingBox();
+      assert.ok(expanded.height > singleLine.height+20,'The fixture really expands the composer before comparing frames');
       await compareTools(page,false,true,[desktop,narrow]);
+      await page.setViewportSize(desktop);
+      await page.evaluate(() => { currentId=null;renderAll(); });
+      await page.locator('.center.chat-empty').waitFor();
+      await page.waitForFunction(() => !document.querySelector('.center').dataset.composerMotion);
+      const notebook = tools[0], surface = await openTool(page,notebook,false);
+      await settle(page);
+      compare(await frame(surface),welcomeFrames[0],'Returning to welcome restores its centered-composer frame');
+      await page.locator(notebook.close).click();
+      await page.locator('.center > .input-wrap').evaluate(node => { node.hidden=true; });
+      const fallback = await openTool(page,notebook,false);
+      await settle(page);
+      const hiddenFrame = await frame(fallback);
+      near(hiddenFrame.y+hiddenFrame.height,desktop.height-16,'Only a hidden composer uses the lower workspace fallback');
+      await page.locator(notebook.close).click();
+      await page.locator('.center > .input-wrap').evaluate(node => { node.hidden=false; });
+      await settle(page);
     }
     await page.setViewportSize(phone);
     if (offline) await settle(page);

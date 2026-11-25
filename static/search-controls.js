@@ -10,6 +10,15 @@
     const attribute = (node, name, value) => {
         if (node.getAttribute(name) !== value) node.setAttribute(name, value);
     };
+    const searchIcon = () => {
+        const icon = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        icon.setAttribute('class', 'dmate-search-icon');
+        icon.setAttribute('viewBox', '0 0 24 24');
+        icon.setAttribute('aria-hidden', 'true');
+        icon.setAttribute('focusable', 'false');
+        icon.innerHTML = '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>';
+        return icon;
+    };
     const update = (input, record) => {
         const label = text('搜索', 'Search'), clear = text('清空搜索', 'Clear search');
         attribute(input, 'placeholder', label);
@@ -40,6 +49,7 @@
             wrapper.append(input);
         }
         wrapper.classList.add('dmate-search-wrap');
+        wrapper.prepend(searchIcon());
         input.classList.add('dmate-search-input');
         let button = wrapper.querySelector('.wrong-search-clear,.dcn-search-clear,.dmate-search-clear');
         const managed = !button || button.dataset.dmateSearchManaged === 'true';

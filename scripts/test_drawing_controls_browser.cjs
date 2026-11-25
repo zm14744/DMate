@@ -50,7 +50,7 @@ async function checkIcon(button, name, size) {
   assert.ok(rect && Math.abs(rect.width - size) <= 1 && Math.abs(rect.height - size) <= 1, name + ': glyph remains visible at its intended size');
 }
 
-async function drawingPaint(page, searchBackground, theme, offline) {
+async function drawingPaint(page, fieldBackground, theme, offline) {
   if (theme === 'light') {
     const paletteControls = [page.locator('.dge-tool-palette > summary'),
       page.locator('.ddw-side-actions > button').nth(0), page.locator('.ddw-side-actions > button').nth(1)];
@@ -119,8 +119,8 @@ async function drawingPaint(page, searchBackground, theme, offline) {
       assert.deepEqual(await labelOverflow(),[],'Long English labels wrap within their mobile buttons');
     }finally{await page.evaluate(language=>DMateI18n.setLanguage(language,false),language);await settle(page);}
   }
-  assert.equal(await page.locator('.ddw-name').evaluate(input => getComputedStyle(input).backgroundColor), searchBackground,
-    'Drawing name uses the search input surface without imposing search dimensions');
+  assert.equal(await page.locator('.ddw-name').evaluate(input => getComputedStyle(input).backgroundColor), fieldBackground,
+    'Drawing name keeps the regular entry field surface');
   await checkIcon(page.locator('[data-editor-undo]'), 'undo-2', 24);
   await checkIcon(page.locator('[data-editor-redo]'), 'redo-2', 24);
   const clear = page.locator('[data-editor-clear].dge-clear-button');
@@ -272,16 +272,13 @@ async function runCase(browser, width, theme, offline) {
       await page.evaluate(mode => window.DMateOfflineAppearance.apply({ mode }, null), theme);
       await filterMetrics(page);
     } else await page.evaluate(mode => { appearanceSettings.mode = mode; applyAppearanceSettings({ save: false }); }, theme);
-    const searchBackground = await page.evaluate(() => {
-      const wrap = document.createElement('div');
-      wrap.className = 'dmate-search-wrap';
-      wrap.hidden = true;
+    const fieldBackground = await page.evaluate(() => {
       const input = document.createElement('input');
-      input.type = 'search';
-      wrap.append(input);
-      document.body.append(wrap);
+      input.hidden = true;
+      input.style.backgroundColor = 'var(--surface-1)';
+      document.body.append(input);
       const background = getComputedStyle(input).backgroundColor;
-      wrap.remove();
+      input.remove();
       return background;
     });
     // Capture the public controller while preserving the real mounted app.
@@ -297,7 +294,7 @@ async function runCase(browser, width, theme, offline) {
     const name = 'Drawing controls ' + width + (offline ? ' offline' : ' online');
     await page.locator('.ddw-name').fill(name);
     await settle(page);
-    await drawingPaint(page, searchBackground, theme, offline);
+    await drawingPaint(page, fieldBackground, theme, offline);
     await undoRedo(page);
     await safeHistoryDelete(page, name, offline);
     if (!offline) {

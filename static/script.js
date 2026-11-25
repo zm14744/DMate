@@ -13560,15 +13560,25 @@ function installChatJumpControls() {
     const inputWrap = center?.querySelector(":scope > .input-wrap");
     const composer = inputWrap?.querySelector(":scope > .input");
     const refreshLayout = () => {
-        // The desktop tools end at the capsule, above any footer hints.
-        // The centered welcome composer leaves the tools at their usual height.
+        // Every visible desktop capsule, including the welcome composer,
+        // supplies the same bottom anchor above any footer hints.
         if (!center?.dataset.composerMotion) {
-            const bounds = window.innerWidth > 1100 && !center?.classList.contains("chat-empty")
-                ? composer?.getBoundingClientRect() : null;
+            const capsuleBounds = composer?.getBoundingClientRect();
+            const bounds = window.innerWidth > 1100
+                ? capsuleBounds : null;
             const bottom = bounds?.height ? `${Math.max(0, window.innerHeight - bounds.bottom)}px` : "";
             const style = document.documentElement.style;
             if (style.getPropertyValue("--dmate-tool-window-bottom") !== bottom) {
                 style.setProperty("--dmate-tool-window-bottom", bottom);
+            }
+            if (capsuleBounds?.width && capsuleBounds.height) {
+                const chatBounds = chat.getBoundingClientRect();
+                const paddingRight = parseFloat(getComputedStyle(chat).paddingRight) || 0;
+                const contentRight = chatBounds.left + chat.clientLeft + chat.clientWidth - paddingRight;
+                const inset = `${Math.round((contentRight - capsuleBounds.right) * 1000) / 1000}px`;
+                if (chat.style.getPropertyValue("--dmate-user-message-right-inset") !== inset) {
+                    chat.style.setProperty("--dmate-user-message-right-inset", inset);
+                }
             }
         }
         queueChatJumpControlsUpdate();

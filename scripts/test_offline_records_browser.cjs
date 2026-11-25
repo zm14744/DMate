@@ -63,7 +63,7 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
       return {create:shape('.dcn-new'),search:shape('.dcn-search'),main:shape('.dcn-main'),
         list:shape('.dcn-list'),content:shape('.dcn-content'),hint:hint && shape('.dcn-list-empty'),
         emptyText:hint?.innerText,hintStyle,
-        searchIcon:shape('.dcn-search-icon'),pen:icon('.dcn-new svg'),magnifier:icon('.dcn-search-icon'),
+        searchIcon:shape('.dmate-search-icon'),pen:icon('.dcn-new svg'),magnifier:icon('.dmate-search-icon'),
         newText:panel.querySelector('.dcn-new').innerText,
         selectedVisible:!!panel.querySelector('.dcn-selection')?.getClientRects().length,
         empty:panel.classList.contains('is-empty')};
@@ -71,17 +71,18 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
     assert.equal(row.empty, expectEmpty);
     assert.equal(row.main.width === 0, expectEmpty, 'The editor is hidden only while the notebook is empty');
     if (expectEmpty) assert.equal(row.emptyText, '暂无条目');
+    assert.equal(row.search.radius,'999px');
+    assert.deepEqual([row.searchIcon.width,row.searchIcon.height],[20,20]);
+    assert.ok(row.searchIcon.left > row.search.left && row.searchIcon.right < row.search.right
+      && Math.abs(row.searchIcon.top + row.searchIcon.height / 2 - row.search.top - row.search.height / 2) < 1,
+    'The magnifier sits inside the search pill at every width');
     if (width > 1100) {
       assert.equal(row.newText,'');
       assert.equal(row.selectedVisible,false);
       assert.equal(row.create.border,'0px');
       assert.equal(row.create.background,'rgba(0, 0, 0, 0)');
       assert.equal(row.search.border,'1px');
-      assert.equal(row.search.radius,'999px');
       assert.deepEqual(row.pen,row.magnifier,'Create and search use matching Lucide icon styles');
-      assert.ok(row.searchIcon.left > row.search.left && row.searchIcon.right < row.search.right
-        && Math.abs(row.searchIcon.top + row.searchIcon.height / 2 - row.search.top - row.search.height / 2) < 1,
-      'The magnifier sits inside the search pill');
       assert.ok(Math.abs(row.list.left-row.content.left)<1 && row.list.right < row.create.left
         && row.create.right < row.search.left && Math.abs(row.create.top-row.search.top)<1,
       'The list occupies column one with both actions in the right-hand toolbar');
@@ -100,8 +101,8 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
       continue;
     }
     assert.equal(row.newText,'新概念');
-    assert.equal(row.searchIcon.width,0);
-    for (const key of ['radius','border','style']) assert.equal(row.create[key],row.search[key]);
+    assert.equal(row.create.radius,'10px','The new-note action retains its mobile and tablet corners');
+    for (const key of ['border','style']) assert.equal(row.create[key],row.search[key]);
     if (row.empty || width <= 680) {
       for (const key of ['top','height']) assert.ok(Math.abs(row.create[key]-row.search[key]) < 1,
         width+': the notebook control row shares its '+key);

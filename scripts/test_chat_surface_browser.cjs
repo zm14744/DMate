@@ -18,6 +18,7 @@ async function state(page) {
         const center = document.querySelector('.center'), chat = document.getElementById('chat');
         const wrap = center.querySelector('.input-wrap'), capsule = wrap.querySelector('.input');
         const ai = chat.querySelector('.msg.ai'), actions = ai.querySelector('.msg-actions');
+        const user = chat.querySelector('.msg.user > .msg-bubble');
         const rect = node => {
             const r = node.getBoundingClientRect();
             return { left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height };
@@ -25,14 +26,14 @@ async function state(page) {
         const css = getComputedStyle(ai), actionStyle = getComputedStyle(actions);
         const fade = getComputedStyle(wrap, '::before');
         return { center:rect(center), chat:rect(chat), wrap:rect(wrap), capsule:rect(capsule),
-            ai:rect(ai), actions:rect(actions), scrollTop:chat.scrollTop,
+            ai:rect(ai), user:rect(user), actions:rect(actions), scrollTop:chat.scrollTop,
             bottomDistance:chat.scrollHeight - chat.clientHeight - chat.scrollTop,
             surface:{ background:css.backgroundColor, image:css.backgroundImage,
                 border:css.borderWidth, shadow:css.boxShadow },
             actionsStyle:{ align:actionStyle.justifyContent, border:actionStyle.borderTopWidth },
             footer:{ background:getComputedStyle(wrap).backgroundColor, image:fade.backgroundImage,
                 pointerEvents:getComputedStyle(wrap).pointerEvents },
-            userColor:getComputedStyle(chat.querySelector('.msg.user > .msg-bubble')).backgroundColor,
+            userColor:getComputedStyle(user).backgroundColor,
             capsuleColor:getComputedStyle(capsule).backgroundColor };
     });
 }
@@ -72,12 +73,14 @@ async function runCase(browser, width, theme) {
         assert.match(initial.footer.image, /0\.72/);
         assert.equal(initial.footer.pointerEvents, 'none');
         assert.equal(initial.userColor, initial.capsuleColor, 'User bubble keeps its composer surface');
+        near(initial.user.right, initial.capsule.right, 'User bubble and composer share a right edge', 1);
 
         // A draft can grow while the reader is at the bottom or reviewing history.
         await page.locator('#text').fill('第一行\n第二行\n第三行\n第四行');
         await settle(page);
         const expanded = await state(page);
         assert.ok(expanded.capsule.height > initial.capsule.height, 'The fixture expands the real textarea');
+        near(expanded.user.right, expanded.capsule.right, 'The right edge stays aligned when the composer expands', 1);
         assert.ok(expanded.bottomDistance <= 2, 'Expanding the composer keeps a bottom reader at the bottom');
         assert.ok(expanded.actions.bottom < expanded.wrap.top, 'Expanded input does not cover the final actions');
         await page.locator('#chat').evaluate(chat => { chat.scrollTop -= 420; });
