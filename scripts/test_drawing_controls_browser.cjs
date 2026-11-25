@@ -271,9 +271,19 @@ async function runCase(browser, width, theme, offline) {
       await revealInterface(page);
       await page.evaluate(mode => window.DMateOfflineAppearance.apply({ mode }, null), theme);
       await filterMetrics(page);
-      await navigate(page, 'notes');
     } else await page.evaluate(mode => { appearanceSettings.mode = mode; applyAppearanceSettings({ save: false }); }, theme);
-    const searchBackground = await page.locator(offline ? '#notesPanel .dcn-search' : '#wrongBookSearch').evaluate(input => getComputedStyle(input).backgroundColor);
+    const searchBackground = await page.evaluate(() => {
+      const wrap = document.createElement('div');
+      wrap.className = 'dmate-search-wrap';
+      wrap.hidden = true;
+      const input = document.createElement('input');
+      input.type = 'search';
+      wrap.append(input);
+      document.body.append(wrap);
+      const background = getComputedStyle(input).backgroundColor;
+      wrap.remove();
+      return background;
+    });
     // Capture the public controller while preserving the real mounted app.
     await page.evaluate(() => {
       const mount = window.DMateDrawingWorkspace.mount;

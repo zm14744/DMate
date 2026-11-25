@@ -366,4 +366,18 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
 @media(min-width:1101px) {
   body.offline-workspace .offline-main.center { padding-left:48px; }
   html[data-offline-sidebar="collapsed"] body.offline-workspace .offline-main.center { padding-left:94px; }
+
+  /* These tools are inline pages, so center their common frame in the main
+     column while retaining room for workspace navigation and safe scrolling. */
+  body.offline-workspace .offline-main > :is(#notesPanel,#mistakesPanel,#graphPanel,#drawingPanel) {
+    box-sizing:border-box;
+    flex:0 1 auto;
+    width:min(var(--dmate-tool-window-width,1160px),calc(100% - 48px));
+    max-width:var(--dmate-tool-window-width,1160px);
+    height:var(--dmate-tool-window-height,min(88dvh,920px));
+    max-height:calc(100% - 48px);
+    min-height:0;
+    margin:auto;
+    border-radius:var(--dmate-tool-window-radius,18px);
+  }
 }

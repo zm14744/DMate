@@ -30,6 +30,11 @@
   flex:1 1 auto;
   border-radius:16px!important;
 }
+@media(min-width:1101px) {
+  #knowledgeGraphModal.offline-graph-inline > .graph-modal-card {
+    border-radius:var(--dmate-tool-window-radius,18px)!important;
+  }
+}
 @media(max-width:760px) {
   /* Local floating details stay beneath the workspace navigation drawer. */
   #graphPanel > #knowledgeGraphModal.offline-graph-inline {

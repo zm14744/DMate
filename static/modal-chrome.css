@@ -1,3 +1,36 @@
+/* Online tools share one desktop frame. Offline pages use the same size tokens. */
+@media(min-width:1101px) {
+    :root {
+        --dmate-tool-window-width:1160px;
+        --dmate-tool-window-height:min(88dvh,920px);
+        --dmate-tool-window-radius:18px;
+        --dmate-tool-window-bottom:16px;
+    }
+
+    :is(#wrongBookModal,#knowledgeGraphModal:not(.offline-graph-inline)) {
+        align-items:flex-end;
+        padding:12px 12px var(--dmate-tool-window-bottom);
+    }
+
+    :is(#conceptNotebookDialog.dcn-dialog,
+        #graphEditorDialog:has(.dmate-drawing-workspace),
+        #wrongBookModal > .modal-card,
+        #knowledgeGraphModal:not(.offline-graph-inline) > .graph-modal-card) {
+        box-sizing:border-box;
+        width:min(var(--dmate-tool-window-width),calc(100vw - 24px));
+        max-width:calc(100vw - 24px);
+        height:var(--dmate-tool-window-height);
+        max-height:calc(100dvh - var(--dmate-tool-window-bottom) - 12px);
+        border-radius:var(--dmate-tool-window-radius);
+    }
+
+    :is(#conceptNotebookDialog.dcn-dialog,#graphEditorDialog:has(.dmate-drawing-workspace)) {
+        position:fixed;
+        inset:auto 0 var(--dmate-tool-window-bottom) 0;
+        margin:0 auto;
+    }
+}
+
 /* Share the wrong-book, learning-report and knowledge-graph header geometry.
    Negative margins extend each header through its dialog's own padding;
    workspace content retains its own spacing rules. */

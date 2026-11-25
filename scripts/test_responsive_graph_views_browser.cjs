@@ -118,8 +118,8 @@ async function ready(page, kind) {
       return {scrollbar:style.scrollbarWidth, gutter:style.scrollbarGutter,
         toolbarBorder:getComputedStyle(toolbar).borderBottomWidth};
     });
-    assert.deepEqual(frameStyle, {scrollbar:'none',gutter:'auto',toolbarBorder:'0px'},
-      'The graph viewport hides scrollbar gutters and the toolbar seam');
+    assert.deepEqual(frameStyle, {scrollbar:'none',gutter:'auto',toolbarBorder:isMobile(page) ? '0px' : '1px'},
+      'The graph hides scrollbar gutters and separates the toolbar on desktop');
   }
   await settle(page);
 }

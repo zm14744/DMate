@@ -13556,22 +13556,41 @@ function installChatJumpControls() {
         markScrollIntent();
     });
     chat.addEventListener("scroll", onChatScroll, { passive:true });
-    window.addEventListener("resize", queueChatJumpControlsUpdate, { passive:true });
-    window.visualViewport?.addEventListener("resize", queueChatJumpControlsUpdate, { passive:true });
+    const center = chat.closest(".center");
+    const inputWrap = center?.querySelector(":scope > .input-wrap");
+    const composer = inputWrap?.querySelector(":scope > .input");
+    const refreshLayout = () => {
+        // The desktop tools end at the capsule, above any footer hints.
+        // The centered welcome composer leaves the tools at their usual height.
+        if (!center?.dataset.composerMotion) {
+            const bounds = window.innerWidth > 1100 && !center?.classList.contains("chat-empty")
+                ? composer?.getBoundingClientRect() : null;
+            const bottom = bounds?.height ? `${Math.max(0, window.innerHeight - bounds.bottom)}px` : "";
+            const style = document.documentElement.style;
+            if (style.getPropertyValue("--dmate-tool-window-bottom") !== bottom) {
+                style.setProperty("--dmate-tool-window-bottom", bottom);
+            }
+        }
+        queueChatJumpControlsUpdate();
+    };
+    window.addEventListener("resize", refreshLayout, { passive:true });
+    window.visualViewport?.addEventListener("resize", refreshLayout, { passive:true });
     if (typeof ResizeObserver !== "undefined") {
-        const observer = new ResizeObserver(queueChatJumpControlsUpdate);
+        const observer = new ResizeObserver(refreshLayout);
         observer.observe(chat);
-        const inputWrap = chat.closest(".center")?.querySelector(".input-wrap");
         if (inputWrap) observer.observe(inputWrap);
+        if (composer) observer.observe(composer);
     }
     if (typeof MutationObserver !== "undefined") {
         // 按帧合并变化：长回答/公式渲染期间不会反复触发布局。
-        new MutationObserver(queueChatJumpControlsUpdate).observe(chat, {
-            childList:true,
-            subtree:true
+        const observer = new MutationObserver(records => {
+            if (records.some(record => record.target === center)) refreshLayout();
+            else queueChatJumpControlsUpdate();
         });
+        observer.observe(chat, { childList:true, subtree:true });
+        if (center) observer.observe(center, { attributes:true, attributeFilter:["data-composer-motion"] });
     }
-    queueChatJumpControlsUpdate();
+    refreshLayout();
 }
 
 function isChatNearBottom(chat, threshold = 90) {

@@ -7036,6 +7036,9 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
 
 /* 桌面图谱使用真实尺寸绘制，画布内部滚动和缩放。 */
 @media (min-width:761px) {
+    #knowledgeGraphModal .graph-toolbar {
+        border-bottom:1px solid var(--surface-3);
+    }
     #knowledgeGraphModal .knowledge-graph-canvas {
         display:flex;
         flex-direction:column;
