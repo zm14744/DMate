@@ -12,6 +12,29 @@ body[data-appearance-theme="dark"] {
     --dmate-modal-background:rgba(34,34,34,var(--panel-alpha));
 }
 
+/* The composer surface supplies the message field's fill, edge and depth. */
+body[data-appearance-theme] {
+    --dmate-composer-bg:rgba(var(--surface-2-rgb),var(--panel-alpha,1));
+    --dmate-composer-image:none;
+    --dmate-composer-border:var(--border-strong,#cbd5e1);
+    --dmate-composer-radius:28px;
+}
+body[data-appearance-theme="light"] {
+    --dmate-composer-border:color-mix(in srgb,var(--text-muted,#86868b) 24%,transparent);
+    --dmate-composer-shadow:0 4px 16px rgba(0,0,0,.055),0 1px 3px rgba(0,0,0,.025);
+}
+body[data-appearance-theme="dark"] {
+    --dmate-composer-shadow:0 5px 18px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.035);
+}
+body[data-appearance-theme="navy"] {
+    --dmate-composer-bg:transparent;
+    --dmate-composer-image:linear-gradient(180deg,
+        rgba(27,38,59,var(--panel-alpha,1)),
+        rgba(23,33,53,var(--panel-alpha,1)));
+    --dmate-composer-border:rgba(148,163,184,.12);
+    --dmate-composer-shadow:0 5px 18px rgba(2,6,23,.20),inset 0 1px 0 rgba(226,232,240,.035);
+}
+
 @layer dmate-panel-surfaces {
     /* Assistant replies are transcript text, including live streamed turns.
        Keep user bubbles and independent learning panels on their own surfaces. */

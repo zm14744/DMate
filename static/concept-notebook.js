@@ -22,7 +22,7 @@ function mount(options){
  const contextKey=()=>options.getContextKey?.()??'';
  const current=()=>state.notes.find(n=>n.id===currentId);
  const fingerprint=()=>JSON.stringify(state.notes.filter(n=>selected.has(n.id)).map(n=>({id:n.id,title:n.title,content:n.content})));
- const noteName=note=>note.title.trim()||uiText('未命名概念','Untitled concept');
+ const noteName=note=>note.title.trim()||uiText('未命名条目','Untitled entry');
  dialog.classList.add('dcn-dialog');dialog.setAttribute('aria-labelledby','conceptNotebookTitle');
  const heading=el('header','dcn-heading'),headingText=el('h2','','笔记本');headingText.id='conceptNotebookTitle';
  // Announce the notebook first instead of focusing the close button and
@@ -37,8 +37,8 @@ function mount(options){
  const list=el('div','dcn-list'),selection=el('div','dcn-selection'),count=el('span');
  selection.append(count);sidebar.append(newButton,searchWrap,selection,list);
  const editor=el('section','dcn-editor');
- const titleLabel=el('label','','概念名称'),title=el('textarea','dcn-title');title.maxLength=LIMITS.title;title.rows=1;title.setAttribute('aria-label','概念名称');titleLabel.append(title);
- const originalLabel=el('label','','概念内容'),original=el('textarea','dcn-original');original.maxLength=LIMITS.content;original.rows=1;original.setAttribute('aria-label','概念内容');originalLabel.append(original);
+ const titleLabel=el('label','','条目名称'),title=el('textarea','dcn-title');title.maxLength=LIMITS.title;title.rows=1;title.setAttribute('aria-label','条目名称');titleLabel.append(title);
+ const originalLabel=el('label','','条目内容'),original=el('textarea','dcn-original');original.maxLength=LIMITS.content;original.rows=1;original.setAttribute('aria-label','条目内容');originalLabel.append(original);
  const saved=el('span','dcn-saved');saved.setAttribute('role','status');editor.append(titleLabel,originalLabel,saved);
  const ai=el('section','dcn-ai');
  const questionLabel=el('label','','补充要求（可选）'),question=el('textarea','dcn-question');question.maxLength=1000;question.rows=2;question.setAttribute('aria-label','补充要求（可选）');questionLabel.append(question);
@@ -72,16 +72,18 @@ function mount(options){
  function renderList(){
   const query=search.value.trim().toLocaleLowerCase();searchClear.hidden=!search.value;list.replaceChildren();
   const visible=state.notes.filter(note=>(note.title+'\n'+note.content).toLocaleLowerCase().includes(query));
-  if(!visible.length)list.append(el('p','dcn-list-empty',uiText('无','None')));
+  if(!visible.length)list.append(el('p','dcn-list-empty',state.notes.length?uiText('无','None'):uiText('暂无条目','No entries yet')));
   const names=new Map();for(const note of state.notes)names.set(noteName(note),(names.get(noteName(note))||0)+1);
   for(const note of visible){
    const row=el('div','dcn-note'+(note.id===currentId?' is-current':''));row.dataset.noteId=note.id;
-   const hit=el('label','dcn-note-select'),check=el('input');check.type='checkbox';check.checked=selected.has(note.id);check.setAttribute('aria-label',uiText('选择概念：'+(note.title.trim()||'未命名概念'),'Select concept: '+(note.title.trim()||'Untitled concept')));hit.append(check);
+   const name=noteName(note);
+   const hit=el('label','dcn-note-select'),check=el('input');check.type='checkbox';check.checked=selected.has(note.id);check.setAttribute('aria-label',uiText('选择概念：'+name,'Select concept: '+name));hit.append(check);
    check.addEventListener('change',()=>{if(check.checked)selected.add(note.id);else selected.delete(note.id);invalidate();renderActions();});
-   const openNote=action(noteName(note),()=>{currentId=note.id;renderList();renderEditor();renderActions();},'dcn-note-open');
+   const openNote=action(name,()=>{currentId=note.id;renderList();renderEditor();renderActions();},'dcn-note-open');
    const remove=action('',event=>{event.stopPropagation();void removeNote(note.id);},'dcn-note-delete');
    remove.disabled=!!deletePending;remove.title=uiText('删除概念','Delete concept');
-   remove.setAttribute('aria-label',uiText('删除概念：'+(note.title.trim()||'未命名概念')+(names.get(noteName(note))>1?'（'+note.id+'）':''),'Delete concept: '+(note.title.trim()||'Untitled concept')+(names.get(noteName(note))>1?'（'+note.id+'）':'')));
+   const duplicate=names.get(name)>1?'（'+note.id+'）':'';
+   remove.setAttribute('aria-label',uiText('删除概念：'+name,'Delete concept: '+name)+duplicate);
    if(note.title.trim())contentNode(openNote);
    openNote.setAttribute('aria-current',String(note.id===currentId));row.append(hit,openNote,remove);list.append(row);
   }
@@ -143,7 +145,7 @@ function mount(options){
    !data.relations.every(row=>row&&ids.has(row.from)&&ids.has(row.to)&&row.from!==row.to&&typeof row.type==='string'&&typeof row.explanation==='string'))throw new Error(uiText('AI 返回了未选中概念的关联，请重试。'));
  }
  function showResult(data,notes){
-  const names=new Map(notes.map(n=>[n.id,n.title.trim()||uiText('未命名概念','Untitled concept')])),version=serial,key=contextKey(),source=fingerprint();result.replaceChildren();
+  const names=new Map(notes.map(note=>[note.id,noteName(note)])),version=serial,key=contextKey(),source=fingerprint();result.replaceChildren();
   const isCurrent=()=>!destroyed&&dialog.open&&serial===version&&contextKey()===key&&fingerprint()===source;
   const rich=(className,text)=>{const node=contentNode(el('div',className));if(root.DMateAIAnswer?.render)void root.DMateAIAnswer.render(node,text,{isCurrent});else node.textContent=text;return node;};
   if(data.summary)result.append(rich('dcn-summary',data.summary));

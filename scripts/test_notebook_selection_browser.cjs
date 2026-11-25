@@ -51,7 +51,7 @@ async function runCase(browser, width, theme) {
       initializeConceptNotebook(); window.dmateConceptNotebook.open();
     }, theme);
     const dialog = page.locator('#conceptNotebookDialog');
-    assert.equal(await dialog.getByLabel('概念内容', {exact:true}).count(), 1,
+    assert.equal(await dialog.getByLabel('条目内容', {exact:true}).count(), 1,
       'The online concept editor exposes its current content label');
     const explain = dialog.locator('.dcn-ai-actions > .dcn-primary');
     const relations = dialog.locator('.dcn-ai-actions > button').nth(1);

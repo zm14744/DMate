@@ -32,9 +32,10 @@ async function navigate(page, panel) {
   await page.locator('.offline-nav-item[data-panel="'+panel+'"]').click();
   await page.locator('#'+panel+'Panel').waitFor({state:'visible'});
 }
-async function checkNoteControlRow(panel) {
+async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
   const page = panel.page(), viewport = page.viewportSize();
   const widths = viewport.width > 1100 ? [viewport.width] : [320, viewport.width, 768];
+  let desktopColumns;
   for (const width of widths) {
     await page.setViewportSize({...viewport,width});
     await settle(page);
@@ -48,23 +49,54 @@ async function checkNoteControlRow(panel) {
         const svg = panel.querySelector(selector), box = svg.getBoundingClientRect(), css = getComputedStyle(svg);
         return {width:box.width,height:box.height,stroke:css.stroke,strokeWidth:css.strokeWidth};
       };
+      const hint = panel.querySelector('.dcn-list-empty');
+      let hintStyle;
+      if (hint) {
+        const css = getComputedStyle(hint), reference = document.createElement('span');
+        reference.hidden = true;
+        reference.style.color = 'var(--text-subtle)';
+        hint.append(reference);
+        hintStyle = {color:css.color, subtle:getComputedStyle(reference).color, size:parseFloat(css.fontSize),
+          scale:parseFloat(css.getPropertyValue('--font-scale')), weight:css.fontWeight};
+        reference.remove();
+      }
       return {create:shape('.dcn-new'),search:shape('.dcn-search'),main:shape('.dcn-main'),
+        list:shape('.dcn-list'),content:shape('.dcn-content'),hint:hint && shape('.dcn-list-empty'),
+        emptyText:hint?.innerText,hintStyle,
         searchIcon:shape('.dcn-search-icon'),pen:icon('.dcn-new svg'),magnifier:icon('.dcn-search-icon'),
         newText:panel.querySelector('.dcn-new').innerText,
         selectedVisible:!!panel.querySelector('.dcn-selection')?.getClientRects().length,
         empty:panel.classList.contains('is-empty')};
     });
-    if (!row.empty && width > 1100) {
+    assert.equal(row.empty, expectEmpty);
+    assert.equal(row.main.width === 0, expectEmpty, 'The editor is hidden only while the notebook is empty');
+    if (expectEmpty) assert.equal(row.emptyText, '暂无条目');
+    if (width > 1100) {
       assert.equal(row.newText,'');
       assert.equal(row.selectedVisible,false);
       assert.equal(row.create.border,'0px');
       assert.equal(row.create.background,'rgba(0, 0, 0, 0)');
       assert.equal(row.search.border,'1px');
+      assert.equal(row.search.radius,'999px');
       assert.deepEqual(row.pen,row.magnifier,'Create and search use matching Lucide icon styles');
-      assert.ok(row.searchIcon.right < row.search.left,'The magnifier sits outside the input');
-      assert.ok(Math.abs(row.create.left-row.main.left)<1 && Math.abs(row.create.top-row.search.top)<1
-        && row.create.bottom < row.main.top && row.search.right <= row.main.right,
-      'Create and search align above the right editor');
+      assert.ok(row.searchIcon.left > row.search.left && row.searchIcon.right < row.search.right
+        && Math.abs(row.searchIcon.top + row.searchIcon.height / 2 - row.search.top - row.search.height / 2) < 1,
+      'The magnifier sits inside the search pill');
+      assert.ok(Math.abs(row.list.left-row.content.left)<1 && row.list.right < row.create.left
+        && row.create.right < row.search.left && Math.abs(row.create.top-row.search.top)<1,
+      'The list occupies column one with both actions in the right-hand toolbar');
+      desktopColumns = [row.list.left,row.list.width,row.create.left,row.search.left,row.search.right];
+      if (beforeCreate) assert.deepEqual(desktopColumns, beforeCreate, 'Creating the first note preserves the list column and toolbar positions');
+      if (expectEmpty) {
+        assert.ok(Math.abs(row.hint.left + row.hint.width/2 - row.list.left - row.list.width/2) < 2
+          && Math.abs(row.hint.top + row.hint.height/2 - row.list.top - row.list.height/2) < 2,
+        'The empty message is centered in the left list');
+        assert.deepEqual([row.hintStyle.size,row.hintStyle.weight,row.hintStyle.color],
+          [22 * row.hintStyle.scale,'500',row.hintStyle.subtle]);
+      } else {
+        assert.ok(Math.abs(row.create.left-row.main.left)<1 && row.create.bottom < row.main.top && row.search.right <= row.main.right,
+          'Create and search align above the right editor');
+      }
       continue;
     }
     assert.equal(row.newText,'新概念');
@@ -87,6 +119,17 @@ async function checkNoteControlRow(panel) {
     }
   }
   await page.setViewportSize(viewport);
+  return desktopColumns;
+}
+async function checkFirstNotebookEntry(panel) {
+  const untitled = panel.locator('.dcn-note-open');
+  await untitled.waitFor();
+  assert.equal(await untitled.innerText(), '未命名条目');
+  for (const [selector,label] of [['.dcn-title','条目名称'],['.dcn-original','条目内容']]) {
+    const field = panel.locator(selector);
+    assert.equal(await field.getAttribute('aria-label'), label);
+    assert.equal(await field.evaluate(node => node.labels[0].innerText.trim()), label);
+  }
 }
 async function onlineStyles(page,theme) {
   await page.goto(baseURL,{waitUntil:'networkidle'});
@@ -113,14 +156,16 @@ async function onlineStyles(page,theme) {
   });
   const notebook=page.locator('#conceptNotebookDialog');
   await notebook.waitFor({state:'visible'});
-  await checkNoteControlRow(notebook);
+  const emptyColumns = await checkNoteControlRow(notebook, true);
   await notebook.getByRole('button',{name:'新概念',exact:true}).click();
+  await checkFirstNotebookEntry(notebook);
   await notebook.locator('.dcn-title').fill('样式参考');
   await notebook.locator('.dcn-original').fill('参考笔记');
-  await checkNoteControlRow(notebook);
+  await checkNoteControlRow(notebook, false, emptyColumns);
   result.create=await style(notebook.locator('.dcn-new'));
-  assert.equal(await notebook.locator('.dcn-original').getAttribute('aria-label'),'概念内容');
-  assert.equal((await notebook.locator('.dcn-editor label').last().innerText()).trim(),'概念内容');
+  await notebook.locator('.dcn-search').fill('没有这条记录');
+  assert.equal(await notebook.locator('.dcn-list-empty').innerText(), '无');
+  await notebook.locator('.dcn-search').fill('');
   result.remove=await circle(notebook.locator('.dcn-note-delete'));
   await notebook.locator('.dcn-note-delete').click();
   assert.equal(await notebook.locator('.dcn-confirm-body').innerText(),'删除后，笔记内容将不可恢复');
@@ -221,12 +266,11 @@ async function exercise(page,reference,width) {
 
   await navigate(page,'notes');
   assert.equal(await page.locator('#notesPanel .dcn-ai,#notesPanel .dcn-ai-actions,#notesPanel .dcn-question').count(),0,'The restored notebook has its original local controls and no AI panel');
-  assert.equal((await page.locator('#addNote').innerText()).trim(),'新概念');
-  await checkNoteControlRow(page.locator('#notesPanel'));
+  const notebook = page.locator('#notesPanel');
+  const emptyColumns = await checkNoteControlRow(notebook, true);
   await page.locator('#addNote').click();
-  await checkNoteControlRow(page.locator('#notesPanel'));
-  assert.equal(await page.locator('.dcn-original').getAttribute('aria-label'),'概念内容');
-  assert.equal((await page.locator('.dcn-editor label').last().innerText()).trim(),'概念内容');
+  await checkFirstNotebookEntry(notebook);
+  await checkNoteControlRow(notebook, false, emptyColumns);
   await page.locator('.dcn-title').fill('集合笔记');await page.locator('.dcn-original').fill('保留我的原始推导：幂集含有所有子集');
   await page.waitForFunction(async()=>(await __offlineTestStore.all('notes')).some(row=>row.content.includes('原始推导')));
   const firstNote=(await records(page,'notes'))[0];

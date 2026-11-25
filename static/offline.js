@@ -596,10 +596,10 @@
     searchWrap.append(search, searchClear);
     const list = el("div", "dcn-list");
     const editor = el("section", "dcn-editor");
-    const nameLabel = el("label", "", tr("概念名称", "Concept name")), name = el("textarea", "dcn-title");
-    name.maxLength = 160; name.rows = 1; name.setAttribute("aria-label", tr("概念名称", "Concept name")); nameLabel.append(name);
-    const bodyLabel = el("label", "", tr("概念内容", "Concept content")), body = el("textarea", "dcn-original");
-    body.rows = 1; body.setAttribute("aria-label", tr("概念内容", "Concept content")); bodyLabel.append(body);
+    const nameLabel = el("label", "", tr("条目名称", "Entry name")), name = el("textarea", "dcn-title");
+    name.maxLength = 160; name.rows = 1; name.setAttribute("aria-label", tr("条目名称", "Entry name")); nameLabel.append(name);
+    const bodyLabel = el("label", "", tr("条目内容", "Entry content")), body = el("textarea", "dcn-original");
+    body.rows = 1; body.setAttribute("aria-label", tr("条目内容", "Entry content")); bodyLabel.append(body);
     editor.append(nameLabel, bodyLabel);
     main.append(editor);
     function renderActions() {
@@ -614,14 +614,14 @@
       searchClear.hidden = !search.value;
       const query = state.noteQuery.trim().toLocaleLowerCase();
       const visible = state.noteRows.filter(row => !query || (row.title + "\n" + row.content).toLocaleLowerCase().includes(query));
-      if (!visible.length) list.append(el("p", "dcn-list-empty", tr("无", "None")));
+      if (!visible.length) list.append(el("p", "dcn-list-empty", state.noteRows.length ? tr("无", "None") : tr("暂无条目", "No entries yet")));
       const names = new Map();
       for (const row of state.noteRows) {
-        const title = row.title.trim() || tr("未命名概念", "Untitled concept");
+        const title = row.title.trim() || tr("未命名条目", "Untitled entry");
         names.set(title, (names.get(title) || 0) + 1);
       }
       for (const row of visible) {
-        const title = row.title.trim() || tr("未命名概念", "Untitled concept");
+        const title = row.title.trim() || tr("未命名条目", "Untitled entry");
         const item = el("div", "dcn-note" + (row.id === state.selectedNoteId ? " is-current" : ""));
         item.dataset.noteId = row.id;
         const open = button(title, "dcn-note-open", () => {
