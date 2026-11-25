@@ -1545,14 +1545,7 @@ input[type="search"]::-webkit-search-cancel-button {
     justify-content:space-between;
     gap:14px;
     padding:10px 14px;
-    border-bottom:1px solid var(--surface-3);
     background:var(--surface-1);
-}
-
-@media (max-width:760px) {
-    #knowledgeGraphModal[data-graph-view="history"] .graph-toolbar {
-        border-bottom:0;
-    }
 }
 
 .graph-toolbar-left {
@@ -1704,6 +1697,14 @@ input[type="search"]::-webkit-search-cancel-button {
 .knowledge-graph-canvas::-webkit-scrollbar-thumb:hover,
 .graph-detail-body::-webkit-scrollbar-thumb:hover {
     background:var(--text-subtle);
+}
+
+#knowledgeGraphModal :is(.kg-desktop-viewport,.kg-mobile-viewport) {
+    scrollbar-width:none;
+}
+
+#knowledgeGraphModal :is(.kg-desktop-viewport,.kg-mobile-viewport)::-webkit-scrollbar {
+    display:none;
 }
 
 .kg-section {
@@ -5114,7 +5115,6 @@ body[data-appearance-theme="light"] .input input {
         touch-action:pan-x pan-y;
         border-radius:10px;
         background:var(--kg-mobile-viewport-bg);
-        scrollbar-gutter:stable both-edges;
     }
 
     .kg-mobile-zoom-surface {
@@ -7034,7 +7034,7 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
     }
 }
 
-/* 2026-10-10 桌面图谱：真实尺寸绘制，局部缩放、稳定滚动条，不缩整页。 */
+/* 桌面图谱使用真实尺寸绘制，画布内部滚动和缩放。 */
 @media (min-width:761px) {
     #knowledgeGraphModal .knowledge-graph-canvas {
         display:flex;
@@ -7063,9 +7063,6 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         min-width:0;
         min-height:0;
         overflow:auto;
-        scrollbar-gutter:stable;
-        scrollbar-width:var(--dmate-scrollbar-width,thin);
-        scrollbar-color:var(--dmate-scrollbar-color,var(--border-mid) transparent);
         overscroll-behavior:contain;
     }
     #knowledgeGraphModal .kg-desktop-zoom-surface {

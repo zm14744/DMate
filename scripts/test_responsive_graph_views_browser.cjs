@@ -112,6 +112,14 @@ async function ready(page, kind) {
       const viewport = document.querySelector('.kg-mobile-viewport');
       return !viewport || (viewport._kgScale > 0 && getComputedStyle(viewport).visibility !== 'hidden');
     });
+    const frameStyle = await view(page, kind).evaluate(viewport => {
+      const style = getComputedStyle(viewport);
+      const toolbar = viewport.closest('#knowledgeGraphModal').querySelector('.graph-toolbar');
+      return {scrollbar:style.scrollbarWidth, gutter:style.scrollbarGutter,
+        toolbarBorder:getComputedStyle(toolbar).borderBottomWidth};
+    });
+    assert.deepEqual(frameStyle, {scrollbar:'none',gutter:'auto',toolbarBorder:'0px'},
+      'The graph viewport hides scrollbar gutters and the toolbar seam');
   }
   await settle(page);
 }
