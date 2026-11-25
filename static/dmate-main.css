@@ -760,7 +760,6 @@ body[data-appearance-theme="light"] #sendBtn.ai-stop-button:hover {
 .wrong-empty {
     padding:28px 8px;
     text-align:center;
-    color:var(--text-subtle);
 }
 
 /* Empty panels center their single message in the scrollable content area. */
@@ -1515,9 +1514,6 @@ input[type="search"]::-webkit-search-cancel-button {
 .learning-review-empty {
     padding:28px 12px;
     text-align:center;
-    color:var(--text-subtle);
-    font-size:var(--font-small);
-    line-height:1.7;
 }
 
 .learning-review-actions {
@@ -1742,6 +1738,18 @@ input[type="search"]::-webkit-search-cancel-button {
     color:var(--text-subtle);
 }
 
+.wrong-empty,
+.learning-review-empty,
+#knowledgeGraphCanvas > .kg-empty,
+#knowledgeGraphHistory > .graph-detail-empty,
+#knowledgeGraphDetailTitle[hidden] + #knowledgeGraphDetail > .graph-detail-empty {
+    background:transparent;
+    color:var(--text-muted);
+    font-size:var(--font-small);
+    font-weight:600;
+    line-height:1.4;
+}
+
 .learning-empty-state,
 #knowledgeGraphModal .kg-empty-state {
     display:flex;
@@ -1749,11 +1757,6 @@ input[type="search"]::-webkit-search-cancel-button {
     align-items:center;
     gap:12px;
     padding:16px;
-    background:transparent;
-    color:var(--text-muted);
-    font-size:var(--font-small);
-    font-weight:600;
-    line-height:1.4;
     text-align:center;
 }
 
@@ -2124,13 +2127,6 @@ input[type="search"]::-webkit-search-cancel-button {
 #knowledgeGraphDetailTitle[hidden] + #knowledgeGraphDetail > .graph-detail-empty {
     margin:0;
     text-align:center;
-}
-
-#knowledgeGraphDetail > .kg-node-empty {
-    background:transparent;
-    font-size:calc(22px * var(--font-scale));
-    font-weight:500;
-    line-height:1.3;
 }
 
 @media(max-width:760px) {

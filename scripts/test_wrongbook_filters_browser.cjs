@@ -112,12 +112,13 @@ async function runCase(browser, width) {
     assert.equal(await page.evaluate(() => wrongBookFilter), 'pending', 'A new page starts at pending correction');
     await page.evaluate(() => openWrongBook());
     const emptyBook = page.locator('#wrongBookList .wrong-empty');
-    const font = el => {
-      const {fontFamily, fontSize, fontWeight, lineHeight} = getComputedStyle(el);
-      return {fontFamily, fontSize, fontWeight, lineHeight};
+    const promptStyle = el => {
+      const {fontFamily, fontSize, fontWeight, lineHeight, color} = getComputedStyle(el);
+      const backgroundColor = getComputedStyle(el.closest('.modal-card')).backgroundColor;
+      return {fontFamily, fontSize, fontWeight, lineHeight, color, backgroundColor};
     };
     assert.equal(await emptyBook.innerText(), '暂时没有错题');
-    const emptyBookFont = await emptyBook.locator('span').evaluate(font);
+    const emptyBookStyle = await emptyBook.locator('span').evaluate(promptStyle);
     assert.equal(await emptyBook.locator('svg').innerHTML(), await page.locator('#wrongBookBtn > svg').innerHTML());
     assert.ok(await emptyBook.evaluate(el => {
       const group = el.getBoundingClientRect(), list = el.parentElement.getBoundingClientRect();
@@ -126,7 +127,7 @@ async function runCase(browser, width) {
     }), 'The empty book message is centered below the filters');
     await page.evaluate(() => DMateI18n.setLanguage('en', false));
     assert.equal(await emptyBook.innerText(), 'No mistakes yet');
-    const englishEmptyBookFont = await emptyBook.locator('span').evaluate(font);
+    const englishEmptyBookStyle = await emptyBook.locator('span').evaluate(promptStyle);
     await page.evaluate(() => { DMateI18n.setLanguage('zh-CN', false); closeWrongBook(); });
     await seed(page);
     await page.evaluate(() => openWrongBook());
@@ -201,11 +202,11 @@ async function runCase(browser, width) {
     const emptyRetests = page.locator('#wrongRetestReviewList');
     const emptyRetestLabel = emptyRetests.locator('.learning-review-empty');
     assert.equal(await emptyRetests.innerText(), '暂时没有题目');
-    assert.deepEqual(await emptyRetestLabel.evaluate(font), emptyBookFont, 'The empty prompts use the same typography');
+    assert.deepEqual(await emptyRetestLabel.evaluate(promptStyle), emptyBookStyle, 'The empty prompts share typography and theme colors');
     assert.equal(await emptyRetests.locator('svg').count(), 0, 'The retest placeholder is text only');
     await page.evaluate(() => DMateI18n.setLanguage('en', false));
     assert.equal(await emptyRetests.innerText(), 'No questions yet');
-    assert.deepEqual(await emptyRetestLabel.evaluate(font), englishEmptyBookFont, 'The English empty prompts use the same typography');
+    assert.deepEqual(await emptyRetestLabel.evaluate(promptStyle), englishEmptyBookStyle, 'The English empty prompts also share the same styling');
     await page.evaluate(() => DMateI18n.setLanguage('zh-CN', false));
     await page.locator('#wrongRetestReviewModal .modal-close-dot').click();
     assert.equal(await page.evaluate(() => processWrongQuestionRetestReply({ id: 'filter-local-retest',

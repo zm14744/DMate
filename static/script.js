@@ -22245,7 +22245,7 @@ function renderKnowledgeGraphDetail({desktopHistory = false} = {}) {
         title.hidden = true;
         title.textContent = "";
         const empty = document.createElement("div");
-        empty.className = desktopHistory ? "graph-detail-empty kg-node-empty" : "graph-detail-empty";
+        empty.className = "graph-detail-empty";
         empty.textContent = desktopHistory ? dmateUiText("暂无节点", "No nodes yet")
             : document.querySelector("#knowledgeGraphCanvas > .kg-empty")?.textContent || dmateUiText("无", "None");
         detail.replaceChildren(empty);

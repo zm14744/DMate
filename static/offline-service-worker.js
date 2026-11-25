@@ -1,6 +1,6 @@
 "use strict";
-const CACHE_NAME = "dmate-offline-shell-v128";
-const PREVIOUS_CACHE_NAME = "dmate-offline-shell-v127";
+const CACHE_NAME = "dmate-offline-shell-v129";
+const PREVIOUS_CACHE_NAME = "dmate-offline-shell-v128";
 const CACHE_READY = "/__dmate_offline_ready__/"+CACHE_NAME;
 const PRECACHE = [
   "/static/appearance-bootstrap.js?v=3",
@@ -12,7 +12,7 @@ const PRECACHE = [
   "/static/icons/dmate-app-v52-48.png",
   "/static/icons/dmate-app-v52-192.png",
   "/static/icons/dmate-app-v52-180.png",
-  "/static/dmate-main.css?v=83",
+  "/static/dmate-main.css?v=84",
   "/static/graph-editor.css?v=27",
   "/static/drawing-workspace.css?v=56",
   "/static/modal-chrome.css",
@@ -25,7 +25,7 @@ const PRECACHE = [
   "/static/button-themes.css?v=68",
   "/static/offline-knowledge-graph.css?v=55",
   "/static/knowledge-graph-sheet.css?v=5",
-  "/static/offline.css?v=70",
+  "/static/offline.css?v=71",
   "/static/search-controls.css?v=27",
   "/static/search-controls.js?v=27",
   "/static/select-controls.css?v=43",
