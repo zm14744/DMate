@@ -792,7 +792,7 @@ body[data-appearance-theme="dark"] #sendBtn.ai-stop-button {
     padding:14px;
     margin-bottom:12px;
     border-radius:10px;
-    background:var(--surface-0);
+    background:var(--surface-1);
     border:1px solid var(--surface-3);
 }
 
@@ -909,7 +909,6 @@ body[data-appearance-theme="dark"] #sendBtn.ai-stop-button {
     justify-content:space-between;
     gap:12px;
     padding:10px 14px;
-    border-bottom:1px solid var(--surface-3);
     background:var(--surface-0);
 }
 
@@ -977,7 +976,6 @@ body[data-appearance-theme="dark"] #sendBtn.ai-stop-button {
     grid-template-columns:minmax(220px, 1fr) auto auto auto auto;
     gap:8px;
     padding:10px 14px;
-    border-bottom:1px solid var(--surface-3);
     background:var(--surface-1);
 }
 
@@ -1272,6 +1270,14 @@ input[type="search"]::-webkit-search-cancel-button {
     border-radius:9px;
     background:var(--surface-1);
     overflow:hidden;
+}
+
+#wrongBookList > .wrong-card :is(.wrong-answer-details,.wrong-analysis-details) {
+    background:var(--dmate-modal-background,var(--surface-0));
+}
+
+#mistakeList > .wrong-card :is(.wrong-answer-details,.wrong-analysis-details) {
+    background:var(--surface-2);
 }
 
 .wrong-answer-summary,
@@ -1703,12 +1709,14 @@ input[type="search"]::-webkit-search-cancel-button {
     background:var(--text-subtle);
 }
 
-#knowledgeGraphModal :is(.kg-desktop-viewport,.kg-mobile-viewport) {
-    scrollbar-width:none;
-}
+@media(max-width:760px) {
+    #knowledgeGraphModal :is(.kg-desktop-viewport,.kg-mobile-viewport) {
+        scrollbar-width:none;
+    }
 
-#knowledgeGraphModal :is(.kg-desktop-viewport,.kg-mobile-viewport)::-webkit-scrollbar {
-    display:none;
+    #knowledgeGraphModal :is(.kg-desktop-viewport,.kg-mobile-viewport)::-webkit-scrollbar {
+        display:none;
+    }
 }
 
 .kg-section {
@@ -6548,6 +6556,9 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         min-width:0;
         min-height:0;
         overflow:auto;
+        scrollbar-gutter:stable;
+        scrollbar-width:var(--dmate-scrollbar-width,thin);
+        scrollbar-color:var(--dmate-scrollbar-color,var(--border-mid) transparent);
         overscroll-behavior:contain;
     }
     #knowledgeGraphModal .kg-desktop-zoom-surface {
@@ -7430,11 +7441,6 @@ body[data-appearance-theme] #wrongBookModal #wrongBookList {
     background:var(--dm-frost-panel-strong) !important;
     background-image:none !important;
 }
-body[data-appearance-theme] #wrongBookModal .wrong-toolbar,
-body[data-appearance-theme] #wrongBookModal .wrong-tools {
-    border-bottom:1px solid var(--dm-frost-border) !important;
-}
-body[data-appearance-theme] #wrongBookModal .wrong-card,
 body[data-appearance-theme] #wrongBookModal .wrong-empty {
     background:var(--dm-frost-panel) !important;
     background-image:none !important;

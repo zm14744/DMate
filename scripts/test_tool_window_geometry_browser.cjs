@@ -76,8 +76,8 @@ async function checkGraph(page) {
   });
   assert.equal(borders.width,mobile ? '0px' : '1px','Graph toolbar separator at '+page.viewportSize().width);
   if (!mobile) assert.equal(borders.line,'solid');
-  assert.equal(borders.bar,'none','The graph viewport hides its scrollbars');
-  assert.equal(borders.gutter,'auto','Hidden scrollbars reserve no gutter');
+  assert.equal(borders.bar,mobile ? 'none' : 'auto','The desktop graph uses shared scrollbars and mobile hides them');
+  assert.equal(borders.gutter,mobile ? 'auto' : 'stable','Only the desktop graph reserves a scrollbar gutter');
 }
 
 async function compareTools(page, offline, active, sizes, previousFrames) {

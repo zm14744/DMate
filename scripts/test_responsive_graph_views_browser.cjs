@@ -118,8 +118,10 @@ async function ready(page, kind) {
       return {scrollbar:style.scrollbarWidth, gutter:style.scrollbarGutter,
         toolbarBorder:getComputedStyle(toolbar).borderBottomWidth};
     });
-    assert.deepEqual(frameStyle, {scrollbar:'none',gutter:'auto',toolbarBorder:isMobile(page) ? '0px' : '1px'},
-      'The graph hides scrollbar gutters and separates the toolbar on desktop');
+    assert.deepEqual(frameStyle, isMobile(page)
+      ? {scrollbar:'none',gutter:'auto',toolbarBorder:'0px'}
+      : {scrollbar:'auto',gutter:'stable',toolbarBorder:'1px'},
+      'Desktop uses the shared scrollbars and a separate toolbar, while mobile keeps an edge-to-edge viewport');
   }
   await settle(page);
 }
@@ -176,6 +178,15 @@ async function customize(page, kind, variant) {
   await settle(page);
   const current = await camera(page, kind);
   assert.ok(current.left > 0 || current.top > 0, 'The camera fixture is actually panned');
+  if (kind === 'graph' && !isMobile(page)) {
+    assert.ok(current.left > 0 && current.top > 0, 'The desktop graph scrolls along both axes');
+    const gutters = await view(page, kind).evaluate(node => {
+      const css = getComputedStyle(node);
+      return [node.offsetWidth-node.clientWidth-parseFloat(css.borderLeftWidth)-parseFloat(css.borderRightWidth),
+        node.offsetHeight-node.clientHeight-parseFloat(css.borderTopWidth)-parseFloat(css.borderBottomWidth)];
+    });
+    assert.ok(gutters.every(size => size > 0), 'Both desktop scrollbars occupy space on the overflowing graph: ' + gutters);
+  }
   return current;
 }
 
@@ -294,7 +305,7 @@ async function runCase(browser, kind, offline, first) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ headless: true,
+  const browser = await chromium.launch({ headless: true, ignoreDefaultArgs:['--hide-scrollbars'],
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
     const kinds = process.env.DMATE_RESPONSIVE_TEST_KIND ? [process.env.DMATE_RESPONSIVE_TEST_KIND] : ['graph', 'drawing'];

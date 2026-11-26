@@ -128,7 +128,7 @@ body.offline-workspace :is(#questionList,#conceptList) > button { flex-shrink:0;
     grid-template-rows:minmax(0,1fr) auto;
   }
   body.offline-workspace :is(.question-layout,.concept-layout) > :is(#questionDetail,#conceptDetail) { display:none; }
-  .offline-library-preview { display:flex; align-items:center; justify-content:center; min-width:0; padding-top:12px; border-top:1px solid var(--surface-3); }
+  .offline-library-preview { display:flex; align-items:center; justify-content:center; min-width:0; padding-top:12px; }
 }
 
 /* Full details reuse the selected article, with its own scroll area and no
@@ -165,8 +165,12 @@ html[data-ui-language="en"] .question-option{line-height:var(--dmate-reading-lin
 .answer-panel h3 { margin:0 0 8px; color:var(--text-muted); font-size:14px; }
 .answer-panel p { margin:0 0 12px; line-height:1.8; font-size:14px; white-space:pre-wrap; }
 body.offline-workspace #questionDetail :is(.wrong-answer-details,.wrong-analysis-details) > .dmate-chat-answer { padding:12px!important; }
+/* Idle question rows expose the library panel's surface; disclosures use the
+   same fill while retaining their rounded outer frame. */
+body.offline-workspace #questionDetail :is(.wrong-answer-details,.wrong-analysis-details) { background:var(--surface-2); }
+body.offline-workspace #questionDetail :is(.wrong-answer-details,.wrong-analysis-details)[open] > summary { border-bottom:0; }
 .concept-summary { margin:0 0 16px; color:var(--text-secondary); font-size:14px; line-height:1.8; }
-.concept-detail .detail-section { padding-top:14px; border-top:1px solid var(--surface-3); }
+.concept-detail .detail-section { padding-top:14px; }
 .prereq-list { display:flex; gap:7px; flex-wrap:wrap; }
 .prereq-list button { min-height:34px; padding:7px 10px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface-2); color:var(--text-primary); font:inherit; font-size:13px; }
 /* Related concepts, modules and exercises share the filled action surface.
@@ -195,9 +199,9 @@ body.offline-workspace #questionDetail :is(.wrong-answer-details,.wrong-analysis
     outline-offset:2px!important;
   }
 }
-/* Question details use the concept detail's section separators. Long
-   exercise titles wrap inside a narrow graph sidebar without shrinking rows. */
-body.offline-workspace :is(.question-parent-concepts,.question-graph-modules) { min-width:0; margin-top:18px; padding-top:14px; border-top:1px solid var(--surface-3); }
+/* Keep relation sections spaced without drawing internal dividing strokes.
+   Long exercise titles wrap without shrinking their links. */
+body.offline-workspace :is(.question-parent-concepts,.question-graph-modules) { min-width:0; margin-top:18px; padding-top:14px; }
 body.offline-workspace .offline-graph-learning-links { flex:0 0 auto; min-width:0; }
 body.offline-workspace :is(.question-parent-concepts,.question-graph-modules,.offline-graph-learning-links) .prereq-list button { box-sizing:border-box; flex:none; min-width:0; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
 /* Tablet-width landscape keeps the two graph columns inside the short page.

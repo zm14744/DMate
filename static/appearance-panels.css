@@ -62,7 +62,7 @@ body[data-appearance-theme="navy"] {
         .dgs-information,.dgs-modes,.dcn-content,.dcn-main,.dcn-sidebar,#info,.learning-summary,
         .ocr-task-list,.ocr-task-card,.ocr-review-rendered,.ocr-review-preview,
         .appearance-background-preview:not([data-has-background="true"]),
-        .wrong-card,.wrong-feedback,.wrong-empty,.wrong-answer-body,.wrong-analysis-body,.wrong-solution-body,
+        .wrong-feedback,.wrong-empty,.wrong-answer-body,.wrong-analysis-body,.wrong-solution-body,
         .learning-review-intro,
         .kg-section,.kg-mobile-section,.kg-mobile-viewport,.kg-history-preview,
         .graph-metric,.graph-detail-tip,.graph-detail-empty,.graph-summary-item:not(.focus),
