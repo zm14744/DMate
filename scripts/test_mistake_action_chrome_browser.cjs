@@ -102,13 +102,16 @@ async function checkHeadingLabels(page, reference) {
   await toolsEntry(page, 'conceptNotebookBtn');
   await page.locator('#conceptNotebookDialog').waitFor({ state: 'visible' });
   const notebook = page.locator('#conceptNotebookDialog');
-  for (const checkbox of await notebook.getByRole('checkbox').all()) await checkbox.check();
-  await notebook.locator('.dcn-relation-trigger').click();
-  await notebook.getByRole('dialog', { name: '分析关联' }).waitFor();
+  const narrow = page.viewportSize().width <= 760;
+  if (narrow) await notebook.locator('.dcn-note-open').first().click();
   for (const selector of ['.dcn-title', '.dcn-original']) {
     assert.deepEqual(await fontStyle(page.locator('#conceptNotebookDialog ' + selector).locator('..')), reference,
       selector + ' label matches the graph heading');
   }
+  if (narrow) await notebook.locator('.dcn-mobile-sheet[open] .dcn-sheet-close').click();
+  for (const checkbox of await notebook.getByRole('checkbox').all()) await checkbox.check();
+  await notebook.locator('.dcn-relation-trigger').click();
+  await notebook.getByRole('dialog', { name: '分析关联' }).waitFor();
   const requirements = notebook.getByRole('textbox', { name: '分析要求（可选）' });
   const requirementsLabel = await fontStyle(requirements.locator('..'));
   assert.equal(requirementsLabel.size, reference.size);

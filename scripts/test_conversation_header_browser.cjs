@@ -247,6 +247,8 @@ async function notebookAnalysisTrigger(page, newButton) {
   assert.equal(await trigger.isDisabled(), true, 'A single entry cannot be compared');
   await newButton.click();
   await dialog.locator('.dcn-title').fill('关联概念');
+  const sheetClose = dialog.locator('.dcn-mobile-sheet[open] .dcn-sheet-close');
+  if (await sheetClose.isVisible()) await sheetClose.click();
   for (const checkbox of await checkboxes.all()) await checkbox.check();
   assert.equal(await trigger.isEnabled(), true, 'Two selected entries enable relation analysis');
   await page.mouse.move(0, 0); await dialog.locator('.dcn-search').focus(); await settle(page);
@@ -292,6 +294,8 @@ async function notebookButton(page) {
   await button.click();
   assert.equal(await page.locator('#conceptNotebookDialog .dcn-note').count(), before + 1, 'New entry still creates an editable notebook entry');
   await page.locator('#conceptNotebookDialog .dcn-title').fill('局部概念');
+  const sheetClose = page.locator('#conceptNotebookDialog .dcn-mobile-sheet[open] .dcn-sheet-close');
+  if (await sheetClose.isVisible()) await sheetClose.click();
   await notebookAnalysisTrigger(page, button);
   const savedTitle = await page.locator('#conceptNotebookDialog .dcn-title').inputValue();
   await language(page, 'en');

@@ -57,6 +57,9 @@ async function runCase(browser, width, theme) {
     const relations = dialog.locator('.dcn-relation-trigger');
     const panel = dialog.locator('.dcn-analysis-panel');
     const submit = panel.locator('.dcn-analysis-submit');
+    const sheet = dialog.locator('.dcn-mobile-sheet');
+    const compact = width <= 760;
+    let editorSheet;
     const checkbox = id => dialog.locator('.dcn-note[data-note-id="' + id + '"] input[type="checkbox"]');
     await dialog.waitFor({ state: 'visible' });
     assert.equal(await relations.innerText(), '分析关联');
@@ -70,10 +73,23 @@ async function runCase(browser, width, theme) {
     await checkbox('beta').check();
     await dialog.locator('.dcn-note[data-note-id="alpha"] .dcn-note-open').click();
     assert.equal(await dialog.locator('.dcn-title').inputValue(), '当前打开的群概念');
+    if (compact) {
+      await sheet.locator('.dcn-sheet-body .dcn-title').waitFor();
+      editorSheet = await sheet.boundingBox();
+      const bottomInset = page.viewportSize().height - editorSheet.y - editorSheet.height;
+      assert.ok(editorSheet.y > 0 && bottomInset >= 0 && bottomInset < 24, 'The editor opens at the bottom of the viewport');
+      await sheet.locator('.dcn-sheet-close').click();
+      await sheet.waitFor({ state:'hidden' });
+      assert.ok(await checkbox('beta').isChecked(), 'Opening and dismissing an entry preserves its independent selection');
+    }
     assert.equal(await relations.isDisabled(), true);
     await checkbox('gamma').check();
     await relations.click();
     await dialog.getByRole('dialog', { name: '分析关联', exact: true }).waitFor();
+    if (compact) {
+      await sheet.locator('.dcn-sheet-body .dcn-analysis-panel').waitFor();
+      assert.deepEqual(await sheet.boundingBox(), editorSheet, 'Relationship analysis uses the same bottom sheet as the entry editor');
+    }
     assert.equal(await panel.getByRole('heading').count(), 0);
     const question = panel.getByRole('textbox', { name: '分析要求（可选）', exact: true });
     assert.equal(await question.inputValue(), '');
@@ -150,6 +166,7 @@ async function runCase(browser, width, theme) {
     await checkbox('blank').uncheck();
     await checkbox('gamma').check();
     const closing = await beginPending();
+    if (compact) await sheet.locator('.dcn-sheet-close').click();
     await dialog.locator('.dcn-heading > .dcn-close').click();
     await releaseCanceled(closing);
     assert.equal(await dialog.isVisible(), false);

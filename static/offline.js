@@ -4,6 +4,8 @@
   const libraryMobile = window.matchMedia("(max-width:1100px)");
   const libraryScroll = {concepts:0, questions:0};
   let libraryDetail = null;
+  let notebookSheet = null, noteView = null, replacingNoteSheet = false;
+  let noteIntentRevision = 0, noteOpenIntent = null;
   const state = {
     storage: null, ready:false, concepts: [], questions: [], graph: null, translations: {concepts:{},questions:{}},
     panel: "graph", selectedQuestion: null, selectedConcept: null,
@@ -113,6 +115,8 @@
   function invalidateWorkspace() {
     if (!workspaceActive) return;
     workspaceActive = false;
+    closeNotebookSheet();
+    notebookSheet?.destroy(); notebookSheet = null; noteView = null;
     state.ready = false;
     state.noteRows = []; state.noteDrafts.clear();
     state.drawingController?.destroy?.();
@@ -410,6 +414,10 @@
   function switchPanel(name) {
     if (!panelMeta[name]) return;
     closeLibraryDetail(false);
+    if (name !== "notes") {
+      closeNotebookSheet();
+      state.notesRenderRevision = (state.notesRenderRevision || 0) + 1;
+    }
     if (name !== "graph" && state.graphController) {
       state.graphController.destroy(); state.graphController = null;
     }
@@ -558,20 +566,59 @@
     state.noteDrafts.delete(row.id);
   }
 
+  function getNotebookSheet() {
+    if (!notebookSheet && window.DMateNotebookSheet) notebookSheet = window.DMateNotebookSheet.mount($("notesPanel"));
+    return notebookSheet;
+  }
+
+  function closeNotebookSheet() {
+    noteIntentRevision++; noteOpenIntent = null;
+    notebookSheet?.close();
+  }
+
+  function showNotebookEditor({initialField, returnToNew = false} = {}) {
+    const view = noteView;
+    if (state.panel !== "notes" || !view?.id) return false;
+    const sheet = getNotebookSheet(), focus = initialField === "name" ? view.name : initialField === "body" ? view.body : null;
+    if (!sheet?.isMobile()) { focus?.focus({preventScroll:true}); return false; }
+    view.returnToNew = returnToNew;
+    const opened = sheet.open(view.editor, {
+      label:tr("条目详情", "Entry details"), initialFocus:focus,
+      returnFocus:() => {
+        const row = returnToNew ? null : [...$("noteList").querySelectorAll(".dcn-note")].find(node => node.dataset.noteId === view.id);
+        return row?.querySelector(".dcn-note-open") || $("addNote");
+      },
+      onClose:() => { if (!replacingNoteSheet) { noteIntentRevision++; noteOpenIntent = null; } }
+    });
+    if (opened) window.DMateTextareaAutosize?.refresh?.(view.editor);
+    return opened;
+  }
+
   async function renderNotes() {
     const revision = state.notesRenderRevision = (state.notesRenderRevision || 0) + 1;
+    const versions = new Map(state.noteRows.map(row => [row.id, row.updatedAt]));
     await flushNoteDrafts();
     const [savedNotes, metadata] = await Promise.all([all("notes"), transaction("settings", "readonly", os => os.get("notebook-deletions"))]);
-    if (revision !== state.notesRenderRevision) return;
+    if (revision !== state.notesRenderRevision || state.panel !== "notes" || !workspaceCurrent()) return;
     const byId = new Map(savedNotes.filter(row => !metadata?.deleted?.[row.id]
       || noteTime(metadata.deleted[row.id]) < noteTime(row.updatedAt)).map(row => [row.id, row]));
     // A failed write stays visible and retryable when changing panels. Read the
     // drafts after IndexedDB finishes so newer input also wins this merge.
+    for (const row of state.noteRows) {
+      if (versions.get(row.id) !== row.updatedAt && (!metadata?.deleted?.[row.id]
+          || noteTime(metadata.deleted[row.id]) < noteTime(row.updatedAt))
+          && (!byId.has(row.id) || noteTime(byId.get(row.id).updatedAt) < noteTime(row.updatedAt))) byId.set(row.id, {...row});
+    }
     for (const [id, row] of state.noteDrafts) byId.set(id, {...row});
     const rows = [...byId.values()].sort((a,b) => noteTime(b.updatedAt) - noteTime(a.updatedAt));
     state.noteRows = rows;
     if (!rows.some(row => row.id === state.selectedNoteId)) state.selectedNoteId = rows[0]?.id || null;
     const host = $("noteList");
+    const previous = noteView, reopenId = previous && notebookSheet?.contains(previous.editor) ? previous.id : null;
+    const active = document.activeElement, field = active === previous?.name ? "name" : active === previous?.body ? "body" : null;
+    const selection = field ? {start:active.selectionStart,end:active.selectionEnd,direction:active.selectionDirection,scroll:active.scrollTop} : null;
+    replacingNoteSheet = true;
+    try { notebookSheet?.close(); } finally { replacingNoteSheet = false; }
     host.replaceChildren();
     const sidebar = el("aside", "dcn-sidebar"), main = el("section", "dcn-main");
     sidebar.setAttribute("aria-label", tr("概念笔记列表", "Concept note list"));
@@ -619,7 +666,9 @@
         const item = el("div", "dcn-note" + (row.id === state.selectedNoteId ? " is-current" : ""));
         item.dataset.noteId = row.id;
         const open = button(title, "dcn-note-open", () => {
+          noteIntentRevision++; noteOpenIntent = null;
           state.selectedNoteId = row.id; renderList(); renderEditor(); renderActions();
+          showNotebookEditor();
         });
         if (row.title.trim()) open.setAttribute("data-i18n-content", "");
         open.setAttribute("aria-current", String(row.id === state.selectedNoteId));
@@ -632,7 +681,7 @@
             if (!await flushNoteDrafts()) { toast("笔记尚未保存，请保留当前页面后重试。"); return; }
             await deleteNote(state.noteRows.find(note => note.id === row.id) || row); await renderNotes();
           } finally {
-            state.noteDeletePending = null; renderActions();
+            state.noteDeletePending = null; noteView?.renderActions();
           }
         });
         deletion.title = tr("删除概念", "Delete concept");
@@ -645,6 +694,7 @@
       editor.hidden = !row;
       name.value = row?.title || ""; body.value = row?.content || "";
       body.maxLength = Math.max(12000, row?.content.length || 0);
+      if (noteView?.editor === editor) noteView.id = row?.id || null;
     }
     const edit = () => {
       const row = state.noteRows.find(note => note.id === state.selectedNoteId);
@@ -657,15 +707,37 @@
     search.addEventListener("input", () => { state.noteQuery = search.value; renderList(); });
     const tools = el("div", "dcn-tools");
     tools.append(create, searchWrap); sidebar.append(tools, list); host.append(sidebar, main);
+    noteView = {editor,name,body,id:null,returnToNew:false,renderActions};
+    getNotebookSheet();
     renderList(); renderEditor(); renderActions();
     window.DMateTextareaAutosize?.refresh?.(host);
+    const intent = noteOpenIntent;
+    if (intent && intent.revision === noteIntentRevision && intent.id === state.selectedNoteId) {
+      noteOpenIntent = null;
+      showNotebookEditor({initialField:"name",returnToNew:true});
+    } else if (reopenId && reopenId === noteView.id) {
+      showNotebookEditor({initialField:field,returnToNew:previous.returnToNew});
+      const target = field === "name" ? name : field === "body" ? body : null;
+      if (target && selection) {
+        target.setSelectionRange(selection.start,selection.end,selection.direction);
+        target.scrollTop = selection.scroll;
+      }
+    }
   }
 
   async function createNote() {
+    const revision = ++noteIntentRevision;
+    noteOpenIntent = null;
     if (!await flushNoteDrafts()) { toast("笔记尚未保存，请保留当前页面后重试。"); return; }
     const row = {id:uid(), title:"", content:"", createdAt:stamp(), updatedAt:stamp()};
-    await put("notes", row); state.selectedNoteId = row.id; state.noteQuery = "";
-    await renderNotes(); $("noteList").querySelector(".dcn-title")?.focus({preventScroll:true});
+    await put("notes", row);
+    if (revision !== noteIntentRevision || state.panel !== "notes") {
+      if (state.panel === "notes") await renderNotes();
+      return;
+    }
+    state.selectedNoteId = row.id; state.noteQuery = "";
+    noteOpenIntent = {id:row.id,revision};
+    await renderNotes();
   }
 
   function chapterCategories() {
@@ -1269,6 +1341,7 @@
     for (const type of ["input", "change", "click"]) document.addEventListener(type, () => queueMicrotask(checkpoint));
     document.addEventListener("toggle", () => requestAnimationFrame(checkpoint), true);
     window.addEventListener("pagehide", checkpoint);
+    window.addEventListener("pagehide", closeNotebookSheet);
     window.DMateI18n?.register?.({
       "基本定义":"Definition", "理解与说明":"Explanation", "典型例题":"Worked example", "常见错误":"Common mistakes",
       "评分要点":"Marking criteria", "细分概念":"Detailed concepts", "所属图谱知识点":"Knowledge-map topic",
@@ -1331,7 +1404,7 @@
       if (state.panel === "questions") renderQuestions();
       if (state.panel === "concepts") renderConcepts();
       if (state.panel === "mistakes") void renderMistakes();
-      if (state.panel === "notes") void renderNotes();
+      if (state.panel === "notes") void renderNotes().catch(error => toast(storageError(error)));
       if (event.detail?.persist !== false) {
         void put("settings", {id:"language",value:event.detail.language,updatedAt:Date.now()})
           .catch(() => toast(tr("语言偏好暂时无法保存", "The language preference could not be saved.")));

@@ -90,6 +90,7 @@ async function online(page,width) {
     ],deleted:{}};
     initializeConceptNotebook();dmateConceptNotebook.open();
   });
+  if(width<=760)await page.locator('#conceptNotebookDialog .dcn-note-open').first().click();
   await grows(page,page.locator('.dcn-title'),'notebook concept name',longTitle);
   await grows(page,page.locator('.dcn-original'),'notebook original content');
   const original=page.locator('.dcn-original');
@@ -103,6 +104,7 @@ async function online(page,width) {
   assert.ok(before.height>0&&after.height>0,'Width/font changes preserve a measured editable field');
   await page.evaluate(()=>document.documentElement.style.removeProperty('--font-scale'));
   const notebook=page.locator('#conceptNotebookDialog');
+  if(width<=760)await notebook.locator('.dcn-mobile-sheet[open] .dcn-sheet-close').click();
   for(const checkbox of await notebook.getByRole('checkbox').all()) await checkbox.check();
   await notebook.locator('.dcn-relation-trigger').click();
   await grows(page,notebook.getByRole('dialog',{name:'分析关联'}).getByRole('textbox',{name:'分析要求（可选）'}),'notebook analysis request');
@@ -166,6 +168,7 @@ async function runCase(browser,width) {
     await page.locator('#addNote').click();
     await grows(page,page.locator('.dcn-title'),'offline notebook concept name',longTitle);
     await grows(page,page.locator('.dcn-original'),'offline notebook concept content');
+    if(width<=760)await page.locator('#notesPanel .dcn-mobile-sheet[open] .dcn-sheet-close').click();
     await graphTextFields(page,true);
     assert.deepEqual(requests,[],'Resizing and editing fields never generates model output');assert.deepEqual(errors,[]);
     console.log('PASS '+width+': real online/offline fields grow, cap, shrink, refill and retain values/selection/keyboard behavior');

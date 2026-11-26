@@ -235,7 +235,8 @@ async function offlineSearches(page) {
   await notebook.fill('__missing_local_note__');
   await clearSearch(notebook);
   await page.locator('#addNote').click();
-  await checkInputFocus(page.locator('#noteList .dcn-original'), { typeText: true });
+  await checkInputFocus(page.locator('#notesPanel .dcn-original'), { typeText: true });
+  if (page.viewportSize().width <= 760) await page.locator('#notesPanel .dcn-sheet-close').click();
   await page.evaluate(() => window.DMateI18n.setLanguage('en', false));
   await checkSearchLabel(notebook, 'Search');
   await noOverflow(page, 'Offline notebook search');
@@ -275,8 +276,9 @@ async function onlineSearches(page, reference) {
   for (const name of ['Alpha Graph', 'Beta Logic']) {
     await page.locator('#conceptNotebookDialog .dcn-new').click();
     await page.locator('#conceptNotebookDialog .dcn-title').fill(name);
+    if (name === 'Beta Logic') await checkInputFocus(page.locator('#conceptNotebookDialog .dcn-original'), { typeText: true });
+    if (page.viewportSize().width <= 760) await page.locator('#conceptNotebookDialog .dcn-sheet-close').click();
   }
-  await checkInputFocus(page.locator('#conceptNotebookDialog .dcn-original'), { typeText: true });
   assert.equal(await page.locator('.dcn-list .dcn-note').count(), 2);
   await notebook.fill('Alpha');
   assert.equal(await page.locator('.dcn-list .dcn-note').count(), 1);

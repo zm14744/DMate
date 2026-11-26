@@ -34,7 +34,7 @@ async function navigate(page, panel) {
 }
 async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
   const page = panel.page(), viewport = page.viewportSize();
-  const hasAnalysis = !expectEmpty && await panel.getAttribute('id') === 'conceptNotebookDialog';
+  const online = await panel.getAttribute('id') === 'conceptNotebookDialog';
   const search = panel.locator('.dcn-search');
   assert.equal(await search.getAttribute('aria-label'), '搜索');
   assert.equal(await search.evaluate(input => input.placeholder), '');
@@ -84,18 +84,32 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
         empty:panel.classList.contains('is-empty')};
     });
     assert.equal(row.empty, expectEmpty);
+    const compact = width <= 760;
+    const hasAnalysis = online && (compact || !expectEmpty);
     assert.equal(Boolean(row.relation?.width), hasAnalysis);
-    if (hasAnalysis) assert.ok(row.relation.right < row.search.left && Math.abs(row.relation.top-row.search.top)<1,
+    if (!compact && hasAnalysis) assert.ok(row.relation.right < row.search.left && Math.abs(row.relation.top-row.search.top)<1,
       'The online analysis trigger sits to the left of search in the same row');
     assert.equal(row.newLabel,'新条目');
-    assert.equal(row.form.width === 0, expectEmpty, 'The empty notebook hides the editing fields');
-    assert.equal(row.main.width === 0, expectEmpty && width <= 1100, 'The desktop editor surface remains visible when empty');
+    assert.equal(row.form.width === 0, compact || expectEmpty, 'Editing fields stay out of the mobile list and empty editor');
+    assert.equal(row.main.width === 0, compact || (expectEmpty && width <= 1100), 'The desktop editor surface remains visible when empty');
     if (expectEmpty) assert.equal(row.emptyText, '暂无条目');
     assert.equal(row.search.radius,'999px');
     assert.deepEqual([row.searchIcon.width,row.searchIcon.height],[20,20]);
     assert.ok(row.searchIcon.left > row.search.left && row.searchIcon.right < row.search.right
       && Math.abs(row.searchIcon.top + row.searchIcon.height / 2 - row.search.top - row.search.height / 2) < 1,
     'The magnifier sits inside the search pill at every width');
+    if (compact) {
+      assert.ok(row.search.bottom <= row.list.top && row.list.height > 0 && row.list.bottom <= row.create.top,
+        width + ': search is above the entries and New is below the list');
+      assert.ok(row.create.left < row.content.left + row.content.width / 2, 'New is on the leading side of the footer');
+      if (online) {
+        const center = box => box.top + box.height / 2;
+        assert.ok(Math.abs(center(row.create)-center(row.relation))<1 && row.create.right <= row.relation.left,
+          'New and Analyze relationships are on the same footer row');
+        assert.ok(await panel.locator('.dcn-relation-trigger').isDisabled(), 'The footer action requires at least two checked entries');
+      }
+      continue;
+    }
     if (width > 1100) {
       assert.equal(row.newText,'');
       assert.equal(row.selectedVisible,false);
@@ -136,15 +150,12 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
       assert.ok(row.create.bottom < row.relation.top && Math.abs(row.create.left-row.relation.left)<1
         && Math.abs(row.create.right-row.search.right)<1,
       'Create takes the first row above analysis and search in the populated online notebook');
-    } else if (row.empty || width <= 680) {
+    } else if (row.empty) {
       for (const key of ['top','height']) assert.ok(Math.abs(row.create[key]-row.search[key]) < 1,
         width+': the notebook control row shares its '+key);
       assert.ok(row.create.left >= 0 && row.create.right < row.search.left && row.search.right <= width,
         'Both notebook controls fit side by side');
-      if (row.empty) assert.ok(row.create.width < row.search.width,
-        width+': empty notebook keeps a compact create action and a wider search');
-      else assert.ok(Math.abs(row.create.width-row.search.width) < 1,
-        width+': populated mobile notebook preserves its original two columns');
+      assert.ok(row.create.width < row.search.width, width+': empty notebook keeps a compact create action and a wider search');
     } else {
       assert.ok(row.search.top >= row.create.top+row.create.height+9,
         width+': the tablet notebook stacks create and search');
@@ -154,6 +165,13 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
   }
   await page.setViewportSize(viewport);
   return desktopColumns;
+}
+async function closePhoneEditor(panel) {
+  if (panel.page().viewportSize().width > 760) return;
+  const sheet = panel.locator('.dcn-mobile-sheet');
+  await sheet.locator('.dcn-sheet-body .dcn-original').waitFor();
+  await sheet.locator('.dcn-sheet-close').click();
+  await sheet.waitFor({state:'hidden'});
 }
 async function checkFirstNotebookEntry(panel) {
   const untitled = panel.locator('.dcn-note-open');
@@ -195,6 +213,7 @@ async function onlineStyles(page,theme) {
   await checkFirstNotebookEntry(notebook);
   await notebook.locator('.dcn-title').fill('样式参考');
   await notebook.locator('.dcn-original').fill('参考笔记');
+  await closePhoneEditor(notebook);
   await checkNoteControlRow(notebook, false, emptyColumns);
   result.create=await style(notebook.locator('.dcn-new'));
   await notebook.locator('.dcn-search').fill('没有这条记录');
@@ -303,8 +322,9 @@ async function exercise(page,reference,width) {
   const emptyColumns = await checkNoteControlRow(notebook, true);
   await page.locator('#addNote').click();
   await checkFirstNotebookEntry(notebook);
-  await checkNoteControlRow(notebook, false, emptyColumns);
   await page.locator('.dcn-title').fill('集合笔记');await page.locator('.dcn-original').fill('保留我的原始推导：幂集含有所有子集');
+  await closePhoneEditor(notebook);
+  await checkNoteControlRow(notebook, false, emptyColumns);
   await page.waitForFunction(async()=>(await __offlineTestStore.all('notes')).some(row=>row.content.includes('原始推导')));
   const firstNote=(await records(page,'notes'))[0];
   await page.mouse.move(0,0);await settle(page);assert.deepEqual(await style(page.locator('#addNote')),reference.create,'The offline create action shares the online style');
@@ -317,6 +337,7 @@ async function exercise(page,reference,width) {
     return current && current.dataset.noteId!==previous;
   },firstNote.id);
   await page.locator('.dcn-title').fill('图论笔记');await page.locator('.dcn-original').fill('路径、回路和连通性');
+  await closePhoneEditor(notebook);
   await page.waitForFunction(async()=>{
     const notes=await __offlineTestStore.all('notes');
     return notes.length===2&&notes.some(row=>row.content==='路径、回路和连通性');
@@ -338,6 +359,7 @@ async function exercise(page,reference,width) {
   assert.equal((await records(page,'notes')).length,2,'Notes survive a fully offline refresh');
   await page.locator('.dcn-note[data-note-id="'+firstNote.id+'"] .dcn-note-open').click();
   assert.equal(await page.locator('.dcn-original').inputValue(),'保留我的原始推导：幂集含有所有子集');
+  await closePhoneEditor(notebook);
   await page.locator('.dcn-note[data-note-id="'+firstNote.id+'"] .dcn-note-delete').click();await confirmDeletion(page,'删除这个概念？',offlineDeletionText);
   await page.waitForFunction(async()=>(await __offlineTestStore.all('notes')).length===1);
   await navigate(page,'mistakes');await page.locator('#mistakeList .wrong-card').waitFor({state:'visible'});

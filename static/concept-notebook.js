@@ -57,9 +57,17 @@ function mount(options){
  const status=el('p','dcn-status'),result=el('div','dcn-results');status.setAttribute('role','status');result.setAttribute('aria-label','关联分析结果');
  controls.append(submitButton,cancelButton);analysisPanel.append(questionLabel,controls,status,result);
  main.append(editor);content.append(sidebar,main);dialog.replaceChildren(heading,content,analysisPanel);
+ const sheet=root.DMateNotebookSheet?.mount?.(dialog),sheetMedia=win.matchMedia?.('(max-width:760px)');
+ const isMobile=()=>Boolean(sheet?.isMobile());
+ const noteTrigger=identifier=>[...list.querySelectorAll('.dcn-note')].find(row=>row.dataset.noteId===identifier)?.querySelector('.dcn-note-open')||newButton;
+ function openEditorSheet(isNew=false){
+  if(!isMobile()||!current()||!dialog.open)return;
+  sheet.open(editor,{label:isNew?uiText('新条目','New entry'):uiText('编辑条目','Edit entry'),
+   returnFocus:isNew?newButton:()=>noteTrigger(currentId),initialFocus:isNew?title:undefined});
+ }
  const analysisPanelSize=typeof win.ResizeObserver==='function'?new win.ResizeObserver(positionAnalysisPanel):null;
  function positionAnalysisPanel(){
-  if(analysisPanel.hidden)return;
+  if(analysisPanel.hidden||isMobile()||sheet?.contains(analysisPanel))return;
   const viewport=win.visualViewport,frame=dialog.getBoundingClientRect(),anchor=relationButton.getBoundingClientRect();
   const left=Math.max(frame.left,viewport?.offsetLeft||0)+8,top=Math.max(frame.top,viewport?.offsetTop||0)+8;
   const right=Math.min(frame.right,(viewport?.offsetLeft||0)+(viewport?.width||win.innerWidth))-8;
@@ -71,19 +79,29 @@ function mount(options){
   analysisPanel.style.left=Math.max(left,Math.min(anchor.left,right-width))+'px';
   analysisPanel.style.top=Math.max(top,Math.min(up?anchor.top-8-height:anchor.bottom+8,bottom-height))+'px';
  }
- function hideAnalysisPanel(restoreFocus=false){
-  if(analysisPanel.hidden)return;
-  analysisPanel.hidden=true;relationButton.setAttribute('aria-expanded','false');
+ function finishAnalysisPanel(){
+  analysisPanel.hidden=true;analysisPanel.setAttribute('role','dialog');relationButton.setAttribute('aria-expanded','false');
   analysisPanelSize?.disconnect();
   win.removeEventListener('resize',positionAnalysisPanel);
   win.visualViewport?.removeEventListener('resize',positionAnalysisPanel);
   win.visualViewport?.removeEventListener('scroll',positionAnalysisPanel);
-  if(restoreFocus)relationButton.focus({preventScroll:true});
+ }
+ function hideAnalysisPanel(restoreFocus=false){
+  const wasOpen=!analysisPanel.hidden,inSheet=sheet?.contains(analysisPanel);
+  finishAnalysisPanel();
+  if(inSheet){sheet.close({restoreFocus});return;}
+  if(wasOpen&&restoreFocus)relationButton.focus({preventScroll:true});
  }
  function toggleAnalysisPanel(){
   if(relationButton.disabled)return;
   if(!analysisPanel.hidden){hideAnalysisPanel(true);return;}
   analysisPanel.hidden=false;relationButton.setAttribute('aria-expanded','true');
+  if(isMobile()){
+   for(const property of ['left','top','max-width','max-height'])analysisPanel.style.removeProperty(property);
+   analysisPanel.setAttribute('role','group');
+   sheet.open(analysisPanel,{label:uiText('分析关联','Analyze relationships'),returnFocus:relationButton,onClose:finishAnalysisPanel});
+   return;
+  }
   positionAnalysisPanel();
   analysisPanelSize?.observe(analysisPanel);
   win.addEventListener('resize',positionAnalysisPanel);
@@ -107,7 +125,7 @@ function mount(options){
   deletePrompt?.finish(false);deletePending=null;serial++;active?.controller.abort();active=null;result.replaceChildren();status.textContent='';renderActions();
  }
  function renderActions(){
-  const empty=state.notes.length===0;dialog.classList.toggle('is-empty',empty);selection.hidden=empty;relationButton.hidden=empty;
+  const empty=state.notes.length===0;dialog.classList.toggle('is-empty',empty);selection.hidden=empty;relationButton.hidden=empty&&!isMobile();
   const size=selected.size;count.textContent=uiText('已选 '+size+' 条',size+' selected');
   relationButton.disabled=size<2;submitButton.disabled=Boolean(active)||size<2;cancelButton.hidden=!active;
   submitButton.setAttribute('aria-busy',String(Boolean(active)));
@@ -125,7 +143,7 @@ function mount(options){
    const name=noteName(note);
    const hit=el('label','dcn-note-select'),check=el('input');check.type='checkbox';check.checked=selected.has(note.id);check.setAttribute('aria-label',uiText('选择概念：'+name,'Select concept: '+name));hit.append(check);
    check.addEventListener('change',()=>{if(check.checked)selected.add(note.id);else selected.delete(note.id);invalidate();renderActions();});
-   const openNote=action(name,()=>{currentId=note.id;renderList();renderEditor();renderActions();},'dcn-note-open');
+   const openNote=action(name,()=>{currentId=note.id;renderList();renderEditor();renderActions();openEditorSheet();},'dcn-note-open');
    const remove=action('',event=>{event.stopPropagation();void removeNote(note.id);},'dcn-note-delete');
    remove.disabled=!!deletePending;remove.title=uiText('删除概念','Delete concept');
    const duplicate=names.get(name)>1?'（'+note.id+'）':'';
@@ -144,7 +162,8 @@ function mount(options){
   if(state.notes.length>=LIMITS.notes)return;
   const id=win.crypto?.randomUUID?.()||'concept-'+Date.now()+'-'+Math.random().toString(36).slice(2);
   const note={id,title:'',content:'',updatedAt:Date.now()};state.notes.unshift(note);currentId=id;search.value='';
-  invalidate();persist();renderList();renderEditor();renderActions();title.focus({preventScroll:true});
+  invalidate();persist();renderList();renderEditor();renderActions();
+  if(isMobile())openEditorSheet(true);else title.focus({preventScroll:true});
  }
  function edit(field,value){
   const note=current();if(!note)return;
@@ -222,12 +241,14 @@ function mount(options){
   }catch(error){if(valid())status.textContent=error?.name==='AbortError'?'概念分析超时，请重试。':error?.message||'概念分析失败，请重试。';}
   finally{clearTimeout(timeout);if(active===op){active=null;if(!destroyed)renderActions();}}
  }
- function open(){if(destroyed)return;hideAnalysisPanel();invalidate();load();saveError=false;saved.textContent='';search.value='';renderList();renderEditor();renderActions();options.onOpen?.();if(!dialog.open)dialog.showModal();}
- function close(){if(saveError&&!persist())return;hideAnalysisPanel();invalidate();if(dialog.open)dialog.close();}
- function refresh(){if(destroyed)return;hideAnalysisPanel();invalidate();load();renderList();renderEditor();renderActions();}
- const onClose=()=>{hideAnalysisPanel();invalidate();};
- const onCancel=event=>{if(!analysisPanel.hidden){event.preventDefault();hideAnalysisPanel(true);return;}if(saveError&&!persist()){event.preventDefault();return;}invalidate();};
- const onPointerDown=event=>{if(!analysisPanel.contains(event.target)&&!relationButton.contains(event.target))hideAnalysisPanel();};
+ function open(){if(destroyed)return;sheet?.close();hideAnalysisPanel();invalidate();load();saveError=false;saved.textContent='';search.value='';renderList();renderEditor();renderActions();options.onOpen?.();if(!dialog.open)dialog.showModal();}
+ function close(){if(saveError&&!persist())return;sheet?.close();hideAnalysisPanel();invalidate();if(dialog.open)dialog.close();}
+ function refresh(){if(destroyed)return;sheet?.close();hideAnalysisPanel();invalidate();load();renderList();renderEditor();renderActions();}
+ const onClose=event=>{if(event.target!==dialog)return;sheet?.close();hideAnalysisPanel();invalidate();};
+ const onCancel=event=>{if(event.target!==dialog)return;if(sheet?.contains(editor)||sheet?.contains(analysisPanel)){event.preventDefault();sheet.close({restoreFocus:true});return;}if(!analysisPanel.hidden){event.preventDefault();hideAnalysisPanel(true);return;}if(saveError&&!persist()){event.preventDefault();return;}invalidate();};
+ const onPointerDown=event=>{if(isMobile()||sheet?.contains(editor)||sheet?.contains(analysisPanel))return;if(!analysisPanel.contains(event.target)&&!relationButton.contains(event.target))hideAnalysisPanel();};
+ const onBreakpointChange=()=>{if(destroyed)return;sheet?.close();hideAnalysisPanel();renderActions();};
+ sheetMedia?.addEventListener('change',onBreakpointChange);
  title.addEventListener('input',()=>edit('title',title.value));original.addEventListener('input',()=>edit('content',original.value));
  question.addEventListener('input',()=>invalidate());search.addEventListener('input',renderList);button.addEventListener('click',open);dialog.addEventListener('close',onClose);dialog.addEventListener('cancel',onCancel);dialog.addEventListener('pointerdown',onPointerDown);
  const viewChange=()=>queueMicrotask(()=>win.dispatchEvent(new Event('dmate:notebook-viewchange')));
@@ -238,7 +259,7 @@ function mount(options){
   selected=new Set((Array.isArray(value.selected)?value.selected:[]).filter(id=>state.notes.some(note=>note.id===id)));
   search.value=typeof value.search==='string'?value.search:'';question.value=typeof value.question==='string'?value.question:'';
   renderList();renderEditor();renderActions();
- },destroy(){if(destroyed)return;hideAnalysisPanel();invalidate();destroyed=true;button.removeEventListener('click',open);dialog.removeEventListener('close',onClose);dialog.removeEventListener('cancel',onCancel);dialog.removeEventListener('pointerdown',onPointerDown);for(const type of ['input','change','click'])dialog.removeEventListener(type,viewChange);if(dialog.open)dialog.close();dialog.replaceChildren();}};
+ },destroy(){if(destroyed)return;sheet?.close();hideAnalysisPanel();invalidate();destroyed=true;sheetMedia?.removeEventListener('change',onBreakpointChange);sheet?.destroy();button.removeEventListener('click',open);dialog.removeEventListener('close',onClose);dialog.removeEventListener('cancel',onCancel);dialog.removeEventListener('pointerdown',onPointerDown);for(const type of ['input','change','click'])dialog.removeEventListener(type,viewChange);if(dialog.open)dialog.close();dialog.replaceChildren();}};
 }
 root.DMateConceptNotebook={mount};
 })(typeof window!=='undefined'?window:globalThis);
