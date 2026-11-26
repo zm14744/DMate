@@ -35,8 +35,11 @@
     :is(#graphEditorDialog:has(.dmate-drawing-workspace),#drawingPanel) > .graph-editor-dialog-head {
         flex:0 0 auto;
         padding:14px 16px;
-        border-bottom:1px solid var(--surface-3)!important;
         font:400 var(--font-base,16px)/normal var(--dmate-font-ui,system-ui);
+    }
+    :is(#wrongBookModal,#knowledgeGraphModal,#learningReviewModal) > .modal-card > .modal-head,
+    :is(#graphEditorDialog:has(.dmate-drawing-workspace),#drawingPanel) > .graph-editor-dialog-head {
+        border-bottom:1px solid var(--surface-3)!important;
     }
 
     /* The export buttons keep their hit area while matching the notebook's title row. */
@@ -56,10 +59,13 @@
     gap:12px;
     min-width:0;
     padding:14px 16px;
+}
+.graph-editor-dialog > .graph-editor-dialog-head,
+.ocr-group-dialog > header {
     border-bottom:1px solid var(--surface-3);
 }
 .graph-editor-dialog > .graph-editor-dialog-head { margin:-18px -18px 3px; }
-.dcn-dialog > .dcn-heading { margin:-20px -20px -5px; }
+.dcn-dialog > .dcn-heading { margin:-20px -20px -5px; border-bottom:0; }
 .ocr-group-dialog > header { margin:-22px -22px 18px; }
 
 .graph-editor-dialog > .graph-editor-dialog-head > h2,

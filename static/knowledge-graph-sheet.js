@@ -21,6 +21,7 @@
             return !destroyed && host.isConnected && mobile.matches
                 && host.classList.contains('graph-fullscreen-view') && !hidden(host)
                 && wrap?.isConnected && !hidden(wrap) && !hidden(title) && detail?.isConnected
+                && Boolean(host.querySelector('#knowledgeGraphCanvas .kg-mobile-node.selected, #knowledgeGraphCanvas .kg-node-group.selected'))
                 && Boolean(title.textContent.trim())
                 && window.getComputedStyle(host).display !== 'none'
                 && window.getComputedStyle(host).visibility !== 'hidden';
@@ -121,7 +122,8 @@
         function sync() {
             if (destroyed) return;
             parts();
-            if (!eligible() || !['peek', 'expanded'].includes(state())) close();
+            if (!eligible()) close();
+            else if (!['peek', 'expanded'].includes(state())) setState('peek');
             else paint();
         }
         function open({keepExpanded = false} = {}) {

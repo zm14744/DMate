@@ -576,14 +576,14 @@
     notebookSheet?.close();
   }
 
-  function showNotebookEditor({initialField, returnToNew = false, peek = false} = {}) {
+  function showNotebookEditor({initialField, returnToNew = false, peek = false, preserveFocus = false} = {}) {
     const view = noteView;
     if (state.panel !== "notes" || !view?.id) return false;
     const sheet = getNotebookSheet(), focus = initialField === "name" ? view.name : initialField === "body" ? view.body : null;
     if (!sheet?.isMobile()) { focus?.focus({preventScroll:true}); return false; }
     view.returnToNew = returnToNew;
     const opened = sheet.open(view.editor, {
-      label:tr("条目详情", "Entry details"), initialFocus:focus, peek,
+      label:tr("条目详情", "Entry details"), initialFocus:preserveFocus ? document.activeElement : focus, peek,
       returnFocus:() => {
         const row = returnToNew ? null : [...$("noteList").querySelectorAll(".dcn-note")].find(node => node.dataset.noteId === view.id);
         return row?.querySelector(".dcn-note-open") || $("addNote");
@@ -723,7 +723,7 @@
         target.setSelectionRange(selection.start,selection.end,selection.direction);
         target.scrollTop = selection.scroll;
       }
-    }
+    } else if (noteView.id) showNotebookEditor({peek:true,preserveFocus:true});
   }
 
   async function createNote() {

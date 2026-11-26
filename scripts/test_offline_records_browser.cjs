@@ -84,6 +84,7 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
         empty:panel.classList.contains('is-empty')};
     });
     assert.equal(row.empty, expectEmpty);
+    if (online) assert.equal(await panel.locator(':scope > .dcn-heading').evaluate(node => getComputedStyle(node).borderBottomWidth),'0px');
     const compact = width <= 760;
     const hasAnalysis = online && (compact || !expectEmpty);
     assert.equal(Boolean(row.relation?.width), hasAnalysis);
@@ -120,6 +121,10 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
     if (width > 1100) {
       assert.equal(row.selectedVisible,false);
       assert.equal(row.search.border,'1px');
+      for (const control of [row.create,row.search]) {
+        assert.ok(Math.abs((control.top-row.tools.top)-(row.tools.bottom-control.bottom))<=1,
+          'The desktop notebook toolbar has the same space above and below its controls');
+      }
       const [list,toolbar,editor,search] = row.colors;
       assert.deepEqual(editor,search,'The writing area and search share their background');
       assert.notDeepEqual(list,editor,'The notebook list remains a distinct surface');
@@ -327,6 +332,7 @@ async function exercise(page,reference,width) {
 
   await navigate(page,'notes');
   const notebook = page.locator('#notesPanel');
+  if(width<=760) assert.equal(await notebook.locator('.dcn-mobile-sheet[open]').count(),0,'The empty notebook has no grabber');
   const emptyColumns = await checkNoteControlRow(notebook, true);
   await page.locator('#addNote').click();
   await checkFirstNotebookEntry(notebook);
@@ -365,6 +371,15 @@ async function exercise(page,reference,width) {
   if(width===390&&process.env.OFFLINE_RECORDS_SCREENSHOTS==='1')await page.screenshot({path:'/tmp/dmate-offline-records-390-notes.png'});
   await page.reload({waitUntil:'networkidle'});await ready(page);await navigate(page,'notes');
   assert.equal((await records(page,'notes')).length,2,'Notes survive a fully offline refresh');
+  if(width<=760){
+    const sheet=notebook.locator('.dcn-mobile-sheet[open]');
+    await sheet.locator('.dcn-sheet-handle[aria-expanded="false"]').waitFor();
+    const selected=notebook.locator('.dcn-note.is-current .dcn-note-open'), name=await selected.innerText();
+    await selected.tap();
+    await sheet.locator('.dcn-sheet-handle[aria-expanded="true"]').waitFor();
+    assert.equal(await sheet.locator('.dcn-title').inputValue(),name,'Tapping the restored current entry opens its editor');
+    await closePhoneEditor(notebook);
+  }
   await page.locator('.dcn-note[data-note-id="'+firstNote.id+'"] .dcn-note-open').click();
   assert.equal(await page.locator('.dcn-original').inputValue(),'保留我的原始推导：幂集含有所有子集');
   await closePhoneEditor(notebook);

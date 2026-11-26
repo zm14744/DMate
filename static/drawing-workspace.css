@@ -110,6 +110,12 @@
  .ddw-editor .dge-view-controls>button{padding:5px 4px}
  .ddw-editor .dge-overlay-zoom{min-width:36px}
 }
+@media(min-width:901px){
+ .ddw-editor .dge-float-panel:is([data-panel-key="graphs"],[data-panel-key="results"])>.dge-float-content,
+ .dmate-drawing-workspace .ddw-side-panel:has(>.ddw-ai-actions){width:min(320px,calc(100vw - 16px));padding:10px}
+ .ddw-editor .dge-float-panel[data-panel-key="graphs"] .dge-toolbar{gap:8px}
+ .dmate-drawing-workspace .ddw-side-panel:has(>.ddw-ai-actions) .ddw-ai-requirement{height:64px;min-height:64px}
+}
 @media(max-width:900px){
  .ddw-side-panel,.ddw-editor .dge-float-content,.dcn-analysis-panel{width:min(300px,calc(100vw - 24px));padding:10px}
  .ddw-editor .dge-float-panel .dge-toolbar{gap:8px}

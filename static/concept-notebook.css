@@ -126,7 +126,8 @@
         display:flex;
         justify-content:space-between;
         gap:20px;
-        padding:var(--dcn-content-top-inset) 25px 12px 10px;
+        padding:calc((var(--dcn-content-top-inset) + 12px)/2) 25px;
+        padding-left:10px;
         background:color-mix(in srgb,var(--dcn-list-surface),var(--surface-1));
     }
     .dcn-dialog .dcn-main {

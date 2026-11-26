@@ -21146,6 +21146,7 @@ async function openKnowledgeGraph() {
         modal.dataset.graphReady = "true";
         modal.style.visibility = "";
         modal.style.pointerEvents = "";
+        syncKnowledgeGraphNodeSheet();
         return true;
     } catch (error) {
         if (revision !== knowledgeGraphOpenRevision) return false;
@@ -21794,6 +21795,14 @@ function openKnowledgeGraphNodeSheet(keepExpanded = false) {
     knowledgeGraphNodeSheet?.open({keepExpanded});
 }
 
+function syncKnowledgeGraphNodeSheet() {
+    const modal = document.getElementById("knowledgeGraphModal");
+    if (modal?.classList.contains("graph-fullscreen-view") && window.matchMedia("(max-width:760px)").matches) {
+        knowledgeGraphNodeSheet ||= window.DMateKnowledgeGraphSheet?.mount(modal);
+    }
+    knowledgeGraphNodeSheet?.sync();
+}
+
 function navigateKnowledgeGraphRelation(nodeId) {
     const target = findKnowledgeGraphNodeById(nodeId);
     const modal = document.getElementById("knowledgeGraphModal");
@@ -21862,13 +21871,16 @@ function selectKnowledgeGraphNode(nodeId, sourceElement = null, {keepSheetExpand
 
     const selected = sourceElement?.closest?.(
         ".kg-mobile-node, .kg-node-group"
-    );
+    ) || [...(canvas?.querySelectorAll(".kg-mobile-node,.kg-node-group") || [])]
+        .find(element => element.dataset.knowledgeNodeId === String(nodeId));
     selected?.classList.add("selected");
 
     // 只刷新右侧/下方详情，不重建全部节点和连线。
     // 手机上点击节点时不会再出现整张图谱闪一下、卡一下。
     renderKnowledgeGraphSide({refreshHistory:false});
-    if (selected?.matches(".kg-mobile-node")) openKnowledgeGraphNodeSheet(keepSheetExpanded);
+    // Programmatic selection retains an already expanded sheet. A real node
+    // press still starts at peek unless its navigation explicitly preserves it.
+    if (sourceElement || keepSheetExpanded) openKnowledgeGraphNodeSheet(keepSheetExpanded);
 }
 
 
@@ -22163,7 +22175,7 @@ function renderKnowledgeGraphSide({refreshHistory = true} = {}) {
         document.getElementById("knowledgeGraphHistory")?.replaceChildren();
         renderKnowledgeGraphDetail({desktopHistory});
     }
-    knowledgeGraphNodeSheet?.sync();
+    syncKnowledgeGraphNodeSheet();
 }
 
 function renderKnowledgeGraphDetail({desktopHistory = false} = {}) {
@@ -22511,7 +22523,7 @@ function renderKnowledgeGraph({viewportOnly = false} = {}) {
 
     if (viewportOnly) {
         placeKnowledgeGraphSideTabs();
-        knowledgeGraphNodeSheet?.sync();
+        syncKnowledgeGraphNodeSheet();
     } else {
         renderKnowledgeGraphSide();
     }

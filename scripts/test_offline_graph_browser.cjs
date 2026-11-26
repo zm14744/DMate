@@ -173,15 +173,25 @@ async function checkMobileDetailSheet(page) {
     await page.setViewportSize({width:viewport.width, height:520});
     await readyGraph(page);
     assert.equal(await modal.locator('.kg-mobile-expand,.kg-mobile-zoom-controls,.kg-mobile-zoom-label').count(), 0);
-    assert.equal(await modal.getAttribute('data-kg-sheet'), null, 'The initial graph leaves the sheet closed');
+    assert.equal(await stage.locator('.kg-mobile-node.selected').count(), 1);
+    assert.equal(await modal.getAttribute('data-kg-sheet'), 'peek', 'The initially selected node already provides a grabber');
     await stage.getByRole('button', {name:'图的基本概念', exact:true}).tap();
     await settle(page);
     assert.equal(await modal.getAttribute('data-kg-sheet'), 'peek');
     assert.equal(await title.innerText(), '图的基本概念');
-    assert.ok(await title.isVisible());
-    assert.equal(await detail.isVisible(), false, 'The collapsed sheet keeps the selected title without its detail body');
+    assert.equal(await title.isVisible(), false);
+    assert.equal(await detail.isVisible(), false, 'The collapsed graph exposes just its grabber');
     const selectedCamera = await camera();
     const panel = modal.locator('.knowledge-graph-side'), collapsed = await panel.boundingBox();
+    const grip = await handle.locator('.kg-sheet-grip').boundingBox();
+    assert.deepEqual([collapsed.width, collapsed.height, grip.width, grip.height], [68, 24, 36, 4]);
+    const inset = await panel.evaluate(node => {
+      const box = node.getBoundingClientRect(), parent = node.offsetParent, bounds = parent.getBoundingClientRect();
+      return [box.left + box.width / 2 - bounds.left - bounds.width / 2,
+        bounds.top + parent.clientTop + parent.clientHeight - box.bottom];
+    });
+    near(inset[0], 0, 'The grabber is centered in its frame');
+    near(inset[1], 6, 'The grabber sits six pixels above the frame bottom');
     assert.notEqual(await panel.evaluate(node => getComputedStyle(node).backgroundColor), 'rgba(0, 0, 0, 0)',
       'The floating details use a panel surface above the graph');
     const paint=element=>element.evaluate(node=>[node,...node.querySelectorAll('.kg-sheet-grip')].map(part=>{
@@ -189,22 +199,19 @@ async function checkMobileDetailSheet(page) {
       return {paint:Object.fromEntries(['backgroundColor','backgroundImage','color','borderColor','boxShadow','filter','opacity','outlineWidth']
         .map(key=>[key,style[key]])),box:[box.x,box.y,box.width,box.height]};
     }));
-    for(const [name,element] of [['handle',handle],['title',title]]){
-      await page.mouse.move(0,0);await settle(page);
-      const idle=await paint(element);
-      await element.hover();await settle(page);
-      assert.deepEqual(await paint(element),idle,name+': hovering has no visual feedback');
-      assert.equal(await modal.getAttribute('data-kg-sheet'),'peek',name+': hover does not open the sheet');
-      await element.tap();await settle(page);
-      assert.equal(await modal.getAttribute('data-kg-sheet'),'peek',name+': tapping does not open the sheet');
-      near((await panel.boundingBox()).height,collapsed.height,name+': taps and hover preserve the collapsed height');
-      assert.deepEqual(await camera(),selectedCamera,name+': taps and hover preserve the graph camera');
-    }
+    await page.mouse.move(0,0);await settle(page);
+    const idle=await paint(handle);
+    await handle.hover();await settle(page);
+    assert.deepEqual(await paint(handle),idle,'Hover preserves the grabber appearance');
+    await handle.tap();await settle(page);
+    assert.equal(await modal.getAttribute('data-kg-sheet'),'peek','Tapping the grabber does not expand the sheet');
+    assert.deepEqual(await camera(),selectedCamera,'Taps and hover preserve the graph camera');
     await swipe(handle, -130, async () => {
       assert.ok((await panel.boundingBox()).height > collapsed.height + 24, 'The sheet follows the finger before release');
       assert.ok(await detail.isVisible(), 'The body appears while the user pulls the sheet up');
     });
     assert.equal(await modal.getAttribute('data-kg-sheet'), 'expanded');
+    assert.equal(await title.isVisible(), true);
     assert.deepEqual(await camera(), selectedCamera, 'Expanding the sheet preserves the graph viewport and camera');
     assert.ok(await detail.locator('button.graph-detail-term').count() >= 12, 'The sheet includes the real course relationships');
     await swipe(detail, -95);
@@ -213,7 +220,7 @@ async function checkMobileDetailSheet(page) {
     await swipe(title, 125);
     assert.equal(await modal.getAttribute('data-kg-sheet'), 'peek');
     await swipe(handle, 100, async () => {
-      near((await panel.boundingBox()).height, collapsed.height, 'Pulling down stops at the title bar');
+      near((await panel.boundingBox()).height, collapsed.height, 'Pulling down stops at the grabber');
     });
     assert.equal(await modal.getAttribute('data-kg-sheet'), 'peek');
     assert.deepEqual(await camera(), selectedCamera, 'Sheet gestures retain the graph camera');

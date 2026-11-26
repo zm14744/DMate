@@ -74,6 +74,16 @@ async function runCase(browser, width, theme) {
     assert.equal(await panel.isVisible(), false);
     assert.equal(await count(), 0);
 
+    if (compact) {
+      const current = dialog.locator('.dcn-note.is-current .dcn-note-open');
+      const name = await current.innerText();
+      await sheet.getByRole('button', {name:'展开面板',exact:true}).waitFor();
+      await current.tap();
+      await sheet.getByRole('button', {name:'收起面板',exact:true}).waitFor();
+      assert.equal(await sheet.locator('.dcn-title').inputValue(), name, 'The current entry opens from the initial grabber');
+      await page.keyboard.press('Escape');
+      await sheet.waitFor({state:'hidden'});
+    }
     await checkbox('beta').check();
     await dialog.locator('.dcn-note[data-note-id="alpha"] .dcn-note-open').click();
     assert.equal(await dialog.locator('.dcn-title').inputValue(), '当前打开的群概念');

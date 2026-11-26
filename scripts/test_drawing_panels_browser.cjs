@@ -383,6 +383,22 @@ async function viewportAndPopoverChecks(page, mobile, label, online = true) {
       if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/viewport-' + label + '-' + name + '-failure.png' });
       throw new Error(label + ' ' + name + ': ' + error.message, { cause: error });
     }
+    if (name !== 'tools' && metrics[name].screenWidth === 390) {
+      assert.deepEqual([metrics[name].width, metrics[name].padding], [300, 10],
+        label + ': ' + name + ' keeps its phone dimensions');
+    }
+    if (metrics[name].screenWidth > 900 && name !== 'tools') {
+      const {width, padding} = metrics[name];
+      assert.deepEqual([width, padding], name === 'history' ? [380, 12] : [320, 10],
+        label + ': ' + name + ' desktop panel width and padding');
+      if (name === 'settings') {
+        assert.equal(await page.locator(panel + ' .dge-toolbar').evaluate(node => getComputedStyle(node).rowGap), '8px');
+      } else if (name === 'ai-guidance' || name === 'ai-generation') {
+        const field = page.locator(panel + ' .ddw-ai-requirement');
+        assert.deepEqual(await field.evaluate(node => [getComputedStyle(node).minHeight, getComputedStyle(node).maxHeight]),
+          ['64px', '200px'], 'The compact AI input retains room to grow');
+      }
+    }
     if(name==='settings'&&mobile){
       const position=await page.locator(panel).evaluate(node=>{
         const rect=node.getBoundingClientRect(),trigger=document.querySelector('.ddw-side-actions>button:first-child').getBoundingClientRect();

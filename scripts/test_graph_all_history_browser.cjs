@@ -278,6 +278,7 @@ async function checkCase(browser,width,language) {
     if (mobile) await checkInlineList();
     await assertModeControls(page,'history',label+'/return to historical list');
     await page.locator('#knowledgeGraphDetailTab').click();
+    await expandGraphDetails(page);
     assert.equal(await page.locator('#knowledgeGraphDetailTitle').isVisible(),true,label+': revisiting details shows the selected node title');
     await recentHasNoHistory(page,label);
     assert.equal(await page.evaluate(()=>getCurrent().id),'history-lower',label+': recent mode still uses the actual current conversation');

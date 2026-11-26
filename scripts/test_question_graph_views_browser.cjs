@@ -192,7 +192,9 @@ async function checkView(browser, width, language) {
       await page.locator('#knowledgeGraphCanvas .kg-mobile-node.selected').click();
       await settle(page);
       assert.equal(await page.locator('#knowledgeGraphModal').getAttribute('data-kg-sheet'), 'peek');
-      assert.equal(await page.locator('#knowledgeGraphDetail').isVisible(),false,label+': the collapsed sheet can locate the source with its body hidden');
+      assert.equal(await page.locator('#knowledgeGraphDetail').isVisible(),false);
+      assert.equal(await page.locator(locate).isVisible(),false,label+': the compact grabber leaves the source action in the expanded details');
+      await expandGraphDetails(page);
     }
     assert.equal(await page.locator(locate).isVisible(),true,label+': recent details provide Go to original question');
     await assertLocatePlacement(page,label+'/recent');

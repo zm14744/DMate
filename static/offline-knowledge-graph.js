@@ -207,6 +207,7 @@ function mount(host,options={}) {
   });
   const viewKey=[mobileGraph?'mobile':'desktop',dmateUiLanguage(),visibleNodes.map(node=>node.id).join(',')].join('|');
   if(!viewportOnly){renderDetail();root.DMateI18n?.translate(host);}
+  if(mobileGraph)nodeSheet||=root.DMateKnowledgeGraphSheet?.mount(host);
   nodeSheet?.sync();
   const viewport=canvas.querySelector('.kg-mobile-viewport,.kg-desktop-viewport');
   const ready=()=>{if(!destroyed&&(!viewport||canvas.contains(viewport))){host.dataset.ready='true';host.dataset.graphReady='true';}};
