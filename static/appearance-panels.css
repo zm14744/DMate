@@ -51,7 +51,7 @@ body[data-appearance-theme="dark"] {
         .account-body,.wrong-toolbar,.wrong-tools,#wrongBookList,.learning-review-body,
         .graph-toolbar,.graph-summary,.knowledge-graph-main,.knowledge-graph-side,
         .knowledge-graph-canvas,.graph-side-tabs,.graph-side-page,.appearance-background-viewer-body,
-        .dgs-information,.dgs-modes,.dcn-content,.dcn-main,.dcn-sidebar,#info,.learning-summary,
+        .dgs-information,.dgs-modes,.dcn-content,.dcn-sidebar,#info,.learning-summary,
         .ocr-task-list,.ocr-task-card,.ocr-review-rendered,.ocr-review-preview,
         .appearance-background-preview:not([data-has-background="true"]),
         .wrong-feedback,.wrong-empty,.wrong-answer-body,.wrong-analysis-body,.wrong-solution-body,

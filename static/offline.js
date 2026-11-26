@@ -575,7 +575,8 @@
     host.replaceChildren();
     const sidebar = el("aside", "dcn-sidebar"), main = el("section", "dcn-main");
     sidebar.setAttribute("aria-label", tr("概念笔记列表", "Concept note list"));
-    const create = action(tr("新概念", "New concept"), "dcn-new", createNote, "square-pen");
+    const create = action(tr("新条目", "New entry"), "dcn-new", createNote, "square-pen");
+    create.title = create.getAttribute("aria-label");
     const createIcon = create.querySelector("svg");
     if (createIcon) for (const [name, value] of Object.entries({width:20,height:20,fill:"none",stroke:"currentColor","stroke-width":1.8,
       "stroke-linecap":"round","stroke-linejoin":"round","data-icon":"square-pen"})) createIcon.setAttribute(name, value);
@@ -599,7 +600,6 @@
     function renderActions() {
       const empty = state.noteRows.length === 0;
       $("notesPanel").classList.toggle("is-empty", empty);
-      main.hidden = empty;
       name.disabled = body.disabled = state.noteDeletePending === state.selectedNoteId;
       for (const deletion of host.querySelectorAll(".dcn-note-delete")) deletion.disabled = Boolean(state.noteDeletePending);
     }
@@ -655,7 +655,8 @@
     };
     name.addEventListener("input", edit); body.addEventListener("input", edit);
     search.addEventListener("input", () => { state.noteQuery = search.value; renderList(); });
-    sidebar.append(create, searchWrap, list); host.append(sidebar, main);
+    const tools = el("div", "dcn-tools");
+    tools.append(create, searchWrap); sidebar.append(tools, list); host.append(sidebar, main);
     renderList(); renderEditor(); renderActions();
     window.DMateTextareaAutosize?.refresh?.(host);
   }

@@ -46,8 +46,8 @@ async function sharedTooltip(page, target, text) {
   await target.hover();
   const tooltip = page.locator('.dm-ui-tooltip[role="tooltip"]');
   await tooltip.waitFor({ state: 'visible' });
-  assert.equal(await tooltip.innerText(), text, 'The shared tooltip displays the complete protected conversation name');
-  assert.equal(await tooltip.locator('*').count(), 0, 'Conversation names stay literal text inside the tooltip');
+  assert.equal(await tooltip.innerText(), text, 'The shared tooltip displays the complete label');
+  assert.equal(await tooltip.locator('*').count(), 0, 'The tooltip displays its label as literal text');
   assert.equal(await target.getAttribute('title'), '', 'Native rectangular tooltip is suppressed while the shared tooltip is active');
   assert.ok((await target.getAttribute('aria-describedby') || '').split(/\s+/).includes(await tooltip.getAttribute('id')));
   const style = await tooltip.evaluate(node => Object.fromEntries(['backgroundColor', 'backgroundImage', 'borderWidth', 'borderColor',
@@ -289,16 +289,17 @@ async function notebookButton(page) {
   await page.locator(compact ? '#mobileToolsBtn' : '#desktopToolsBtn').click();
   await page.locator('#conceptNotebookBtn').click();
   await page.locator('#conceptNotebookDialog').waitFor({ state: 'visible' });
-  const button = page.locator('#conceptNotebookDialog .dcn-sidebar > .dcn-new');
-  assert.equal(await button.innerText(), compact ? '新概念' : '');
-  assert.equal(await button.getAttribute('aria-label'), '新概念');
+  const button = page.locator('#conceptNotebookDialog .dcn-new');
+  assert.equal(await button.innerText(), compact ? '新条目' : '');
+  assert.equal(await button.getAttribute('aria-label'), '新条目');
+  if (!compact) await sharedTooltip(page, button, '新条目');
   const paths = locator => locator.locator('svg[data-icon="square-pen"] > path').evaluateAll(nodes => nodes.map(node => node.getAttribute('d')));
   const matchedPaths = await paths(source);
   assert.equal(matchedPaths.length, 2);
   assert.deepEqual(await paths(button), matchedPaths, 'Both creation buttons use the same square-pen icon');
   assert.equal(await button.evaluate(node => getComputedStyle(node).justifyContent), compact ? 'flex-start' : 'center');
   await page.mouse.move(0, 0); await page.locator('#conceptNotebookTitle').focus(); await settle(page);
-  if (compact) assert.deepEqual(await notebookStyle(button), idle, 'Mobile New concept matches the new-conversation button');
+  if (compact) assert.deepEqual(await notebookStyle(button), idle, 'Mobile New entry matches the new-conversation button');
   else {
     const paint = await notebookStyle(button);
     assert.equal(paint.backgroundColor, 'rgba(0, 0, 0, 0)');
@@ -306,13 +307,14 @@ async function notebookButton(page) {
   }
   const before = await page.locator('#conceptNotebookDialog .dcn-note').count();
   await button.click();
-  assert.equal(await page.locator('#conceptNotebookDialog .dcn-note').count(), before + 1, 'New concept still creates an editable notebook entry');
+  assert.equal(await page.locator('#conceptNotebookDialog .dcn-note').count(), before + 1, 'New entry still creates an editable notebook entry');
   await page.locator('#conceptNotebookDialog .dcn-title').fill('局部概念');
   await notebookAiActions(page, button);
   const savedTitle = await page.locator('#conceptNotebookDialog .dcn-title').inputValue();
   await language(page, 'en');
-  assert.equal(await button.innerText(), compact ? 'New concept' : '');
-  assert.equal(await button.getAttribute('aria-label'), 'New concept');
+  assert.equal(await button.innerText(), compact ? 'New entry' : '');
+  assert.equal(await button.getAttribute('aria-label'), 'New entry');
+  if (!compact) await sharedTooltip(page, button, 'New entry');
   assert.equal(await page.locator('#conceptNotebookDialog .dcn-title').inputValue(), savedTitle, 'Language changes preserve concept content');
   await language(page, 'zh-CN');
   await page.locator('#conceptNotebookDialog .dcn-close').first().click();

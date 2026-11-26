@@ -23,6 +23,7 @@
     min-width:0;
     overflow:hidden;
 }
+.dcn-tools {display:contents}
 .dcn-selection,.dcn-list { grid-column:1 / -1; }
 .dcn-dialog input:not([type=checkbox]),.dcn-dialog textarea{display:block;width:100%;min-width:0;max-width:100%;margin:6px 0 0;padding:10px;border:1px solid var(--border-strong,#cbd5e1);border-radius:9px;background:var(--surface-2,#f8fafc);color:var(--text-primary,#1e293b);font:inherit;font-size:14px;line-height:1.6;box-shadow:none}
 .dcn-dialog :is(textarea.dcn-title,textarea.dcn-original,textarea.dcn-question){font:400 var(--font-base,16px) var(--dmate-font-ui,system-ui);line-height:1.5}
@@ -70,17 +71,49 @@
     .dcn-dialog.is-empty .dcn-content{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);flex:1 1 auto;gap:0}
     .dcn-dialog.is-empty .dcn-sidebar{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:10px;align-content:stretch}
     .dcn-dialog.is-empty .dcn-list{grid-column:1/-1;display:grid;place-items:center;overflow:auto}
+    .dcn-dialog.is-empty .dcn-main{display:none}
 }
 
 @media(min-width:1101px){
+    .dcn-dialog {
+        --dcn-list-surface:var(--dmate-modal-background,var(--surface-2));
+        --dcn-content-top-inset:11px;
+    }
+    .dcn-dialog.offline-notebook {
+        --dcn-list-surface:var(--surface-2);
+        --dcn-content-top-inset:20px;
+    }
+    /* Let the right pane reach the frame edges while keeping the list and
+       toolbar controls in their original positions. */
     .dcn-dialog .dcn-content {
-        grid-template-columns:minmax(180px,260px) auto minmax(0,1fr);
+        grid-template-columns:minmax(180px,260px) minmax(0,1fr);
         grid-template-rows:auto minmax(0,1fr);
-        row-gap:12px;
+        gap:0 20px;
+        margin-block:calc(-1 * var(--dcn-content-top-inset)) -20px;
+        margin-inline-end:-20px;
     }
     .dcn-dialog .dcn-sidebar {display:contents}
-    .dcn-dialog .dcn-list {grid-area:1 / 1 / -1 / 2}
-    .dcn-dialog .dcn-main {grid-area:2 / 2 / -1 / -1}
+    .dcn-dialog .dcn-list {
+        grid-area:1 / 1 / -1 / 2;
+        margin-block:var(--dcn-content-top-inset) 20px;
+    }
+    .dcn-dialog .dcn-tools,
+    .dcn-dialog .dcn-main {
+        margin-inline-start:-10px;
+    }
+    .dcn-dialog .dcn-tools {
+        grid-area:1 / 2;
+        display:flex;
+        justify-content:space-between;
+        gap:20px;
+        padding:var(--dcn-content-top-inset) 25px 12px 10px;
+        background:color-mix(in srgb,var(--dcn-list-surface),var(--surface-1));
+    }
+    .dcn-dialog .dcn-main {
+        grid-area:2 / 2;
+        padding:12px 25px 30px 12px;
+        background:var(--surface-1);
+    }
     .dcn-dialog.is-empty .dcn-list > .dcn-list-empty {
         color:var(--text-subtle);
         font-size:calc(22px * var(--font-scale,1));
@@ -94,7 +127,7 @@
         --dm-control-border:transparent;
         --dm-control-hover-border:transparent;
         --dm-control-text:var(--text-secondary);
-        grid-area:1 / 2;
+        flex:none;
         justify-content:center;
         width:44px;
         padding:0;
@@ -104,10 +137,7 @@
         color:var(--text-secondary);
     }
     .dcn-dialog .dcn-search-wrap {
-        grid-area:1 / 3;
-        justify-self:end;
         width:min(100%,240px);
-        margin-right:5px;
     }
 }
 

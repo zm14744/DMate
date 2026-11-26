@@ -236,7 +236,7 @@ async function onlineSearches(page, reference) {
   assert.ok((await clearButton(notebook).getAttribute('class')).includes('dcn-search-clear'), 'Reuse notebook clear control');
   await expectClear(notebook, false);
   for (const name of ['Alpha Graph', 'Beta Logic']) {
-    await page.locator('#conceptNotebookDialog .dcn-sidebar > .dcn-new').click();
+    await page.locator('#conceptNotebookDialog .dcn-new').click();
     await page.locator('#conceptNotebookDialog .dcn-title').fill(name);
   }
   assert.equal(await page.locator('.dcn-list .dcn-note').count(), 2);

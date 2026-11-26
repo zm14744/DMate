@@ -29,11 +29,14 @@ function mount(options){
  const closeButton=action('',close,'dcn-close');closeButton.title='关闭笔记本';closeButton.setAttribute('aria-label','关闭笔记本');heading.append(headingText,closeButton);
  const content=el('div','dcn-content'),sidebar=el('aside','dcn-sidebar'),main=el('section','dcn-main');
  sidebar.setAttribute('aria-label','概念笔记列表');
- const newButton=action('',create,'dcn-new'),search=el('input','dcn-search');newButton.append(squarePenIcon(d),el('span','dmate-ui-label','新概念'));newButton.setAttribute('aria-label',uiText('新概念','New concept'));search.type='search';search.setAttribute('aria-label','搜索');
+ const newButton=action('',create,'dcn-new'),search=el('input','dcn-search');
+ newButton.title=uiText('新条目','New entry');newButton.setAttribute('aria-label',newButton.title);
+ newButton.append(squarePenIcon(d),el('span','dmate-ui-label',newButton.title));search.type='search';search.setAttribute('aria-label','搜索');
  const searchWrap=el('div','dcn-search-wrap'),searchClear=action('',()=>{search.value='';renderList();search.focus({preventScroll:true});},'dcn-search-clear');
  searchClear.setAttribute('aria-label','清空搜索');searchClear.title='清空搜索';searchClear.hidden=true;searchWrap.append(search,searchClear);
  const list=el('div','dcn-list'),selection=el('div','dcn-selection'),count=el('span');
- selection.append(count);sidebar.append(newButton,searchWrap,selection,list);
+ const tools=el('div','dcn-tools');
+ tools.append(newButton,searchWrap);selection.append(count);sidebar.append(tools,selection,list);
  const editor=el('section','dcn-editor');
  const titleLabel=el('label','','条目名称'),title=el('textarea','dcn-title');title.maxLength=LIMITS.title;title.rows=1;title.setAttribute('aria-label','条目名称');titleLabel.append(title);
  const originalLabel=el('label','','条目内容'),original=el('textarea','dcn-original');original.maxLength=LIMITS.content;original.rows=1;original.setAttribute('aria-label','条目内容');originalLabel.append(original);
@@ -60,7 +63,7 @@ function mount(options){
   deletePrompt?.finish(false);deletePending=null;serial++;active?.controller.abort();active=null;result.replaceChildren();status.textContent='';renderActions();
  }
  function renderActions(){
-  const empty=state.notes.length===0;dialog.classList.toggle('is-empty',empty);selection.hidden=empty;ai.hidden=empty;main.hidden=empty;
+  const empty=state.notes.length===0;dialog.classList.toggle('is-empty',empty);selection.hidden=empty;ai.hidden=empty;
   const size=selected.size;count.textContent=uiText('已选 '+size+' 条',size+' selected');
   explainButton.disabled=!!active||size!==1;relationButton.disabled=!!active||size<2;cancelButton.hidden=!active;
   ai.setAttribute('aria-busy',String(Boolean(active)));

@@ -53,6 +53,14 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
         return {width:box.width,height:box.height,stroke:css.stroke,strokeWidth:css.strokeWidth};
       };
       const hint = panel.querySelector('.dcn-list-empty');
+      const paint = selector => {
+        let node = panel.querySelector(selector);
+        while (node && getComputedStyle(node).backgroundColor === 'rgba(0, 0, 0, 0)') node = node.parentElement;
+        const ctx = document.createElement('canvas').getContext('2d');
+        ctx.fillStyle = getComputedStyle(node).backgroundColor;
+        ctx.fillRect(0,0,1,1);
+        return Array.from(ctx.getImageData(0,0,1,1).data);
+      };
       let hintStyle;
       if (hint) {
         const css = getComputedStyle(hint), reference = document.createElement('span');
@@ -63,16 +71,20 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
           scale:parseFloat(css.getPropertyValue('--font-scale')), weight:css.fontWeight};
         reference.remove();
       }
-      return {create:shape('.dcn-new'),search:shape('.dcn-search'),main:shape('.dcn-main'),
+      return {create:shape('.dcn-new'),search:shape('.dcn-search'),tools:shape('.dcn-tools'),main:shape('.dcn-main'),
+        form:shape('.dcn-editor'),firstLabel:shape('.dcn-editor label'),
+        colors:innerWidth>1100 ? ['.dcn-list','.dcn-tools','.dcn-main','.dcn-search'].map(paint) : null,
         list:shape('.dcn-list'),content:shape('.dcn-content'),hint:hint && shape('.dcn-list-empty'),
         emptyText:hint?.innerText,hintStyle,
         searchIcon:shape('.dmate-search-icon'),pen:icon('.dcn-new svg'),magnifier:icon('.dmate-search-icon'),
-        newText:panel.querySelector('.dcn-new').innerText,
+        newText:panel.querySelector('.dcn-new').innerText,newLabel:panel.querySelector('.dcn-new').getAttribute('aria-label'),
         selectedVisible:!!panel.querySelector('.dcn-selection')?.getClientRects().length,
         empty:panel.classList.contains('is-empty')};
     });
     assert.equal(row.empty, expectEmpty);
-    assert.equal(row.main.width === 0, expectEmpty, 'The editor is hidden only while the notebook is empty');
+    assert.equal(row.newLabel,'新条目');
+    assert.equal(row.form.width === 0, expectEmpty, 'The empty notebook hides the editing fields');
+    assert.equal(row.main.width === 0, expectEmpty && width <= 1100, 'The desktop editor surface remains visible when empty');
     if (expectEmpty) assert.equal(row.emptyText, '暂无条目');
     assert.equal(row.search.radius,'999px');
     assert.deepEqual([row.searchIcon.width,row.searchIcon.height],[20,20]);
@@ -86,6 +98,14 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
       assert.equal(row.create.background,'rgba(0, 0, 0, 0)');
       assert.equal(row.search.border,'1px');
       assert.deepEqual(row.pen,row.magnifier,'Create and search use matching Lucide icon styles');
+      const [list,toolbar,editor,search] = row.colors;
+      assert.deepEqual(editor,search,'The writing area and search share their background');
+      assert.notDeepEqual(list,editor,'The notebook list remains a distinct surface');
+      for (let i=0;i<3;i++) assert.ok(Math.abs(toolbar[i]-(list[i]+editor[i])/2)<=1,
+        'The toolbar color lies halfway between the list and writing surfaces');
+      assert.ok(Math.abs(row.tools.left-row.main.left)<1 && Math.abs(row.tools.right-row.main.right)<1
+        && Math.abs(row.tools.bottom-row.main.top)<1 && Math.abs(row.main.bottom-row.content.bottom)<1,
+      'The toolbar and writing surface fill the right column up to their shared edge and the bottom');
       assert.ok(Math.abs(row.list.left-row.content.left)<1 && row.list.right < row.create.left
         && row.create.right < row.search.left && Math.abs(row.create.top-row.search.top)<1,
       'The list occupies column one with both actions in the right-hand toolbar');
@@ -98,12 +118,13 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
         assert.deepEqual([row.hintStyle.size,row.hintStyle.weight,row.hintStyle.color],
           [22 * row.hintStyle.scale,'500',row.hintStyle.subtle]);
       } else {
-        assert.ok(Math.abs(row.create.left-row.main.left)<1 && row.create.bottom < row.main.top && row.search.right <= row.main.right,
-          'Create and search align above the right editor');
+        assert.ok(row.create.left >= row.tools.left && row.create.bottom < row.main.top && row.search.right <= row.main.right,
+          'Create and search sit inside the toolbar above the editor');
+        assert.ok(Math.abs(row.firstLabel.top-row.tools.bottom-12)<1,'The first field starts 12px below the toolbar');
       }
       continue;
     }
-    assert.equal(row.newText,'新概念');
+    assert.equal(row.newText,'新条目');
     assert.equal(row.create.radius,'10px','The new-note action retains its mobile and tablet corners');
     for (const key of ['border','style']) assert.equal(row.create[key],row.search[key]);
     if (row.empty || width <= 680) {
@@ -161,7 +182,7 @@ async function onlineStyles(page,theme) {
   const notebook=page.locator('#conceptNotebookDialog');
   await notebook.waitFor({state:'visible'});
   const emptyColumns = await checkNoteControlRow(notebook, true);
-  await notebook.getByRole('button',{name:'新概念',exact:true}).click();
+  await notebook.getByRole('button',{name:'新条目',exact:true}).click();
   await checkFirstNotebookEntry(notebook);
   await notebook.locator('.dcn-title').fill('样式参考');
   await notebook.locator('.dcn-original').fill('参考笔记');

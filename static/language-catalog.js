@@ -164,7 +164,7 @@
         "对话": "Conversations",
         "关闭对话列表": "Close conversation list",
         "关闭学习工具": "Close learning tools",
-        "新概念": "New concept",
+        "新条目": "New entry",
         "新对话": "New chat",
         "新建对话": "Start a new chat",
         "登录 / 注册": "Sign in / Register",
