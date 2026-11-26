@@ -10,7 +10,6 @@ const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const conceptsURL = '/static/offline-content/concepts.zh-CN.json';
 const questionsURL = '/static/offline-content/questions.zh-CN.json';
 const translationsURL = '/static/offline-content/translations.en.json';
-const themes = ['dark', 'navy'];
 const probe = [
   '### Markdown study probe', '',
   'A **bold** and *emphasized* paragraph with inline \\(x_i^2+1\\) and `literal_name`.', '',
@@ -28,11 +27,6 @@ async function protectAPIs(page) {
   await page.route(/\/(?:chat|ocr|drawing\/(?:generate|guide|upload))(?:\?|$)/, route => {
     page.modelCalls++; return route.abort();
   });
-}
-
-async function setTheme(page, theme) {
-  await page.evaluate(value => { document.documentElement.dataset.appearanceTheme = document.body.dataset.appearanceTheme = value; }, theme);
-  await settle(page);
 }
 
 async function snapshot(locator) {
@@ -96,18 +90,18 @@ async function onlineReference(browser, width) {
   try {
     await page.goto(baseURL + '/', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => typeof renderChat === 'function' && window.DMateMathMarkdown);
-    for (const language of ['zh-CN', 'en']) for (const theme of themes) {
+    for (const language of ['zh-CN', 'en']) {
       await page.evaluate(({ language, source }) => {
         stopCloudLivePolling(); DMateI18n.setLanguage(language, false);
         newChat(); getCurrent().messages.push({ role: 'ai', text: source }); renderChat();
       }, { language, source: probe });
-      await setTheme(page, theme);
+      await settle(page);
       await page.waitForFunction(() => {
         const node = document.querySelector('#chat>.msg.ai>.msg-content>.ai-content');
         return node && !node.classList.contains('math-pending') && node.querySelectorAll('mjx-container>svg').length === 3;
       });
-      result[language + '/' + theme] = await snapshot(page.locator('#chat>.msg.ai>.msg-content>.ai-content'));
-      assert.deepEqual(result[language + '/' + theme].structure, { ul: 2, ol: 2, rows: 2, code: 'x_label = 2', svg: 3, errors: 0 });
+      result[language] = await snapshot(page.locator('#chat>.msg.ai>.msg-content>.ai-content'));
+      assert.deepEqual(result[language].structure, { ul: 2, ol: 2, rows: 2, code: 'x_label = 2', svg: 3, errors: 0 });
     }
     assert.equal(page.modelCalls, 0); assert.deepEqual(page.studyErrors, []);
     return result;
@@ -375,7 +369,7 @@ async function run(browser, width) {
     assert.equal(await page.evaluate(() => navigator.onLine), false, 'The reload really runs with browser networking disabled');
     await hookRenderer(page); const data = await packs(page);
     for (const url of [conceptsURL, questionsURL, translationsURL]) assert.ok(cachedResponses.has(url), 'Actual deployed pack is served by the offline worker: ' + url);
-    await languageChoice(page, 'zh-CN'); await setTheme(page, 'navy'); await navigation(page, 'concepts');
+    await languageChoice(page, 'zh-CN'); await navigation(page, 'concepts');
     assert.equal(await page.locator('#conceptSearch,#questionSearch').count(), 0,
       'Concept and exercise libraries have no search controls offline');
     await page.locator('#conceptCategory').selectOption(data.concept.category);
@@ -385,17 +379,17 @@ async function run(browser, width) {
       'Worked examples are now exercises rather than an embedded concept section');
     let checkedChineseProbe = false;
     for (const language of ['zh-CN', 'en', 'zh-CN']) {
-      await languageChoice(page, language); await setTheme(page, 'navy');
+      await languageChoice(page, language);
       assert.equal(await page.locator('#conceptCategory').inputValue(), data.concept.category, 'Language change preserves the concept chapter filter');
       assert.equal(await page.locator('#conceptList .concept-item.active').getAttribute('data-concept-id'), data.concept.id, 'Language change preserves the selected concept');
-      await assertContent(page, 'concepts', data.concept.id, language, references[language + '/navy']);
+      await assertContent(page, 'concepts', data.concept.id, language, references[language]);
       if (language === 'en') {
         const count = await page.locator('#conceptList .concept-item').count();
         assert.equal(await page.locator('#conceptCount').textContent(), count + (count === 1 ? ' concept' : ' concepts'), 'English filtered counters use the correct singular/plural');
       }
       if (language === 'en' && process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/study-' + width + '-concept-en.png' });
-      if (language === 'en' || !checkedChineseProbe) for (const theme of themes) {
-        await setTheme(page, theme); await formatProbe(page, references[language + '/' + theme]);
+      if (language === 'en' || !checkedChineseProbe) {
+        await formatProbe(page, references[language]);
       }
       if (language === 'zh-CN') checkedChineseProbe = true;
     }
@@ -419,8 +413,8 @@ async function run(browser, width) {
     await page.locator('#questionDetail .wrong-answer-summary').click();
     await page.locator('#questionDetail .wrong-analysis-summary').click();
     for (const language of ['en', 'zh-CN']) {
-      await languageChoice(page, language); await setTheme(page, 'navy');
-      await assertContent(page, 'questions', data.example.id, language, references[language + '/navy']);
+      await languageChoice(page, language);
+      await assertContent(page, 'questions', data.example.id, language, references[language]);
       assert.equal(await page.evaluate(({conceptId, language}) => {
         const concept = studyPacks.concepts.find(row => row.id === conceptId);
         const source = language === 'en' ? studyPacks.en.concepts[conceptId].example : concept.example;
@@ -428,7 +422,7 @@ async function run(browser, width) {
           === DMateMathMarkdown.prepareStudyText(source);
       }, {conceptId:data.example.conceptId, language}), true, 'The original worked example is rendered in the exercise answer');
     }
-    await setTheme(page, 'navy'); await navigation(page, 'questions');
+    await navigation(page, 'questions');
     for (const [index, question] of data.questions.entries()) {
       await closeLibraryDetail(page);
       await page.locator('#questionCategory').selectOption(question.category);
@@ -438,7 +432,7 @@ async function run(browser, width) {
       await page.locator('#questionDetail .wrong-answer-summary').click();
       await page.locator('#questionDetail .wrong-analysis-summary').click();
       for (const language of ['en', 'zh-CN']) {
-        await languageChoice(page, language); await setTheme(page, 'navy');
+        await languageChoice(page, language);
         assert.equal(await page.locator('#questionCategory').inputValue(), question.category, 'Language change preserves the chapter filter');
         assert.equal(await page.locator('#questionDifficulty').inputValue(), question.difficulty, 'Language change preserves the difficulty filter');
         assert.equal(await page.locator('#questionList .question-item.active').getAttribute('data-question-id'), question.id, 'Language change preserves the selected exercise');
@@ -448,7 +442,7 @@ async function run(browser, width) {
           const count = await page.locator('#questionList .question-item').count();
           assert.equal(await page.locator('#questionCount').textContent(), count + (count === 1 ? ' exercise' : ' exercises'));
         }
-        await assertContent(page, 'questions', question.id, language, references[language + '/navy']);
+        await assertContent(page, 'questions', question.id, language, references[language]);
         if (index === 0) {
           await plainOptions(page);
           if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/study-' + width + '-options-' + language + '.png' });

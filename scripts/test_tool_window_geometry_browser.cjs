@@ -184,7 +184,7 @@ async function checkEdition(browser, offline, theme) {
   const browser = await chromium.launch({headless:true,ignoreDefaultArgs:['--hide-scrollbars'],
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? {executablePath:process.env.CHROMIUM_EXECUTABLE_PATH} : {})});
   try {
-    for (const theme of ['dark','navy']) await checkEdition(browser,false,theme);
+    await checkEdition(browser,false,'dark');
     await checkEdition(browser,true);
   }
   finally { await browser.close(); }

@@ -54,7 +54,8 @@ async function panels(page) {
 
 async function typographyAndCopy(page, width) {
   const raw = '3.14。\nhttps://example.test/a.b。\n登录。';
-  for (const theme of ['dark', 'navy']) for (const language of ['zh-CN', 'en']) for (const scale of [1, 1.2]) {
+  const theme = 'dark';
+  for (const language of ['zh-CN', 'en']) for (const scale of [1, 1.2]) {
     await page.evaluate(({ theme, language, scale }) => {
       appearanceSettings.mode = theme; applyAppearanceSettings({ save:false });
       document.documentElement.style.setProperty('--font-scale', String(scale));

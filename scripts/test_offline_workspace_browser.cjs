@@ -320,20 +320,23 @@ async function appearanceControls(page, width, theme, reference) {
   await openAppearance();
   const dialog = page.locator('#appearanceModal');
   await dialog.waitFor();
-  assert.deepEqual(await dialog.locator('[data-appearance-mode]').evaluateAll(nodes => nodes.map(node => node.dataset.appearanceMode).sort()), ['dark', 'navy']);
+  assert.deepEqual(await dialog.locator('[data-appearance-mode]').evaluateAll(nodes => nodes.map(node => node.dataset.appearanceMode).sort()), ['dark']);
   assert.deepEqual(await dialog.locator('[data-appearance-accent]').evaluateAll(nodes => nodes.map(node => node.dataset.appearanceAccent).sort()), ['blue', 'purple']);
   assert.equal(await dialog.locator('[data-appearance-font]').count(), 0, 'Appearance uses the standard text size');
   assert.equal(await dialog.locator('[data-appearance-fit]').count(), 2, 'Both wallpaper fit modes are available');
   for (const id of ['appearanceMaskRange', 'appearanceBlurRange', 'appearancePanelRange', 'appearanceBubbleRange']) {
     await dialog.locator('#' + id).waitFor({ state: 'visible' });
   }
-  const alternate = theme === 'dark' ? 'navy' : 'dark';
-  await dialog.locator('[data-appearance-mode="' + alternate + '"]').click();
-  await page.waitForFunction(value => document.documentElement.dataset.appearanceTheme === value, alternate);
+  const savedAccent = await page.evaluate(() => DMateOfflineAppearance.getSettings().accent);
+  const alternate = savedAccent === 'purple' ? 'blue' : 'purple';
+  const accentSelected = (value) => page.waitForFunction(value =>
+    document.querySelector('[data-appearance-accent="' + value + '"]').classList.contains('active'), value);
+  await dialog.locator('[data-appearance-accent="' + alternate + '"]').click();
+  await accentSelected(alternate);
   await page.locator('#appearanceClose').click();
   await page.waitForFunction(value => document.documentElement.dataset.appearanceTheme === value, theme);
   await openAppearance();
-  await dialog.locator('[data-appearance-mode="' + theme + '"]').click();
+  await accentSelected(savedAccent);
   await page.waitForFunction(value => document.documentElement.dataset.appearanceTheme === value, theme);
   assert.deepEqual(await closeStyle(page.locator('#appearanceClose')), reference.close, 'Appearance uses the shared close dot');
   await page.locator('#appearanceDone').click();
@@ -954,14 +957,10 @@ async function runCase(browser, width, theme) {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
-    const themes = (process.env.DMATE_TEST_THEMES || 'dark,navy').split(',');
-    assert.ok(themes.length && themes.every(theme => ['dark', 'navy'].includes(theme)), 'Supported theme selection');
-    for (const theme of themes) {
-      // Each viewport owns its browser context, service-worker target and screenshots.
-      const cases = await Promise.allSettled([1440, 390].map(width => runCase(browser, width, theme)));
-      for (const result of cases) {
-        if (result.status === 'rejected') throw result.reason;
-      }
+    // Each viewport owns its browser context, service-worker target and screenshots.
+    const cases = await Promise.allSettled([1440, 390].map(width => runCase(browser, width, 'dark')));
+    for (const result of cases) {
+      if (result.status === 'rejected') throw result.reason;
     }
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

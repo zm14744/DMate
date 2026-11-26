@@ -354,7 +354,7 @@ async function disconnected(browser) {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
-    await runCase(browser, 1440, 900, 'navy');
+    await runCase(browser, 1440, 900, 'dark');
     await runCase(browser, 390, 844, 'dark');
     await landscapeSmoke(browser);
     await disconnected(browser);

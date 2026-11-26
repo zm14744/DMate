@@ -42,14 +42,6 @@ body[data-appearance-theme] {
         background-image:none!important;
     }
 
-    /* Keep a barely shaded light sidebar without a visible dividing stroke.
-       The shared panel paint uses an important layer, so override it here rather
-       than adding another competing unlayered background. */
-    body[data-appearance-theme="light"]:not(.has-custom-background) .left {
-        background-color:#e9edf2!important;
-        background-image:none!important;
-        border-right-color:transparent!important;
-    }
 
     /* Session details are inline sidebar text, including the empty “无”. */
     body[data-appearance-theme] .right #info {
@@ -111,13 +103,6 @@ body[data-appearance-theme] {
         box-shadow:none!important;
     }
 
-    @media(min-width:1101px) {
-        body[data-appearance-theme="light"] #learningReviewModal :is(
-            .modal-head,.learning-review-section,.learning-review-actions
-        ) {
-            border-color:#94a3b8!important;
-        }
-    }
 
     /* Toolbars embedded in a floating panel share its background. Separate
        palettes and source pickers remain independent translucent panels. */

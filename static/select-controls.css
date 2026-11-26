@@ -52,8 +52,7 @@
             -webkit-text-fill-color:currentColor!important;
             cursor:pointer;
         }
-        body[data-appearance-theme="dark"] select,
-        body[data-appearance-theme="navy"] select { color-scheme:dark; }
+        body[data-appearance-theme="dark"] select { color-scheme:dark; }
         body[data-appearance-theme] select:not([multiple]):is(:not([size]),[size="1"]):not(:disabled):hover {
             border-color:var(--text-muted)!important;
         }

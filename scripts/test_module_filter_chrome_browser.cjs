@@ -365,9 +365,9 @@ async function disconnectedCase(browser) {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
-    for (const width of [390, 1440]) for (const theme of ['dark', 'navy']) await runCase(browser, width, theme, false);
-    for (const [width, theme] of [[390, 'dark'], [1440, 'navy']]) await runCase(browser, width, theme, true);
-    await runCase(browser, 820, 'navy', true);
+    for (const width of [390, 1440]) await runCase(browser, width, 'dark', false);
+    for (const [width, theme] of [[390, 'dark'], [1440, 'dark']]) await runCase(browser, width, theme, true);
+    await runCase(browser, 820, 'dark', true);
     await disconnectedCase(browser);
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

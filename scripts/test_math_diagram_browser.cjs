@@ -88,20 +88,12 @@ async function passiveGenerationPanel(page, mock, guideRequests, initial, langua
   assert.equal(await page.locator('.ddw-ai-requirement').getAttribute('aria-label'), requiredLabel);
   assert.equal(await page.locator('.ddw-ai-requirement').getAttribute('required'), '');
   assert.equal(await page.locator('[data-drawing-guide]').count(), 0, 'Generation and guidance have separate submit actions');
-  const originalTheme = await page.evaluate(() => [document.documentElement.dataset.appearanceTheme, document.body.dataset.appearanceTheme]);
-  for (const theme of ['dark', 'navy']) {
-    await page.evaluate(value => { document.documentElement.dataset.appearanceTheme = document.body.dataset.appearanceTheme = value; }, theme);
-    const disabledStyle = await panelStyle(page, '[data-math-diagram-generate]');
-    const composerStyle = await page.locator('#sendBtn').evaluate(button => ({
-      background: getComputedStyle(button).backgroundColor, arrow: getComputedStyle(button, '::before').backgroundColor
-    }));
-    assert.equal(disabledStyle.button.backgroundColor, composerStyle.background, theme + ': the inactive generation arrow shares the composer surface');
-    assert.equal(disabledStyle.button.color, composerStyle.arrow, theme + ': the inactive generation arrow shares the composer icon color');
-  }
-  await page.evaluate(([rootTheme, bodyTheme]) => {
-    document.documentElement.dataset.appearanceTheme = rootTheme; document.body.dataset.appearanceTheme = bodyTheme;
-  }, originalTheme);
   const disabledStyle = await panelStyle(page, '[data-math-diagram-generate]');
+  const composerStyle = await page.locator('#sendBtn').evaluate(button => ({
+    background: getComputedStyle(button).backgroundColor, arrow: getComputedStyle(button, '::before').backgroundColor
+  }));
+  assert.equal(disabledStyle.button.backgroundColor, composerStyle.background, 'The inactive generation arrow shares the composer surface');
+  assert.equal(disabledStyle.button.color, composerStyle.arrow, 'The inactive generation arrow shares the composer icon color');
   for (const value of ['', '  \n\t  ']) {
     await page.locator('.ddw-ai-requirement').fill(value);
     assert.equal(await page.locator('[data-math-diagram-generate]').isDisabled(), true);

@@ -277,7 +277,7 @@ async function checkReturnPreservesView(browser, width) {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
     // Camera restoration belongs to an existing conversation. Closing a graph
     // over the landing page intentionally resets it to all knowledge.
-    await page.evaluate(() => { appearanceSettings.mode = 'navy'; applyAppearanceSettings({save:false}); newChat(); });
+    await page.evaluate(() => { appearanceSettings.mode = 'dark'; applyAppearanceSettings({save:false}); newChat(); });
     await openFullGraph(page);
     if (mobile) await settleGraph(page);
     else await page.waitForSelector(viewSelector);
@@ -307,7 +307,7 @@ async function checkReturnPreservesView(browser, width) {
     for (const colorScheme of ['dark', 'light']) {
       await page.emulateMedia({ colorScheme });
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-      assert.equal(await page.locator('html').getAttribute('data-appearance-theme'), 'navy');
+      assert.equal(await page.locator('html').getAttribute('data-appearance-theme'), 'dark');
       await checkPreserved(width + '/OS ' + colorScheme);
     }
 
@@ -718,7 +718,7 @@ async function checkNodeGestures(browser, width) {
     for (const width of [1440, 390]) await checkReturnPreservesView(browser, width);
     for (const width of [1440, 820, 390]) await checkPanelPresentation(browser, width);
     for (const width of [390, 620]) await checkNodeGestures(browser, width);
-    for (const theme of ['dark', 'navy']) await checkSelectionBorder(browser, theme);
+    await checkSelectionBorder(browser, 'dark');
     for (const width of [390, 620]) await mobileCase(browser, width);
     const page = await browser.newPage({ viewport: { width: 820, height: 844 } });
     try {

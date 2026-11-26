@@ -5642,7 +5642,7 @@ body[data-appearance-theme="dark"] {
 }
 
 /* =========================================================
-   DMate v6.4：黑色 / 蓝色两套主题。
+   DMate v6.4：黑色主题层级。
    黑色主题按 ChatGPT 式层级处理：
    两侧更深，中间主工作区稍亮，输入框再提一层。
    重点是“同属黑色系但有明确深浅”，而不是整页一块黑。
@@ -5673,29 +5673,6 @@ body[data-appearance-theme="dark"] {
     color-scheme:dark;
 }
 
-:root[data-appearance-theme="navy"],
-body[data-appearance-theme="navy"] {
-    --surface-0:#0f172a;
-    --surface-0-rgb:15,23,42;
-    --surface-1:rgba(11,18,32,var(--panel-alpha));
-    --surface-1-rgb:11,18,32;
-    --surface-2:rgba(17,24,39,var(--panel-alpha));
-    --surface-2-rgb:17,24,39;
-    --surface-3:rgba(31,41,55,var(--panel-alpha));
-    --surface-3-rgb:31,41,55;
-    --surface-4:rgba(38,52,73,var(--panel-alpha));
-    --surface-4-rgb:38,52,73;
-    --border-strong:#334155;
-    --border-mid:#475569;
-    --text-strong:#f8fafc;
-    --text-primary:#e2e8f0;
-    --text-secondary:#cbd5e1;
-    --text-muted:#94a3b8;
-    --text-subtle:#64748b;
-    --accent-text:#eff6ff;
-    --background-mask-rgb:15,23,42;
-    color-scheme:dark;
-}
 
 /* 黑色主题：左右侧栏更深，中间稍浅，输入框再亮一层。 */
 body[data-appearance-theme="dark"] {
@@ -5799,9 +5776,6 @@ body[data-appearance-theme="dark"] .learning-panel {
     border-top-color:#2a2a2a;
 }
 
-body[data-appearance-theme="navy"] {
-    background:#0f172a;
-}
 
 
 /* =========================================================
@@ -5817,10 +5791,6 @@ body[data-appearance-theme="navy"] {
 :root[data-appearance-theme="dark"],
 body[data-appearance-theme="dark"] {
     --modal-backdrop:rgba(0,0,0,.62);
-}
-:root[data-appearance-theme="navy"],
-body[data-appearance-theme="navy"] {
-    --modal-backdrop:rgba(0,0,0,.58);
 }
 
 .modal {
@@ -6068,10 +6038,6 @@ body[data-appearance-theme="dark"] .appearance-footer button:not(.primary):hover
         background:transparent !important;
     }
 
-    body[data-appearance-theme="navy"] .input {
-        border-color:rgba(148,163,184,.30) !important;
-        box-shadow:none !important;
-    }
 
     body[data-appearance-theme="dark"]:not(.has-custom-background) .mobile-topbar,
     body[data-appearance-theme="dark"]:not(.has-custom-background) .left,
@@ -6099,14 +6065,6 @@ body[data-appearance-theme="dark"] .appearance-footer button:not(.primary):hover
     }
 }
 
-/* 桌面端蓝色：输入区域与聊天区域自然衔接，不再出现分界线。 */
-@media (min-width:1101px) {
-    body[data-appearance-theme="navy"]:not(.has-custom-background) .input-wrap,
-    body[data-appearance-theme="navy"]:not(.has-custom-background) .input {
-        border-top:0 !important;
-        box-shadow:none !important;
-    }
-}
 
 /* 黑色主题整体下压到接近 GPT 的真黑层级，同时保留两侧 / 中间差异。 */
 body[data-appearance-theme="dark"]:not(.has-custom-background),
@@ -6226,13 +6184,6 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         margin:0 !important;
     }
 
-    body[data-appearance-theme="navy"]:not(.has-custom-background) .input-wrap {
-        background:var(--surface-0) !important;
-    }
-    body[data-appearance-theme="navy"] .input {
-        background:rgba(var(--surface-2-rgb),.98) !important;
-        border-color:rgba(148,163,184,.30) !important;
-    }
 
     body[data-appearance-theme="dark"]:not(.has-custom-background) .input-wrap {
         background:#0d0d0d !important;
@@ -6264,14 +6215,7 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
     }
 }
 
-/* 桌面蓝色：只去掉输入区与聊天区之间的分界线，不改变原有形态。 */
 @media (min-width:1101px) {
-    body[data-appearance-theme="navy"]:not(.has-custom-background) .input-wrap,
-    body[data-appearance-theme="navy"]:not(.has-custom-background) .input {
-        border-top:0 !important;
-        box-shadow:none !important;
-    }
-
     /* 桌面黑色单独保持 GPT 式输入胶囊。 */
     body[data-appearance-theme="dark"]:not(.has-custom-background) .input-wrap {
         background:#0d0d0d !important;
@@ -6302,21 +6246,12 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
 
 /* =========================================================
    DMate v6.8：桌面输入区纠正
-   - 蓝色：输入区外层与聊天区同色，去掉横向分隔感；保留桌面输入控件原形态。
    - 黑色：撤销 v6.7 的桌面“移动端式胶囊”，恢复 v6.6 的桌面输入结构。
    - 仅作用于桌面，不改变移动端已经统一好的输入框几何。
    ========================================================= */
 @media (min-width:1101px) {
 
 
-    /* 蓝色：同样把下方整条输入承载区并回聊天区，不改变桌面控件尺寸。 */
-    body[data-appearance-theme="navy"]:not(.has-custom-background) .input-wrap,
-    body[data-appearance-theme="navy"]:not(.has-custom-background) .input {
-        background:#0f172a !important;
-        background-image:none !important;
-        border-top:0 !important;
-        box-shadow:none !important;
-    }
 
     /* 黑色：恢复 v6.6 的桌面结构——整行输入区 + 独立文本框，不再使用外层大胶囊。 */
     body[data-appearance-theme="dark"]:not(.has-custom-background) .input-wrap {
@@ -6384,7 +6319,7 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
 
 
 
-    /* 黑色 / 蓝色仍保留各自原有的真正输入框样式，仅移除外层分隔带。 */
+    /* 黑色仍保留原有的真正输入框样式，仅移除外层分隔带。 */
     body[data-appearance-theme="dark"].has-custom-background .input input {
         background:#2f2f2f !important;
         background-image:none !important;
@@ -6392,11 +6327,6 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         box-shadow:none !important;
     }
 
-    body[data-appearance-theme="navy"].has-custom-background .input input {
-        background:rgba(var(--surface-3-rgb),.92) !important;
-        background-image:none !important;
-        box-shadow:none !important;
-    }
 }
 
 /* OCR in progress: remove image action from flex flow on both desktop and mobile. */
@@ -6965,17 +6895,6 @@ body[data-appearance-theme="dark"] {
     --dm-frost-border:rgba(82,82,91,.34);
 }
 
-body[data-appearance-theme="navy"] {
-    --dm-success-text:#86efac;
-    --dm-success-soft:rgba(134,239,172,.16);
-    --dm-danger-text:#fca5a5;
-    --dm-danger-soft:rgba(252,165,165,.13);
-    --dm-warning-text:#fbbf24;
-    --dm-warning-soft:rgba(251,191,36,.13);
-    --dm-frost-panel:rgba(15,23,42,.70);
-    --dm-frost-panel-strong:rgba(15,23,42,.80);
-    --dm-frost-border:rgba(96,165,250,.18);
-}
 
 /* 成功、危险与警告状态沿用各主题的语义配色。 */
 .wrong-status.corrected {
@@ -7220,13 +7139,6 @@ body[data-appearance-theme] #ocrCancelBtn {
     body[data-appearance-theme="dark"].has-custom-background .input input {
         background:rgba(47,47,47,.94) !important;
         border-color:#3a3a3a !important;
-    }
-    body[data-appearance-theme="navy"] .input input,
-    body[data-appearance-theme="navy"] .input input:hover,
-    body[data-appearance-theme="navy"] .input input:focus,
-    body[data-appearance-theme="navy"].has-custom-background .input input {
-        background:rgba(var(--surface-3-rgb),.94) !important;
-        border-color:var(--border-strong) !important;
     }
     body[data-appearance-theme] .input input:focus {
         border-color:var(--accent) !important;

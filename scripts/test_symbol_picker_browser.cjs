@@ -79,7 +79,6 @@ assert.equal(symbols.reduce((n,group)=>n+group.items.length,0),124);
 const base=[
 'html,body{width:100%;height:100%;margin:0;overflow:hidden}',
 'body[data-appearance-theme="dark"]{--text-primary:#ececec;--text-secondary:#c7c7c7;--text-muted:#9a9a9a;--text-strong:#f4f4f4;--surface-1:#171717;--surface-2:#242424;--surface-3:#313131;--border-strong:#3a3a3a;--accent:#3b82f6;--accent-bg:#26394c;background:#101010;color:#ececec}',
-'body[data-appearance-theme="navy"]{--text-primary:#e2e8f0;--text-secondary:#cbd5e1;--text-muted:#94a3b8;--text-strong:#f8fafc;--surface-1:#0b1220;--surface-2:#1f2937;--surface-3:#334155;--border-strong:#475569;--accent:#3b82f6;--accent-bg:#1f2937;background:#0f172a;color:#e2e8f0}',
 '.layout{position:relative;overflow:hidden;height:100dvh;transform:translateZ(0)}',
 '.center{position:relative;height:100%;overflow:hidden;transform:translateZ(0);display:flex;align-items:center;justify-content:center}',
 '.center.chat-empty>.input-wrap:not([hidden]){position:absolute;inset:50% 24px auto 24px;max-width:760px;margin:auto;transform:translateY(-50%)}',
@@ -182,16 +181,13 @@ async function verify(browser,engine,size){
   assert.equal(await page.locator('#text').inputValue(),'A∈B',label+': click did not insert');
   await page.locator('#outside').click();
   assert.equal(await page.locator('.dmate-symbol-panel').getAttribute('hidden'),'',label+': outside click did not close');
-  for(const theme of ['dark','navy']){
-    await page.evaluate(t=>document.body.dataset.appearanceTheme=t,theme);
-    await page.locator('.dmate-symbol-keyboard').click();
-    const visible=await page.locator('.dmate-symbol-panel').evaluate(el=>{
-      const style=getComputedStyle(el);
-      return el.getBoundingClientRect().height>0 && style.backgroundColor!=='transparent' && style.backgroundColor!=='rgba(0, 0, 0, 0)';
-    });
-    assert.equal(visible,true,label+'/'+theme+': palette invisible');
-    await page.locator('.dmate-symbol-keyboard').click();
-  }
+  await page.locator('.dmate-symbol-keyboard').click();
+  const visible=await page.locator('.dmate-symbol-panel').evaluate(el=>{
+    const style=getComputedStyle(el);
+    return el.getBoundingClientRect().height>0 && style.backgroundColor!=='transparent' && style.backgroundColor!=='rgba(0, 0, 0, 0)';
+  });
+  assert.equal(visible,true,label+': palette invisible');
+  await page.locator('.dmate-symbol-keyboard').click();
   assert.deepEqual(errors,[],label+': JavaScript page errors');
   console.log('PASS '+label+' '+box.vw+'x'+box.vh+' at '+Math.round(box.x)+','+Math.round(box.y));
  } finally {await context.close();}

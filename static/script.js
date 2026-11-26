@@ -232,9 +232,7 @@ function normalizeAppearanceSettings(value) {
         : {};
 
     return {
-        mode: ["dark", "navy"].includes(source.mode)
-            ? source.mode
-            : APPEARANCE_DEFAULTS.mode,
+        mode: APPEARANCE_DEFAULTS.mode,
         accent: Object.prototype.hasOwnProperty.call(
             APPEARANCE_ACCENTS,
             source.accent
@@ -323,10 +321,6 @@ function saveAppearanceSettings() {
     // No cloud sync: this is deliberately a device-local preference.
 }
 
-function resolveAppearanceTheme() {
-    return appearanceSettings.mode === "navy" ? "navy" : "dark";
-}
-
 function applyAppearanceSettings(options = {}) {
     const root = document.documentElement;
     const body = document.body;
@@ -337,11 +331,9 @@ function applyAppearanceSettings(options = {}) {
 
     const accent = APPEARANCE_ACCENTS[appearanceSettings.accent]
         || APPEARANCE_ACCENTS.blue;
-    const theme = resolveAppearanceTheme();
-
-    body.dataset.appearanceTheme = theme;
-    root.dataset.appearanceTheme = theme;
-    root.style.backgroundColor = {dark:"#0d0d0d",navy:"#0f172a"}[theme];
+    body.dataset.appearanceTheme = APPEARANCE_DEFAULTS.mode;
+    root.dataset.appearanceTheme = APPEARANCE_DEFAULTS.mode;
+    root.style.backgroundColor = "#0d0d0d";
 
     const browserColorScheme = "dark";
     root.style.colorScheme = browserColorScheme;
@@ -356,9 +348,8 @@ function applyAppearanceSettings(options = {}) {
             "content",
             browserColorScheme
         );
-    const browserThemeColor = theme === "navy" ? "#0f172a" : "#171717";
     document.querySelector('meta[name="theme-color"]')
-        ?.setAttribute("content", browserThemeColor);
+        ?.setAttribute("content", "#171717");
     root.style.setProperty("--accent", accent.main);
     root.style.setProperty("--accent-rgb", accent.rgb);
     root.style.setProperty("--accent-deep", accent.deep);
@@ -422,13 +413,6 @@ function applyAppearanceSettings(options = {}) {
 }
 
 function syncAppearanceControls() {
-    document.querySelectorAll("[data-appearance-mode]").forEach(button => {
-        button.classList.toggle(
-            "active",
-            button.dataset.appearanceMode === appearanceSettings.mode
-        );
-    });
-
     document.querySelectorAll("[data-appearance-accent]").forEach(button => {
         button.classList.toggle(
             "active",
@@ -921,14 +905,6 @@ function bindAppearanceControls() {
     viewerClose?.addEventListener("click", closeAppearanceBackgroundViewer);
     viewer?.addEventListener("click", event => {
         if (event.target === viewer) closeAppearanceBackgroundViewer();
-    });
-
-    document.querySelectorAll("[data-appearance-mode]").forEach(button => {
-        button.addEventListener("click", () => {
-            appearanceSettings.mode = button.dataset.appearanceMode;
-            appearanceDraftDirty = true;
-            applyAppearanceSettings({ save:false });
-        });
     });
 
     document.querySelectorAll("[data-appearance-accent]").forEach(button => {

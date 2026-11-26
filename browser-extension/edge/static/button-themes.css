@@ -2,20 +2,6 @@
 body[data-appearance-theme] {
     --dm-control-transition:background-color .12s ease,border-color .12s ease,color .12s ease;
 }
-body[data-appearance-theme="light"] {
-    --dm-control-bg:#e2e8f0;
-    --dm-control-hover-bg:#cfd9e6;
-    --dm-control-border:#c2cbd7;
-    --dm-control-hover-border:#94a3b8;
-    --dm-control-text:#334155;
-}
-body[data-appearance-theme="navy"] {
-    --dm-control-bg:#1f2937;
-    --dm-control-hover-bg:#30405a;
-    --dm-control-border:#475569;
-    --dm-control-hover-border:#64748b;
-    --dm-control-text:#e2e8f0;
-}
 body[data-appearance-theme="dark"] {
     --dm-control-bg:#2b2b2b;
     --dm-control-hover-bg:#393939;
@@ -26,37 +12,14 @@ body[data-appearance-theme="dark"] {
 
 
 /* Shared neutral selection palette, matching the active conversation. */
-body[data-appearance-theme="light"] {
-    --dm-selected-bg:#dce4ee;
-    --dm-selected-hover:#cfd9e5;
-    --dm-selected-ring:#718096;
-}
 body[data-appearance-theme="dark"] {
     --dm-selected-bg:#3d3d3d;
     --dm-selected-hover:#494949;
     --dm-selected-ring:#8d8d8d;
 }
-body[data-appearance-theme="navy"] {
-    --dm-selected-bg:#334155;
-    --dm-selected-hover:#40536b;
-    --dm-selected-ring:#94a3b8;
-}
 
-/* A named important layer supersedes old theme/mobile !important fills,
-   including the light-theme PNG that otherwise masks hover colors. */
+/* A named important layer supersedes old theme/mobile !important fills. */
 @layer dmate-button-themes {
-    /* Separate the light conversation rail and its actions from the canvas. */
-    @media(min-width:1101px) {
-        body[data-appearance-theme="light"]:not(.has-custom-background) .left {
-            --dm-control-bg:#ffffff;
-            --dm-control-hover-bg:#f3f7fc;
-            --dm-control-border:#c3d1e2;
-            --dm-control-hover-border:#91a9c2;
-            background-color:#e2ebf5!important;
-            background-image:none!important;
-            border-right:1px solid #c0cedf!important;
-        }
-    }
 
     body[data-appearance-theme] :is(button,.download-actions > a):not(:is(
         #sendBtn,#imageBtn,#voiceInputBtn,#ocrCancelBtn,
@@ -112,14 +75,6 @@ body[data-appearance-theme="navy"] {
     body[data-appearance-theme] .learning-actions button {
         border-width:1px!important;
         border-style:solid!important;
-    }
-    @media(min-width:1101px) {
-        body[data-appearance-theme]:is([data-appearance-theme="light"],[data-appearance-theme="navy"]) .left {
-            border-right:1px solid transparent!important;
-        }
-        body[data-appearance-theme]:is([data-appearance-theme="light"],[data-appearance-theme="navy"]) .right {
-            border-left:1px solid transparent!important;
-        }
     }
 
     body[data-appearance-theme] button:is(.active,.is-active,[aria-pressed="true"],[aria-selected="true"]) {
@@ -193,19 +148,10 @@ body[data-appearance-theme="navy"] {
         text-align:left !important;
     }
 
-    /* Only interaction shows a surface; light / dark / navy each have a
-       restrained but distinguishable hover and pressed state. */
-    body[data-appearance-theme="light"] {
-        --dm-nav-hover:rgba(51,65,85,.10);
-        --dm-nav-pressed:rgba(51,65,85,.16);
-    }
+    /* Interaction shows a restrained hover and pressed surface. */
     body[data-appearance-theme="dark"] {
         --dm-nav-hover:rgba(255,255,255,.09);
         --dm-nav-pressed:rgba(255,255,255,.14);
-    }
-    body[data-appearance-theme="navy"] {
-        --dm-nav-hover:rgba(148,163,184,.17);
-        --dm-nav-pressed:rgba(148,163,184,.25);
     }
     @media(hover:hover) {
         body[data-appearance-theme] :is(#downloadAppBtn,#accountBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn):not([hidden]):not(:disabled):not([aria-disabled="true"]):hover {
@@ -234,7 +180,7 @@ body[data-appearance-theme="navy"] {
     body[data-appearance-theme] { --dm-control-transition:none; }
 }
 
-/* Lucide outline icons: one geometry across light / dark / navy.
+/* Lucide outline icons: one shared geometry.
    Source artwork: https://lucide.dev/ (ISC; download is Feather-derived MIT).
    The original licenses are distributed as static/lucide-icons-LICENSE.txt. */
 body[data-appearance-theme] :is(
@@ -270,7 +216,7 @@ body[data-appearance-theme] :is(
     white-space:nowrap;
 }
 
-/* Reuse existing account-state classes and three-theme success/warning tokens.
+/* Reuse existing account-state classes and semantic success/warning tokens.
    Only the UserRound icon changes color, never the account label. */
 body[data-appearance-theme] #accountBtn .account-entry-icon {
     color:var(--text-muted,#94a3b8) !important;
@@ -332,7 +278,7 @@ body[data-appearance-theme] #accountBtn.is-syncing .account-entry-icon {
         color:var(--text-primary) !important;
         -webkit-text-fill-color:var(--text-primary) !important;
     }
-    /* Swatch center keeps its real blue/purple/teal color: only the selection
+    /* Swatch center keeps its real blue/purple color: only the selection
        ring becomes neutral, without an accent-colored glow. */
     body[data-appearance-theme] .appearance-swatch.active {
         outline:3px solid var(--dm-selected-ring) !important;

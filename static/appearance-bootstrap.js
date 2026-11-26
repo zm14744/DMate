@@ -13,7 +13,7 @@
   const number = (value,min,max,fallback) => Number.isFinite(Number(value)) ? Math.min(max,Math.max(min,Number(value))) : fallback;
   function normalize(value) {
     const source = value || {};
-    return {mode:['dark','navy'].includes(source.mode) ? source.mode : defaults.mode,
+    return {mode:defaults.mode,
       accent:Object.hasOwn(accents,source.accent) ? source.accent : defaults.accent,
       backgroundFit:['cover','contain'].includes(source.backgroundFit) ? source.backgroundFit : defaults.backgroundFit,
       mask:number(source.mask,0,70,35),blur:number(source.blur,0,12,0),
@@ -29,10 +29,9 @@
   let picture = null, epoch = 0, task = Promise.resolve();
   function paint() {
     const root = document.documentElement, body = document.body;
-    const theme = settings.mode;
-    root.dataset.appearanceTheme = theme;
+    root.dataset.appearanceTheme = defaults.mode;
     root.style.colorScheme = 'dark';
-    root.style.backgroundColor = {dark:'#0d0d0d',navy:'#0f172a'}[theme];
+    root.style.backgroundColor = '#0d0d0d';
     const accent = accents[settings.accent], alpha = settings.panelOpacity/100;
     const values = {'--accent':accent[0],'--accent-rgb':accent[1],'--accent-deep':accent[2],
       '--accent-deeper':accent[3],'--accent-soft':accent[4],'--accent-pale':accent[5],
@@ -42,10 +41,10 @@
       '--bubble-alpha':settings.bubbleOpacity/100,'--background-mask-alpha':settings.mask/100,
       '--background-blur':settings.blur+'px','--background-size':settings.backgroundFit};
     for (const [key,value] of Object.entries(values)) root.style.setProperty(key,String(value));
-    if (body) {body.dataset.appearanceTheme = theme;body.style.colorScheme = root.style.colorScheme;}
+    if (body) {body.dataset.appearanceTheme = defaults.mode;body.style.colorScheme = root.style.colorScheme;}
     document.querySelector('meta[name="color-scheme"]')?.setAttribute('content',root.style.colorScheme);
     document.querySelector('meta[name="supported-color-schemes"]')?.setAttribute('content','dark');
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',{dark:'#171717',navy:'#0f172a'}[theme]);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content','#171717');
     const layer = document.getElementById('appearanceBackgroundLayer');
     if (picture && layer && body) {layer.style.backgroundImage = 'url("'+picture.url+'")';body.classList.add('has-custom-background');}
   }

@@ -35,10 +35,6 @@ body[data-appearance-theme="dark"] .interaction-mode-switch {
     --dmate-mode-track-bg:#1b1b1b;
     --dmate-mode-thumb-bg:#242424;
 }
-body[data-appearance-theme="navy"] .interaction-mode-switch {
-    --dmate-mode-track-bg:#132036;
-    --dmate-mode-thumb-bg:#1d2c43;
-}
 body[data-appearance-theme] .interaction-mode-switch::after {
     content:""; position:absolute; z-index:0; inset:2px 0;
     border:0; border-radius:999px;

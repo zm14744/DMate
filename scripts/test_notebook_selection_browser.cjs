@@ -145,6 +145,6 @@ async function runCase(browser, width, theme) {
 (async () => {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
-  try { for (const width of [390, 1440]) for (const theme of ['dark', 'navy']) await runCase(browser, width, theme); }
+  try { for (const width of [390, 1440]) await runCase(browser, width, 'dark'); }
   finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

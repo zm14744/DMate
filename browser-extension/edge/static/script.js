@@ -147,7 +147,7 @@ const APPEARANCE_MAX_SOURCE_BYTES = 15 * 1024 * 1024;
 const APPEARANCE_MAX_IMAGE_SIDE = 1920;
 
 const APPEARANCE_DEFAULTS = Object.freeze({
-    mode: "system",
+    mode: "dark",
     accent: "blue",
     fontSize: "standard",
     backgroundFit: "cover",
@@ -173,14 +173,6 @@ const APPEARANCE_ACCENTS = Object.freeze({
         deeper: "#6d28d9",
         soft: "#a78bfa",
         pale: "#c4b5fd"
-    },
-    teal: {
-        main: "#14b8a6",
-        rgb: "20,184,166",
-        deep: "#0d9488",
-        deeper: "#0f766e",
-        soft: "#5eead4",
-        pale: "#99f6e4"
     }
 });
 
@@ -189,7 +181,6 @@ let appearanceCommittedSettings = { ...APPEARANCE_DEFAULTS };
 let appearanceBackgroundObjectUrl = "";
 let appearanceHasBackground = false;
 let appearanceGuestCommittedBackgroundBlob = null;
-let appearanceSystemMedia = null;
 let appearanceDraftOriginalSettings = null;
 let appearanceBackgroundDraftMode = "unchanged"; // unchanged | set | remove
 let appearanceDraftBackgroundBlob = null;
@@ -211,9 +202,7 @@ function normalizeAppearanceSettings(value) {
         : {};
 
     return {
-        mode: ["system", "light", "dark", "navy"].includes(source.mode)
-            ? source.mode
-            : APPEARANCE_DEFAULTS.mode,
+        mode: APPEARANCE_DEFAULTS.mode,
         accent: Object.prototype.hasOwnProperty.call(
             APPEARANCE_ACCENTS,
             source.accent
@@ -300,35 +289,6 @@ function saveAppearanceSettings() {
     // No cloud sync: this is deliberately a device-local preference.
 }
 
-function resolveAppearanceTheme() {
-    if (appearanceSettings.mode === "light") {
-        return "light";
-    }
-
-    if (appearanceSettings.mode === "dark") {
-        return "dark";
-    }
-
-    if (appearanceSettings.mode === "navy") {
-        return "navy";
-    }
-
-    // Installed hosts can report the OS theme directly when their WebView's
-    // media query is stale. Keep this device signal in memory, not preferences.
-    const nativeTheme = window.__DMATE_NATIVE_SYSTEM_THEME__;
-    if (nativeTheme === "dark" || nativeTheme === "light") {
-        return nativeTheme;
-    }
-
-    try {
-        return window.matchMedia("(prefers-color-scheme: dark)").matches
-            ? "dark"
-            : "light";
-    } catch (_error) {
-        return "light";
-    }
-}
-
 function fontScaleForAppearance(size) {
     if (size === "small") return 0.92;
     if (size === "large") return 1.08;
@@ -345,28 +305,25 @@ function applyAppearanceSettings(options = {}) {
 
     const accent = APPEARANCE_ACCENTS[appearanceSettings.accent]
         || APPEARANCE_ACCENTS.blue;
-    const theme = resolveAppearanceTheme();
+    const theme = APPEARANCE_DEFAULTS.mode;
 
     body.dataset.appearanceTheme = theme;
     root.dataset.appearanceTheme = theme;
 
-    // 用户明确选择浅色时用 only light，阻止部分安卓浏览器再次强制染成深色。
-    const browserColorScheme = theme === "light" ? "only light" : "dark";
+    const browserColorScheme = "dark";
     root.style.colorScheme = browserColorScheme;
     body.style.colorScheme = browserColorScheme;
     document.querySelector('meta[name="color-scheme"]')
         ?.setAttribute(
             "content",
-            theme === "light" ? "only light" : "dark"
+            browserColorScheme
         );
     document.querySelector('meta[name="supported-color-schemes"]')
         ?.setAttribute(
             "content",
-            theme === "light" ? "light" : "dark"
+            browserColorScheme
         );
-    const browserThemeColor = theme === "light"
-        ? "#f8fafc"
-        : (theme === "navy" ? "#0f172a" : "#171717");
+    const browserThemeColor = "#171717";
     document.querySelector('meta[name="theme-color"]')
         ?.setAttribute("content", browserThemeColor);
     root.style.setProperty("--accent", accent.main);
@@ -437,13 +394,6 @@ function applyAppearanceSettings(options = {}) {
 }
 
 function syncAppearanceControls() {
-    document.querySelectorAll("[data-appearance-mode]").forEach(button => {
-        button.classList.toggle(
-            "active",
-            button.dataset.appearanceMode === appearanceSettings.mode
-        );
-    });
-
     document.querySelectorAll("[data-appearance-accent]").forEach(button => {
         button.classList.toggle(
             "active",
@@ -867,30 +817,6 @@ async function resetAppearance() {
     applyAppearanceSettings({ save:false });
 }
 
-function setupAppearanceSystemThemeListener() {
-    const onChange = () => {
-        if (appearanceSettings.mode === "system") {
-            applyAppearanceSettings({ save: false });
-        }
-    };
-    try {
-        appearanceSystemMedia = window.matchMedia("(prefers-color-scheme: dark)");
-        if (typeof appearanceSystemMedia.addEventListener === "function") {
-            appearanceSystemMedia.addEventListener("change", onChange);
-        } else if (typeof appearanceSystemMedia.addListener === "function") {
-            appearanceSystemMedia.addListener(onChange);
-        }
-    } catch (_error) {
-        // 部分移动浏览器不支持变更事件，回到页面时再读取系统设置。
-    }
-    window.addEventListener("dmate:native-system-theme", onChange);
-    window.addEventListener("pageshow", onChange);
-    window.addEventListener("focus", onChange);
-    document.addEventListener("visibilitychange", () => {
-        if (!document.hidden) onChange();
-    });
-}
-
 function bindAppearanceControls() {
     const appearanceBtn = document.getElementById("appearanceBtn");
     const appearanceClose = document.getElementById("appearanceClose");
@@ -929,14 +855,6 @@ function bindAppearanceControls() {
     viewerClose?.addEventListener("click", closeAppearanceBackgroundViewer);
     viewer?.addEventListener("click", event => {
         if (event.target === viewer) closeAppearanceBackgroundViewer();
-    });
-
-    document.querySelectorAll("[data-appearance-mode]").forEach(button => {
-        button.addEventListener("click", () => {
-            appearanceSettings.mode = button.dataset.appearanceMode;
-            appearanceDraftDirty = true;
-            applyAppearanceSettings({ save:false });
-        });
     });
 
     document.querySelectorAll("[data-appearance-accent]").forEach(button => {
@@ -984,7 +902,6 @@ function initAppearanceSystem() {
     appearanceCommittedSettings = { ...appearanceSettings };
     applyAppearanceSettings({ save:false });
     bindAppearanceControls();
-    setupAppearanceSystemThemeListener();
     loadAppearanceBackground();
 }
 

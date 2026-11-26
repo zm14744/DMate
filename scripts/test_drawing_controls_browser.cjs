@@ -160,21 +160,11 @@ async function safeHistoryDelete(page, name, offline) {
   const paint = control => control.evaluate(button => Object.fromEntries(
     ['width','height','padding','borderWidth','borderRadius',
       'backgroundColor','backgroundImage','boxShadow','filter'].map(key => [key, getComputedStyle(button)[key]])));
-  const original = await page.evaluate(() => [document.documentElement.dataset.appearanceTheme, document.body.dataset.appearanceTheme]);
-  try {
-    for (const theme of ['dark','navy']) {
-      await page.evaluate(theme => [document.documentElement,document.body].forEach(node => { node.dataset.appearanceTheme = theme; }), theme);
-      await page.mouse.move(0,0); await settle(page);
-      const expected = await paint(reference);
-      assert.deepEqual(await paint(remove), expected, 'History dot matches modal close geometry and paint in ' + theme);
-      await remove.hover(); await settle(page);
-      assert.deepEqual(await paint(remove), expected, 'Hover does not change the solid close-dot parameters');
-    }
-  } finally {
-    await page.evaluate(values => [document.documentElement,document.body].forEach((node,i) => {
-      if (values[i] === undefined) delete node.dataset.appearanceTheme; else node.dataset.appearanceTheme = values[i];
-    }), original);
-  }
+  await page.mouse.move(0,0); await settle(page);
+  const expected = await paint(reference);
+  assert.deepEqual(await paint(remove), expected, 'History dot matches modal close geometry and paint');
+  await remove.hover(); await settle(page);
+  assert.deepEqual(await paint(remove), expected, 'Hover does not change the solid close-dot parameters');
   const before = await page.evaluate(() => window.__drawingControlsController.getPages().map(page => ({ id: page.id, name: page.name })));
   const own = before.find(page => page.name === name);
   assert.ok(own, 'Delete is limited to this context’s temporary drawing');
@@ -314,15 +304,15 @@ async function runCase(browser, width, theme, offline) {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
-    for (const [width, theme] of [[1440, 'navy'], [390, 'dark'], [320, 'dark']]) for (const offline of [false, true]) await runCase(browser, width, theme, offline);
+    for (const [width, theme] of [[1440, 'dark'], [390, 'dark'], [320, 'dark']]) for (const offline of [false, true]) await runCase(browser, width, theme, offline);
     const context = await browser.newContext({ viewport: { width: 820, height: 900 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
     try {
       const page = await context.newPage(); await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
       await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
       await revealInterface(page);
-      await page.evaluate(() => window.DMateOfflineAppearance.apply({ mode: 'navy' }, null));
+      await page.evaluate(() => window.DMateOfflineAppearance.apply({ mode: 'dark' }, null));
       await filterMetrics(page);
-      console.log('PASS offline 820/navy: matching library filter dimensions and independent scrolling');
+      console.log('PASS offline 820/dark: matching library filter dimensions and independent scrolling');
     } finally { await context.close(); }
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

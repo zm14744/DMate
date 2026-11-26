@@ -12,13 +12,6 @@ body[data-appearance-theme] {
     --dm-filled-font-weight:400;
     --dm-filled-line-height:normal;
 }
-body[data-appearance-theme="navy"] {
-    --dm-control-bg:#1f2937;
-    --dm-control-hover-bg:#30405a;
-    --dm-control-border:#475569;
-    --dm-control-hover-border:#64748b;
-    --dm-control-text:#e2e8f0;
-}
 body[data-appearance-theme="dark"] {
     --dm-control-bg:#2b2b2b;
     --dm-control-hover-bg:#393939;
@@ -33,11 +26,6 @@ body[data-appearance-theme="dark"] {
     --dm-selected-bg:#3d3d3d;
     --dm-selected-hover:#494949;
     --dm-selected-ring:#8d8d8d;
-}
-body[data-appearance-theme="navy"] {
-    --dm-selected-bg:#334155;
-    --dm-selected-hover:#40536b;
-    --dm-selected-ring:#94a3b8;
 }
 
 /* A named important layer supersedes old theme/mobile !important fills. */
@@ -98,14 +86,6 @@ body[data-appearance-theme="navy"] {
     body[data-appearance-theme] .learning-actions button {
         border-width:1px!important;
         border-style:solid!important;
-    }
-    @media(min-width:1101px) {
-        body[data-appearance-theme]:is([data-appearance-theme="navy"]) .left {
-            border-right:1px solid transparent!important;
-        }
-        body[data-appearance-theme]:is([data-appearance-theme="navy"]) .right {
-            border-left:1px solid transparent!important;
-        }
     }
 
     body[data-appearance-theme] button:is(.active,.is-active,[aria-pressed="true"],[aria-selected="true"]) {
@@ -184,10 +164,6 @@ body[data-appearance-theme="navy"] {
         --dm-nav-hover:rgba(255,255,255,.09);
         --dm-nav-pressed:rgba(255,255,255,.14);
     }
-    body[data-appearance-theme="navy"] {
-        --dm-nav-hover:rgba(148,163,184,.17);
-        --dm-nav-pressed:rgba(148,163,184,.25);
-    }
     @media(hover:hover) {
         body[data-appearance-theme] :is(#downloadAppBtn,#accountBtn,#exportDataBtn,#offlineWorkspaceBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn):not([hidden]):not(:disabled):not([aria-disabled="true"]):hover {
             background:var(--dm-nav-hover) !important;
@@ -251,7 +227,7 @@ body[data-appearance-theme] :is(
     white-space:nowrap;
 }
 
-/* Reuse existing account-state classes and three-theme success/warning tokens.
+/* Reuse existing account-state classes and semantic success/warning tokens.
    Only the UserRound icon changes color, never the account label. */
 body[data-appearance-theme] #accountBtn .account-entry-icon {
     color:var(--text-muted,#94a3b8) !important;

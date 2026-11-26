@@ -301,6 +301,6 @@ async function runCase(browser, width, theme) {
   try {
     const widths = process.env.DMATE_TEST_WIDTHS ? process.env.DMATE_TEST_WIDTHS.split(',').map(Number) : [390, 1440];
     assert.ok(widths.length && widths.every(width => [390, 1440].includes(width)), 'Use supported desktop/mobile test widths');
-    for (const width of widths) for (const theme of ['dark', 'navy']) await runCase(browser, width, theme);
+    for (const width of widths) await runCase(browser, width, 'dark');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

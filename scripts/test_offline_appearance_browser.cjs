@@ -58,8 +58,13 @@ async function appearance(page) {
 async function appearanceControls(page) {
   await checkSliders(page);
   assert.equal(await page.locator('#appearanceModal [data-appearance-font]').count(), 0);
-  assert.deepEqual(await page.locator('#appearanceModal [data-appearance-mode]').evaluateAll(nodes =>
-    nodes.map(node => node.dataset.appearanceMode).sort()), ['dark', 'navy']);
+  const mode = page.locator('#appearanceModal [data-appearance-mode]');
+  assert.equal(await mode.count(), 1);
+  assert.equal(await mode.getAttribute('data-appearance-mode'), 'dark');
+  assert.equal(await mode.innerText(), '黑色');
+  assert.equal(await mode.getAttribute('aria-pressed'), 'true');
+  assert.equal(await mode.isDisabled(), true);
+  assert.equal(await mode.locator('xpath=ancestor::div[contains(@class,"appearance-section")][1]').locator('.appearance-section-title').innerText(), '显示模式');
   assert.deepEqual(await page.locator('#appearanceModal [data-appearance-accent]').evaluateAll(nodes =>
     nodes.map(node => node.dataset.appearanceAccent).sort()), ['blue', 'purple']);
   const separators = await page.locator('#appearanceModal').evaluate(dialog => [
@@ -192,55 +197,51 @@ async function sharedThemeSurfaces(browser,width,offline) {
       newChat();getCurrent().name='主题验证';getCurrent().nameSource='user';
       getCurrent().messages=[{role:'user',text:'颜色验证'},{role:'ai',text:'这是一段普通讲解。'}];renderChat();
     });
-    for(const [mode,expected] of [['dark',[13,13,13]],['navy',[15,23,42]]]){
-      await page.evaluate(async({mode,offline})=>{
-        if(offline)await DMateOfflineAppearance.apply({...DMateOfflineAppearance.getSettings(),mode,panelOpacity:100},null);
-        else{clearAppearanceBackgroundVisual();appearanceSettings={...APPEARANCE_DEFAULTS,mode,panelOpacity:100};applyAppearanceSettings({save:true});}
-      },{mode,offline});
+    await page.evaluate(async offline=>{
+      if(offline)await DMateOfflineAppearance.apply({...DMateOfflineAppearance.getSettings(),mode:'dark',panelOpacity:100},null);
+      else{clearAppearanceBackgroundVisual();appearanceSettings={...APPEARANCE_DEFAULTS,mode:'dark',panelOpacity:100};applyAppearanceSettings({save:true});}
+    },offline);
+    await settlePalette(page);
+    const base=await surfacePixel(page,page.locator(offline?'#offlineMain':'#chat'),{left:null,...(offline?{top:3}:{})});
+    assert.deepEqual(base,[13,13,13],edition+'/'+width+': actual visible workspace color');
+    const modalColor=[34,34,34];
+    const opener=page.locator(offline?(width<=1100?'#offlineNavToggle':'#offlineDesktopSidebarOpen')
+      :(width<=1100?'#mobileNavBtn':'#desktopSidebarOpen'));
+    if(await opener.getAttribute('aria-expanded')!=='true')await opener.click();
+    await settlePalette(page);
+    const sidebar=page.locator(offline?'#offlineSidebar':'#conversationSidebar');
+    const sidebarPaint=await paint(sidebar);
+    assert.equal(sidebarPaint.alpha,1);
+    assert.deepEqual(await surfacePixel(page,sidebar),sidebarPaint.rgb,edition+'/'+width+': visible sidebar pixels match its theme');
+    if(width<=1100){
+      if(offline)await page.locator('#offlineNavClose').click();
+      else await page.evaluate(()=>closeMobileShellDrawers());
       await settlePalette(page);
-      const base=await surfacePixel(page,page.locator(offline?'#offlineMain':'#chat'),{left:null,...(offline?{top:3}:{})});
-      assert.deepEqual(base,expected,edition+'/'+width+'/'+mode+': actual visible workspace color');
-      const modalColor=mode==='dark'?[34,34,34]:base;
-      if(mode==='dark'){
-        const opener=page.locator(offline?(width<=1100?'#offlineNavToggle':'#offlineDesktopSidebarOpen')
-          :(width<=1100?'#mobileNavBtn':'#desktopSidebarOpen'));
-        if(await opener.getAttribute('aria-expanded')!=='true')await opener.click();
-        await settlePalette(page);
-        const sidebar=page.locator(offline?'#offlineSidebar':'#conversationSidebar');
-        const sidebarPaint=await paint(sidebar);
-        assert.equal(sidebarPaint.alpha,1);
-        assert.deepEqual(await surfacePixel(page,sidebar),sidebarPaint.rgb,edition+'/'+width+': visible sidebar pixels match its theme');
-        if(width<=1100){
-          if(offline)await page.locator('#offlineNavClose').click();
-          else await page.evaluate(()=>closeMobileShellDrawers());
-          await settlePalette(page);
-        }
-      }
-      await page.evaluate(offline=>offline?DMateOfflineAppearance.open():openAppearance(),offline);
-      const card=page.locator('#appearanceModal .appearance-card');
-      await card.waitFor({state:'visible'});await settlePalette(page);
-      for(const alpha of [1,.8]){
-        if(alpha<1){
-          await page.locator('#appearancePanelRange').evaluate(node=>{node.value='80';node.dispatchEvent(new Event('input',{bubbles:true}));});
-          await settlePalette(page);
-        }
-        const label=edition+'/'+width+'/'+mode+'/'+alpha;
-        await checkPaint(card,modalColor,alpha,label+' appearance');
-        if(alpha===1)assert.deepEqual(await surfacePixel(page,card),modalColor,label+': actual appearance pixels match the dialog color');
-        await page.evaluate(()=>{void DMateDeleteConfirm.request(document.getElementById('appearanceModal'),
-          {title:'颜色核对',body:'用于验证弹窗背景。',noticeOnly:true});});
-        const notice=page.locator('.dmate-delete-confirm[open]');
-        await notice.waitFor({state:'visible'});await settlePalette(page);
-        await checkPaint(notice,modalColor,alpha,label+' native notice');
-        assert.equal(await notice.locator('.dmate-delete-confirm-title').evaluate(node=>getComputedStyle(node).opacity),'1');
-        if(alpha===1)assert.deepEqual(await surfacePixel(page,notice),modalColor,label+': native dialog pixels match the dialog color');
-        await notice.locator('.dmate-delete-confirm-close').click();
-        await notice.waitFor({state:'detached'});
-      }
-      await page.locator('#appearanceClose').click();
-      await page.waitForFunction(()=>document.documentElement.style.getPropertyValue('--panel-alpha').trim()==='1');
     }
-    console.log('PASS '+edition+' '+width+': actual chat/sidebar pixels, shared modal/native colors and live panel opacity across both themes');
+    await page.evaluate(offline=>offline?DMateOfflineAppearance.open():openAppearance(),offline);
+    const card=page.locator('#appearanceModal .appearance-card');
+    await card.waitFor({state:'visible'});await settlePalette(page);
+    for(const alpha of [1,.8]){
+      if(alpha<1){
+        await page.locator('#appearancePanelRange').evaluate(node=>{node.value='80';node.dispatchEvent(new Event('input',{bubbles:true}));});
+        await settlePalette(page);
+      }
+      const label=edition+'/'+width+'/'+alpha;
+      await checkPaint(card,modalColor,alpha,label+' appearance');
+      if(alpha===1)assert.deepEqual(await surfacePixel(page,card),modalColor,label+': actual appearance pixels match the dialog color');
+      await page.evaluate(()=>{void DMateDeleteConfirm.request(document.getElementById('appearanceModal'),
+        {title:'颜色核对',body:'用于验证弹窗背景。',noticeOnly:true});});
+      const notice=page.locator('.dmate-delete-confirm[open]');
+      await notice.waitFor({state:'visible'});await settlePalette(page);
+      await checkPaint(notice,modalColor,alpha,label+' native notice');
+      assert.equal(await notice.locator('.dmate-delete-confirm-title').evaluate(node=>getComputedStyle(node).opacity),'1');
+      if(alpha===1)assert.deepEqual(await surfacePixel(page,notice),modalColor,label+': native dialog pixels match the dialog color');
+      await notice.locator('.dmate-delete-confirm-close').click();
+      await notice.waitFor({state:'detached'});
+    }
+    await page.locator('#appearanceClose').click();
+    await page.waitForFunction(()=>document.documentElement.style.getPropertyValue('--panel-alpha').trim()==='1');
+    console.log('PASS '+edition+' '+width+': actual chat/sidebar pixels, shared modal/native colors and live panel opacity');
   }finally{await context.close();}
 }
 

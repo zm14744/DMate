@@ -16,7 +16,7 @@
   function normalize(value) {
     const source = value && typeof value === 'object' ? value : {};
     return {
-      mode:['dark','navy'].includes(source.mode) ? source.mode : defaults.mode,
+      mode:defaults.mode,
       accent:Object.hasOwn(accents, source.accent) ? source.accent : defaults.accent,
       backgroundFit:['cover','contain'].includes(source.backgroundFit) ? source.backgroundFit : defaults.backgroundFit,
       mask:clamp(source.mask,0,70,defaults.mask), blur:clamp(source.blur,0,12,defaults.blur),
@@ -41,7 +41,7 @@
   }
 
   function syncControls() {
-    for (const [attribute, value] of [['mode',settings.mode],['accent',settings.accent],['fit',settings.backgroundFit]]) {
+    for (const [attribute, value] of [['accent',settings.accent],['fit',settings.backgroundFit]]) {
       document.querySelectorAll('[data-appearance-' + attribute + ']').forEach(button => {
         const active = button.getAttribute('data-appearance-' + attribute) === value;
         button.classList.toggle('active', active);
@@ -82,13 +82,13 @@
   }
   function paint() {
     const root = document.documentElement, body = document.body;
-    const theme = settings.mode, accent = accents[settings.accent], alpha = settings.panelOpacity / 100;
-    root.dataset.appearanceTheme = body.dataset.appearanceTheme = theme;
-    root.style.backgroundColor = {dark:'#0d0d0d',navy:'#0f172a'}[theme];
+    const accent = accents[settings.accent], alpha = settings.panelOpacity / 100;
+    root.dataset.appearanceTheme = body.dataset.appearanceTheme = defaults.mode;
+    root.style.backgroundColor = '#0d0d0d';
     root.style.colorScheme = body.style.colorScheme = 'dark';
     document.querySelector('meta[name="color-scheme"]')?.setAttribute('content','dark');
     document.querySelector('meta[name="supported-color-schemes"]')?.setAttribute('content','dark');
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',theme === 'navy' ? '#0f172a' : '#171717');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content','#171717');
     const values = {
       '--accent':accent[0], '--accent-rgb':accent[1], '--accent-deep':accent[2],
       '--accent-deeper':accent[3], '--accent-soft':accent[4], '--accent-pale':accent[5],
@@ -237,7 +237,7 @@
     listen('appearanceBackgroundViewerClose','click',closeViewer);
     listen('appearanceBackgroundViewer','click',event => { if (event.target === $('appearanceBackgroundViewer')) closeViewer(); });
     listen('appearanceModal','click',event => { if (event.target === $('appearanceModal')) close(); });
-    for (const [attribute,key] of [['mode','mode'],['accent','accent'],['fit','backgroundFit']]) {
+    for (const [attribute,key] of [['accent','accent'],['fit','backgroundFit']]) {
       document.querySelectorAll('[data-appearance-' + attribute + ']').forEach(button => button.addEventListener('click',() => {
         if (!opened || pending) return;
         settings = normalize({...settings,[key]:button.getAttribute('data-appearance-' + attribute)}); paint();

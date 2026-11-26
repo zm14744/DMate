@@ -1,9 +1,9 @@
 "use strict";
-const CACHE_NAME = "dmate-offline-shell-v139";
-const PREVIOUS_CACHE_NAME = "dmate-offline-shell-v138";
+const CACHE_NAME = "dmate-offline-shell-v140";
+const PREVIOUS_CACHE_NAME = "dmate-offline-shell-v139";
 const CACHE_READY = "/__dmate_offline_ready__/"+CACHE_NAME;
 const PRECACHE = [
-  "/static/appearance-bootstrap.js?v=4",
+  "/static/appearance-bootstrap.js?v=5",
   "/static/offline-appearance-preload.js?v=1",
   "/offline",
   "/static/icons/dmate-app-v52.ico",
@@ -12,7 +12,7 @@ const PRECACHE = [
   "/static/icons/dmate-app-v52-48.png",
   "/static/icons/dmate-app-v52-192.png",
   "/static/icons/dmate-app-v52-180.png",
-  "/static/dmate-main.css?v=91",
+  "/static/dmate-main.css?v=92",
   "/static/graph-editor.css?v=28",
   "/static/drawing-workspace.css?v=57",
   "/static/modal-chrome.css",
@@ -20,15 +20,15 @@ const PRECACHE = [
   "/static/ai-answer-renderer.css?v=22",
   "/static/red-circle-controls.css",
   "/static/ui-tooltip.css",
-  "/static/appearance-panels.css?v=1",
+  "/static/appearance-panels.css?v=2",
   "/static/dmate-shared-overrides.css?v=25",
-  "/static/button-themes.css?v=70",
+  "/static/button-themes.css?v=71",
   "/static/offline-knowledge-graph.css?v=56",
   "/static/knowledge-graph-sheet.css?v=5",
-  "/static/offline.css?v=75",
+  "/static/offline.css?v=76",
   "/static/search-controls.css?v=29",
   "/static/search-controls.js?v=29",
-  "/static/select-controls.css?v=44",
+  "/static/select-controls.css?v=45",
   "/static/mobile-select.js?v=26",
   "/static/textarea-autosize.css?v=1",
   "/static/textarea-autosize.js?v=1",
@@ -55,7 +55,7 @@ const PRECACHE = [
   "/static/language.js?v=59",
   "/static/knowledge-graph-labels.js?v=22",
   "/static/knowledge-graph-sheet.js?v=3",
-  "/static/offline-appearance.js?v=14",
+  "/static/offline-appearance.js?v=15",
   "/static/offline-privacy-motion.js?v=4",
   "/static/offline-shell.js?v=42",
   "/static/offline-knowledge-graph.js?v=67",

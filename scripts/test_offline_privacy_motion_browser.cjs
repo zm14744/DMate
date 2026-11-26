@@ -212,32 +212,28 @@ async function assertLayout(page) {
   for (const viewport of [{width:1440,height:900},{width:390,height:844},
     {width:844,height:390},{width:240,height:700}]) {
     await page.setViewportSize(viewport);
-    for (const theme of ['dark','navy']) {
-      const result = await page.evaluate(theme => {
-        document.documentElement.dataset.appearanceTheme = theme;
-        document.body.dataset.appearanceTheme = theme;
-        const cover = document.getElementById('offlinePrivacyCover');
-        const svg = cover.querySelector('.offline-privacy-mark-growth');
-        const rect = svg.getBoundingClientRect(), eye = document.getElementById('offlinePrivacyRestore').getBoundingClientRect();
-        return {rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height},
-          stroke:getComputedStyle(svg.querySelector('line')).stroke,
-          background:getComputedStyle(cover).backgroundColor,
-          overflow:document.documentElement.scrollWidth > innerWidth || cover.scrollWidth > cover.clientWidth,
-          eyeInside:eye.x >= 0 && eye.y >= 0 && eye.right <= innerWidth && eye.bottom <= innerHeight,
-          fallbackVisible:[...cover.querySelectorAll('img')].some(img => getComputedStyle(img).display !== 'none')};
-      },theme);
-      const label = viewport.width+'x'+viewport.height+' '+theme;
-      assert.equal(result.stroke,'rgb(255, 255, 255)',label+': theme ink follows original logo');
-      assert.equal(result.background,{dark:'rgb(13, 13, 13)',navy:'rgb(15, 23, 42)'}[theme],label+': theme background remains intact');
-      assert.equal(result.overflow,false,label+': no horizontal overflow');
-      assert.equal(result.eyeInside,true,label+': the reveal button stays inside the viewport');
-      assert.equal(result.fallbackVisible,false,label+': the fallback does not overlap the growing logo');
-      assert.ok(Math.abs(result.rect.width-result.rect.height)<1,label+': geometry keeps its aspect ratio');
-      assert.ok(Math.abs(result.rect.x+result.rect.width/2-viewport.width/2)<2,label+': logo stays centered horizontally');
-      assert.ok(Math.abs(result.rect.y+result.rect.height/2-viewport.height/2)<2,label+': logo stays centered vertically');
-      assert.ok(result.rect.x>=0 && result.rect.y>=0 && result.rect.x+result.rect.width<=viewport.width
-        && result.rect.y+result.rect.height<=viewport.height,label+': full geometry fits the viewport');
-    }
+    const result = await page.evaluate(() => {
+      const cover = document.getElementById('offlinePrivacyCover');
+      const svg = cover.querySelector('.offline-privacy-mark-growth');
+      const rect = svg.getBoundingClientRect(), eye = document.getElementById('offlinePrivacyRestore').getBoundingClientRect();
+      return {rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height},
+        stroke:getComputedStyle(svg.querySelector('line')).stroke,
+        background:getComputedStyle(cover).backgroundColor,
+        overflow:document.documentElement.scrollWidth > innerWidth || cover.scrollWidth > cover.clientWidth,
+        eyeInside:eye.x >= 0 && eye.y >= 0 && eye.right <= innerWidth && eye.bottom <= innerHeight,
+        fallbackVisible:[...cover.querySelectorAll('img')].some(img => getComputedStyle(img).display !== 'none')};
+    });
+    const label = viewport.width+'x'+viewport.height;
+    assert.equal(result.stroke,'rgb(255, 255, 255)',label+': theme ink follows original logo');
+    assert.equal(result.background,'rgb(13, 13, 13)',label+': theme background remains intact');
+    assert.equal(result.overflow,false,label+': no horizontal overflow');
+    assert.equal(result.eyeInside,true,label+': the reveal button stays inside the viewport');
+    assert.equal(result.fallbackVisible,false,label+': the fallback does not overlap the growing logo');
+    assert.ok(Math.abs(result.rect.width-result.rect.height)<1,label+': geometry keeps its aspect ratio');
+    assert.ok(Math.abs(result.rect.x+result.rect.width/2-viewport.width/2)<2,label+': logo stays centered horizontally');
+    assert.ok(Math.abs(result.rect.y+result.rect.height/2-viewport.height/2)<2,label+': logo stays centered vertically');
+    assert.ok(result.rect.x>=0 && result.rect.y>=0 && result.rect.x+result.rect.width<=viewport.width
+      && result.rect.y+result.rect.height<=viewport.height,label+': full geometry fits the viewport');
   }
 }
 
@@ -300,9 +296,9 @@ async function assertLayout(page) {
 
       await assertLayout(page);
       await revealInterface(page);
-      assert.equal(await page.locator('#offlinePrivacyCover').evaluate(node => node.open),false,'The mobile eye still reveals after resize and theme changes');
+      assert.equal(await page.locator('#offlinePrivacyCover').evaluate(node => node.open),false,'The mobile eye still reveals after resizing');
       assert.deepEqual(errors,[],'Animation and resizing raise no page errors');
-      console.log('PASS desktop, narrow mobile and landscape geometry across both themes');
+      console.log('PASS desktop, narrow mobile and landscape geometry');
     } finally {await context.close();}
 
     const reduced = await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce'});

@@ -275,7 +275,7 @@ async function onlineReference(browser, width, theme, available) {
     if (process.env.OFFLINE_SCREENSHOT_DIR) await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/online-graph-' + width + '-' + theme + '.png' });
     const expected = {};
     await readyGraph(page);
-    if (mobile(page) && theme === 'navy') await checkMobileDetailSheet(page);
+    if (mobile(page)) await checkMobileDetailSheet(page);
     for (const name of categories) {
       await category(page, name);
       await readyGraph(page);
@@ -654,7 +654,7 @@ async function runCase(browser, width, theme) {
     await page.waitForFunction(() => navigator.serviceWorker.controller && document.documentElement.dataset.offlineReady === 'true');
     await revealInterface(page);
     await page.evaluate(() => DMateOfflineAppearance.open());
-    await page.locator('#appearanceModal [data-appearance-mode="' + theme + '"]').click();
+    assert.equal(await page.locator('#appearanceModal [data-appearance-mode]').getAttribute('data-appearance-mode'),theme);
     await page.locator('#appearanceDone').click();
     await page.locator('#appearanceModal').waitFor({state:'hidden'});
     await openOfflineGraph(page);
@@ -697,7 +697,7 @@ async function runCase(browser, width, theme) {
     }
     assert.deepEqual(await frame(page).locator('#knowledgeGraphCategory option').allTextContents(), reference.categories);
     await readyGraph(page);
-    if (mobile(page) && theme === 'navy') await checkMobileDetailSheet(page);
+    if (mobile(page)) await checkMobileDetailSheet(page);
     for (const name of reference.categories) {
       await category(page, name);
       await readyGraph(page);
@@ -735,6 +735,6 @@ async function runCase(browser, width, theme) {
   const browser = await chromium.launch({ headless: true,
     ignoreDefaultArgs:['--hide-scrollbars'],
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
-  try { for (const width of [1440, 390]) for (const theme of ['navy', 'dark']) await runCase(browser, width, theme); }
+  try { for (const width of [1440, 390]) await runCase(browser, width, 'dark'); }
   finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

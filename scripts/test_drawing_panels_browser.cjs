@@ -225,37 +225,27 @@ async function closeProperty(page) {
 
 async function borderlessButtons(page, mobile) {
   const selector = '.ddw-page-actions>button:not(.ddw-upload-button),.ddw-editor>.dge-topline>button,.ddw-editor .dge-view-controls>button';
-  const original = await page.evaluate(() => [document.documentElement.dataset.appearanceTheme, document.body.dataset.appearanceTheme]);
-  try {
-    for (const theme of ['navy', 'dark']) {
-      await page.evaluate(theme => { document.documentElement.dataset.appearanceTheme = document.body.dataset.appearanceTheme = theme; }, theme);
-      await page.mouse.move(0, 0); await settle(page);
-      const borders = await page.locator(selector).evaluateAll(nodes => nodes.map(node => {
-        const s = getComputedStyle(node);
-        return { text: node.textContent || node.getAttribute('aria-label'),
-          borderless: ['Top', 'Right', 'Bottom', 'Left'].every(side => parseFloat(s['border' + side + 'Width']) === 0
-            || s['border' + side + 'Style'] === 'none' || /(?:transparent|rgba\([^)]*,\s*0\))/.test(s['border' + side + 'Color'])) };
-      }));
-      assert.ok(borders.length >= 8, 'All page, history, and zoom toolbar controls are checked');
-      assert.ok(borders.every(item => item.borderless), theme + ': toolbar buttons have no visible border: ' + JSON.stringify(borders));
-      if (!mobile) for (const group of ['.ddw-page-actions>button:not(.ddw-upload-button):enabled', '.ddw-editor>.dge-topline>button:enabled', '.ddw-editor .dge-view-controls>button:enabled']) {
-        const button = page.locator(group).first();
-        await page.mouse.move(0, 0); await settle(page);
-        const before = await button.evaluate(node => ({ background: getComputedStyle(node).backgroundColor,
-          rect: [...['x', 'y', 'width', 'height']].map(key => node.getBoundingClientRect()[key]) }));
-        await button.hover(); await settle(page);
-        const after = await button.evaluate(node => ({ background: getComputedStyle(node).backgroundColor,
-          rect: [...['x', 'y', 'width', 'height']].map(key => node.getBoundingClientRect()[key]) }));
-        assert.notEqual(after.background, before.background, theme + ': enabled toolbar button retains a visible hover state');
-        after.rect.forEach((value, i) => assert.ok(Math.abs(value - before.rect[i]) <= .5, 'Hover does not shift toolbar geometry'));
-      }
-    }
-  } finally {
-    await page.evaluate(values => [document.documentElement, document.body].forEach((node, i) => {
-      if (values[i] == null) delete node.dataset.appearanceTheme; else node.dataset.appearanceTheme = values[i];
-    }), original);
+  await page.mouse.move(0, 0); await settle(page);
+  const borders = await page.locator(selector).evaluateAll(nodes => nodes.map(node => {
+    const s = getComputedStyle(node);
+    return { text: node.textContent || node.getAttribute('aria-label'),
+      borderless: ['Top', 'Right', 'Bottom', 'Left'].every(side => parseFloat(s['border' + side + 'Width']) === 0
+        || s['border' + side + 'Style'] === 'none' || /(?:transparent|rgba\([^)]*,\s*0\))/.test(s['border' + side + 'Color'])) };
+  }));
+  assert.ok(borders.length >= 8, 'All page, history, and zoom toolbar controls are checked');
+  assert.ok(borders.every(item => item.borderless), 'Toolbar buttons have no visible border: ' + JSON.stringify(borders));
+  if (!mobile) for (const group of ['.ddw-page-actions>button:not(.ddw-upload-button):enabled', '.ddw-editor>.dge-topline>button:enabled', '.ddw-editor .dge-view-controls>button:enabled']) {
+    const button = page.locator(group).first();
     await page.mouse.move(0, 0); await settle(page);
+    const before = await button.evaluate(node => ({ background: getComputedStyle(node).backgroundColor,
+      rect: [...['x', 'y', 'width', 'height']].map(key => node.getBoundingClientRect()[key]) }));
+    await button.hover(); await settle(page);
+    const after = await button.evaluate(node => ({ background: getComputedStyle(node).backgroundColor,
+      rect: [...['x', 'y', 'width', 'height']].map(key => node.getBoundingClientRect()[key]) }));
+    assert.notEqual(after.background, before.background, 'Enabled toolbar button retains a visible hover state');
+    after.rect.forEach((value, i) => assert.ok(Math.abs(value - before.rect[i]) <= .5, 'Hover does not shift toolbar geometry'));
   }
+  await page.mouse.move(0, 0); await settle(page);
 }
 
 async function canvasChrome(page) {
@@ -459,8 +449,7 @@ async function headerExportChecks(page, label, offline = false) {
       centered:!close || Math.abs(box.y + box.height / 2 - close.y - close.height / 2) < 1};
   });
   assert.deepEqual(geometry, {width:32, height:32, icon:20, border:'0px', leftOfClose:true, gap:offline ? null : 10, centered:true});
-  const originalTheme = await page.evaluate(() => {
-    const theme = document.body.dataset.appearanceTheme;
+  await page.evaluate(() => {
     window.headerExportRecords = [];
     window.headerOriginalPng = DMateDrawingExport.pngBlob;
     window.headerOriginalSave = DMateDrawingExport.save;
@@ -479,8 +468,6 @@ async function headerExportChecks(page, label, offline = false) {
       await new Promise(resolve => { window.finishHeaderExport = resolve; });
       return {destination:'download'};
     };
-    document.body.dataset.appearanceTheme = 'navy';
-    return theme;
   });
   try {
     const canvasPaint = await page.locator('.ddw-editor').evaluate(editor => {
@@ -522,11 +509,10 @@ async function headerExportChecks(page, label, offline = false) {
     const toggle = page.locator('.ddw-page-actions>button[aria-expanded="true"]');
     if (await toggle.count()) await toggle.click();
   } finally {
-    await page.evaluate(theme => {
+    await page.evaluate(() => {
       DMateDrawingExport.pngBlob = window.headerOriginalPng;
       DMateDrawingExport.save = window.headerOriginalSave;
-      document.body.dataset.appearanceTheme = theme;
-    }, originalTheme);
+    });
   }
   console.log('PASS ' + label + ': header image icon exports only the selected drawing, with real PNG and busy guards');
 }

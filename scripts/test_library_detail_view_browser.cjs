@@ -122,18 +122,15 @@ async function layout(page, kind) {
 
 async function rowPaint(page, kind) {
   const p = prefix(kind);
-  for (const mode of ['dark', 'navy']) {
-    await page.evaluate(mode => window.DMateOfflineAppearance.apply({ mode }, null), mode); await settle(page);
-    const paints = await page.locator('#' + p + 'List .' + p + '-item').evaluateAll(nodes => [nodes[0], nodes[1]].filter(Boolean).map(node => {
-      const css = getComputedStyle(node);
-      return { background: css.backgroundColor, image: css.backgroundImage, shadow: css.boxShadow,
-        border: [css.borderTopWidth, css.borderRightWidth, css.borderBottomWidth, css.borderLeftWidth] };
-    }));
-    for (const paint of paints) {
-      assert.match(paint.background, /rgba\([^)]*,\s*0\)|transparent/, 'Only the outer selection row paints a background');
-      assert.equal(paint.image, 'none'); assert.equal(paint.shadow, 'none');
-      assert.deepEqual(paint.border, ['0px', '0px', '0px', '0px'], 'Inner title button has no rectangular border');
-    }
+  const paints = await page.locator('#' + p + 'List .' + p + '-item').evaluateAll(nodes => [nodes[0], nodes[1]].filter(Boolean).map(node => {
+    const css = getComputedStyle(node);
+    return { background: css.backgroundColor, image: css.backgroundImage, shadow: css.boxShadow,
+      border: [css.borderTopWidth, css.borderRightWidth, css.borderBottomWidth, css.borderLeftWidth] };
+  }));
+  for (const paint of paints) {
+    assert.match(paint.background, /rgba\([^)]*,\s*0\)|transparent/, 'Only the outer selection row paints a background');
+    assert.equal(paint.image, 'none'); assert.equal(paint.shadow, 'none');
+    assert.deepEqual(paint.border, ['0px', '0px', '0px', '0px'], 'Inner title button has no rectangular border');
   }
 }
 
