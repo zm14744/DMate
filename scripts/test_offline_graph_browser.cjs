@@ -121,6 +121,7 @@ async function topology(page) {
 }
 
 async function selectFirst(page) {
+  await collapseGraphDetails(page);
   const node = nodes(page).first();
   await node.scrollIntoViewIfNeeded();
   await node.click();
@@ -175,10 +176,14 @@ async function checkMobileDetailSheet(page) {
     assert.equal(await modal.locator('.kg-mobile-expand,.kg-mobile-zoom-controls,.kg-mobile-zoom-label').count(), 0);
     assert.equal(await stage.locator('.kg-mobile-node.selected').count(), 1);
     assert.equal(await modal.getAttribute('data-kg-sheet'), 'peek', 'The initially selected node already provides a grabber');
-    await stage.getByRole('button', {name:'图的基本概念', exact:true}).tap();
+    assert.equal(await detail.isVisible(), false, 'Automatic selection leaves the detail body collapsed');
+    const graphBasics = stage.getByRole('button', {name:'图的基本概念', exact:true});
+    await graphBasics.tap();
     await settle(page);
-    assert.equal(await modal.getAttribute('data-kg-sheet'), 'peek');
+    assert.equal(await modal.getAttribute('data-kg-sheet'), 'expanded', 'A node tap opens its details directly');
     assert.equal(await title.innerText(), '图的基本概念');
+    assert.ok(await detail.isVisible());
+    await handle.tap();await settle(page);
     assert.equal(await title.isVisible(), false);
     assert.equal(await detail.isVisible(), false, 'The collapsed graph exposes just its grabber');
     const selectedCamera = await camera();
@@ -236,9 +241,13 @@ async function checkMobileDetailSheet(page) {
     });
     assert.equal(await modal.getAttribute('data-kg-sheet'), 'peek');
     assert.deepEqual(await camera(), selectedCamera, 'Sheet gestures retain the graph camera');
+    await graphBasics.tap();await settle(page);
+    assert.equal(await modal.getAttribute('data-kg-sheet'), 'expanded', 'Tapping the same node reopens its collapsed details');
+    assert.equal(await title.innerText(), '图的基本概念');
+    await handle.tap();await settle(page);
     await stage.getByRole('button', {name:'路径与连通性', exact:true}).tap();
     await settle(page);
-    assert.equal(await modal.getAttribute('data-kg-sheet'), 'peek');
+    assert.equal(await modal.getAttribute('data-kg-sheet'), 'expanded');
     assert.equal(await title.innerText(), '路径与连通性');
   } finally {
     await cdp.detach();

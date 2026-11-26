@@ -21788,11 +21788,11 @@ function renderKnowledgeGraphSection(container, nodes, title, context) {
     container.appendChild(section);
 }
 
-function openKnowledgeGraphNodeSheet(keepExpanded = false) {
+function openKnowledgeGraphNodeSheet(options) {
     const modal = document.getElementById("knowledgeGraphModal");
     if (!modal?.classList.contains("graph-fullscreen-view") || !window.matchMedia("(max-width:760px)").matches) return;
     knowledgeGraphNodeSheet ||= window.DMateKnowledgeGraphSheet?.mount(modal);
-    knowledgeGraphNodeSheet?.open({keepExpanded});
+    knowledgeGraphNodeSheet?.open(options);
 }
 
 function syncKnowledgeGraphNodeSheet() {
@@ -21828,10 +21828,10 @@ function navigateKnowledgeGraphRelation(nodeId) {
     }
     knowledgeGraphSideMode = "detail";
     knowledgeGraphSelectedNodeId = target.id;
-    if (reuseCanvas) selectKnowledgeGraphNode(target.id, existing, {keepSheetExpanded:true});
+    if (reuseCanvas) selectKnowledgeGraphNode(target.id, existing);
     else {
         renderKnowledgeGraph();
-        openKnowledgeGraphNodeSheet(true);
+        openKnowledgeGraphNodeSheet({expanded:true});
     }
 
     // Preserve the current zoom; scroll only enough to reveal the target.
@@ -21858,7 +21858,7 @@ function navigateKnowledgeGraphRelation(nodeId) {
     });
 }
 
-function selectKnowledgeGraphNode(nodeId, sourceElement = null, {keepSheetExpanded = false} = {}) {
+function selectKnowledgeGraphNode(nodeId, sourceElement = null) {
     knowledgeGraphSelectedNodeId = nodeId;
     knowledgeGraphSideMode = "detail";
 
@@ -21878,9 +21878,7 @@ function selectKnowledgeGraphNode(nodeId, sourceElement = null, {keepSheetExpand
     // 只刷新右侧/下方详情，不重建全部节点和连线。
     // 手机上点击节点时不会再出现整张图谱闪一下、卡一下。
     renderKnowledgeGraphSide({refreshHistory:false});
-    // Programmatic selection retains an already expanded sheet. A real node
-    // press still starts at peek unless its navigation explicitly preserves it.
-    if (sourceElement || keepSheetExpanded) openKnowledgeGraphNodeSheet(keepSheetExpanded);
+    if (sourceElement) openKnowledgeGraphNodeSheet({expanded:true});
 }
 
 
@@ -22103,7 +22101,7 @@ function setKnowledgeGraphSideMode(mode) {
     knowledgeGraphSideMode = knowledgeGraphViewMode === "history" && mode === "history" ? "history" : "detail";
     renderKnowledgeGraphSide();
     if (knowledgeGraphSideMode === "detail" && knowledgeGraphSelectedNodeId) {
-        openKnowledgeGraphNodeSheet(true);
+        openKnowledgeGraphNodeSheet();
     }
 }
 

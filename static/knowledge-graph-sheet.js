@@ -139,11 +139,10 @@
             else if (!['peek', 'expanded'].includes(state())) setState('peek');
             else paint();
         }
-        function open({keepExpanded = false} = {}) {
+        function open({expanded = state() === 'expanded'} = {}) {
             if (destroyed) return false;
             parts();
             if (!eligible()) { close(); return false; }
-            const expanded = keepExpanded && state() === 'expanded';
             detail.scrollTop = 0;
             resetDrag(); setState(expanded ? 'expanded' : 'peek');
             return true;

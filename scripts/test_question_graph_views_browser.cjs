@@ -189,12 +189,12 @@ async function checkView(browser, width, language) {
     await assertLiveGraph(page,recent,label+'/recent');
     await assertExports(page,recent,label+'/recent');
     if (width <= 760) {
-      await page.locator('#knowledgeGraphCanvas .kg-mobile-node.selected').click();
-      await settle(page);
       assert.equal(await page.locator('#knowledgeGraphModal').getAttribute('data-kg-sheet'), 'peek');
-      assert.equal(await page.locator('#knowledgeGraphDetail').isVisible(),false);
-      assert.equal(await page.locator(locate).isVisible(),false,label+': the compact grabber leaves the source action in the expanded details');
-      await expandGraphDetails(page);
+      assert.equal(await page.locator(locate).isVisible(),false,label+': automatic selection leaves only the grabber visible');
+      await page.locator('#knowledgeGraphCanvas .kg-mobile-node.selected').tap();
+      await settle(page);
+      assert.equal(await page.locator('#knowledgeGraphModal').getAttribute('data-kg-sheet'), 'expanded');
+      assert.ok(await page.locator('#knowledgeGraphDetail').isVisible(),label+': tapping the selected concept reveals the source action directly');
     }
     assert.equal(await page.locator(locate).isVisible(),true,label+': recent details provide Go to original question');
     await assertLocatePlacement(page,label+'/recent');

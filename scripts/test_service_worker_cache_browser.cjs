@@ -81,10 +81,10 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       '/static/vendor/fflate-0.8.2/fflate.min.js', '/static/offline-backup.js?v=3',
       '/static/backup-download.js?v=1', '/static/appearance-bootstrap.js?v=5',
       '/static/offline-appearance-preload.js?v=1', '/static/offline-appearance.js?v=15',
-      '/static/offline.js?v=84', '/static/offline-knowledge-graph.js?v=69', '/static/knowledge-graph-labels.js?v=22',
+      '/static/offline.js?v=84', '/static/offline-knowledge-graph.js?v=70', '/static/knowledge-graph-labels.js?v=22',
       '/static/ui-tooltip.js?v=50',
       '/static/offline-knowledge-graph.css?v=56', '/static/offline-entry.js?v=50',
-      '/static/knowledge-graph-sheet.css?v=7', '/static/knowledge-graph-sheet.js?v=5', '/static/knowledge-graph-desktop.js?v=1', '/static/math-markdown.js?v=23',
+      '/static/knowledge-graph-sheet.css?v=7', '/static/knowledge-graph-sheet.js?v=6', '/static/knowledge-graph-desktop.js?v=1', '/static/math-markdown.js?v=23',
       '/static/search-controls.css?v=30', '/static/search-controls.js?v=29',
       '/static/offline-content/concepts.zh-CN.json?v=34', '/static/offline-content/questions.zh-CN.json?v=34',
       '/static/offline-content/knowledge_graph.json?v=28',
@@ -104,11 +104,11 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     // changed versions and unversioned application code still come fresh.
     await page.goto(new URL('/health', baseURL).href);
     await page.evaluate(async packs => {
-      const cache = await caches.open('dmate-offline-shell-v152');
-      await cache.put('/static/concept-notebook.css?v=15',new Response('/* old notebook grip color */'));
+      const cache = await caches.open('dmate-offline-shell-v153');
+      await cache.put('/static/knowledge-graph-sheet.js?v=5',new Response('/* old node sheet opening behavior */'));
       await cache.put('/static/graph-editor-model.js',new Response('/* obsolete unversioned editor model */'));
       for(const asset of packs) await cache.put(asset.path,new Response(asset.text,{headers:{'Content-Type':'application/json'}}));
-      await cache.put('/__dmate_offline_ready__/dmate-offline-shell-v152',new Response('ready'));
+      await cache.put('/__dmate_offline_ready__/dmate-offline-shell-v153',new Response('ready'));
     },reusablePacks);
     await page.goto(new URL('/offline', baseURL).href, { waitUntil: 'networkidle' });
     await page.evaluate(async () => {
@@ -125,7 +125,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
       if (canonical.length !== 1) throw new Error('Expected exactly one precached shared stylesheet');
       return { name: names[0], canonical: canonical[0].url };
     }, assetPath);
-    assert.equal(current.name, 'dmate-offline-shell-v153', 'The offline workspace uses the refreshed shell cache');
+    assert.equal(current.name, 'dmate-offline-shell-v154', 'The offline workspace uses the refreshed shell cache');
     assert.equal((await fetchAsset(page, current.canonical)).text, networkCSS,
       'The refreshed shell loads current frameless controls instead of the obsolete stylesheet');
     for (const asset of sharedAssets) {
@@ -138,7 +138,7 @@ async function disconnectWorkerNetwork(browser, workerURL) {
     assert.ok(workerRequests.length > 0,'The browser exposes actual service-worker network requests');
     for(const asset of reusablePacks) assert.ok(!workerRequests.includes(new URL(asset.path,baseURL).href),
       'Upgrade reuses the complete prior immutable study pack without downloading it again: '+asset.path);
-    assert.ok(workerRequests.includes(new URL('/static/concept-notebook.css?v=16',baseURL).href),'The updated notebook grip styles are fetched');
+    assert.ok(workerRequests.includes(new URL('/static/knowledge-graph-sheet.js?v=6',baseURL).href),'The updated graph sheet is fetched');
     assert.ok(workerRequests.includes(new URL('/static/graph-editor-model.js',baseURL).href),'Unversioned application code is fetched');
     assert.notEqual(await page.evaluate(async name => (await(await caches.open(name)).match('/static/graph-editor-model.js')).text(),current.name),
       '/* obsolete unversioned editor model */');

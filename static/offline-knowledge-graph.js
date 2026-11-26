@@ -145,7 +145,7 @@ function mount(host,options={}) {
   }
   root.DMateI18n?.translate(detail);
  }
- function selectKnowledgeGraphNode(id,sourceElement=null,{showSheet=Boolean(sourceElement),keepExpanded=false}={}){
+ function selectKnowledgeGraphNode(id,sourceElement=null,{showSheet=Boolean(sourceElement),expanded=true}={}){
   knowledgeGraphSelectedNodeId=String(id);
   for(const node of canvas.querySelectorAll('.kg-node-group,.kg-mobile-node')){
    const selected=node.dataset.nodeId===knowledgeGraphSelectedNodeId;node.classList.toggle('selected',selected);node.setAttribute('aria-pressed',String(selected));
@@ -154,7 +154,7 @@ function mount(host,options={}) {
   renderDetail();
   if(showSheet&&isMobileAppShell()&&host.classList.contains('graph-fullscreen-view')){
    nodeSheet||=root.DMateKnowledgeGraphSheet?.mount(host);
-   nodeSheet?.open({keepExpanded});
+   nodeSheet?.open({expanded});
   }
   options.onSelectionChange?.(allNodes.find(node=>String(node.id)===knowledgeGraphSelectedNodeId));
  }
@@ -162,7 +162,7 @@ function mount(host,options={}) {
   knowledgeGraphSelectedNodeId=String(record.id);
   const targetCategory=categories.includes(record.category)?record.category:'全部';
   if(category!==targetCategory)setCategory(targetCategory);
-  selectKnowledgeGraphNode(knowledgeGraphSelectedNodeId,null,{showSheet:true,keepExpanded:true});
+  selectKnowledgeGraphNode(knowledgeGraphSelectedNodeId,null,{showSheet:true});
   revealSelectedGraphNode({focus:true,nearest:true});
  }
  function revealSelectedGraphNode({focus=false,nearest=false}={}){
@@ -258,7 +258,7 @@ function mount(host,options={}) {
   const reveal=Boolean(selectionOptions?.reveal);knowledgeGraphSelectedNodeId=String(record.id);
   if(reveal&&!visibleNodes.some(node=>String(node.id)===knowledgeGraphSelectedNodeId))setCategory(record.category);
   const node=canvas.querySelector(`[data-node-id="${CSS.escape(knowledgeGraphSelectedNodeId)}"]`);
-  selectKnowledgeGraphNode(knowledgeGraphSelectedNodeId,node,{showSheet:reveal});
+  selectKnowledgeGraphNode(knowledgeGraphSelectedNodeId,node,{showSheet:reveal,expanded:false});
   if(reveal)revealSelectedGraphNode();
  },destroy(){destroyed=true;disposeViews();fontObserver.disconnect();controller.abort();observer.disconnect();window.cancelAnimationFrame(resizeFrame);closeChoice();nodeSheet?.destroy();host.classList.remove('graph-fullscreen-view');canvas.replaceChildren();delete host.dataset.ready;delete host.dataset.graphReady;}};
 // A responsive renderer has a different layout, so keep its own camera. The

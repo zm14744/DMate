@@ -4,7 +4,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
-const {pinchGraph, expandGraphDetails} = require('./knowledge-graph-touch-fixtures.cjs');
+const {pinchGraph, expandGraphDetails, collapseGraphDetails} = require('./knowledge-graph-touch-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const near = (actual, expected, message, tolerance = 1.5) =>
   assert.ok(Math.abs(actual - expected) <= tolerance,
@@ -564,6 +564,7 @@ async function checkSelectionBorder(browser, theme) {
     await first.tap();
     assert.equal(await mobile.locator('.kg-mobile-node.selected').count(), 1, theme + ': only one node selected');
     assert.equal(await first.evaluate(node => node.classList.contains('selected')), true);
+    await collapseGraphDetails(mobile);
     const secondName = await mobile.locator('.kg-mobile-node:not(.selected)').first().getAttribute('aria-label');
     const second = mobile.locator('.kg-mobile-stage').getByRole('button', { name: secondName, exact: true });
     await second.tap();
@@ -593,8 +594,10 @@ async function checkSelectionBorder(browser, theme) {
         const style = getComputedStyle(path);
         return [style.stroke, style.strokeWidth, style.opacity];
       });
+      await collapseGraphDetails(page);
       await page.locator('#knowledgeGraphCanvas [data-knowledge-node-id="' + source + '"]').click();
       const selectedStyle = await stroke();
+      await collapseGraphDetails(page);
       await page.locator('#knowledgeGraphCanvas [data-knowledge-node-id="proof_direct_contradiction"]').click();
       const plainStyle = await stroke();
       assert.notEqual(plainStyle[0], accent, theme + ': unrelated edges use the normal stroke');
@@ -662,6 +665,7 @@ async function checkNodeGestures(browser, width) {
     assert.equal(await selectedName(), point.name, width + ': mouse click must reach the node');
     assert.equal(await page.evaluate(() => window.graphSelectionCount), 1, width + ': one mouse click must activate once');
     for (const [dx, dy] of [[3, 2], [-4, 0]]) {
+      await collapseGraphDetails(page);
       point = await nodePoint();
       const before = await snapshot(page);
       await nativeTap(point, dx, dy);
@@ -671,6 +675,7 @@ async function checkNodeGestures(browser, width) {
     }
 
     // Enlarge this small module so both tested widths have a real pan range.
+    await collapseGraphDetails(page);
     await pinchGraph(page, 1.8);
     point = await nodePoint();
     const beforeDrag = await selectedName();
@@ -685,6 +690,7 @@ async function checkNodeGestures(browser, width) {
     assert.ok((await snapshot(page)).scroll.left > oldLeft, width + ': horizontal drag must pan the graph');
     await nativeTap(await nodePoint()); // A new tap must work without a cooldown after dragging.
 
+    await collapseGraphDetails(page);
     await pinchGraph(page, .75);
     const beforePinch = (await snapshot(page)).scale;
     const beforePinchCount = await page.evaluate(() => window.graphSelectionCount);
