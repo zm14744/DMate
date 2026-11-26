@@ -602,6 +602,7 @@ async function relationNavigation(page) {
 
   await category(page, '全部');
   await readyGraph(page);
+  await collapseGraphDetails(page);
   await frame(page).locator('[data-node-id="logic_reasoning"]').scrollIntoViewIfNeeded();
   await frame(page).locator('[data-node-id="logic_reasoning"]').click();
   await expandGraphDetails(page);
