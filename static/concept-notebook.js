@@ -16,7 +16,7 @@ function mount(options){
  const d=dialog.ownerDocument,win=d.defaultView||root,transport=options.fetch||win.fetch.bind(win);
  const el=(tag,cls,text)=>{const n=d.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;};
  const action=(text,fn,cls='')=>{const b=el('button',cls,text);b.type='button';b.addEventListener('click',fn);return b;};
- let state={notes:[],deleted:{}},currentId=null,selected=new Set(),active=null,serial=0,destroyed=false,saveError=false,loadedContext,deletePending=null,deletePrompt=null;
+ let state={notes:[],deleted:{}},currentId=null,selected=new Set(),active=null,serial=0,destroyed=false,saveError=false,analysisComplete=false,loadedContext,deletePending=null,deletePrompt=null;
  const contextKey=()=>options.getContextKey?.()??'';
  const current=()=>state.notes.find(n=>n.id===currentId);
  const fingerprint=()=>JSON.stringify(state.notes.filter(n=>selected.has(n.id)).map(n=>({id:n.id,title:n.title,content:n.content})));
@@ -54,7 +54,7 @@ function mount(options){
  submitButton.append(sendIcon);
  const cancelButton=action('',()=>{invalidate();submitButton.focus({preventScroll:true});},'dcn-close dcn-analysis-cancel');
  cancelButton.setAttribute('aria-label','取消分析');cancelButton.title='取消分析';
- const status=el('p','dcn-status'),result=el('div','dcn-results');status.setAttribute('role','status');result.setAttribute('aria-label','关联分析结果');
+ const status=el('p','dcn-status'),result=el('div','dcn-results');status.setAttribute('role','status');result.setAttribute('aria-label','关联分析结果');result.setAttribute('role','region');result.tabIndex=-1;
  controls.append(submitButton,cancelButton);analysisPanel.append(questionLabel,controls,status,result);
  main.append(editor);content.append(sidebar,main);dialog.replaceChildren(heading,content,analysisPanel);
  const sheet=root.DMateNotebookSheet?.mount?.(dialog),sheetMedia=win.matchMedia?.('(max-width:760px)');
@@ -95,6 +95,7 @@ function mount(options){
  function toggleAnalysisPanel(){
   if(relationButton.disabled)return;
   if(!analysisPanel.hidden){if(!sheet?.expand())hideAnalysisPanel(true);return;}
+  if(!active)invalidate();
   analysisPanel.hidden=false;relationButton.setAttribute('aria-expanded','true');
   if(isMobile()){
    for(const property of ['left','top','max-width','max-height'])analysisPanel.style.removeProperty(property);
@@ -122,16 +123,20 @@ function mount(options){
   catch(error){saveError=true;saved.textContent=error?.message||'保存失败，请保留当前页面后重试。';return false;}
  }
  function invalidate(){
-  deletePrompt?.finish(false);deletePending=null;serial++;active?.controller.abort();active=null;result.replaceChildren();status.textContent='';renderActions();
+  deletePrompt?.finish(false);deletePending=null;serial++;active?.controller.abort();active=null;analysisComplete=false;result.replaceChildren();status.textContent='';renderActions();
  }
  function renderActions(){
+  const focused=d.activeElement,focusResult=analysisComplete&&(questionLabel.contains(focused)||controls.contains(focused));
+  const focusAction=focused===submitButton&&!!active||focused===cancelButton&&!active;
   const empty=state.notes.length===0;dialog.classList.toggle('is-empty',empty);selection.hidden=empty;relationButton.hidden=empty&&!isMobile();
   const size=selected.size;count.textContent=uiText('已选 '+size+' 条',size+' selected');
+  questionLabel.hidden=analysisComplete;controls.hidden=analysisComplete;
   relationButton.disabled=size<2;submitButton.disabled=Boolean(active)||size<2;cancelButton.hidden=!active;
   submitButton.setAttribute('aria-busy',String(Boolean(active)));
   if(relationButton.disabled)hideAnalysisPanel();
   newButton.disabled=state.notes.length>=LIMITS.notes;
   for(const remove of list.querySelectorAll('.dcn-note-delete'))remove.disabled=!!deletePending;
+  if(!analysisPanel.hidden){if(focusResult)result.focus({preventScroll:true});else if(focusAction&&!analysisComplete)(active?cancelButton:submitButton).focus({preventScroll:true});}
  }
  function renderList(){
   const query=search.value.trim().toLocaleLowerCase();searchClear.hidden=!search.value;list.replaceChildren();
@@ -204,22 +209,19 @@ function mount(options){
   finally{if(deletePending===op)deletePending=null;if(!destroyed){renderEditor();renderActions();}}
  }
  function validateReply(data,notes){
-  if(data?.ok!==true||!Array.isArray(data.explanations)||!Array.isArray(data.relations)||typeof data.summary!=='string')throw new Error(uiText('AI 返回的概念分析不完整，请重试。'));
+  if(data?.ok!==true||!Array.isArray(data.relations))throw new Error(uiText('AI 返回的概念分析不完整，请重试。'));
   const ids=new Set(notes.map(n=>n.id));
-  if(!data.explanations.every(row=>row&&ids.has(row.note_id)&&typeof row.explanation==='string')||
-   !data.relations.every(row=>row&&ids.has(row.from)&&ids.has(row.to)&&row.from!==row.to&&typeof row.type==='string'&&typeof row.explanation==='string'))throw new Error(uiText('AI 返回了未选中概念的关联，请重试。'));
+  if(!data.relations.every(row=>row&&ids.has(row.from)&&ids.has(row.to)&&row.from!==row.to&&typeof row.explanation==='string'&&row.explanation.trim()))throw new Error(uiText('AI 返回了未选中概念的关联，请重试。'));
  }
  function showResult(data,notes){
   const names=new Map(notes.map(note=>[note.id,noteName(note)])),version=serial,key=contextKey(),source=fingerprint();result.replaceChildren();
   const isCurrent=()=>!destroyed&&dialog.open&&serial===version&&contextKey()===key&&fingerprint()===source;
-  const rich=(className,text)=>{const node=contentNode(el('div',className));if(root.DMateAIAnswer?.render)void root.DMateAIAnswer.render(node,text,{isCurrent});else node.textContent=text;return node;};
-  if(data.summary)result.append(rich('dcn-summary',data.summary));
-  for(const row of data.explanations){const section=el('section','dcn-explanation');section.append(contentNode(el('h4','',names.get(row.note_id))),rich('dcn-ai-text',row.explanation));result.append(section);}
-  if(data.relations.length){result.append(el('h4','','概念之间的关联'));for(const row of data.relations){const section=el('section','dcn-relation');section.append(contentNode(el('strong','',names.get(row.from)+' → '+names.get(row.to)+' · '+row.type)),rich('dcn-ai-text',row.explanation));result.append(section);}}
-  else result.append(el('p','','没有得到可确认的直接关联。'));
+  const rich=text=>{const node=contentNode(el('div','dcn-ai-text'));if(root.DMateAIAnswer?.render)void root.DMateAIAnswer.render(node,text,{typography:'inline',isCurrent});else node.textContent=text;return node;};
+  for(const row of data.relations){const from=names.get(row.from),to=names.get(row.to),section=el('section','dcn-relation');section.append(contentNode(el('strong','',uiText(from+'与'+to,from+' and '+to))),rich(row.explanation));result.append(section);}
+  if(!data.relations.length)result.append(el('p','',uiText('没有得到可确认的直接关联','No confirmed direct relationships found')));
  }
  async function analyze(){
-  if(active||analysisPanel.hidden)return;
+  if(active||analysisPanel.hidden||analysisComplete)return;
   const notes=state.notes.filter(n=>selected.has(n.id)).map(n=>({id:n.id,title:n.title,content:n.content}));
   if(notes.length<2||notes.length>LIMITS.selected){status.textContent='每次请选择 2 至 12 条条目';return;}
   if(notes.some(n=>!n.title.trim()&&!n.content.trim())){status.textContent='请先完善所选条目';return;}
@@ -236,8 +238,8 @@ function mount(options){
    if(!valid())return;
    if(!response.ok||data?.ok!==true)throw new Error(typeof data?.error==='string'?data.error:'概念分析失败，请重试。');
    validateReply(data,notes);if(data.action!=='relations')throw new Error(uiText('概念分析任务不匹配，请重试。'));
-   showResult(data,notes);options.onResults?.(result);status.textContent='';
-   if(!analysisPanel.hidden){positionAnalysisPanel();result.scrollIntoView({block:'nearest'});}
+   showResult(data,notes);options.onResults?.(result);if(!valid())return;analysisComplete=true;status.textContent='';renderActions();
+   if(!analysisPanel.hidden){positionAnalysisPanel();analysisPanel.scrollTop=0;const body=analysisPanel.closest('.dcn-sheet-body');if(body)body.scrollTop=0;}
   }catch(error){if(valid())status.textContent=error?.name==='AbortError'?'概念分析超时，请重试。':error?.message||'概念分析失败，请重试。';}
   finally{clearTimeout(timeout);if(active===op){active=null;if(!destroyed)renderActions();}}
  }
@@ -246,20 +248,22 @@ function mount(options){
  function refresh(){if(destroyed)return;sheet?.close();hideAnalysisPanel();invalidate();load();renderList();renderEditor();renderActions();}
  const onClose=event=>{if(event.target!==dialog)return;sheet?.close();hideAnalysisPanel();invalidate();};
  const onCancel=event=>{if(event.target!==dialog)return;if(sheet?.contains(editor)||sheet?.contains(analysisPanel)){event.preventDefault();sheet.close({restoreFocus:true});return;}if(!analysisPanel.hidden){event.preventDefault();hideAnalysisPanel(true);return;}if(saveError&&!persist()){event.preventDefault();return;}invalidate();};
+ const onKeyDown=event=>{if(event.key!=='Escape'||event.isComposing||isMobile()||analysisPanel.hidden||event.target.closest?.('dialog')!==dialog)return;event.preventDefault();event.stopPropagation();hideAnalysisPanel(true);};
  const onPointerDown=event=>{if(isMobile()||sheet?.contains(editor)||sheet?.contains(analysisPanel))return;if(!analysisPanel.contains(event.target)&&!relationButton.contains(event.target))hideAnalysisPanel();};
  const onBreakpointChange=()=>{if(destroyed)return;sheet?.close();hideAnalysisPanel();renderActions();};
  sheetMedia?.addEventListener('change',onBreakpointChange);
  title.addEventListener('input',()=>edit('title',title.value));original.addEventListener('input',()=>edit('content',original.value));
- question.addEventListener('input',()=>invalidate());search.addEventListener('input',renderList);button.addEventListener('click',open);dialog.addEventListener('close',onClose);dialog.addEventListener('cancel',onCancel);dialog.addEventListener('pointerdown',onPointerDown);
+ question.addEventListener('input',()=>invalidate());search.addEventListener('input',renderList);button.addEventListener('click',open);dialog.addEventListener('close',onClose);dialog.addEventListener('cancel',onCancel);dialog.addEventListener('keydown',onKeyDown,true);dialog.addEventListener('pointerdown',onPointerDown);
  const viewChange=()=>queueMicrotask(()=>win.dispatchEvent(new Event('dmate:notebook-viewchange')));
  for(const type of ['input','change','click'])dialog.addEventListener(type,viewChange);
  return {open,close,refresh,getState:()=>copy(state),getViewState:()=>({currentId,selected:[...selected],search:search.value,question:question.value}),restoreViewState(value){
-  if(!value||typeof value!=='object')return;load();
+  if(!value||typeof value!=='object')return;const previous=JSON.stringify([loadedContext,state.notes,[...selected].sort()]);load();
   if(state.notes.some(note=>note.id===value.currentId))currentId=value.currentId;
   selected=new Set((Array.isArray(value.selected)?value.selected:[]).filter(id=>state.notes.some(note=>note.id===id)));
   search.value=typeof value.search==='string'?value.search:'';question.value=typeof value.question==='string'?value.question:'';
+  if(previous!==JSON.stringify([loadedContext,state.notes,[...selected].sort()]))invalidate();
   renderList();renderEditor();renderActions();
- },destroy(){if(destroyed)return;sheet?.close();hideAnalysisPanel();invalidate();destroyed=true;sheetMedia?.removeEventListener('change',onBreakpointChange);sheet?.destroy();button.removeEventListener('click',open);dialog.removeEventListener('close',onClose);dialog.removeEventListener('cancel',onCancel);dialog.removeEventListener('pointerdown',onPointerDown);for(const type of ['input','change','click'])dialog.removeEventListener(type,viewChange);if(dialog.open)dialog.close();dialog.replaceChildren();}};
+ },destroy(){if(destroyed)return;sheet?.close();hideAnalysisPanel();invalidate();destroyed=true;sheetMedia?.removeEventListener('change',onBreakpointChange);sheet?.destroy();button.removeEventListener('click',open);dialog.removeEventListener('close',onClose);dialog.removeEventListener('cancel',onCancel);dialog.removeEventListener('keydown',onKeyDown,true);dialog.removeEventListener('pointerdown',onPointerDown);for(const type of ['input','change','click'])dialog.removeEventListener(type,viewChange);if(dialog.open)dialog.close();dialog.replaceChildren();}};
 }
 root.DMateConceptNotebook={mount};
 })(typeof window!=='undefined'?window:globalThis);

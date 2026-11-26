@@ -60,15 +60,18 @@
 :where(.dcn-analysis-panel){width:min(380px,calc(100vw - 16px))}
 .dcn-dialog .dcn-analysis-panel label{color:var(--text-primary);font-weight:400}
 .dcn-dialog .dcn-analysis-panel .dcn-question{min-height:70px;max-height:200px;padding:9px;border-radius:8px}
-.dcn-analysis-actions{display:flex;align-items:center;gap:9px;margin-top:10px}
+.dcn-analysis-actions{display:flex;align-items:center;justify-content:space-between;gap:9px;margin-top:10px}
 .dcn-status{font-size:13px;line-height:1.6;margin:12px 0 0;color:var(--text-subtle,#64748b);overflow-wrap:anywhere}
 .dcn-status:empty{display:none}
-.dcn-results{display:flex;flex-direction:column;gap:12px;margin-top:14px;line-height:1.75;overflow-wrap:anywhere}
+.dcn-results{display:flex;flex-direction:column;gap:14px;line-height:1.65;overflow-wrap:anywhere}
 .dcn-results:empty{display:none}
-.dcn-results>h4,.dcn-explanation>h4{margin:0 0 5px;font-size:15px}
-.dcn-summary,.dcn-results>p{margin:0}
-.dcn-explanation,.dcn-relation{padding:12px;border:1px solid var(--border-strong,#cbd5e1);border-radius:10px;background:var(--surface-2,#f8fafc)}
-.dcn-ai-text:not(.dmate-ai-answer){white-space:pre-wrap}
+.dcn-results:focus{outline:none}
+.dcn-results>p{margin:0}
+.dcn-relation>strong{display:block;margin:0 0 4px;font-size:15px;line-height:1.45}
+.dcn-relation .dcn-ai-text{color:var(--text-secondary);font-size:var(--font-small,14px)}
+.dcn-ai-text>p{margin:0}
+.dcn-ai-text>p+p{margin-top:6px}
+.dcn-ai-text:not(.dmate-ai-answer),.dcn-ai-text.dmate-ai-answer-plain{white-space:pre-wrap}
 @media(max-width:680px){.dcn-dialog{width:calc(100vw - 16px);max-width:calc(100vw - 16px);height:calc(100dvh - 16px);max-height:calc(100dvh - 16px);padding:14px;border-radius:14px}.dcn-content{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(150px,25dvh) minmax(0,1fr);gap:14px}.dcn-sidebar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);gap:8px}.dcn-list{display:block}.dcn-note{padding:4px 7px}.dcn-main{padding-right:3px}.dcn-heading h2{font-size:18px}.dcn-dialog button{min-height:36px}}
 @media(max-width:680px){
     .dcn-tools-right:not(:has(.dcn-relation-trigger:not([hidden]))){display:contents}

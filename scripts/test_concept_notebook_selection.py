@@ -80,6 +80,64 @@ class NotebookSelectionTests(unittest.TestCase):
                 self.assertEqual(error.exception.code, code)
                 completion.assert_not_called()
 
+    def test_relations_use_only_brief_relationship_output_and_preserve_the_request(self):
+        records = [{"id": "group", "title": "群", "content": ""},
+                   {"id": "ring", "title": "环", "content": ""}]
+        relation = {"from": "ring", "to": "group", "type": "结构",
+                    "explanation": "环的加法结构构成阿贝尔群；乘法一般不构成群。"}
+        for language in ("zh-CN", "en"):
+            with self.subTest(language=language):
+                request = {"action": "relations", "notes": records, "language": language,
+                           "question": "仅比较加法与乘法，不要求证明。"}
+                before = copy.deepcopy(request)
+                completion = Mock(return_value={"ok": True, "content": json.dumps({
+                    "explanations": [], "relations": [relation], "summary": ""})})
+                result = analyze_notebook(request, completion=completion)
+                self.assertEqual(request, before)
+                self.assertEqual(result["explanations"], [])
+                self.assertEqual(result["summary"], "")
+                self.assertEqual(result["relations"], [relation])
+                system, user = completion.call_args.args[0]
+                self.assertEqual(json.loads(user["content"])["notes"], records)
+                self.assertEqual(json.loads(user["content"])["question"], request["question"])
+                for instruction in (("一至两句", "标准定义", "explanations=[]", "不能把建议先修说成数学上的必然蕴含")
+                                    if language == "zh-CN" else
+                                    ("one or two short", "standard definition", "explanations=[]", "prerequisites are not logical implications")):
+                    self.assertIn(instruction, system["content"])
+
+    def test_legacy_relation_explanations_and_summary_are_validated_then_omitted(self):
+        records = [note("a"), note("b")]
+        relation = {"from": records[0]["id"], "to": records[1]["id"],
+                    "type": "比较", "explanation": "两个概念的定义域不同。"}
+        response = {"explanations": [{"note_id": row["id"], "explanation": "旧版独立解释"} for row in records],
+                    "relations": [relation], "summary": "旧版分析前言与总结"}
+        completion = Mock(return_value={"ok": True, "content": json.dumps(response)})
+        result = analyze_notebook({"action": "relations", "notes": records}, completion=completion)
+        self.assertEqual(result["relations"], [relation])
+        self.assertEqual(result["explanations"], [])
+        self.assertEqual(result["summary"], "")
+        response["explanations"][0]["note_id"] = "unselected-note"
+        with self.assertRaises(NotebookError):
+            analyze_notebook({"action": "relations", "notes": records},
+                             completion=lambda *a, **kw: {"ok": True, "content": json.dumps(response)})
+
+    def test_relations_without_a_supported_pair_return_empty_compatible_fields(self):
+        result = analyze_notebook({"action": "relations", "notes": [note("a"), note("b")]},
+                                 completion=lambda *a, **kw: {"ok": True, "content": json.dumps({
+                                     "explanations": [], "relations": [], "summary": ""})})
+        self.assertEqual({key: result[key] for key in ("explanations", "relations", "summary")},
+                         {"explanations": [], "relations": [], "summary": ""})
+
+    def test_concise_relation_contract_still_rejects_unselected_self_and_duplicate_pairs(self):
+        records = [note("a"), note("b")]
+        relation = {"from": records[0]["id"], "to": records[1]["id"], "type": "比较", "explanation": "条件不同。"}
+        for rows in ([{**relation, "to": "not-selected"}],
+                     [{**relation, "to": relation["from"]}], [relation, relation]):
+            with self.subTest(rows=rows), self.assertRaises(NotebookError):
+                analyze_notebook({"action": "relations", "notes": records},
+                                 completion=lambda *a, **kw: {"ok": True, "content": json.dumps({
+                                     "explanations": [], "relations": rows, "summary": ""})})
+
 
 if __name__ == "__main__":
     unittest.main()

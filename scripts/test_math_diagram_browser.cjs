@@ -191,9 +191,9 @@ async function history(page) {
   return page.locator('.ddw-history-open');
 }
 
-function mockGenerator(page) {
+function mockDrawingRequest(page, action) {
   const plans = [], unexpected = [], requests = [];
-  const install = page.route('**/drawing/generate', async route => {
+  const install = page.route('**/drawing/' + action, async route => {
     const payload = route.request().postDataJSON(); requests.push(payload);
     const plan = plans.shift();
     if (!plan) { unexpected.push(payload); await route.abort(); return; }
@@ -211,6 +211,56 @@ function mockGenerator(page) {
     if (!hold) release();
     return { started, release };
   } };
+}
+
+async function pendingCancel(page) {
+  const panel = page.locator('.ddw-side-panel'), actions = panel.locator('.ddw-ai-actions');
+  const cancel = actions.getByRole('button', {name:/取消|cancel/i});
+  await cancel.waitFor();
+  assert.ok(await panel.locator('.ddw-ai-label').isVisible() && await panel.locator('.ddw-ai-requirement').isVisible());
+  assert.ok(await actions.locator('[data-drawing-guide],[data-math-diagram-generate]').isDisabled(),
+    'A pending request cannot be submitted a second time');
+  const [row, button] = await Promise.all([actions.boundingBox(), cancel.boundingBox()]);
+  assert.ok(Math.abs(row.x + row.width - button.x - button.width) <= 1,
+    'The pending request can be canceled from the right end of the action row');
+  return cancel;
+}
+
+async function guidanceWorkflow(page, mock) {
+  const toggle = page.locator('[data-drawing-ai-guidance]'), panel = page.locator('.ddw-side-panel');
+  const input = panel.locator('.ddw-ai-requirement'), send = panel.locator('[data-drawing-guide]');
+  const before = await state(page);
+  await toggle.click();
+  const request = 'Explain the cycle in this graph.';
+  await input.fill(request);
+  const stale = mock.enqueue({json:{ok:true, answer:'Canceled answer'}}, true);
+  await send.click();
+  const {payload} = await stale.started;
+  assert.equal(payload.requirement, request);
+  assert.deepEqual(payload.document, before.document);
+  await (await pendingCancel(page)).click();
+  stale.release();
+  assert.equal(await input.inputValue(), request);
+  assert.equal(await send.isEnabled(), true, 'Cancel restores the original guidance request');
+
+  const message = 'Guidance service busy';
+  mock.enqueue({status:503, json:{ok:false, error:message}});
+  await send.click();
+  await notice(page, /Guidance service busy/);
+  assert.equal(await input.inputValue(), request, 'A failed request can be retried without retyping');
+  const answer = 'Each vertex in this cycle has degree two.';
+  mock.enqueue({json:{ok:true, answer}});
+  await send.click();
+  await panel.getByText(answer, {exact:true}).waitFor();
+  assert.equal(await panel.locator('.ddw-ai-label:visible,.ddw-ai-requirement:visible,button:visible').count(), 0,
+    'Successful guidance shows only the answer');
+  assert.deepEqual((await state(page)).document, before.document, 'Guidance leaves the drawing intact');
+  await toggle.click();
+  await toggle.click();
+  await input.waitFor();
+  assert.equal(await panel.getByText(answer, {exact:true}).isVisible(), false,
+    'Reopening guidance returns to the request form');
+  await toggle.click();
 }
 
 async function checkDiagram(page, expected) {
@@ -281,10 +331,10 @@ async function runCase(browser, width, language) {
   const page = await browser.newPage({ viewport: { width, height: 900 }, isMobile: width < 760, hasTouch: width < 760,
     ...(width < 760 ? { userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36' } : {}),
     serviceWorkers: 'block' }); // keep paid endpoints entirely inside Playwright's route interception
-  const errors = [], guideRequests = [];
+  const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.route('**/drawing/guide', route => { guideRequests.push(route.request().url()); return route.abort(); });
-  const mock = mockGenerator(page); await mock.install;
+  const mock = mockDrawingRequest(page, 'generate'), guidance = mockDrawingRequest(page, 'guide');
+  await Promise.all([mock.install, guidance.install]);
   try {
     await page.goto(baseURL + '/', { waitUntil: 'networkidle' });
     await page.evaluate(value => DMateI18n.setLanguage(value, false), language);
@@ -294,7 +344,7 @@ async function runCase(browser, width, language) {
     assert.deepEqual(initial.document.graphs[0].vertices, []);
     assert.deepEqual(initial.document.graphs[0].edges, []);
     assert.equal(await page.locator('.ddw-name').isEnabled(), true, 'The automatic page is editable');
-    await passiveGenerationPanel(page, mock, guideRequests, initial, language);
+    await passiveGenerationPanel(page, mock, guidance.requests, initial, language);
     // Keep covering AI generation from a genuinely empty gallery after the
     // user deletes the automatic page, without reopening the workspace.
     await history(page);
@@ -320,6 +370,7 @@ async function runCase(browser, width, language) {
       'Successful generation closes the request popover');
     const started = await checkDiagram(page, starter);
     assert.equal(started.pages[0].requirement, cycleRequirement, 'The generated page retains the explicit drawing requirement');
+    await guidanceWorkflow(page, guidance);
     await history(page);
     await page.locator('.ddw-history-delete').click();
     await page.locator('.dmate-delete-confirm-delete').click();
@@ -344,11 +395,16 @@ async function runCase(browser, width, language) {
     assert.deepEqual(await (await history(page)).allTextContents(), generated.pages.map(item => item.name));
     console.log('CHECK ' + width + '/' + language + ': required explicit C5, empty-gallery K5 and Hasse generation rendered with real WASM; previous pages retained');
 
-    for (const action of ['edit', 'requirement-edit', 'switch', 'dismiss', 'guidance', 'close']) {
+    for (const action of ['cancel', 'edit', 'requirement-edit', 'switch', 'dismiss', 'guidance', 'close']) {
       const held = mock.enqueue({ json: fixture('graph', 'STALE ' + action) }, true);
       await (await ai(page, 'K5 pending ' + action)).click(); await held.started;
       assert.equal(await page.locator('[data-math-diagram-generate]').isDisabled(), true, 'Only one generation runs at a time');
       const count = (await state(page)).pages.length;
+      if (action === 'cancel') {
+        await (await pendingCancel(page)).click();
+        assert.equal(await page.locator('.ddw-ai-requirement').inputValue(), 'K5 pending cancel');
+        assert.equal(await page.locator('[data-math-diagram-generate]').isEnabled(), true);
+      }
       if (action === 'edit') await page.locator('.ddw-name').fill('Edited during ' + action);
       if (action === 'requirement-edit') await page.locator('.ddw-ai-requirement').fill('');
       if (action === 'switch') await (await history(page)).first().click();
@@ -387,7 +443,7 @@ async function runCase(browser, width, language) {
       await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/math-diagram-' + width + '-' + language + '.png' });
     }
     assert.deepEqual(mock.unexpected, [], 'Every generation request is mocked');
-    assert.deepEqual(guideRequests, [], 'No paid guidance call is made');
+    assert.deepEqual(guidance.unexpected, [], 'Every guidance request is mocked');
     assert.deepEqual(errors, [], 'No page errors');
     console.log('PASS ' + width + '/' + language + ': passive matching AI popovers, required generation and disabled empty arrow, explicit C5, real Graphviz K5/Hasse with hyphen IDs and retained SVG routes, stable pages, edit/switch/dismiss/close cancellation, localized errors and PNG ' + JSON.stringify(png));
   } catch (error) {

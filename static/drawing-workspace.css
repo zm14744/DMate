@@ -83,6 +83,9 @@
 .ddw-history-delete::before{content:'';position:absolute;inset:-6px;border-radius:50%}
 .ddw-ai-label{display:flex;flex-direction:column;gap:7px;font-size:14px;margin-bottom:10px}
 .ddw-ai-actions{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-top:2px}
+.dmate-drawing-workspace .ddw-ai-actions>.ddw-ai-cancel{appearance:none;-webkit-appearance:none;display:block;flex:0 0 24px;width:24px;min-width:24px;max-width:24px;height:24px;min-height:24px;max-height:24px;margin:0 0 0 auto;padding:0!important;border:0!important;border-radius:50%;background:#ef4444;color:transparent;font-size:0;line-height:0;cursor:pointer}
+.ddw-side-panel :is(.ddw-ai-label,.ddw-ai-actions,.ddw-ai-cancel)[hidden]{display:none!important}
+.ddw-ai-actions[hidden]+.ddw-ai-answer{margin-top:0}
 .ddw-ai-requirement{width:100%;box-sizing:border-box;resize:vertical;min-height:70px;max-height:200px;padding:9px;border-radius:8px;border:1px solid var(--border-strong,#cbd5e1);background:var(--surface-2,#f8fafc);color:inherit;font:inherit}
 .ddw-ai-answer{font-size:14px;white-space:normal;overflow-wrap:anywhere;line-height:1.7;margin-top:14px}
 .ddw-ai-answer:empty{display:none}

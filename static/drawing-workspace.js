@@ -49,7 +49,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   exportButton.dataset.drawingExport='true';exportButton.title=uiText('以图片形式导出','Export as image');exportButton.setAttribute('aria-label',exportButton.title);exportButton.append(imageIcon());
   actions.append(newButton,historyButton);if(uploadButton)actions.append(uploadButton);top.append(name,actions);rail.append(settingsButton,informationButton);if(aiButton)rail.append(aiButton,generateButton);body.append(editorHost);shell.append(top,body,panel,noticeOwner);host.replaceChildren(shell);host.classList.add('has-drawing-workspace');
   const exportHeader=host.closest('.graph-editor-dialog')?.querySelector(':scope > .graph-editor-dialog-head')||top;
-  let requirement='',answer='',answerDocument='',answerRequirement='',nameFollowsGraph=false,aiTask='';
+  let requirement='',answer='',nameFollowsGraph=false,aiTask='';
   const active=()=>pages.find(p=>p.id===activeId);
   function showNextNotice(){
    if(destroyed||noticeFrame||noticeCurrent||!noticeQueue.length)return;
@@ -59,6 +59,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
     noticeFrame=0;const parent=noticeOwner.closest('dialog');
     if(destroyed||!noticeOwner.isConnected||(parent&&!parent.open)){noticeQueue=[];return;}
     const next=noticeQueue.shift();
+    if(next.isCurrent&&!next.isCurrent()){showNextNotice();return;}
     if(next.persistent&&next.message!==persistError){showNextNotice();return;}
     if(typeof root.DMateDeleteConfirm?.request!=='function')return;
     noticeCurrent=next.message;if(next.persistent)persistNoticeShown=next.message;
@@ -66,16 +67,16 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
      .finally(()=>{noticeCurrent='';showNextNotice();});
    });
   }
-  function setStatus(message){
+  function setStatus(message,isCurrent){
    if(destroyed)return;
    const value=String(message||persistError||'').trim();if(!value)return;
    const persistent=Boolean(persistError&&value===persistError);
-   if((persistent&&persistNoticeShown===value)||noticeCurrent===value||noticeQueue.some(item=>item.message===value))return;
-   noticeQueue.push({message:value,persistent});showNextNotice();
+   if((persistent&&persistNoticeShown===value)||noticeCurrent===value||noticeQueue.some(item=>item.message===value&&(!item.isCurrent||item.isCurrent())))return;
+   noticeQueue.push({message:value,persistent,isCurrent});showNextNotice();
   }
   function abortAnswer(){aiEpoch++;aiAbort?.abort();aiAbort=null;aiTask='';}
   function invalidateAnswer(){
-   abortAnswer();answer='';answerDocument='';answerRequirement='';
+   abortAnswer();answer='';
    const ask=panel.querySelector('[data-drawing-guide],[data-math-diagram-generate]');if(ask)ask.setAttribute('aria-busy','false');
    const result=panel.querySelector('.ddw-ai-answer');if(result)result.replaceChildren();
    syncChrome();
@@ -165,6 +166,10 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    if(generateButton){generateButton.disabled=disabled;generateButton.setAttribute('aria-busy',String(aiTask==='generate'));}
    const send=panel.querySelector('[data-drawing-guide],[data-math-diagram-generate]');
    if(send){send.disabled=disabled||Boolean(aiAbort)||!requirement.trim()||(panelMode==='ai'&&empty);send.setAttribute('aria-busy',String(aiTask===(panelMode==='generate'?'generate':'guide')));}
+   const cancel=panel.querySelector('[data-drawing-ai-cancel]');
+   if(cancel){cancel.hidden=!aiAbort;cancel.disabled=disabled;}
+   const completed=panelMode==='ai'&&Boolean(answer);
+   for(const form of panel.querySelectorAll('.ddw-ai-label,.ddw-ai-actions'))form.hidden=completed;
    shell.classList.toggle('is-empty',empty);
    if(palette){palette.open=toolsExpanded&&!empty;const trigger=palette.querySelector(':scope > summary');trigger?.setAttribute('aria-expanded',String(palette.open));trigger?.setAttribute('aria-disabled',String(disabled));}
    const editorOpen=Boolean(editorHost.querySelector('.dge-floating-actions > details[open]'));
@@ -274,7 +279,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   function mountPage(){
    const version=++editorVersion,current=()=>!destroyed&&version===editorVersion;
    editor?.destroy();editor=null;const p=active(),documentValue=p?.document||emptyDocument();
-   name.value=p?.name||'';nameFollowsGraph=false;requirement=p?.requirement||'';answer='';answerDocument='';answerRequirement='';
+   name.value=p?.name||'';nameFollowsGraph=false;requirement=p?.requirement||'';answer='';
    const initial=p?blank(p.name):emptyDocument();
    if(p&&(!p.viewState||typeof p.viewState!=='object'||Array.isArray(p.viewState)))p.viewState={};
    editor=root.DMateGraphEditor.mount(editorHost,{document:clone(documentValue),initialDocument:initial,blankCanvas:true,drawingOnly:true,viewState:p?.viewState,
@@ -315,10 +320,10 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    pages.push(page);activeId=page.id;panelMode='';persist();mountPage();setStatus(uiText('数学图已生成，可以继续编辑。','Mathematical diagram generated. You can continue editing it.'));
    return page.id;
   }
-  function togglePanel(mode){if((mode==='ai'||mode==='generate')&&!features.ai)return;closeTools();editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();closeEditorPanels();panelMode=panelMode===mode?'':mode;renderPanel();syncChrome();}
+  function togglePanel(mode){if((mode==='ai'||mode==='generate')&&!features.ai)return;if(mode==='ai'&&panelMode!=='ai')answer='';closeTools();editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();closeEditorPanels();panelMode=panelMode===mode?'':mode;renderPanel();syncChrome();}
   function renderPanel(){
    if((panelMode==='ai'||panelMode==='generate')&&!features.ai)panelMode='';
-   if(aiTask==='generate'&&panelMode!=='generate')abortAnswer();
+   if((aiTask==='generate'&&panelMode!=='generate')||(aiTask==='guide'&&panelMode!=='ai'))abortAnswer();
    panel.style.visibility='hidden';panel.hidden=!panelMode;panel.replaceChildren();historyButton.setAttribute('aria-expanded',String(panelMode==='history'));aiButton?.setAttribute('aria-expanded',String(panelMode==='ai'));generateButton?.setAttribute('aria-expanded',String(panelMode==='generate'));
    if(!panelMode){syncChrome();return;}
    panel.setAttribute('aria-label',panelMode==='history'?uiText('历史绘图','Drawing history'):panelMode==='generate'?uiText('AI生成','AI generation'):uiText('AI指导','AI guidance'));
@@ -341,11 +346,16 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    const ask=button('',()=>generating?requestGenerate():requestGuide(),'ddw-guide-button');ask.append(sendIcon());
    if(generating){ask.dataset.mathDiagramGenerate='true';ask.setAttribute('aria-label',uiText('请求 AI 生成','Request AI generation'));ask.title=uiText('生成数学图','Generate diagram');}
    else{ask.dataset.drawingGuide='true';ask.setAttribute('aria-label',uiText('请求 AI 指导','Request AI guidance'));ask.title=uiText('获取指导','Get guidance');}
+   const cancel=button('',()=>{invalidateAnswer();renderPanel();panel.querySelector('[data-drawing-guide],[data-math-diagram-generate]')?.focus({preventScroll:true});},'ddw-ai-cancel modal-close-dot');
+   cancel.dataset.drawingAiCancel=generating?'generate':'guide';cancel.title=generating?uiText('取消生成','Cancel generation'):uiText('取消指导','Cancel guidance');cancel.setAttribute('aria-label',cancel.title);
    const result=el('div','ddw-ai-answer');result.setAttribute('data-i18n-content','');result.setAttribute('aria-live','polite');
-   actionRow.append(ask);panel.append(label,actionRow,result);
+   actionRow.append(ask,cancel);panel.append(label,actionRow,result);
    if(!generating&&answer){
     const renderedAnswer=answer,renderedPage=activeId,renderedRequirement=requirement;
-    if(root.DMateAIAnswer?.render)root.DMateAIAnswer.render(result,answer,{isCurrent:()=>!destroyed&&panelMode==='ai'&&activeId===renderedPage&&answer===renderedAnswer&&requirement===renderedRequirement});
+    syncChrome();
+    const isCurrent=()=>!destroyed&&host.isConnected&&result.isConnected&&panel.contains(result)&&panelMode==='ai'&&activeId===renderedPage&&answer===renderedAnswer&&requirement===renderedRequirement;
+    const retryEmptyResult=()=>{if(isCurrent()&&!result.textContent.trim()&&!result.querySelector('img,svg,math')){answer='';result.replaceChildren();syncChrome();}};
+    if(root.DMateAIAnswer?.render){try{Promise.resolve(root.DMateAIAnswer.render(result,answer,{isCurrent})).then(retryEmptyResult,retryEmptyResult);}catch(_){retryEmptyResult();}}
     else result.textContent=answer;
    } else if(generating&&aiTask==='generate') {
     result.textContent=uiText('正在生成数学图并自动布局…','Generating and laying out the diagram…');
@@ -376,31 +386,33 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    setStatus('');
   }
   async function requestGuide(){
-   if(!features.ai||aiAbort||destroyed||panelMode!=='ai'||!active()||!requirement.trim())return;collect();persist();
+   if(!features.ai||aiAbort||destroyed||!host.isConnected||panelMode!=='ai'||!active()||!requirement.trim())return;collect();persist();
    const snapshot=clone(currentDocument()),snapshotKey=fingerprint(snapshot),request=requirement,selected=activeId,epoch=++aiEpoch;
+   const isCurrent=()=>!destroyed&&host.isConnected&&epoch===aiEpoch&&panelMode==='ai'&&activeId===selected&&fingerprint(currentDocument())===snapshotKey&&requirement===request;
    const controller=new win.AbortController();aiAbort=controller;aiTask='guide';answer='';renderPanel();setStatus('');
    try{
     const response=await win.fetch('/drawing/guide',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({document:snapshot,requirement:request,language:root.DMateI18n?.getLanguage?.()||doc.documentElement.lang||'zh-CN'}),signal:controller.signal});
     let result;try{result=await response.json();}catch(_){throw new Error(uiText('AI 返回内容无效，请重试。'));}
+    if(!isCurrent())return;
     if(!response.ok||result.ok!==true||typeof result.answer!=='string'||!result.answer.trim())throw new Error(result.error||'AI 指导暂时失败，请重试。');
-    if(destroyed||epoch!==aiEpoch||activeId!==selected||fingerprint(currentDocument())!==snapshotKey||requirement!==request)return;
-    answer=result.answer;answerDocument=snapshotKey;answerRequirement=request;setStatus('');
-   }catch(error){if(!destroyed&&epoch===aiEpoch&&error?.name!=='AbortError')setStatus(error?.message||'AI 指导失败，请重试。');}
+    answer=result.answer;setStatus('');
+   }catch(error){if(isCurrent()&&error?.name!=='AbortError')setStatus(error?.message||'AI 指导失败，请重试。',isCurrent);}
    finally{if(epoch===aiEpoch){aiAbort=null;aiTask='';if(!destroyed)renderPanel();}}
   }
   async function requestGenerate(){
-   if(!features.ai||aiAbort||destroyed||panelMode!=='generate')return;
+   if(!features.ai||aiAbort||destroyed||!host.isConnected||panelMode!=='generate')return;
    const requestedRequirement=requirement.trim();if(!requestedRequirement)return;
    const request=requestedRequirement;
    if(pages.length>=50){setStatus('最多保留 50 张绘图，请先导出并删除不再需要的历史绘图。');return;}
    if(!root.DMateMathDiagram?.generate){setStatus(uiText('数学图生成模块未加载，请刷新后重试。','The diagram generator is not loaded. Refresh and try again.'));return;}
    const selected=activeId,epoch=++aiEpoch,controller=new win.AbortController();aiAbort=controller;aiTask='generate';answer='';renderPanel();setStatus('');
+   const isCurrent=()=>!destroyed&&host.isConnected&&epoch===aiEpoch&&panelMode==='generate'&&activeId===selected&&requirement.trim()===requestedRequirement;
    try{
     const result=await root.DMateMathDiagram.generate(request,root.DMateI18n?.getLanguage?.()||doc.documentElement.lang||'zh-CN',controller.signal);
-    if(destroyed||epoch!==aiEpoch||panelMode!=='generate'||activeId!==selected||requirement.trim()!==requestedRequirement)return;
+    if(!isCurrent())return;
     createPageFromDocument(result.document,result.title,requestedRequirement);
    }catch(error){
-    if(!destroyed&&epoch===aiEpoch&&error?.name!=='AbortError')setStatus(error?.message||uiText('数学图生成失败，请重试。','Diagram generation failed. Please try again.'));
+    if(isCurrent()&&error?.name!=='AbortError')setStatus(error?.message||uiText('数学图生成失败，请重试。','Diagram generation failed. Please try again.'),isCurrent);
    }finally{if(epoch===aiEpoch){aiAbort=null;aiTask='';if(!destroyed)renderPanel();}}
   }
   async function makeImage(){
