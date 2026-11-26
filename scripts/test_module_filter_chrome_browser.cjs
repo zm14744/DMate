@@ -162,6 +162,46 @@ async function moduleControls(page) {
   await noOverflow(page);
 }
 
+async function phoneToolbarRows(page, offline) {
+  if (!graphMobile(page)) return;
+  const viewport = page.viewportSize();
+  const controls = page.locator('#knowledgeGraphModal .graph-toolbar-left');
+  const measure = () => controls.evaluate(group => {
+    const box = node => node?.getClientRects().length ? node.getBoundingClientRect().toJSON() : null;
+    return { group:box(group), picker:box(group.querySelector('#knowledgeGraphCategoryTrigger')),
+      tabs:[...group.querySelectorAll('button[aria-controls="knowledgeGraphCanvas"]')].map(box).filter(Boolean) };
+  });
+  for (const width of [320, viewport.width]) {
+    await page.setViewportSize({ ...viewport, width });
+    await settle(page);
+    const {group, picker, tabs} = await measure();
+    assert.ok(picker && Math.abs(picker.left-group.left) < 1 && Math.abs(picker.right-group.right) < 1,
+      width + ': module picker spans the toolbar row');
+    if (offline) {
+      assert.equal(tabs.length, 0);
+      assert.ok(Math.abs(group.height - picker.height) < 1, 'The offline module picker occupies one row');
+      continue;
+    }
+    assert.equal(tabs.length, 3, 'The fixture exposes full, history and recent modes');
+    tabs.forEach((box, i) => {
+      assert.ok(Math.abs(box.top - tabs[0].top) < 1 && box.bottom <= picker.top,
+        width + ': every mode is on the first row above the module picker');
+      if (i) assert.ok(tabs[i-1].right <= box.left + 1, 'Adjacent modes do not overlap');
+    });
+  }
+  if (!offline) {
+    for (const id of ['knowledgeGraphHistoryBtn','knowledgeGraphScopeBtn']) {
+      await page.locator('#' + id).click();
+      await settle(page);
+      const {group, picker, tabs} = await measure();
+      assert.equal(picker, null);
+      assert.ok(Math.abs(group.height - tabs[0].height) < 1, 'Hiding the picker removes its whole grid row');
+    }
+    await page.locator('#knowledgeGraphFocusBtn').click();
+    await settle(page);
+  }
+}
+
 async function offlineHeader(page, wallpaper = false) {
   assert.equal(await page.locator('#offlineAppearanceToggle').count(), 0, 'The topbar palette button is removed');
   assert.equal(await page.locator('#offlineAppearanceBtn').count(), 1, 'Sidebar appearance action remains');
@@ -318,6 +358,7 @@ async function runCase(browser, width, theme, offline) {
       await page.waitForSelector('#knowledgeGraphCanvas .kg-section');
       await graphNavigationPaint(page);
     }
+    await phoneToolbarRows(page, offline);
     await moduleControls(page);
     if (offline) {
       await sidebarAppearance(page);

@@ -2,6 +2,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const { revealInterface } = require('./offline-vault-browser-fixtures.cjs');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const near = (actual, expected, message, tolerance = 2) => assert.ok(Math.abs(actual - expected) <= tolerance,
   message + ': ' + actual + ' vs ' + expected);
@@ -21,30 +22,40 @@ async function closeDrawer(page, kind) {
     && !document.body.classList.contains('mobile-tools-open'));
 }
 
-async function checkHeader(page, sidebar) {
-  const state = await page.locator(sidebar + ' > .mobile-drawer-head').evaluate(head => {
-    const button = head.querySelector('button'), box = head.getBoundingClientRect(), rect = button.getBoundingClientRect();
-    const style = getComputedStyle(button), walker = document.createTreeWalker(head, NodeFilter.SHOW_TEXT);
-    let node, visibleText = '';
-    while ((node = walker.nextNode())) {
-      if (!node.textContent.trim() || node.parentElement.closest('button')) continue;
-      const range = document.createRange(); range.selectNode(node);
-      const bounds = range.getBoundingClientRect();
-      if (bounds.width && bounds.height) visibleText += node.textContent.trim();
-    }
-    return { text: visibleText, width: rect.width, height: rect.height,
-      rightGap: box.right - rect.right, left: rect.left, background: style.backgroundColor, radius: style.borderRadius };
-  });
-  assert.equal(state.text, '', sidebar + ': top row contains only its close control');
+async function checkHeader(page, sidebar, titleSelector, closeSelector) {
+  const state = await page.locator(sidebar).evaluate((panel, { titleSelector, closeSelector }) => {
+    const title = panel.querySelector(titleSelector), close = panel.querySelector(closeSelector);
+    const box = panel.getBoundingClientRect(), rect = close.getBoundingClientRect(), row = title.getBoundingClientRect();
+    const eye = panel.querySelector('#offlineDrawerPrivacyToggle')?.getBoundingClientRect();
+    const text = document.createRange();
+    text.selectNodeContents(title);
+    return { text: title.innerText.trim(), width: rect.width, height: rect.height,
+      topInset: row.top - box.top, titleCenter:row.y + row.height / 2, textEnd:text.getBoundingClientRect().right,
+      closeCenter:rect.y + rect.height / 2, closeLeft:rect.left,
+      rightGap: box.right - parseFloat(getComputedStyle(panel).paddingRight) - rect.right,
+      eye:eye ? { center:eye.y + eye.height / 2, left:eye.left, right:eye.right } : null,
+      background:getComputedStyle(close).backgroundColor };
+  }, { titleSelector, closeSelector });
+  assert.ok(state.topInset >= 0 && state.topInset <= 38, sidebar + ': title starts in the first drawer row');
+  near(state.closeCenter, state.titleCenter, sidebar + ': the close control and title share a row');
+  assert.ok(state.textEnd <= (state.eye?.left ?? state.closeLeft), sidebar + ': header controls leave room for the title');
+  if (state.eye) {
+    assert.ok(state.eye.right <= state.closeLeft, 'The privacy button sits before the close button');
+    near(state.eye.center, state.titleCenter, 'The privacy button aligns with the DMate brand');
+  }
+  if (titleSelector === '.dmate-brand-copy') {
+    assert.match(state.text, /^DMate\s+离散数学智能辅学系统$/);
+  }
   assert.ok(state.width >= 12 && state.height >= 12, sidebar + ': close dot is visible');
   near(state.width, state.height, sidebar + ': close dot is round', .5);
-  assert.ok(state.rightGap >= -1 && state.rightGap <= 8, sidebar + ': close stays at the right edge');
+  assert.ok(Math.abs(state.rightGap) <= 8, sidebar + ': close stays at the padded right edge');
   const [red, green, blue] = state.background.match(/[\d.]+/g).map(Number);
   assert.ok(red > 180 && green < 120 && blue < 120, sidebar + ': close dot remains red');
 }
 
 async function checkTools(page, empty) {
   await page.waitForFunction(() => !document.getElementById('conversationInfoSection').hasAttribute('data-info-animating'));
+  await checkHeader(page, '#learningToolsPanel', '.learning-title > div', '#mobileToolsClose');
   const state = await page.evaluate(() => {
     const section = document.getElementById('conversationInfoSection');
     const info = document.getElementById('info'), box = info.getBoundingClientRect(), css = getComputedStyle(info);
@@ -67,7 +78,7 @@ async function checkTools(page, empty) {
       centerY: box.y + box.height / 2, textCenterY: text.y + text.height / 2,
       contentLeft: box.left + info.clientLeft + parseFloat(css.paddingLeft), lines,
       infoBottom: box.bottom, separatorTop: panelBox.top, border: parseFloat(getComputedStyle(panel).borderTopWidth),
-      headingTop: secondBox.top, firstLeft: firstBox.left, secondLeft: secondBox.left,
+      toolsHeadingBottom: secondBox.bottom, infoHeadingTop: firstBox.top, firstLeft: firstBox.left, secondLeft: secondBox.left,
       firstStyle: style(first), secondStyle: style(second), firstText: first.textContent.trim(), secondText: second.textContent.trim(),
       secondVisible: Boolean(secondBox.width && secondBox.height) };
   });
@@ -84,7 +95,7 @@ async function checkTools(page, empty) {
   } else {
     assert.equal(state.sectionHidden,false,'A real message makes conversation information available');
     assert.ok(state.border > 0 && state.separatorTop >= state.infoBottom, 'Section separator follows conversation information');
-    assert.ok(state.headingTop > state.separatorTop + state.border, 'Learning tools heading sits below the separator');
+    assert.ok(state.toolsHeadingBottom <= state.infoHeadingTop, 'Conversation information starts below the drawer title');
     near(state.firstLeft, state.secondLeft, 'Section headings share the same left alignment');
     assert.ok(state.lines.length >= 2, 'New conversation produces real information lines');
     for (const center of state.lines) near(center, state.center, 'Conversation information lines are centered');
@@ -156,6 +167,34 @@ async function checkStationaryBackground(page) {
   }
 }
 
+async function checkOfflineDrawer(browser) {
+  const page = await browser.newPage({ viewport:{ width:390, height:900 }, isMobile:true, hasTouch:true });
+  try {
+    await page.goto(baseURL + '/offline', { waitUntil:'networkidle' });
+    await revealInterface(page);
+    const sidebar = page.locator('#offlineSidebar');
+    for (const width of [390, 820]) {
+      await page.setViewportSize({ width, height:900 });
+      await page.locator('#offlineNavToggle').tap();
+      await page.waitForFunction(() => document.body.classList.contains('offline-nav-open'));
+      await sidebar.evaluate(async node => {
+        await Promise.all(node.getAnimations().map(animation => animation.finished.catch(() => {})));
+      });
+      await checkHeader(page, '#offlineSidebar', '.dmate-brand-copy', '#offlineNavClose');
+      const label = sidebar.getByText('学习工具', { exact:true });
+      assert.equal(await label.count(), 1, 'The offline drawer has one learning tools label');
+      const [brand, heading, firstTool] = await Promise.all([
+        sidebar.locator('.dmate-brand-copy').boundingBox(), label.boundingBox(), sidebar.locator('.offline-nav-item').first().boundingBox()
+      ]);
+      assert.ok(heading && brand.y + brand.height <= heading.y && heading.y + heading.height <= firstTool.y,
+        'The learning tools label separates the brand and tool list');
+      await page.locator('#offlineNavClose').tap();
+      await page.waitForFunction(() => !document.body.classList.contains('offline-nav-open'));
+    }
+    console.log('PASS offline phone/tablet: brand, privacy and close share the header, with one tools label below');
+  } finally { await page.close(); }
+}
+
 async function checkDesktopInfo(browser,theme) {
   const page=await browser.newPage({viewport:{width:1440,height:900}});
   try {
@@ -191,11 +230,10 @@ async function runCase(browser, width, theme) {
     }, theme);
     await page.waitForFunction(() => document.getElementById('conversationInfoSection')?.hidden);
     await openDrawer(page, 'tools');
-    await checkHeader(page, '#learningToolsPanel');
     await checkTools(page, true);
     await closeDrawer(page, 'tools');
     await openDrawer(page, 'left');
-    await checkHeader(page, '#conversationSidebar');
+    await checkHeader(page, '#conversationSidebar', '.dmate-brand-copy', '#mobileNavClose');
     const button = page.locator('#newChatBtn');
     const label = await button.evaluate(node => {
       const icon = node.querySelector('svg'), text = node.querySelector('.dmate-ui-label');
@@ -243,6 +281,7 @@ async function runCase(browser, width, theme) {
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
     for (const width of [390, 620, 820]) await runCase(browser, width, 'dark');
+    await checkOfflineDrawer(browser);
     await checkDesktopInfo(browser,'dark');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

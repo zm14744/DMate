@@ -1,4 +1,4 @@
-/* The learning heading takes the empty information heading's exact place.
+/* Learning tools move continuously when the information section changes.
  * Exercise real rendered frames, rapid reversals and the current session data;
  * no model or backend study operation is needed. Start Flask first. */
 'use strict';
@@ -91,8 +91,9 @@ async function run(browser,width,theme,language='zh-CN') {
       const buttons=['wrongBookBtn','conceptNotebookBtn','knowledgeGraphBtn','graphDrawingBtn','learningReviewBtn'].map(id=>document.getElementById(id));
       window.__learningPanelSnapshot=()=>{
         const current=document.getElementById('conversationInfoSection'),title=document.querySelector('#learningToolsPanel .learning-title');
-        const box=current.getBoundingClientRect(),rect=title.getBoundingClientRect();
-        return {time:performance.now(),height:box.height,x:rect.x,y:rect.y,hidden:current.hidden,
+        const box=current.getBoundingClientRect(),titleBox=title.getBoundingClientRect();
+        const rect=matchMedia('(max-width:1100px)').matches ? buttons[0].getBoundingClientRect() : titleBox;
+        return {time:performance.now(),height:box.height,x:rect.x,y:rect.y,titleY:titleBox.top,hidden:current.hidden,
           ariaHidden:current.getAttribute('aria-hidden'),animating:current.hasAttribute('data-info-animating'),
           hasInfo:document.getElementById('learningToolsPanel').dataset.hasConversationInfo,
           separator:parseFloat(getComputedStyle(title.parentElement).borderTopWidth),
@@ -114,11 +115,19 @@ async function run(browser,width,theme,language='zh-CN') {
     const visible=appearing.frames.at(-1);
     assert.equal(visible.hidden,false);assert.equal(visible.hasInfo,'true');
     const informationHeading=await page.locator('#conversationInfoHeading').boundingBox();
-    near(empty.x,informationHeading.x,label+': learning tools occupy the original information heading left position');
-    near(empty.y,informationHeading.y,label+': learning tools occupy the original information heading top position');
+    if(width>1100) {
+      near(empty.x,informationHeading.x,label+': learning tools occupy the original information heading left position');
+      near(empty.y,informationHeading.y,label+': learning tools occupy the original information heading top position');
+    } else {
+      assert.ok(informationHeading.y>empty.titleY,label+': conversation information appears below the drawer title');
+    }
     assert.ok((await page.locator('#info .conversation-info-line').count())>=2,label+': real information lines appear');
     const growing=await transition(page,'grow');assertMotion(growing,label+'/content-height',10);
     const hiding=await transition(page,'hide');assertMotion(hiding,label+'/hide');
+    if(width<=1100) {
+      for(const change of [appearing,growing,hiding]) for(const row of change.frames)
+        near(row.titleY,empty.titleY,label+': mobile drawer title stays in its header as tools move');
+    }
     assert.equal(hiding.sync.ariaHidden,'true',label+': collapsing information immediately leaves the accessibility tree');
     assert.equal(hiding.frames.at(-1).hidden,true);near(hiding.frames.at(-1).y,empty.y,label+': final collapsed position matches the original top');
 
