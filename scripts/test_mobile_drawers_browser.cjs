@@ -36,9 +36,16 @@ async function checkHeader(page, sidebar, titleSelector, closeSelector) {
       eye:eye ? { center:eye.y + eye.height / 2, left:eye.left, right:eye.right } : null,
       background:getComputedStyle(close).backgroundColor };
   }, { titleSelector, closeSelector });
-  assert.ok(state.topInset >= 0 && state.topInset <= 38, sidebar + ': title starts in the first drawer row');
-  near(state.closeCenter, state.titleCenter, sidebar + ': the close control and title share a row');
-  assert.ok(state.textEnd <= (state.eye?.left ?? state.closeLeft), sidebar + ': header controls leave room for the title');
+  if (sidebar === '#learningToolsPanel') {
+    const head = page.locator(sidebar + ' > .mobile-drawer-head');
+    assert.equal(await head.innerText(), await head.locator(closeSelector).innerText(),
+      'The mobile tools header contains only its close control');
+    assert.ok(state.titleCenter > state.closeCenter + state.height / 2, 'The first section heading follows the close row');
+  } else {
+    assert.ok(state.topInset >= 0 && state.topInset <= 38, sidebar + ': title starts in the first drawer row');
+    near(state.closeCenter, state.titleCenter, sidebar + ': the close control and title share a row');
+    assert.ok(state.textEnd <= (state.eye?.left ?? state.closeLeft), sidebar + ': header controls leave room for the title');
+  }
   if (state.eye) {
     assert.ok(state.eye.right <= state.closeLeft, 'The privacy button sits before the close button');
     near(state.eye.center, state.titleCenter, 'The privacy button aligns with the DMate brand');
@@ -55,7 +62,7 @@ async function checkHeader(page, sidebar, titleSelector, closeSelector) {
 
 async function checkTools(page, empty) {
   await page.waitForFunction(() => !document.getElementById('conversationInfoSection').hasAttribute('data-info-animating'));
-  await checkHeader(page, '#learningToolsPanel', '.learning-title > div', '#mobileToolsClose');
+  await checkHeader(page, '#learningToolsPanel', empty ? '.learning-title > div' : '#conversationInfoHeading > div', '#mobileToolsClose');
   const state = await page.evaluate(() => {
     const section = document.getElementById('conversationInfoSection');
     const info = document.getElementById('info'), box = info.getBoundingClientRect(), css = getComputedStyle(info);
@@ -78,7 +85,7 @@ async function checkTools(page, empty) {
       centerY: box.y + box.height / 2, textCenterY: text.y + text.height / 2,
       contentLeft: box.left + info.clientLeft + parseFloat(css.paddingLeft), lines,
       infoBottom: box.bottom, separatorTop: panelBox.top, border: parseFloat(getComputedStyle(panel).borderTopWidth),
-      toolsHeadingBottom: secondBox.bottom, infoHeadingTop: firstBox.top, firstLeft: firstBox.left, secondLeft: secondBox.left,
+      headingTop: secondBox.top, firstLeft: firstBox.left, secondLeft: secondBox.left,
       firstStyle: style(first), secondStyle: style(second), firstText: first.textContent.trim(), secondText: second.textContent.trim(),
       secondVisible: Boolean(secondBox.width && secondBox.height) };
   });
@@ -95,7 +102,7 @@ async function checkTools(page, empty) {
   } else {
     assert.equal(state.sectionHidden,false,'A real message makes conversation information available');
     assert.ok(state.border > 0 && state.separatorTop >= state.infoBottom, 'Section separator follows conversation information');
-    assert.ok(state.toolsHeadingBottom <= state.infoHeadingTop, 'Conversation information starts below the drawer title');
+    assert.ok(state.headingTop > state.separatorTop + state.border, 'Learning tools heading sits below the separator');
     near(state.firstLeft, state.secondLeft, 'Section headings share the same left alignment');
     assert.ok(state.lines.length >= 2, 'New conversation produces real information lines');
     for (const center of state.lines) near(center, state.center, 'Conversation information lines are centered');
@@ -167,31 +174,42 @@ async function checkStationaryBackground(page) {
   }
 }
 
+async function checkNewChatSpacing(page) {
+  const gaps = await page.locator('#conversationSidebar').evaluate(sidebar => {
+    const brand = sidebar.querySelector('.dmate-brand').getBoundingClientRect();
+    const button = sidebar.querySelector('#newChatBtn').getBoundingClientRect();
+    const sessions = sidebar.querySelector('#sessions').getBoundingClientRect();
+    return { above:button.top - brand.bottom, below:sessions.top - button.bottom };
+  });
+  assert.ok(gaps.above >= 15.5 && gaps.below >= 15.5, 'The new chat button has space above and below: ' + JSON.stringify(gaps));
+}
+
 async function checkOfflineDrawer(browser) {
   const page = await browser.newPage({ viewport:{ width:390, height:900 }, isMobile:true, hasTouch:true });
   try {
     await page.goto(baseURL + '/offline', { waitUntil:'networkidle' });
     await revealInterface(page);
     const sidebar = page.locator('#offlineSidebar');
-    for (const width of [390, 820]) {
+    for (const width of [390, 820, 1440]) {
       await page.setViewportSize({ width, height:900 });
-      await page.locator('#offlineNavToggle').tap();
-      await page.waitForFunction(() => document.body.classList.contains('offline-nav-open'));
+      if (width <= 1100) {
+        await page.locator('#offlineNavToggle').tap();
+        await page.waitForFunction(() => document.body.classList.contains('offline-nav-open'));
+      } else if (await page.locator('#offlineDesktopSidebarOpen').isVisible()) {
+        await page.locator('#offlineDesktopSidebarOpen').click();
+      }
       await sidebar.evaluate(async node => {
         await Promise.all(node.getAnimations().map(animation => animation.finished.catch(() => {})));
       });
-      await checkHeader(page, '#offlineSidebar', '.dmate-brand-copy', '#offlineNavClose');
-      const label = sidebar.getByText('学习工具', { exact:true });
-      assert.equal(await label.count(), 1, 'The offline drawer has one learning tools label');
-      const [brand, heading, firstTool] = await Promise.all([
-        sidebar.locator('.dmate-brand-copy').boundingBox(), label.boundingBox(), sidebar.locator('.offline-nav-item').first().boundingBox()
-      ]);
-      assert.ok(heading && brand.y + brand.height <= heading.y && heading.y + heading.height <= firstTool.y,
-        'The learning tools label separates the brand and tool list');
-      await page.locator('#offlineNavClose').tap();
-      await page.waitForFunction(() => !document.body.classList.contains('offline-nav-open'));
+      assert.equal(await sidebar.getByText('学习工具', { exact:true }).count(), 0, 'The offline sidebar omits the tools heading');
+      await sidebar.locator('.offline-nav-item').first().waitFor({ state:'visible' });
+      if (width <= 1100) {
+        await checkHeader(page, '#offlineSidebar', '.dmate-brand-copy', '#offlineNavClose');
+        await page.locator('#offlineNavClose').tap();
+        await page.waitForFunction(() => !document.body.classList.contains('offline-nav-open'));
+      }
     }
-    console.log('PASS offline phone/tablet: brand, privacy and close share the header, with one tools label below');
+    console.log('PASS offline phone, tablet and desktop: tools are accessible below the brand without a section title');
   } finally { await page.close(); }
 }
 
@@ -203,6 +221,8 @@ async function checkDesktopInfo(browser,theme) {
       appearanceSettings.mode=theme;applyAppearanceSettings({save:false});newChat();
       getCurrent().messages.push({role:'user',text:'核对有实际消息时的对话信息。'});renderInfo();
     },theme);
+    if (await page.locator('#desktopSidebarOpen').isVisible()) await page.locator('#desktopSidebarOpen').click();
+    await checkNewChatSpacing(page);
     await page.locator('#desktopToolsBtn').click();
     await page.waitForFunction(() => !document.getElementById('conversationInfoSection').hasAttribute('data-info-animating'));
     const lines=await page.locator('#info').evaluate(info => {
@@ -234,6 +254,7 @@ async function runCase(browser, width, theme) {
     await closeDrawer(page, 'tools');
     await openDrawer(page, 'left');
     await checkHeader(page, '#conversationSidebar', '.dmate-brand-copy', '#mobileNavClose');
+    await checkNewChatSpacing(page);
     const button = page.locator('#newChatBtn');
     const label = await button.evaluate(node => {
       const icon = node.querySelector('svg'), text = node.querySelector('.dmate-ui-label');

@@ -173,6 +173,7 @@ option {
     align-items:center;
     justify-content:flex-start;
     gap:8px;
+    margin-block:6px 16px !important;
     text-align:left;
 }
 
@@ -4003,20 +4004,6 @@ body.has-custom-background .input {
         min-height:48px;
         margin:0 0 10px;
         padding:0 36px 0 2px;
-    }
-
-    #learningToolsPanel > .mobile-drawer-tools-row {
-        min-height:48px;
-        padding:0 2px;
-    }
-
-    #learningToolsPanel.right > .learning-panel > .panel-heading-row.learning-title {
-        position:absolute;
-        top:max(8px,env(safe-area-inset-top));
-        right:50px;
-        left:14px;
-        min-height:48px;
-        margin:0 !important;
     }
 
     .mobile-drawer-close {
