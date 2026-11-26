@@ -70,8 +70,6 @@
         "界面语言": "Interface language",
         "语言 / Language": "Language",
         "简体中文": "Simplified Chinese",
-        "显示模式": "Display mode",
-        "黑色": "Dark",
         "蓝色": "Blue",
         "紫色": "Purple",
         "主题色": "Accent color",

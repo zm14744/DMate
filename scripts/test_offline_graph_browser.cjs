@@ -653,10 +653,7 @@ async function runCase(browser, width, theme) {
     await page.goto(baseURL + '/offline', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => navigator.serviceWorker.controller && document.documentElement.dataset.offlineReady === 'true');
     await revealInterface(page);
-    await page.evaluate(() => DMateOfflineAppearance.open());
-    assert.equal(await page.locator('#appearanceModal [data-appearance-mode]').getAttribute('data-appearance-mode'),theme);
-    await page.locator('#appearanceDone').click();
-    await page.locator('#appearanceModal').waitFor({state:'hidden'});
+    assert.equal(await page.locator('html').getAttribute('data-appearance-theme'), theme);
     await openOfflineGraph(page);
     await inlineLayout(page);
     const available = await frame(page).locator('.graph-modal-card').evaluate(card => {

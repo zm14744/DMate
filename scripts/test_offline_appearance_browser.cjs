@@ -58,13 +58,9 @@ async function appearance(page) {
 async function appearanceControls(page) {
   await checkSliders(page);
   assert.equal(await page.locator('#appearanceModal [data-appearance-font]').count(), 0);
-  const mode = page.locator('#appearanceModal [data-appearance-mode]');
-  assert.equal(await mode.count(), 1);
-  assert.equal(await mode.getAttribute('data-appearance-mode'), 'dark');
-  assert.equal(await mode.innerText(), '黑色');
-  assert.equal(await mode.getAttribute('aria-pressed'), 'true');
-  assert.equal(await mode.isDisabled(), true);
-  assert.equal(await mode.locator('xpath=ancestor::div[contains(@class,"appearance-section")][1]').locator('.appearance-section-title').innerText(), '显示模式');
+  const dialog = page.locator('#appearanceModal');
+  assert.equal(await dialog.getByText(/^(显示模式|Display mode)$/i).count(), 0);
+  assert.equal(await dialog.locator('[data-appearance-mode]').count(), 0);
   assert.deepEqual(await page.locator('#appearanceModal [data-appearance-accent]').evaluateAll(nodes =>
     nodes.map(node => node.dataset.appearanceAccent).sort()), ['blue', 'purple']);
   const separators = await page.locator('#appearanceModal').evaluate(dialog => [
@@ -75,7 +71,7 @@ async function appearanceControls(page) {
     'Appearance groups and dialog chrome have no internal divider lines');
   return page.locator('#appearanceModal').evaluate(dialog => {
     const selectors = ['.appearance-card', '.modal-head', '.appearance-section-title',
-      '[data-appearance-mode="dark"]', '[data-appearance-accent="purple"]',
+      '[data-appearance-accent="blue"]', '[data-appearance-accent="purple"]',
       '[data-appearance-fit="contain"]', '#appearanceMaskRange', '#appearanceBlurRange',
       '#appearancePanelRange', '#appearanceBubbleRange', '#appearanceDone', '#appearanceClose'];
     return Object.fromEntries(selectors.map(selector => {

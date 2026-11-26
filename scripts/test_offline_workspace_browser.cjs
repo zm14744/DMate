@@ -320,7 +320,7 @@ async function appearanceControls(page, width, theme, reference) {
   await openAppearance();
   const dialog = page.locator('#appearanceModal');
   await dialog.waitFor();
-  assert.deepEqual(await dialog.locator('[data-appearance-mode]').evaluateAll(nodes => nodes.map(node => node.dataset.appearanceMode).sort()), ['dark']);
+  assert.equal(await dialog.locator('[data-appearance-mode]').count(), 0);
   assert.deepEqual(await dialog.locator('[data-appearance-accent]').evaluateAll(nodes => nodes.map(node => node.dataset.appearanceAccent).sort()), ['blue', 'purple']);
   assert.equal(await dialog.locator('[data-appearance-font]').count(), 0, 'Appearance uses the standard text size');
   assert.equal(await dialog.locator('[data-appearance-fit]').count(), 2, 'Both wallpaper fit modes are available');
