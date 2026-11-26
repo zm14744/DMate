@@ -30,6 +30,39 @@ function clearButton(input) {
   return input.locator('xpath=..').locator('button.dmate-search-clear');
 }
 
+async function focusPaint(input) {
+  return input.evaluate(node => {
+    const css = getComputedStyle(node);
+    return Object.fromEntries(['borderWidth', 'borderStyle', 'borderColor', 'backgroundColor', 'backgroundImage',
+      'boxShadow', 'filter', 'outlineStyle', 'outlineWidth'].map(property => [property, css[property]]));
+  });
+}
+
+async function checkInputFocus(input, { typeText = false } = {}) {
+  const page = input.page();
+  await input.evaluate(node => node.blur());
+  await settle(page);
+  const idle = await focusPaint(input);
+  if (isMobile(page)) await input.tap(); else await input.click();
+  await settle(page);
+  assert.equal(await input.evaluate(node => document.activeElement === node), true);
+  assert.equal(await page.locator('html').getAttribute('data-dmate-focus-input'), 'pointer');
+  assert.deepEqual(await focusPaint(input), idle, 'Clicking or tapping an editable field keeps its resting paint');
+  if (typeText) {
+    await page.keyboard.type('entry content');
+    assert.equal(await input.inputValue(), 'entry content');
+    assert.equal(await page.locator('html').getAttribute('data-dmate-focus-input'), 'pointer');
+    assert.deepEqual(await focusPaint(input), idle, 'Typing into the clicked field keeps its resting paint');
+  }
+
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await settle(page);
+  assert.equal(await input.evaluate(node => node === document.activeElement && node.matches(':focus-visible')), true,
+    'Keyboard navigation returns visible focus to the field');
+  assert.equal(await page.locator('html').getAttribute('data-dmate-focus-input'), null);
+}
+
 async function searchStyle(input) {
   return input.evaluate(input => {
     const css = getComputedStyle(input), wrapper = getComputedStyle(input.parentElement);
@@ -86,6 +119,7 @@ async function checkSearch(input, expectedStyle) {
   assert.equal(actual.radius, '999px', 'Search retains the pill shape at every viewport');
   assert.deepEqual(actual.wrapperBorder, ['0px', '0px', '0px', '0px'], 'Only the input paints a border');
   if (expectedStyle) assert.deepEqual(actual, expectedStyle, 'Remaining searches use the shared surface');
+  await checkInputFocus(input);
   return actual;
 }
 
@@ -200,6 +234,8 @@ async function offlineSearches(page) {
   await expectClear(notebook, false);
   await notebook.fill('__missing_local_note__');
   await clearSearch(notebook);
+  await page.locator('#addNote').click();
+  await checkInputFocus(page.locator('#noteList .dcn-original'), { typeText: true });
   await page.evaluate(() => window.DMateI18n.setLanguage('en', false));
   await checkSearchLabel(notebook, 'Search');
   await noOverflow(page, 'Offline notebook search');
@@ -233,12 +269,14 @@ async function onlineSearches(page, reference) {
   await page.locator('#conceptNotebookDialog').waitFor({ state: 'visible' });
   const notebook = page.locator('#conceptNotebookDialog .dcn-search');
   await checkSearch(notebook, wrongStyle);
+  assert.notEqual((await searchStyle(notebook)).color, wrongStyle.color, 'Keyboard focus retains the online search border cue');
   assert.ok((await clearButton(notebook).getAttribute('class')).includes('dcn-search-clear'), 'Reuse notebook clear control');
   await expectClear(notebook, false);
   for (const name of ['Alpha Graph', 'Beta Logic']) {
     await page.locator('#conceptNotebookDialog .dcn-new').click();
     await page.locator('#conceptNotebookDialog .dcn-title').fill(name);
   }
+  await checkInputFocus(page.locator('#conceptNotebookDialog .dcn-original'), { typeText: true });
   assert.equal(await page.locator('.dcn-list .dcn-note').count(), 2);
   await notebook.fill('Alpha');
   assert.equal(await page.locator('.dcn-list .dcn-note').count(), 1);

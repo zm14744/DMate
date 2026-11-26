@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script src="/extension/api-bridge.js"></script>
+<script src="/static/control-focus.js"></script>
 <link rel="preload" as="style" href="/static/chat-composer.css?v=edge-1.0.12">
 <link rel="preload" as="script" href="/static/script.js?v=edge-module-31">
 <link rel="preload" as="script" href="/static/vendor/mathjax-3.2.2/es5/tex-svg.js">
@@ -362,7 +363,7 @@ option {
     outline:none;
 }
 
-.input input:focus {
+:root:not([data-dmate-focus-input="pointer"]) .input input:focus {
     border-color:var(--accent);
 }
 
@@ -1341,7 +1342,7 @@ input[type="search"]::-webkit-search-cancel-button {
     line-height:1.6;
 }
 
-.wrong-safe-body textarea:focus {
+:root:not([data-dmate-focus-input="pointer"]) .wrong-safe-body textarea:focus {
     outline:none;
     border-color:var(--accent);
     box-shadow:0 0 0 2px rgba(59,130,246,.14);
@@ -5177,7 +5178,7 @@ body[data-appearance-theme="dark"] {
     outline:none;
 }
 
-.account-field input:focus {
+:root:not([data-dmate-focus-input="pointer"]) .account-field input:focus {
     border-color:var(--accent);
 }
 
@@ -5329,7 +5330,7 @@ body[data-appearance-theme="dark"] {
     outline:none;
 }
 
-.account-code-row input:focus {
+:root:not([data-dmate-focus-input="pointer"]) .account-code-row input:focus {
     border-color:var(--accent);
 }
 
@@ -5712,7 +5713,7 @@ body[data-appearance-theme="dark"] .input input:hover {
     box-shadow:inset 0 0 0 1px #454545;
 }
 
-body[data-appearance-theme="dark"] .input input:focus {
+:root:not([data-dmate-focus-input="pointer"]) body[data-appearance-theme="dark"] .input input:focus {
     border-color:transparent;
     box-shadow:inset 0 0 0 1px #565656;
 }
@@ -5845,7 +5846,7 @@ body[data-appearance-theme="dark"] .input input {
 body[data-appearance-theme="dark"] .input input:hover {
     border-color:#454545 !important;
 }
-body[data-appearance-theme="dark"] .input input:focus {
+:root:not([data-dmate-focus-input="pointer"]) body[data-appearance-theme="dark"] .input input:focus {
     border-color:#565656 !important;
     box-shadow:none !important;
 }
@@ -6242,7 +6243,7 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
     body[data-appearance-theme="dark"] .input input:hover {
         border-color:#454545 !important;
     }
-    body[data-appearance-theme="dark"] .input input:focus {
+    :root:not([data-dmate-focus-input="pointer"]) body[data-appearance-theme="dark"] .input input:focus {
         border-color:#565656 !important;
     }
 }
@@ -7098,7 +7099,7 @@ body[data-appearance-theme] #ocrCancelBtn {
         background:rgba(47,47,47,.94) !important;
         border-color:#3a3a3a !important;
     }
-    body[data-appearance-theme] .input input:focus {
+    :root:not([data-dmate-focus-input="pointer"]) body[data-appearance-theme] .input input:focus {
         border-color:var(--accent) !important;
     }
 
@@ -7883,8 +7884,8 @@ body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
 <link rel="stylesheet" href="/static/learning-report.css?v=edge-1.0.4">
 <link rel="stylesheet" href="/static/red-circle-controls.css?v=edge-1.0.4">
 <style>
-/* Keep focus feedback inside the control, without a blue or red outer ring.
-   Important layer declarations also override the older themed focus rules. */
+/* Pointer interaction keeps the control's idle paint; keyboard navigation
+   retains the component's existing focus feedback. */
 button, input, textarea, select, summary, [role="button"], .image-picker-wrap, label {
     -webkit-tap-highlight-color:transparent;
 }
@@ -7894,8 +7895,9 @@ button, input, textarea, select, summary, [role="button"], .image-picker-wrap, l
         outline-offset:0 !important;
         box-shadow:none !important;
     }
-    input:not([type="checkbox"]):not([type="radio"]):is(:focus, :focus-visible),
-    textarea:is(:focus, :focus-visible), select:is(:focus, :focus-visible) {
+    :root:not([data-dmate-focus-input="pointer"]) input:not([type="checkbox"]):not([type="radio"]):is(:focus, :focus-visible),
+    :root:not([data-dmate-focus-input="pointer"]) textarea:is(:focus, :focus-visible),
+    :root:not([data-dmate-focus-input="pointer"]) select:is(:focus, :focus-visible) {
         border-color:var(--border-strong,#cbd5e1) !important;
     }
     .image-picker-wrap:focus-within > #imageBtn,

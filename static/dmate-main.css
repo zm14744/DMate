@@ -354,7 +354,7 @@ option {
     outline:none;
 }
 
-.input input:focus {
+:root:not([data-dmate-focus-input="pointer"]) .input input:focus {
     border-color:var(--accent);
 }
 
@@ -1392,7 +1392,7 @@ input[type="search"]::-webkit-search-cancel-button {
     line-height:1.6;
 }
 
-.wrong-safe-body textarea:focus {
+:root:not([data-dmate-focus-input="pointer"]) .wrong-safe-body textarea:focus {
     outline:none;
     border-color:var(--accent);
     box-shadow:0 0 0 2px rgba(59,130,246,.14);
@@ -5234,7 +5234,7 @@ body[data-appearance-theme="dark"] {
     outline:none;
 }
 
-.account-field input:focus {
+:root:not([data-dmate-focus-input="pointer"]) .account-field input:focus {
     border-color:var(--accent);
 }
 
@@ -5386,7 +5386,7 @@ body[data-appearance-theme="dark"] {
     outline:none;
 }
 
-.account-code-row input:focus {
+:root:not([data-dmate-focus-input="pointer"]) .account-code-row input:focus {
     border-color:var(--accent);
 }
 
@@ -5756,7 +5756,7 @@ body[data-appearance-theme="dark"] .input input:hover {
     box-shadow:inset 0 0 0 1px #454545;
 }
 
-body[data-appearance-theme="dark"] .input input:focus {
+:root:not([data-dmate-focus-input="pointer"]) body[data-appearance-theme="dark"] .input input:focus {
     border-color:transparent;
     box-shadow:inset 0 0 0 1px #565656;
 }
@@ -5890,7 +5890,7 @@ body[data-appearance-theme="dark"] .input input {
 body[data-appearance-theme="dark"] .input input:hover {
     border-color:#454545 !important;
 }
-body[data-appearance-theme="dark"] .input input:focus {
+:root:not([data-dmate-focus-input="pointer"]) body[data-appearance-theme="dark"] .input input:focus {
     border-color:#565656 !important;
     box-shadow:none !important;
 }
@@ -6285,7 +6285,7 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
     body[data-appearance-theme="dark"] .input input:hover {
         border-color:#454545 !important;
     }
-    body[data-appearance-theme="dark"] .input input:focus {
+    :root:not([data-dmate-focus-input="pointer"]) body[data-appearance-theme="dark"] .input input:focus {
         border-color:#565656 !important;
     }
 }
@@ -7180,7 +7180,7 @@ body[data-appearance-theme] #ocrCancelBtn {
         background:rgba(47,47,47,.94) !important;
         border-color:#3a3a3a !important;
     }
-    body[data-appearance-theme] .input input:focus {
+    :root:not([data-dmate-focus-input="pointer"]) body[data-appearance-theme] .input input:focus {
         border-color:var(--accent) !important;
     }
 

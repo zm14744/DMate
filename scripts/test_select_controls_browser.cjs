@@ -51,10 +51,8 @@ async function checkChooser(page, selectedLabel) {
   await noOverflow(page, 'Mobile choices');
 }
 
-async function openChoice(page, id, trigger) {
-  const select = page.locator('#' + id);
+async function openChoice(page, select, source = select) {
   const label = await select.evaluate(select => select.selectedOptions[0]?.label || '');
-  const source = trigger && await page.locator(trigger).isVisible() ? page.locator(trigger) : select;
   await source.tap();
   await modal(page).waitFor({ state: 'visible' });
   assert.equal(await modal(page).evaluate(dialog => dialog.open), true);
@@ -62,23 +60,67 @@ async function openChoice(page, id, trigger) {
   return source;
 }
 
-async function choose(page, id, value, trigger) {
-  const select = page.locator('#' + id);
+function paint(control) {
+  return control.evaluate(node => {
+    const css = getComputedStyle(node);
+    return Object.fromEntries(['borderColor','borderWidth','borderStyle','backgroundColor','backgroundImage',
+      'boxShadow','filter','outlineStyle','outlineWidth'].map(key => [key, css[key]]));
+  });
+}
+
+async function selectValue(page, select, value, source = select) {
   const label = await select.evaluate((select, value) => [...select.options].find(option => option.value === value)?.label, value);
-  assert.ok(label, id + ': requested canonical value exists');
+  assert.ok(label, 'The requested canonical value exists');
+  await page.mouse.move(0, 0);
+  await source.blur();
+  await settle(page);
+  const idle = await paint(source);
+  const quiet = async () => {
+    await settle(page);
+    assert.equal(await page.locator('html').getAttribute('data-dmate-focus-input'), 'pointer');
+    assert.deepEqual(await paint(source), idle, 'Pointer activation preserves the idle paint for ' + source);
+  };
   if (mobile(page)) {
-    await openChoice(page, id, trigger);
+    await openChoice(page, select, source);
+    await quiet();
     await modal(page).getByRole('radio', { name: label, exact: true }).tap();
     await modal(page).waitFor({ state: 'hidden' });
+    await quiet();
   } else {
     await select.click();
     assert.equal(await modal(page).evaluate(dialog => dialog.open), false, 'Desktop click keeps native choices');
+    assert.ok(await select.evaluate(node => node === document.activeElement), 'The pointer focuses the native select');
+    await quiet();
     await page.keyboard.press('Escape');
     await select.selectOption(value);
   }
-  await page.waitForFunction(({ id, value }) => document.getElementById(id).value === value, { id, value });
   await settle(page);
   assert.equal(await select.inputValue(), value);
+}
+
+async function choose(page, id, value, trigger) {
+  const select = page.locator('#' + id);
+  const source = trigger && await page.locator(trigger).isVisible() ? page.locator(trigger) : select;
+  await selectValue(page, select, value, source);
+  return source;
+}
+
+async function keyboardReturn(page, source) {
+  await source.focus();
+  if (mobile(page)) {
+    assert.equal(await page.locator('html').getAttribute('data-dmate-focus-input'), 'pointer');
+    await page.keyboard.press('Enter');
+    await modal(page).waitFor();
+    assert.equal(await page.locator('html').getAttribute('data-dmate-focus-input'), null,
+      'Keyboard activation works immediately after choosing by touch');
+    await page.keyboard.press('Escape');
+    await modal(page).waitFor({ state: 'hidden' });
+  }
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  assert.equal(await page.locator('html').getAttribute('data-dmate-focus-input'), null);
+  assert.ok(await source.evaluate(node => node === document.activeElement && node.matches(':focus-visible')),
+    'Tab navigation returns visible keyboard focus to the chooser');
 }
 
 async function navigate(page, panel) {
@@ -115,7 +157,7 @@ async function cancellationAndDisabled(page) {
     const option = new Option('暂不可用选项', '__disabled_select_test__');
     option.disabled = true; select.add(option);
   });
-  await openChoice(page, id);
+  await openChoice(page, select);
   const disabled = modal(page).getByRole('radio', { name: '暂不可用选项', exact: true });
   assert.equal(await disabled.isDisabled(), true);
   const box = await disabled.boundingBox();
@@ -126,7 +168,7 @@ async function cancellationAndDisabled(page) {
   await modal(page).waitFor({ state: 'hidden' });
   await page.waitForFunction(id => document.activeElement?.id === id, id);
   assert.equal(await select.inputValue(), before, 'Close cancels without changing the value');
-  await openChoice(page, id);
+  await openChoice(page, select);
   await page.keyboard.press('Escape');
   await modal(page).waitFor({ state: 'hidden' });
   await page.waitForFunction(id => document.activeElement?.id === id, id);
@@ -212,7 +254,8 @@ async function offlineCase(browser, width, theme) {
     assert.equal(await page.locator('#knowledgeGraphCategory option').first().textContent(), '全部模块');
     assert.equal(graphCategories.length, 11, 'All ten real major categories are available');
     await checkNativeStyle(page);
-    await choose(page, 'knowledgeGraphCategory', '图论', '#knowledgeGraphCategoryTrigger');
+    const moduleControl = await choose(page, 'knowledgeGraphCategory', '图论', '#knowledgeGraphCategoryTrigger');
+    await keyboardReturn(page, moduleControl);
     await navigate(page, 'questions');
     await choose(page, 'questionCategory', '图论');
     await choose(page, 'questionDifficulty', '简单');
@@ -245,8 +288,12 @@ async function onlineCase(browser, width, theme) {
     await page.waitForSelector('#knowledgeGraphCanvas .kg-section');
     assert.equal(await page.locator('#knowledgeGraphCategory option').first().textContent(), '全部模块');
     await checkNativeStyle(page);
-    await choose(page, 'knowledgeGraphCategory', '图论', '#knowledgeGraphCategoryTrigger');
+    const moduleControl = await choose(page, 'knowledgeGraphCategory', '图论', '#knowledgeGraphCategoryTrigger');
+    await keyboardReturn(page, moduleControl);
     await noOverflow(page, 'Online graph choices');
+    await page.evaluate(() => { closeKnowledgeGraph(); openWrongBook(); });
+    await choose(page, 'wrongBookSort', 'oldest', '#wrongBookSortTrigger');
+    await page.locator('#wrongBookClose').click();
     await ocrSelectors(page);
     assert.deepEqual(modelRequests, [], 'Changing OCR grouping and region mode never recognizes images');
     assert.deepEqual(errors, [], 'No online selection script errors');
@@ -267,19 +314,6 @@ async function ocrSelectors(page) {
     renderOcrTasks(); openOcrGrouping();
   });
   const group = page.locator('#ocrGroupingDialog select[data-group-field="groupId"]');
-  const change = async (select, value) => {
-    const label = await select.evaluate((node, value) => [...node.options].find(option => option.value === value).label, value);
-    if (mobile(page)) {
-      await select.tap(); await modal(page).waitFor({ state: 'visible' });
-      await checkChooser(page, await select.evaluate(node => node.selectedOptions[0].label));
-      await modal(page).getByRole('radio', { name: label, exact: true }).tap();
-      await modal(page).waitFor({ state: 'hidden' });
-    } else {
-      await select.selectOption(value);
-      assert.equal(await modal(page).evaluate(node => node.open), false);
-    }
-    assert.equal(await select.inputValue(), value);
-  };
   const shape = async select => select.evaluate(node => {
     node.blur();
     const css = getComputedStyle(node);
@@ -288,7 +322,7 @@ async function ocrSelectors(page) {
   });
   const reference = page.locator(mobile(page) ? '#knowledgeGraphCategoryTrigger' : '#knowledgeGraphCategory');
   assert.deepEqual(await shape(group), await shape(reference), 'OCR group choice shares the ordinary select surface');
-  await change(group, '2');
+  await selectValue(page, group, '2');
   assert.equal(await page.evaluate(() => ocrTasks.get('select-fixture').groupId), '2', 'A dynamic choice reaches the real grouping handler');
   await page.locator('#ocrGroupingDialog .ocr-group-close').click();
   await page.evaluate(() => editOcrTask('select-fixture'));
@@ -297,7 +331,7 @@ async function ocrSelectors(page) {
   await page.locator('#graphEditorDialog [data-overlay-tool="bounds"]').click();
   await region.waitFor({ state: 'visible' });
   assert.deepEqual(await shape(region), await shape(reference), 'Region mode shares the ordinary select surface');
-  await change(region, 'irregular');
+  await selectValue(page, region, 'irregular');
   assert.equal(await page.evaluate(() => ocrTasks.get('select-fixture').scanState.view.irregular), true,
     'A dynamic choice reaches the real region-mode handler');
   await page.locator('#graphEditorDialog [data-overlay-tool="select"]').click();

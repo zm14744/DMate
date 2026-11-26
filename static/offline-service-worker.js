@@ -1,6 +1,6 @@
 "use strict";
-const CACHE_NAME = "dmate-offline-shell-v144";
-const PREVIOUS_CACHE_NAME = "dmate-offline-shell-v143";
+const CACHE_NAME = "dmate-offline-shell-v145";
+const PREVIOUS_CACHE_NAME = "dmate-offline-shell-v144";
 const CACHE_READY = "/__dmate_offline_ready__/"+CACHE_NAME;
 const PRECACHE = [
   "/static/appearance-bootstrap.js?v=5",
@@ -12,7 +12,7 @@ const PRECACHE = [
   "/static/icons/dmate-app-v52-48.png",
   "/static/icons/dmate-app-v52-192.png",
   "/static/icons/dmate-app-v52-180.png",
-  "/static/dmate-main.css?v=93",
+  "/static/dmate-main.css?v=94",
   "/static/graph-editor.css?v=29",
   "/static/drawing-workspace.css?v=58",
   "/static/modal-chrome.css",
@@ -21,14 +21,15 @@ const PRECACHE = [
   "/static/red-circle-controls.css",
   "/static/ui-tooltip.css",
   "/static/appearance-panels.css?v=4",
-  "/static/dmate-shared-overrides.css?v=25",
+  "/static/dmate-shared-overrides.css?v=26",
   "/static/button-themes.css?v=72",
   "/static/offline-knowledge-graph.css?v=56",
   "/static/knowledge-graph-sheet.css?v=5",
   "/static/offline.css?v=76",
-  "/static/search-controls.css?v=29",
+  "/static/search-controls.css?v=30",
   "/static/search-controls.js?v=29",
-  "/static/select-controls.css?v=45",
+  "/static/select-controls.css?v=46",
+  "/static/control-focus.js?v=1",
   "/static/mobile-select.js?v=26",
   "/static/textarea-autosize.css?v=1",
   "/static/textarea-autosize.js?v=1",

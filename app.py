@@ -225,6 +225,7 @@ _ONLINE_SCRIPT_GROUPS = {
         'conversation-image-drafts.js', 'ocr-task-client.js', 'learning-panel.js',
     ),
     'controls': (
+        'control-focus.js',
         'conversation-tabs.js', 'desktop-shell.js', 'ui-tooltip.js', 'search-controls.js',
         'textarea-autosize.js', 'scrollbars.js', 'mobile-select.js',
     ),

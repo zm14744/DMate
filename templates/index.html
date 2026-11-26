@@ -292,8 +292,9 @@ button, input, textarea, select, summary, [role="button"], .image-picker-wrap, l
         outline-offset:0 !important;
         box-shadow:none !important;
     }
-    input:not([type="checkbox"]):not([type="radio"]):is(:focus, :focus-visible),
-    textarea:is(:focus, :focus-visible), select:is(:focus, :focus-visible) {
+    :root:not([data-dmate-focus-input="pointer"]) input:not([type="checkbox"]):not([type="radio"]):is(:focus, :focus-visible),
+    :root:not([data-dmate-focus-input="pointer"]) textarea:is(:focus, :focus-visible),
+    :root:not([data-dmate-focus-input="pointer"]) select:is(:focus, :focus-visible) {
         border-color:var(--border-strong,#cbd5e1) !important;
     }
     .image-picker-wrap:focus-within > #imageBtn,

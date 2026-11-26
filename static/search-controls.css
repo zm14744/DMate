@@ -46,7 +46,7 @@
         stroke-linejoin:round;
         pointer-events:none;
     }
-    body[data-appearance-theme] :is(.dmate-search-wrap,.wrong-search-wrap,.dcn-search-wrap) > input:focus-visible {
+    :root:not([data-dmate-focus-input="pointer"]) body[data-appearance-theme] :is(.dmate-search-wrap,.wrong-search-wrap,.dcn-search-wrap) > input:focus-visible {
         border-color:var(--dm-selected-ring,var(--text-primary))!important;
     }
     body[data-appearance-theme] :is(.dmate-search-wrap,.wrong-search-wrap,.dcn-search-wrap) > input:disabled {
