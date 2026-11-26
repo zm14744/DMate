@@ -203,9 +203,21 @@ async function checkMobileDetailSheet(page) {
     const idle=await paint(handle);
     await handle.hover();await settle(page);
     assert.deepEqual(await paint(handle),idle,'Hover preserves the grabber appearance');
-    await handle.tap();await settle(page);
-    assert.equal(await modal.getAttribute('data-kg-sheet'),'peek','Tapping the grabber does not expand the sheet');
-    assert.deepEqual(await camera(),selectedCamera,'Taps and hover preserve the graph camera');
+    assert.equal(await modal.getAttribute('data-kg-sheet'),'peek','Hover alone keeps the grabber collapsed');
+    assert.equal(await handle.getAttribute('aria-controls'),'knowledgeGraphDetail');
+    await modal.getByRole('button',{name:'展开节点详情',exact:true}).tap();await settle(page);
+    assert.equal(await handle.getAttribute('aria-expanded'),'true');
+    assert.equal(await modal.getAttribute('data-kg-sheet'),'expanded','One tap reveals the selected node details');
+    await detail.locator('.graph-detail-field-label').first().tap();
+    assert.ok(await detail.isVisible(),'Tapping detail text keeps it open');
+    await modal.getByRole('button',{name:'收起节点详情',exact:true}).tap();await settle(page);
+    assert.equal(await handle.getAttribute('aria-expanded'),'false');
+    assert.deepEqual(await panel.boundingBox(),collapsed,'Tapping again restores the same capsule');
+    await handle.press('Enter');await settle(page);
+    assert.equal(await modal.getAttribute('data-kg-sheet'),'expanded');
+    await handle.press('Space');await settle(page);
+    assert.equal(await modal.getAttribute('data-kg-sheet'),'peek');
+    assert.deepEqual(await camera(),selectedCamera,'Taps and keyboard activation preserve the graph camera');
     await swipe(handle, -130, async () => {
       assert.ok((await panel.boundingBox()).height > collapsed.height + 24, 'The sheet follows the finger before release');
       assert.ok(await detail.isVisible(), 'The body appears while the user pulls the sheet up');

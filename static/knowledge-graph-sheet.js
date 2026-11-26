@@ -8,12 +8,13 @@
         if (mounted.has(host)) return mounted.get(host);
         const document = host.ownerDocument, window = document.defaultView || root;
         const mobile = window.matchMedia('(max-width:760px)');
-        let wrap = null, title = null, detail = null, drag = null, destroyed = false, observed = false;
-        const handle = document.createElement('div');
+        let wrap = null, title = null, detail = null, drag = null, destroyed = false, observed = false, suppressHandleClick = false;
+        const handle = document.createElement('button');
+        handle.type = 'button';
         handle.className = 'kg-sheet-handle'; handle.hidden = true;
-        handle.setAttribute('aria-hidden', 'true');
+        handle.setAttribute('aria-controls', 'knowledgeGraphDetail');
         const grip = document.createElement('span');
-        grip.className = 'kg-sheet-grip'; handle.append(grip);
+        grip.className = 'kg-sheet-grip'; grip.setAttribute('aria-hidden', 'true'); handle.append(grip);
         const now = () => window.performance?.now?.() ?? Date.now();
         const state = () => host.dataset.kgSheet;
         const hidden = node => !node || Boolean(node.closest('[hidden],.hidden,[aria-hidden="true"]'));
@@ -28,6 +29,11 @@
         }
         function paint() {
             handle.hidden = !['peek', 'expanded'].includes(state());
+            const expanded = state() === 'expanded';
+            handle.setAttribute('aria-expanded', String(expanded));
+            const source = expanded ? '收起节点详情' : '展开节点详情';
+            const english = expanded ? 'Collapse node details' : 'Expand node details';
+            handle.setAttribute('aria-label', root.DMateI18n?.t?.(source, english) || source);
         }
         function resetDrag() {
             const previous = drag; drag = null;
@@ -51,6 +57,7 @@
         }
         function pointerDown(event) {
             if (drag || event.button !== 0 || !state() || !eligible()) return;
+            if (event.currentTarget === handle) suppressHandleClick = false;
             if (event.currentTarget === title
                 && event.target.closest?.('a,button,input,select,textarea,[contenteditable="true"]')) return;
             const peekHeight = parseFloat(window.getComputedStyle(host).getPropertyValue('--kg-sheet-peek-height')) || 0;
@@ -64,6 +71,7 @@
             if (!drag || event.pointerId !== drag.id) return;
             const delta = event.clientY - drag.y;
             drag.lastY = event.clientY;
+            if (drag.target === handle && Math.hypot(delta, event.clientX - drag.x) >= 6) suppressHandleClick = true;
             if (!drag.moved && (Math.abs(delta) < 6 || Math.abs(delta) <= Math.abs(event.clientX - drag.x))) return;
             drag.moved = true;
             const viewport = window.visualViewport?.height || window.innerHeight;
@@ -94,6 +102,11 @@
                 setState('peek');
                 event.preventDefault(); event.stopPropagation();
             }
+        }
+        function toggle(event) {
+            if (!eligible() || !state() || suppressHandleClick && event.detail !== 0) return;
+            resetDrag();
+            setState(state() === 'expanded' ? 'peek' : 'expanded');
         }
         function listen(node, add) {
             if (!node) return;
@@ -140,6 +153,7 @@
             if (destroyed) return;
             close(); destroyed = true; observer?.disconnect();
             listen(handle, false); listen(title, false); handle.remove();
+            handle.removeEventListener('click', toggle);
             host.removeEventListener('keydown', keydown);
             window.removeEventListener('resize', resize);
             window.removeEventListener('dmate:languagechange', sync);
@@ -148,7 +162,7 @@
             mounted.delete(host);
         }
         const api = {open, close, sync, destroy};
-        mounted.set(host, api); listen(handle, true); host.addEventListener('keydown', keydown);
+        mounted.set(host, api); listen(handle, true); handle.addEventListener('click', toggle); host.addEventListener('keydown', keydown);
         window.addEventListener('resize', resize, {passive:true});
         window.addEventListener('dmate:languagechange', sync);
         if (mobile.addEventListener) mobile.addEventListener('change', resize);

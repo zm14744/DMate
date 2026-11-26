@@ -253,7 +253,7 @@ function mount(options){
  function close(){if(saveError&&!persist())return;sheet?.close();hideAnalysisPanel();invalidate();if(dialog.open)dialog.close();}
  function refresh(){if(destroyed)return;sheet?.close();hideAnalysisPanel();invalidate();load();renderList();renderEditor();renderActions();ensureEditorPeek();}
  const onClose=event=>{if(event.target!==dialog)return;sheet?.close();hideAnalysisPanel();invalidate();};
- const onCancel=event=>{if(event.target!==dialog)return;if(sheet?.contains(editor)||sheet?.contains(analysisPanel)){event.preventDefault();sheet.close({restoreFocus:true});return;}if(!analysisPanel.hidden){event.preventDefault();hideAnalysisPanel(true);return;}if(saveError&&!persist()){event.preventDefault();return;}invalidate();};
+ const onCancel=event=>{if(event.target!==dialog)return;if(sheet?.contains(editor)||sheet?.contains(analysisPanel)){event.preventDefault();if(!sheet.collapse())sheet.close({restoreFocus:true});return;}if(!analysisPanel.hidden){event.preventDefault();hideAnalysisPanel(true);return;}if(saveError&&!persist()){event.preventDefault();return;}invalidate();};
  const onKeyDown=event=>{if(event.key!=='Escape'||event.isComposing||isMobile()||analysisPanel.hidden||event.target.closest?.('dialog')!==dialog)return;event.preventDefault();event.stopPropagation();hideAnalysisPanel(true);};
  const onPointerDown=event=>{if(isMobile()||sheet?.contains(editor)||sheet?.contains(analysisPanel))return;if(!analysisPanel.contains(event.target)&&!relationButton.contains(event.target))hideAnalysisPanel();};
  const onBreakpointChange=()=>{if(destroyed)return;sheet?.close();hideAnalysisPanel();renderActions();ensureEditorPeek();};

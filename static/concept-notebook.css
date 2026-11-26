@@ -343,7 +343,7 @@
         touch-action:none;
         -webkit-tap-highlight-color:transparent;
     }
-    .dcn-sheet-grip{display:block;width:36px;height:4px;border-radius:999px;background:var(--text-subtle);pointer-events:none}
+    .dcn-sheet-grip{display:block;width:36px;height:4px;border-radius:999px;background:var(--text-subtle);background:color-mix(in srgb,var(--text-subtle),var(--text-primary) 30%);pointer-events:none}
     .dcn-mobile-sheet[data-dcn-sheet-state="peek"]{
         --dcn-sheet-bottom:max(6px,calc(env(safe-area-inset-bottom,0px) + 4px));
         inset-inline:0;

@@ -122,14 +122,37 @@
     }
 
     body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] .kg-sheet-handle {
+        --dm-control-bg:transparent;
+        --dm-control-hover-bg:transparent;
+        --dm-control-border:transparent;
+        --dm-control-hover-border:transparent;
+        --dm-control-text:var(--text-primary);
         display:flex;
         grid-area:1 / 1 / auto / -1;
         align-items:center;
         justify-content:center;
+        appearance:none;
+        -webkit-appearance:none;
+        width:100%;
+        height:100%;
+        min-width:0;
+        min-height:0;
+        max-height:none;
+        margin:0;
+        padding:0;
+        border:0;
+        border-radius:0;
+        background:transparent;
+        box-shadow:none;
         touch-action:none;
         user-select:none;
         -webkit-user-select:none;
         -webkit-tap-highlight-color:transparent;
+    }
+
+    body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] .kg-sheet-handle:focus-visible {
+        outline:2px solid var(--accent);
+        outline-offset:-3px;
     }
 
     body #knowledgeGraphModal.graph-fullscreen-view[data-kg-sheet] .kg-sheet-grip {
@@ -138,6 +161,7 @@
         height:4px;
         border-radius:999px;
         background:var(--text-subtle);
+        background:color-mix(in srgb,var(--text-subtle),var(--text-primary) 30%);
         pointer-events:none;
     }
 

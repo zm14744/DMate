@@ -62,6 +62,7 @@ async function runCase(browser, width, theme) {
     const cancel = panel.locator('.dcn-analysis-cancel');
     const results = panel.locator('.dcn-results');
     const sheet = dialog.locator('.dcn-mobile-sheet');
+    const expand = sheet.getByRole('button', {name:'展开面板', exact:true});
     const compact = width <= 760;
     let editorSheet;
     const checkbox = id => dialog.locator('.dcn-note[data-note-id="' + id + '"] input[type="checkbox"]');
@@ -77,10 +78,12 @@ async function runCase(browser, width, theme) {
     if (compact) {
       const current = dialog.locator('.dcn-note.is-current .dcn-note-open');
       const name = await current.innerText();
-      await sheet.getByRole('button', {name:'展开面板',exact:true}).waitFor();
+      await expand.waitFor();
       await current.tap();
       await sheet.getByRole('button', {name:'收起面板',exact:true}).waitFor();
       assert.equal(await sheet.locator('.dcn-title').inputValue(), name, 'The current entry opens from the initial grabber');
+      await page.keyboard.press('Escape');
+      await expand.waitFor();
       await page.keyboard.press('Escape');
       await sheet.waitFor({state:'hidden'});
     }
@@ -100,10 +103,10 @@ async function runCase(browser, width, theme) {
       await page.mouse.down();
       await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2 + 80, {steps:8});
       await page.mouse.up();
-      const expand = sheet.getByRole('button', {name:'展开面板', exact:true});
       await expand.waitFor();
       const peek = await sheet.boundingBox();
-      assert.ok(Math.abs(peek.height - 24) <= 1 && Math.abs(bottomGap(peek) - 6) <= 1, 'Lowering the editor leaves a small grip six pixels above the frame bottom');
+      assert.deepEqual([peek.width, peek.height], [68, 24]);
+      assert.ok(Math.abs(bottomGap(peek) - 6) <= 1, 'Lowering the editor leaves its grip six pixels above the frame bottom');
       assert.equal(await sheet.evaluate(node => node.matches(':modal')), false);
       assert.equal(await sheet.locator('.dcn-sheet-body').isVisible(), false);
       await checkbox('beta').uncheck();
@@ -113,8 +116,14 @@ async function runCase(browser, width, theme) {
       assert.deepEqual(await sheet.boundingBox(), editorSheet);
       assert.equal(await dialog.locator('.dcn-title').inputValue(), '当前打开的群概念');
       await page.touchscreen.tap(Math.round(editorSheet.x + 4), Math.round(editorSheet.y - 10));
-      await sheet.waitFor({ state:'hidden' });
-      assert.ok(await checkbox('beta').isChecked(), 'Opening and dismissing an entry preserves its independent selection');
+      await expand.waitFor();
+      assert.deepEqual(await sheet.boundingBox(), peek, 'Tapping the backdrop returns to the visible grabber');
+      await expand.tap();
+      await handle.waitFor();
+      assert.equal(await sheet.locator('.dcn-original').inputValue(), '群的原始笔记。');
+      await handle.tap();
+      await expand.waitFor();
+      assert.ok(await checkbox('beta').isChecked(), 'Collapsing and reopening the entry preserves its independent selection');
     }
     assert.equal(await relations.isDisabled(), true);
     await checkbox('gamma').check();
@@ -179,6 +188,15 @@ async function runCase(browser, width, theme) {
 
     await page.keyboard.press('Escape');
     await panel.waitFor({state:'hidden'});
+    if (compact) {
+      await expand.tap();
+      await row.getByText(relationText, {exact:true}).waitFor();
+      assert.equal(await count(), 1, 'Restoring the collapsed analysis keeps its result without another request');
+      await page.keyboard.press('Escape');
+      await expand.waitFor();
+      await page.keyboard.press('Escape');
+      await sheet.waitFor({state:'hidden'});
+    }
     await relations.click();
     await question.waitFor();
     assert.equal(await results.innerText(), '', 'A fresh analysis starts with an empty result');

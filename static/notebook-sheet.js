@@ -108,7 +108,10 @@
             return setPeek(peek, initialFocus);
         }
 
-        const dismissSheet = () => close({ restoreFocus:true });
+        const dismissSheet = () => {
+            if (!current) return false;
+            return isPeeked() ? close({ restoreFocus:true }) : setPeek(true);
+        };
         handle.addEventListener('click', event => {
             if (!draggedHandle || event.detail === 0) setPeek(!isPeeked());
         });
@@ -163,6 +166,7 @@
             isMobile:() => mobile.matches,
             isPeeked,
             expand:() => isPeeked() && setPeek(false),
+            collapse:() => !isPeeked() && setPeek(true),
             open, close,
             contains:content => current?.content === content,
             destroy() {

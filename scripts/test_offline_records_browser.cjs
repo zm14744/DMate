@@ -184,6 +184,8 @@ async function closePhoneEditor(panel) {
   assert.ok(Math.abs(owner.y + owner.height - editor.y - editor.height - 8) <= 1,
     'The mobile notebook sheet sits eight pixels above the notebook frame bottom');
   await panel.page().keyboard.press('Escape');
+  await sheet.getByRole('button',{name:'展开面板',exact:true}).waitFor();
+  await panel.page().keyboard.press('Escape');
   await sheet.waitFor({state:'hidden'});
 }
 async function checkFirstNotebookEntry(panel) {
@@ -376,8 +378,15 @@ async function exercise(page,reference,width) {
     await sheet.locator('.dcn-sheet-handle[aria-expanded="false"]').waitFor();
     const selected=notebook.locator('.dcn-note.is-current .dcn-note-open'), name=await selected.innerText();
     await selected.tap();
-    await sheet.locator('.dcn-sheet-handle[aria-expanded="true"]').waitFor();
+    const collapse = sheet.locator('.dcn-sheet-handle[aria-expanded="true"]');
+    await collapse.waitFor();
     assert.equal(await sheet.locator('.dcn-title').inputValue(),name,'Tapping the restored current entry opens its editor');
+    const content = await sheet.locator('.dcn-original').inputValue();
+    await collapse.tap();
+    await sheet.locator('.dcn-sheet-handle[aria-expanded="false"]').tap();
+    await collapse.waitFor();
+    assert.equal(await sheet.locator('.dcn-title').inputValue(),name);
+    assert.equal(await sheet.locator('.dcn-original').inputValue(),content,'The offline capsule restores the same saved entry');
     await closePhoneEditor(notebook);
   }
   await page.locator('.dcn-note[data-note-id="'+firstNote.id+'"] .dcn-note-open').click();
