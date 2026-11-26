@@ -108,7 +108,7 @@ async function checkHeadingLabels(page, reference) {
     assert.deepEqual(await fontStyle(page.locator('#conceptNotebookDialog ' + selector).locator('..')), reference,
       selector + ' label matches the graph heading');
   }
-  if (narrow) await notebook.locator('.dcn-mobile-sheet[open] .dcn-sheet-close').click();
+  if (narrow) await page.keyboard.press('Escape');
   for (const checkbox of await notebook.getByRole('checkbox').all()) await checkbox.check();
   await notebook.locator('.dcn-relation-trigger').click();
   await notebook.getByRole('dialog', { name: '分析关联' }).waitFor();

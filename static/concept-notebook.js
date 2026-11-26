@@ -94,7 +94,7 @@ function mount(options){
  }
  function toggleAnalysisPanel(){
   if(relationButton.disabled)return;
-  if(!analysisPanel.hidden){hideAnalysisPanel(true);return;}
+  if(!analysisPanel.hidden){if(!sheet?.expand())hideAnalysisPanel(true);return;}
   analysisPanel.hidden=false;relationButton.setAttribute('aria-expanded','true');
   if(isMobile()){
    for(const property of ['left','top','max-width','max-height'])analysisPanel.style.removeProperty(property);

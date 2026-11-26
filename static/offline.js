@@ -576,14 +576,14 @@
     notebookSheet?.close();
   }
 
-  function showNotebookEditor({initialField, returnToNew = false} = {}) {
+  function showNotebookEditor({initialField, returnToNew = false, peek = false} = {}) {
     const view = noteView;
     if (state.panel !== "notes" || !view?.id) return false;
     const sheet = getNotebookSheet(), focus = initialField === "name" ? view.name : initialField === "body" ? view.body : null;
     if (!sheet?.isMobile()) { focus?.focus({preventScroll:true}); return false; }
     view.returnToNew = returnToNew;
     const opened = sheet.open(view.editor, {
-      label:tr("条目详情", "Entry details"), initialFocus:focus,
+      label:tr("条目详情", "Entry details"), initialFocus:focus, peek,
       returnFocus:() => {
         const row = returnToNew ? null : [...$("noteList").querySelectorAll(".dcn-note")].find(node => node.dataset.noteId === view.id);
         return row?.querySelector(".dcn-note-open") || $("addNote");
@@ -615,6 +615,7 @@
     if (!rows.some(row => row.id === state.selectedNoteId)) state.selectedNoteId = rows[0]?.id || null;
     const host = $("noteList");
     const previous = noteView, reopenId = previous && notebookSheet?.contains(previous.editor) ? previous.id : null;
+    const peek = Boolean(notebookSheet?.isPeeked());
     const active = document.activeElement, field = active === previous?.name ? "name" : active === previous?.body ? "body" : null;
     const selection = field ? {start:active.selectionStart,end:active.selectionEnd,direction:active.selectionDirection,scroll:active.scrollTop} : null;
     replacingNoteSheet = true;
@@ -716,7 +717,7 @@
       noteOpenIntent = null;
       showNotebookEditor({initialField:"name",returnToNew:true});
     } else if (reopenId && reopenId === noteView.id) {
-      showNotebookEditor({initialField:field,returnToNew:previous.returnToNew});
+      showNotebookEditor({initialField:field,returnToNew:previous.returnToNew,peek});
       const target = field === "name" ? name : field === "body" ? body : null;
       if (target && selection) {
         target.setSelectionRange(selection.start,selection.end,selection.direction);

@@ -236,7 +236,7 @@ async function offlineSearches(page) {
   await clearSearch(notebook);
   await page.locator('#addNote').click();
   await checkInputFocus(page.locator('#notesPanel .dcn-original'), { typeText: true });
-  if (page.viewportSize().width <= 760) await page.locator('#notesPanel .dcn-sheet-close').click();
+  if (page.viewportSize().width <= 760) await page.keyboard.press('Escape');
   await page.evaluate(() => window.DMateI18n.setLanguage('en', false));
   await checkSearchLabel(notebook, 'Search');
   await noOverflow(page, 'Offline notebook search');
@@ -277,7 +277,7 @@ async function onlineSearches(page, reference) {
     await page.locator('#conceptNotebookDialog .dcn-new').click();
     await page.locator('#conceptNotebookDialog .dcn-title').fill(name);
     if (name === 'Beta Logic') await checkInputFocus(page.locator('#conceptNotebookDialog .dcn-original'), { typeText: true });
-    if (page.viewportSize().width <= 760) await page.locator('#conceptNotebookDialog .dcn-sheet-close').click();
+    if (page.viewportSize().width <= 760) await page.keyboard.press('Escape');
   }
   assert.equal(await page.locator('.dcn-list .dcn-note').count(), 2);
   await notebook.fill('Alpha');

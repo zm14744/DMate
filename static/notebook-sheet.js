@@ -11,21 +11,20 @@
         const viewport = window.visualViewport;
         let current = null;
         let drag = null;
+        let draggedHandle = false;
 
         const sheet = document.createElement('dialog');
         sheet.className = 'dcn-mobile-sheet';
         const header = document.createElement('header');
         header.className = 'dcn-sheet-head';
-        const handle = document.createElement('div');
+        const handle = document.createElement('button');
+        handle.type = 'button';
         handle.className = 'dcn-sheet-handle';
-        handle.setAttribute('aria-hidden', 'true');
         const grip = document.createElement('span');
         grip.className = 'dcn-sheet-grip';
+        grip.setAttribute('aria-hidden', 'true');
         handle.append(grip);
-        const dismiss = document.createElement('button');
-        dismiss.type = 'button';
-        dismiss.className = 'dcn-close dcn-sheet-close';
-        header.append(handle, dismiss);
+        header.append(handle);
         const body = document.createElement('div');
         body.className = 'dcn-sheet-body';
         sheet.append(header, body);
@@ -38,10 +37,10 @@
         }
 
         function fitViewport() {
-            const visibleHeight = viewport?.height || window.innerHeight;
-            const offset = Math.max(0, window.innerHeight - visibleHeight - (viewport?.offsetTop || 0));
-            sheet.style.setProperty('--dcn-sheet-visible-height', visibleHeight + 'px');
-            sheet.style.setProperty('--dcn-sheet-keyboard-offset', offset + 'px');
+            const top = viewport?.offsetTop || 0;
+            const bottom = Math.min(owner.getBoundingClientRect().bottom, top + (viewport?.height || window.innerHeight));
+            sheet.style.setProperty('--dcn-sheet-visible-height', Math.max(0, bottom - top) + 'px');
+            sheet.style.setProperty('--dcn-sheet-bottom-offset', Math.max(0, window.innerHeight - bottom) + 'px');
         }
 
         function endDrag() {
@@ -61,6 +60,7 @@
             if (sheet.open) sheet.close();
             previous.placeholder.replaceWith(previous.content);
             body.replaceChildren();
+            delete sheet.dataset.dcnSheetState;
             viewport?.removeEventListener('resize', fitViewport);
             viewport?.removeEventListener('scroll', fitViewport);
             window.removeEventListener('resize', fitViewport);
@@ -69,28 +69,55 @@
             return true;
         }
 
-        function open(content, { label, returnFocus = document.activeElement, initialFocus, onClose } = {}) {
-            if (!mobile.matches || !owner.isConnected || !owner.contains(content)) return false;
-            if (current?.content === content) return true;
-            close();
-            const placeholder = document.createComment('notebook sheet content');
-            content.before(placeholder);
-            body.append(content);
-            body.scrollTop = 0;
-            current = { content, placeholder, returnFocus, onClose };
-            sheet.setAttribute('aria-label', label);
-            dismiss.setAttribute('aria-label', root.DMateI18n?.t?.('关闭', 'Close') || '关闭');
+        const isPeeked = () => sheet.dataset.dcnSheetState === 'peek';
+
+        function setPeek(peek, initialFocus) {
+            if (!current) return false;
+            endDrag();
+            if (sheet.open) sheet.close();
+            sheet.dataset.dcnSheetState = peek ? 'peek' : 'expanded';
+            body.hidden = peek;
+            handle.setAttribute('aria-expanded', String(!peek));
+            const source = peek ? '展开面板' : '收起面板';
+            const english = peek ? 'Expand panel' : 'Collapse panel';
+            handle.setAttribute('aria-label', root.DMateI18n?.t?.(source, english) || source);
             fitViewport();
-            sheet.showModal();
-            viewport?.addEventListener('resize', fitViewport);
-            viewport?.addEventListener('scroll', fitViewport);
-            window.addEventListener('resize', fitViewport);
-            focus(initialFocus || dismiss);
+            if (peek) sheet.show();
+            else sheet.showModal();
+            focus(initialFocus || handle);
             return true;
         }
 
+        function open(content, { label, returnFocus = document.activeElement, initialFocus, onClose, peek = false } = {}) {
+            if (!mobile.matches || !owner.isConnected || !owner.contains(content)) return false;
+            if (current?.content === content) {
+                current.returnFocus = returnFocus;
+                current.onClose = onClose;
+            } else {
+                close();
+                const placeholder = document.createComment('notebook sheet content');
+                content.before(placeholder);
+                body.append(content);
+                body.scrollTop = 0;
+                current = { content, placeholder, returnFocus, onClose };
+                viewport?.addEventListener('resize', fitViewport);
+                viewport?.addEventListener('scroll', fitViewport);
+                window.addEventListener('resize', fitViewport);
+            }
+            sheet.setAttribute('aria-label', label);
+            return setPeek(peek, initialFocus);
+        }
+
         const dismissSheet = () => close({ restoreFocus:true });
-        dismiss.addEventListener('click', dismissSheet);
+        handle.addEventListener('click', event => {
+            if (!draggedHandle || event.detail === 0) setPeek(!isPeeked());
+        });
+        handle.addEventListener('keydown', event => {
+            if (event.key !== 'Escape' || !isPeeked()) return;
+            event.preventDefault();
+            event.stopPropagation();
+            dismissSheet();
+        });
         sheet.addEventListener('cancel', event => {
             event.preventDefault();
             event.stopPropagation();
@@ -107,17 +134,23 @@
         });
         handle.addEventListener('pointerdown', event => {
             if (drag || event.button !== 0) return;
+            draggedHandle = false;
             drag = { id:event.pointerId, start:event.clientY };
             handle.setPointerCapture(event.pointerId);
         });
         handle.addEventListener('pointermove', event => {
             if (drag?.id !== event.pointerId) return;
+            const delta = event.clientY - drag.start;
+            if (Math.abs(delta) < 6 && !draggedHandle) return;
+            draggedHandle = true;
             sheet.dataset.dcnSheetDragging = '';
-            sheet.style.setProperty('--dcn-sheet-drag-offset', Math.max(0, event.clientY - drag.start) + 'px');
+            const offset = isPeeked() ? Math.min(0, delta) : Math.max(0, delta);
+            sheet.style.setProperty('--dcn-sheet-drag-offset', offset + 'px');
         });
         handle.addEventListener('pointerup', event => {
             if (drag?.id !== event.pointerId) return;
-            if (event.clientY - drag.start > 48) dismissSheet();
+            const delta = event.clientY - drag.start;
+            if (isPeeked() ? delta < -32 : delta > 48) setPeek(!isPeeked());
             else endDrag();
         });
         for (const type of ['pointercancel', 'lostpointercapture']) {
@@ -128,6 +161,8 @@
 
         const controller = {
             isMobile:() => mobile.matches,
+            isPeeked,
+            expand:() => isPeeked() && setPeek(false),
             open, close,
             contains:content => current?.content === content,
             destroy() {

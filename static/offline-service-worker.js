@@ -1,6 +1,6 @@
 "use strict";
-const CACHE_NAME = "dmate-offline-shell-v149";
-const PREVIOUS_CACHE_NAME = "dmate-offline-shell-v148";
+const CACHE_NAME = "dmate-offline-shell-v150";
+const PREVIOUS_CACHE_NAME = "dmate-offline-shell-v149";
 const CACHE_READY = "/__dmate_offline_ready__/"+CACHE_NAME;
 const PRECACHE = [
   "/static/appearance-bootstrap.js?v=5",
@@ -16,7 +16,7 @@ const PRECACHE = [
   "/static/graph-editor.css?v=29",
   "/static/drawing-workspace.css?v=58",
   "/static/modal-chrome.css",
-  "/static/concept-notebook.css?v=12",
+  "/static/concept-notebook.css?v=13",
   "/static/ai-answer-renderer.css?v=22",
   "/static/red-circle-controls.css",
   "/static/ui-tooltip.css",
@@ -33,8 +33,8 @@ const PRECACHE = [
   "/static/mobile-select.js?v=26",
   "/static/textarea-autosize.css?v=1",
   "/static/textarea-autosize.js?v=1",
-  "/static/scrollbars.css?v=26",
-  "/static/scrollbars.js?v=26",
+  "/static/scrollbars.css?v=27",
+  "/static/scrollbars.js?v=27",
   "/static/graph-editor-model.js",
   "/static/graph-editor-format.js?v=32",
   "/static/graph-editor-overlay.js?v=43",
@@ -68,8 +68,8 @@ const PRECACHE = [
   "/static/offline-backup.js?v=3",
   "/static/backup-download.js?v=1",
   "/static/offline-entry.js?v=50",
-  "/static/notebook-sheet.js?v=1",
-  "/static/offline.js?v=82",
+  "/static/notebook-sheet.js?v=2",
+  "/static/offline.js?v=83",
   "/static/offline-content/concepts.zh-CN.json?v=34",
   "/static/offline-content/questions.zh-CN.json?v=34",
   "/static/offline-content/knowledge_graph.json?v=28",

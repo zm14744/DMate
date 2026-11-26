@@ -76,9 +76,29 @@ async function runCase(browser, width, theme) {
     if (compact) {
       await sheet.locator('.dcn-sheet-body .dcn-title').waitFor();
       editorSheet = await sheet.boundingBox();
-      const bottomInset = page.viewportSize().height - editorSheet.y - editorSheet.height;
-      assert.ok(editorSheet.y > 0 && bottomInset >= 0 && bottomInset < 24, 'The editor opens at the bottom of the viewport');
-      await sheet.locator('.dcn-sheet-close').click();
+      const owner = await dialog.boundingBox();
+      const bottomGap = rect => owner.y + owner.height - rect.y - rect.height;
+      assert.ok(Math.abs(bottomGap(editorSheet) - 8) <= 1, 'The editor sits eight pixels above the notebook frame bottom');
+      assert.equal(await sheet.locator('.dcn-sheet-close').count(), 0);
+      const handle = sheet.getByRole('button', {name:'收起面板', exact:true});
+      const grip = await handle.boundingBox();
+      await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2 + 80, {steps:8});
+      await page.mouse.up();
+      const expand = sheet.getByRole('button', {name:'展开面板', exact:true});
+      await expand.waitFor();
+      const peek = await sheet.boundingBox();
+      assert.ok(Math.abs(peek.height - 24) <= 1 && Math.abs(bottomGap(peek) - 6) <= 1, 'Lowering the editor leaves a small grip six pixels above the frame bottom');
+      assert.equal(await sheet.evaluate(node => node.matches(':modal')), false);
+      assert.equal(await sheet.locator('.dcn-sheet-body').isVisible(), false);
+      await checkbox('beta').uncheck();
+      await checkbox('beta').check();
+      await expand.tap();
+      await handle.waitFor();
+      assert.deepEqual(await sheet.boundingBox(), editorSheet);
+      assert.equal(await dialog.locator('.dcn-title').inputValue(), '当前打开的群概念');
+      await page.touchscreen.tap(Math.round(editorSheet.x + 4), Math.round(editorSheet.y - 10));
       await sheet.waitFor({ state:'hidden' });
       assert.ok(await checkbox('beta').isChecked(), 'Opening and dismissing an entry preserves its independent selection');
     }
@@ -166,7 +186,7 @@ async function runCase(browser, width, theme) {
     await checkbox('blank').uncheck();
     await checkbox('gamma').check();
     const closing = await beginPending();
-    if (compact) await sheet.locator('.dcn-sheet-close').click();
+    if (compact) await page.keyboard.press('Escape');
     await dialog.locator('.dcn-heading > .dcn-close').click();
     await releaseCanceled(closing);
     assert.equal(await dialog.isVisible(), false);

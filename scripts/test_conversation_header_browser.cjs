@@ -247,8 +247,7 @@ async function notebookAnalysisTrigger(page, newButton) {
   assert.equal(await trigger.isDisabled(), true, 'A single entry cannot be compared');
   await newButton.click();
   await dialog.locator('.dcn-title').fill('关联概念');
-  const sheetClose = dialog.locator('.dcn-mobile-sheet[open] .dcn-sheet-close');
-  if (await sheetClose.isVisible()) await sheetClose.click();
+  if (await dialog.locator('.dcn-mobile-sheet[open]').isVisible()) await page.keyboard.press('Escape');
   for (const checkbox of await checkboxes.all()) await checkbox.check();
   assert.equal(await trigger.isEnabled(), true, 'Two selected entries enable relation analysis');
   await page.mouse.move(0, 0); await dialog.locator('.dcn-search').focus(); await settle(page);
@@ -265,26 +264,27 @@ async function notebookAnalysisTrigger(page, newButton) {
 
 async function notebookButton(page) {
   const compact = mobile(page);
+  const labeled = compact && page.viewportSize().width > 760;
   await sidebar(page, true);
   const source = page.locator('#newChatBtn');
   await page.mouse.move(0, 0); await page.locator(compact ? '#mobileNavClose' : '#desktopSidebarToggle').focus();
   await settle(page);
-  const idle = compact ? await notebookStyle(source) : null;
+  const idle = labeled ? await notebookStyle(source) : null;
   await sidebar(page, false);
   await page.locator(compact ? '#mobileToolsBtn' : '#desktopToolsBtn').click();
   await page.locator('#conceptNotebookBtn').click();
   await page.locator('#conceptNotebookDialog').waitFor({ state: 'visible' });
   const button = page.locator('#conceptNotebookDialog .dcn-new');
-  assert.equal(await button.innerText(), compact ? '新条目' : '');
+  assert.equal(await button.innerText(), labeled ? '新条目' : '');
   assert.equal(await button.getAttribute('aria-label'), '新条目');
   if (!compact) await sharedTooltip(page, button, '新条目');
   const paths = locator => locator.locator('svg[data-icon="square-pen"] > path').evaluateAll(nodes => nodes.map(node => node.getAttribute('d')));
   const matchedPaths = await paths(source);
   assert.equal(matchedPaths.length, 2);
   assert.deepEqual(await paths(button), matchedPaths, 'Both creation buttons use the same square-pen icon');
-  assert.equal(await button.evaluate(node => getComputedStyle(node).justifyContent), compact ? 'flex-start' : 'center');
+  assert.equal(await button.evaluate(node => getComputedStyle(node).justifyContent), labeled ? 'flex-start' : 'center');
   await page.mouse.move(0, 0); await page.locator('#conceptNotebookTitle').focus(); await settle(page);
-  if (compact) assert.deepEqual(await notebookStyle(button), idle, 'Mobile New entry matches the new-conversation button');
+  if (labeled) assert.deepEqual(await notebookStyle(button), idle, 'Tablet New entry matches the new-conversation button');
   else {
     const paint = await notebookStyle(button);
     assert.equal(paint.backgroundColor, 'rgba(0, 0, 0, 0)');
@@ -294,12 +294,11 @@ async function notebookButton(page) {
   await button.click();
   assert.equal(await page.locator('#conceptNotebookDialog .dcn-note').count(), before + 1, 'New entry still creates an editable notebook entry');
   await page.locator('#conceptNotebookDialog .dcn-title').fill('局部概念');
-  const sheetClose = page.locator('#conceptNotebookDialog .dcn-mobile-sheet[open] .dcn-sheet-close');
-  if (await sheetClose.isVisible()) await sheetClose.click();
+  if (await page.locator('#conceptNotebookDialog .dcn-mobile-sheet[open]').isVisible()) await page.keyboard.press('Escape');
   await notebookAnalysisTrigger(page, button);
   const savedTitle = await page.locator('#conceptNotebookDialog .dcn-title').inputValue();
   await language(page, 'en');
-  assert.equal(await button.innerText(), compact ? 'New entry' : '');
+  assert.equal(await button.innerText(), labeled ? 'New entry' : '');
   assert.equal(await button.getAttribute('aria-label'), 'New entry');
   if (!compact) await sharedTooltip(page, button, 'New entry');
   assert.equal(await page.locator('#conceptNotebookDialog .dcn-title').inputValue(), savedTitle, 'Language changes preserve concept content');

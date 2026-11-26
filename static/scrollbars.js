@@ -152,13 +152,12 @@
         const thickness = Math.min(6, gutter);
         let x, y, width, height;
         if (axis === 'y') {
-            x = g.rect.left + (g.rtl ? g.leftBorder + (gutter - thickness) / 2
-                : g.width - g.rightBorder - gutter + (gutter - thickness) / 2) * sx;
+            x = g.rect.left + (g.rtl ? g.leftBorder : g.width - g.rightBorder - thickness) * sx;
             y = g.rect.top + (g.top + (length - size) * progress) * sy;
             width = thickness * sx; height = size * sy;
         } else {
             x = g.rect.left + (g.left + (length - size) * progress) * sx;
-            y = g.rect.top + (g.height - g.bottomBorder - gutter + (gutter - thickness) / 2) * sy;
+            y = g.rect.top + (g.height - g.bottomBorder - thickness) * sy;
             width = size * sx; height = thickness * sy;
         }
         let left = Math.max(0, x), top = Math.max(0, y);

@@ -41,13 +41,17 @@ async function paintedAxes(page, selector) {
       return result;
     };
     return {y:count(canvas.width - 8, 0, canvas.width, canvas.height - 8),
-      x:count(0, canvas.height - 8, canvas.width - 8, canvas.height)};
+      x:count(0, canvas.height - 8, canvas.width - 8, canvas.height),
+      rightEdge:count(canvas.width - 1, 0, canvas.width, canvas.height - 8),
+      bottomEdge:count(0, canvas.height - 1, canvas.width - 8, canvas.height)};
   }, png);
 }
 async function assertPaint(page, selector, axis) {
   const paint = await paintedAxes(page, selector);
   assert.equal(paint.x > 0, axis === 'x', selector + ': horizontal paint ' + JSON.stringify(paint));
   assert.equal(paint.y > 0, axis === 'y', selector + ': vertical paint ' + JSON.stringify(paint));
+  if (axis === 'x') assert.ok(paint.bottomEdge > 0, selector + ': horizontal thumb reaches the bottom edge');
+  if (axis === 'y') assert.ok(paint.rightEdge > 0, selector + ': vertical thumb reaches the right edge');
 }
 
 (async () => {

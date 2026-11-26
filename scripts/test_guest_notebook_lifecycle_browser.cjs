@@ -83,7 +83,7 @@ async function guestPageLifecycle(browser, width) {
     await page.waitForFunction(() => !accountVerificationOperation);
     assert.equal((await state(page)).notes.length, 1, 'A delayed guest verification does not erase current-page edits');
     assert.equal((await state(page)).cache, null, 'Guest edits never enter account learning storage');
-    if (width <= 760 && await page.locator('.dcn-mobile-sheet').isVisible()) await page.locator('.dcn-sheet-close').click();
+    if (width <= 760 && await page.locator('.dcn-mobile-sheet').isVisible()) await page.keyboard.press('Escape');
     await page.locator('.dcn-heading .dcn-close').click();
     await page.evaluate(() => window.dmateConceptNotebook.open());
     if (width <= 760) await page.locator('.dcn-note-open').click();

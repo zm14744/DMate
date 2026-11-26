@@ -98,6 +98,13 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
     assert.ok(row.searchIcon.left > row.search.left && row.searchIcon.right < row.search.right
       && Math.abs(row.searchIcon.top + row.searchIcon.height / 2 - row.search.top - row.search.height / 2) < 1,
     'The magnifier sits inside the search pill at every width');
+    if (compact || width > 1100) {
+      assert.equal(row.newText,'');
+      assert.deepEqual([row.create.width,row.create.height,row.create.radius],[44,44,'9px']);
+      assert.equal(row.create.border,'0px');
+      assert.equal(row.create.background,'rgba(0, 0, 0, 0)');
+      assert.deepEqual(row.pen,row.magnifier,'Create and search use matching Lucide icon styles');
+    }
     if (compact) {
       assert.ok(row.search.bottom <= row.list.top && row.list.height > 0 && row.list.bottom <= row.create.top,
         width + ': search is above the entries and New is below the list');
@@ -111,12 +118,8 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
       continue;
     }
     if (width > 1100) {
-      assert.equal(row.newText,'');
       assert.equal(row.selectedVisible,false);
-      assert.equal(row.create.border,'0px');
-      assert.equal(row.create.background,'rgba(0, 0, 0, 0)');
       assert.equal(row.search.border,'1px');
-      assert.deepEqual(row.pen,row.magnifier,'Create and search use matching Lucide icon styles');
       const [list,toolbar,editor,search] = row.colors;
       assert.deepEqual(editor,search,'The writing area and search share their background');
       assert.notDeepEqual(list,editor,'The notebook list remains a distinct surface');
@@ -144,7 +147,7 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
       continue;
     }
     assert.equal(row.newText,'新条目');
-    assert.equal(row.create.radius,'10px','The new-note action retains its mobile and tablet corners');
+    assert.equal(row.create.radius,'10px','The labeled tablet action retains its corners');
     for (const key of ['border','style']) assert.equal(row.create[key],row.search[key]);
     if (hasAnalysis) {
       assert.ok(row.create.bottom < row.relation.top && Math.abs(row.create.left-row.relation.left)<1
@@ -164,13 +167,18 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
     }
   }
   await page.setViewportSize(viewport);
+  await settle(page);
   return desktopColumns;
 }
 async function closePhoneEditor(panel) {
   if (panel.page().viewportSize().width > 760) return;
   const sheet = panel.locator('.dcn-mobile-sheet');
   await sheet.locator('.dcn-sheet-body .dcn-original').waitFor();
-  await sheet.locator('.dcn-sheet-close').click();
+  await settle(panel.page());
+  const [owner,editor] = await Promise.all([panel.boundingBox(),sheet.boundingBox()]);
+  assert.ok(Math.abs(owner.y + owner.height - editor.y - editor.height - 8) <= 1,
+    'The mobile notebook sheet sits eight pixels above the notebook frame bottom');
+  await panel.page().keyboard.press('Escape');
   await sheet.waitFor({state:'hidden'});
 }
 async function checkFirstNotebookEntry(panel) {

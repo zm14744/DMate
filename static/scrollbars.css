@@ -14,7 +14,15 @@
             background-image:none !important;
             box-shadow:none !important;
         }
-        *::-webkit-scrollbar-thumb { border-color:transparent !important; }
+        *::-webkit-scrollbar-thumb {
+            border-style:solid !important;
+            border-color:transparent !important;
+            background-clip:content-box !important;
+        }
+        /* Keep the same paint thickness while aligning it to the outside edge. */
+        *::-webkit-scrollbar-thumb:vertical { border-width:2px 0 2px 4px !important; }
+        :dir(rtl)::-webkit-scrollbar-thumb:vertical { border-width:2px 4px 2px 0 !important; }
+        *::-webkit-scrollbar-thumb:horizontal { border-width:4px 2px 0 !important; }
         [data-dmate-scroll-touch][data-dmate-scroll-active="x"]::-webkit-scrollbar-thumb:horizontal,
         [data-dmate-scroll-touch][data-dmate-scroll-active="y"]::-webkit-scrollbar-thumb:vertical {
             background-color:rgba(148,163,184,.42) !important;
