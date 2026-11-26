@@ -20610,6 +20610,7 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile) {
     const stage = viewport.querySelector(mobile ? '.kg-mobile-stage' : '.kg-desktop-zoom-stage');
     const surface = viewport.querySelector(mobile ? '.kg-mobile-zoom-surface' : '.kg-desktop-zoom-surface');
     if (!stage || !surface) return;
+    const disposeDesktop = mobile ? null : window.DMateKnowledgeGraphDesktop?.mount(viewport, surface);
     viewport.style.visibility = 'hidden';
     viewport.dataset.kgReady = 'false';
     let initialized = false, applying = false, disposed = false, frame = 0, releaseFrame = 0;
@@ -20697,6 +20698,7 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile) {
         viewport.removeEventListener('pointerdown', beginInteraction, {capture:true});
         viewport.removeEventListener('wheel', beginInteraction, {capture:true});
         viewport.removeEventListener('keydown', beginInteraction, {capture:true});
+        disposeDesktop?.();
         previousDispose?.();
     };
     requestAnimationFrame(() => requestAnimationFrame(() => viewport._kgInitializeView?.()));
@@ -21634,21 +21636,9 @@ function installKnowledgeGraphDesktopZoom() {
     }, { passive: false });
 }
 
-function renderKnowledgeGraphSection(container, nodes, title, description, context) {
+function renderKnowledgeGraphSection(container, nodes, title, context) {
     const section = document.createElement("div");
-    section.className = "kg-section";
-
-    const heading = document.createElement("div");
-    heading.className = "kg-section-title";
-    heading.textContent = title;
-    section.appendChild(heading);
-
-    if (description) {
-        const desc = document.createElement("div");
-        desc.className = "kg-section-desc";
-        desc.textContent = description;
-        section.appendChild(desc);
-    }
+    section.className = "kg-section kg-desktop-section";
 
     if (!nodes.length) {
         const empty = document.createElement("div");
@@ -21776,6 +21766,9 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
     // 固定圆角卡片的宽高，只有内部视口随真实尺寸的图谱二维滚动。
     const viewport = document.createElement("div");
     viewport.className = "kg-desktop-viewport";
+    viewport.setAttribute("role", "region");
+    viewport.setAttribute("aria-label", title);
+    viewport.tabIndex = 0;
     // 注意不对 SVG 用 width:100%：整张大图会被压缩到容器宽度，文字小且滚动布局抖动。
     const surface = document.createElement("div");
     surface.className = "kg-desktop-zoom-surface";
@@ -22478,7 +22471,7 @@ function renderKnowledgeGraph({viewportOnly = false} = {}) {
         ? (isWrongKnowledgeGraphView() ? dmateUiText("错题关联", "Wrong question connections") : knowledgeGraphScope === "history"
             ? dmateUiText("历史题目关联", "Historical question connections") : dmateUiText("最近一题关联", "Related to latest question"))
         : displayCategory;
-    let description = questionView
+    const description = questionView
         ? (isWrongKnowledgeGraphView()
             ? dmateUiText(`错题关联 ${visibleNodes.length} 个知识点`, `Wrong question connections ${visibleNodes.length} concepts`)
             : knowledgeGraphScope === "history"
@@ -22503,7 +22496,6 @@ function renderKnowledgeGraph({viewportOnly = false} = {}) {
             fragment,
             visibleNodes,
             sectionTitle,
-            description,
             context
         );
     }

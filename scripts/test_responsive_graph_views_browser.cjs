@@ -118,10 +118,8 @@ async function ready(page, kind) {
       return {scrollbar:style.scrollbarWidth, gutter:style.scrollbarGutter,
         toolbarBorder:getComputedStyle(toolbar).borderBottomWidth};
     });
-    assert.deepEqual(frameStyle, isMobile(page)
-      ? {scrollbar:'none',gutter:'auto',toolbarBorder:'0px'}
-      : {scrollbar:'auto',gutter:'stable',toolbarBorder:'1px'},
-      'Desktop uses the shared scrollbars and a separate toolbar, while mobile keeps an edge-to-edge viewport');
+    assert.deepEqual(frameStyle, {scrollbar:'none',gutter:'auto',toolbarBorder:isMobile(page) ? '0px' : '1px'},
+      'The graph viewport has no native gutters and retains its responsive toolbar');
   }
   await settle(page);
 }
@@ -163,6 +161,51 @@ async function firstFit(page, kind, label) {
   return initial;
 }
 
+async function checkDesktopDrag(page) {
+  const viewport = view(page, 'graph');
+  const bounds = await viewport.boundingBox();
+  const position = () => viewport.evaluate(node => [node.scrollLeft, node.scrollTop]);
+  for (const axis of ['x', 'y']) {
+    const thumb = page.locator('.kg-desktop-scroll-thumb[data-axis="' + axis + '"]');
+    await thumb.waitFor();
+    const box = await thumb.boundingBox();
+    const horizontal = axis === 'x', size = horizontal ? 'width' : 'height';
+    const start = box[axis] - bounds[axis];
+    const end = bounds[size] - start - box[size];
+    const direction = end > start ? 1 : -1;
+    const gap = Math.max(start, end);
+    assert.ok(gap > 24, 'There is empty space beyond the ' + axis + ' thumb');
+    const center = { x:box.x + box.width / 2, y:box.y + box.height / 2 };
+    const empty = { ...center, [axis]:center[axis] + direction * (box[size] / 2 + gap / 2) };
+    const before = await position();
+    assert.ok(await viewport.evaluate((node, point) => node.contains(document.elementFromPoint(point.x, point.y)), empty),
+      'The empty margin along the ' + axis + ' edge belongs to the graph');
+    await page.mouse.click(empty.x, empty.y);
+    await settle(page);
+    assert.deepEqual(await position(), before, 'Clicking the bare ' + axis + ' edge does not page the graph');
+
+    const to = { ...center, [axis]:center[axis] + direction * Math.min(48, gap / 2) };
+    await page.mouse.move(center.x, center.y);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, { steps: 5 });
+    await page.mouse.up();
+    await settle(page);
+    const after = await position();
+    const i = horizontal ? 0 : 1;
+    assert.ok((after[i] - before[i]) * direction > 1, 'Dragging the ' + axis + ' thumb scrolls its axis');
+    near(after[1 - i], before[1 - i], 'Dragging a thumb keeps the other axis still', 1);
+  }
+  const corner = {x:bounds.x + 24, y:bounds.y + 24};
+  const before = await position();
+  await page.mouse.move(corner.x, corner.y);
+  await page.mouse.down();
+  await page.mouse.move(corner.x + 32, corner.y + 32, {steps:5});
+  await page.mouse.up();
+  const after = await position();
+  assert.ok(after[0] < before[0] - 1 && after[1] < before[1] - 1,
+    'Dragging the former title area pans the graph on both axes');
+}
+
 async function customize(page, kind, variant) {
   // Use real controls so the engine records a deliberate camera change.
   if (kind === 'graph' && isMobile(page)) await pinchGraph(page, 2);
@@ -180,12 +223,8 @@ async function customize(page, kind, variant) {
   assert.ok(current.left > 0 || current.top > 0, 'The camera fixture is actually panned');
   if (kind === 'graph' && !isMobile(page)) {
     assert.ok(current.left > 0 && current.top > 0, 'The desktop graph scrolls along both axes');
-    const gutters = await view(page, kind).evaluate(node => {
-      const css = getComputedStyle(node);
-      return [node.offsetWidth-node.clientWidth-parseFloat(css.borderLeftWidth)-parseFloat(css.borderRightWidth),
-        node.offsetHeight-node.clientHeight-parseFloat(css.borderTopWidth)-parseFloat(css.borderBottomWidth)];
-    });
-    assert.ok(gutters.every(size => size > 0), 'Both desktop scrollbars occupy space on the overflowing graph: ' + gutters);
+    await checkDesktopDrag(page);
+    return camera(page, kind);
   }
   return current;
 }
@@ -298,6 +337,15 @@ async function runCase(browser, kind, offline, first) {
     assert.notEqual(adapted.scale, remembered[first].scale, label + ': the user can adjust zoom after returning');
     await resize(page, kind, other); await resize(page, kind, first);
     sameCamera(await camera(page, kind), adapted, label + ': last adjusted view is retained');
+    if (kind === 'graph' && !isMobile(page)) {
+      const node = view(page, kind).locator('.kg-node-group:not(.selected)').first();
+      const idAttribute = offline ? 'data-node-id' : 'data-knowledge-node-id';
+      const id = await node.getAttribute(idAttribute);
+      assert.ok(id);
+      await node.click();
+      assert.equal(await view(page, kind).locator('.kg-node-group.selected').getAttribute(idAttribute), id,
+        'The framed canvas still receives node clicks after moving its thumbs and fitting the graph');
+    }
     assert.equal(calls(), 0, label + ': responsive views never call a model');
     assert.deepEqual(errors, [], label + ': no page errors');
     console.log('PASS ' + label + ': initial fit, independent desktop/mobile cameras and zoom after reopening');

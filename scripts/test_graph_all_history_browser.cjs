@@ -260,8 +260,14 @@ async function checkCase(browser,width,language) {
     assert.equal(await page.locator('#knowledgeGraphDetailWrap').isVisible(),true,label+': selecting a past graph opens historical node details');
     assert.equal(await page.locator('#knowledgeGraphHistoryWrap').isVisible(),false,label+': the historical list yields to its selected details');
     assert.equal(await page.locator('#knowledgeGraphLocateOriginal').count(),0,label+': historical node details have no recent-only source locator');
-    assert.equal(await page.locator('.kg-section-title').innerText(),language==='en'?'Historical question connections':'历史题目关联',
-      label+': the selected graph is explicitly labelled as a historical question');
+    if (mobile) {
+      assert.equal(await page.locator('#knowledgeGraphCanvas .kg-section-title').innerText(),
+        language==='en'?'Historical question connections':'历史题目关联');
+    } else {
+      assert.equal(await page.locator('#knowledgeGraphCanvas :is(.kg-section-title,.kg-section-desc):visible').count(), 0);
+    }
+    assert.equal(await page.locator('#knowledgeGraphDetailTitle').innerText(),language==='en'?'Logical Equivalence':'逻辑等价',
+      label+': the selected historical node is named in the active language');
     assert.equal(await page.locator('#knowledgeGraphDetail .graph-status-pill.current').count(),0,label+': history graph navigation omits the redundant detail pill');
     assert.deepEqual(await page.evaluate(()=>knowledgeGraphDisplayedNodes().map(node=>({id:node.id,prerequisites:node.prerequisites}))),
       [{id:'logic_equivalence',prerequisites:[]}],label+': history graph includes only the question concept without fixed course prerequisites');

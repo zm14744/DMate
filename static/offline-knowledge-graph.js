@@ -267,6 +267,7 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile, onReady)
     const stage = viewport.querySelector(mobile ? '.kg-mobile-stage' : '.kg-desktop-zoom-stage');
     const surface = viewport.querySelector(mobile ? '.kg-mobile-zoom-surface' : '.kg-desktop-zoom-surface');
     if (!stage || !surface) return;
+    const disposeDesktop = mobile ? null : window.DMateKnowledgeGraphDesktop?.mount(viewport, surface);
     viewport.style.visibility = 'hidden';
     viewport.dataset.kgReady = 'false';
     let initialized = false, applying = false, disposed = false, frame = 0, releaseFrame = 0;
@@ -350,6 +351,7 @@ function installKnowledgeGraphViewMemory(viewport, key, memory, mobile, onReady)
         viewport.removeEventListener('pointerdown', beginInteraction, {capture:true});
         viewport.removeEventListener('wheel', beginInteraction, {capture:true});
         viewport.removeEventListener('keydown', beginInteraction, {capture:true});
+        disposeDesktop?.();
         previousDispose?.();
     };
     // The graph and its details are connected before installing the camera.
@@ -910,18 +912,20 @@ function fitKnowledgeGraphDesktop() {
 
 function renderKnowledgeGraphSection(container, nodes, title, description, context, options = {}) {
     const section = document.createElement("div");
-    section.className = "kg-section";
+    section.className = options.forCopy ? "kg-section" : "kg-section kg-desktop-section";
 
-    const heading = document.createElement("div");
-    heading.className = "kg-section-title";
-    heading.textContent = title;
-    section.appendChild(heading);
+    if (options.forCopy) {
+        const heading = document.createElement("div");
+        heading.className = "kg-section-title";
+        heading.textContent = title;
+        section.appendChild(heading);
 
-    if (description) {
-        const desc = document.createElement("div");
-        desc.className = "kg-section-desc";
-        desc.textContent = description;
-        section.appendChild(desc);
+        if (description) {
+            const desc = document.createElement("div");
+            desc.className = "kg-section-desc";
+            desc.textContent = description;
+            section.appendChild(desc);
+        }
     }
 
     if (!nodes.length) {
@@ -1075,6 +1079,11 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
     // 固定圆角卡片的宽高，只有内部视口随真实尺寸的图谱二维滚动。
     const viewport = document.createElement("div");
     viewport.className = "kg-desktop-viewport offline-graph-canvas";
+    if (!options.forCopy) {
+        viewport.setAttribute("role", "region");
+        viewport.setAttribute("aria-label", title);
+        viewport.tabIndex = 0;
+    }
     // 注意不对 SVG 用 width:100%：整张大图会被压缩到容器宽度，文字小且滚动布局抖动。
     const surface = document.createElement("div");
     surface.className = "kg-desktop-zoom-surface";

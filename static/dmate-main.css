@@ -1720,10 +1720,11 @@ input[type="search"]::-webkit-search-cancel-button {
 }
 
 .kg-section {
+    --kg-section-radius:12px;
     margin-bottom:0;
     padding:12px;
     border:1px solid var(--surface-3);
-    border-radius:12px;
+    border-radius:var(--kg-section-radius);
     background:var(--surface-2);
 }
 
@@ -6456,6 +6457,29 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
 
 /* 桌面图谱使用真实尺寸绘制，画布内部滚动和缩放。 */
 @media (min-width:761px) {
+    #knowledgeGraphModal .kg-desktop-scroll-thumb {
+        position:absolute;
+        z-index:1;
+        border-radius:999px;
+        background:rgba(148,163,184,.42);
+        cursor:grab;
+        touch-action:none;
+    }
+    #knowledgeGraphModal .kg-desktop-scroll-thumb[data-axis="x"] {
+        bottom:0;
+        height:var(--kg-desktop-thumb-size);
+    }
+    #knowledgeGraphModal .kg-desktop-scroll-thumb[data-axis="y"] {
+        right:0;
+        width:var(--kg-desktop-thumb-size);
+    }
+    #knowledgeGraphModal .kg-desktop-scroll-thumb:is(:hover,[data-kg-dragging]) {
+        background:rgba(148,163,184,.58);
+    }
+    #knowledgeGraphModal :is(.kg-desktop-viewport,.kg-desktop-scroll-thumb)[data-kg-dragging] {
+        cursor:grabbing;
+        user-select:none;
+    }
     #knowledgeGraphModal .graph-toolbar {
         border-bottom:1px solid var(--surface-3);
     }
@@ -6477,6 +6501,12 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         min-height:0;
         overflow:hidden!important;
     }
+    #knowledgeGraphModal .kg-desktop-section {
+        --kg-desktop-thumb-size:6px;
+        position:relative;
+        padding:0!important;
+        clip-path:inset(0 round var(--kg-section-radius));
+    }
     #knowledgeGraphModal .kg-section-title,
     #knowledgeGraphModal .kg-section-desc {
         flex:none;
@@ -6491,6 +6521,13 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         scrollbar-color:var(--dmate-scrollbar-color,var(--border-mid) transparent);
         overscroll-behavior:contain;
     }
+    #knowledgeGraphModal .kg-desktop-section > .kg-desktop-viewport {
+        scrollbar-gutter:auto;
+        scrollbar-width:none;
+    }
+    #knowledgeGraphModal .kg-desktop-section > .kg-desktop-viewport::-webkit-scrollbar {
+        display:none;
+    }
     #knowledgeGraphModal .kg-desktop-zoom-surface {
         position:relative;
         overflow:visible;
@@ -6498,6 +6535,9 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         min-height:1px;
         /* 小图和适应后的图谱在可视画布内居中，不贴左边留一大块空白。 */
         margin-inline:auto;
+    }
+    #knowledgeGraphModal .kg-desktop-section .kg-desktop-zoom-surface {
+        overflow:hidden;
     }
     #knowledgeGraphModal .kg-desktop-zoom-stage {
         position:absolute;

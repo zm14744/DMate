@@ -169,9 +169,13 @@ async function checkWrongBookGraph(browser, width) {
       label + ': actual renderer draws the same two involved nodes');
     await page.evaluate(() => DMateI18n.setLanguage('en', false));
     await settle(page);
-    assert.match(await page.locator('#knowledgeGraphCanvas .kg-section-title').textContent(), /[A-Za-z]/,
-      label + ': graph heading updates with the current language');
-    assert.doesNotMatch(await page.locator('#knowledgeGraphCanvas .kg-section-title').textContent(), /错题/);
+    if (width <= 760) {
+      assert.equal(await page.locator('#knowledgeGraphCanvas .kg-section-title').textContent(), 'Wrong question connections');
+    } else {
+      assert.equal(await page.locator('#knowledgeGraphCanvas :is(.kg-section-title,.kg-section-desc):visible').count(), 0);
+    }
+    assert.equal(await page.locator('#knowledgeGraphDetailTitle').innerText(), 'Permutations and Combinations',
+      label + ': the selected node title updates with the live language');
     assert.deepEqual((await graphSnapshot(page)).ids, EXPECTED, label + ': language changes preserve the exact source graph');
     await page.evaluate(() => DMateI18n.setLanguage('zh-CN', false));
     await locateAndExpect(page, 'wrong-current', 'pending', conversation, label + '/clicked newer pending');

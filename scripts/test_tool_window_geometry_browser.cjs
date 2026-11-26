@@ -69,15 +69,33 @@ async function checkGraph(page) {
   const mobile = page.viewportSize().width <= 760;
   const viewport = page.locator('#knowledgeGraphCanvas ' + (mobile ? '.kg-mobile-viewport' : '.kg-desktop-viewport'));
   await viewport.waitFor();
-  const borders = await viewport.evaluate(node => {
+  const geometry = await viewport.evaluate(node => {
     const toolbar = getComputedStyle(document.querySelector('#knowledgeGraphModal .graph-toolbar'));
-    const style = getComputedStyle(node);
-    return { width:toolbar.borderBottomWidth, line:toolbar.borderBottomStyle, bar:style.scrollbarWidth, gutter:style.scrollbarGutter };
+    const section = node.closest('.kg-section'), style = getComputedStyle(node), clip = getComputedStyle(section);
+    const box = node.getBoundingClientRect(), frame = section.getBoundingClientRect();
+    const thumbs = Array.from(section.querySelectorAll(':scope > .kg-desktop-scroll-thumb'), thumb => {
+      const axis = thumb.dataset.axis, edge = thumb.getBoundingClientRect();
+      return { axis, inset:thumb.hidden ? null : (axis === 'x' ? box.bottom-edge.bottom : box.right-edge.right) };
+    });
+    return { separator:toolbar.borderBottomWidth, line:toolbar.borderBottomStyle, bar:style.scrollbarWidth,
+      gutter:style.scrollbarGutter, radius:clip.borderRadius, overflow:clip.overflow,
+      headings:section.querySelectorAll('.kg-section-title,.kg-section-desc').length, thumbs,
+      insets:[box.left-frame.left-parseFloat(clip.borderLeftWidth),frame.right-box.right-parseFloat(clip.borderRightWidth),
+        box.top-frame.top-parseFloat(clip.borderTopWidth),frame.bottom-box.bottom-parseFloat(clip.borderBottomWidth)] };
   });
-  assert.equal(borders.width,mobile ? '0px' : '1px','Graph toolbar separator at '+page.viewportSize().width);
-  if (!mobile) assert.equal(borders.line,'solid');
-  assert.equal(borders.bar,mobile ? 'none' : 'auto','The desktop graph uses shared scrollbars and mobile hides them');
-  assert.equal(borders.gutter,mobile ? 'auto' : 'stable','Only the desktop graph reserves a scrollbar gutter');
+  assert.equal(geometry.separator,mobile ? '0px' : '1px','Graph toolbar separator at '+page.viewportSize().width);
+  assert.equal(geometry.bar,'none');
+  assert.equal(geometry.gutter,'auto');
+  assert.deepEqual(geometry.thumbs.map(thumb => thumb.axis).sort(),mobile ? [] : ['x','y']);
+  if (!mobile) {
+    assert.equal(geometry.line,'solid');
+    assert.equal(geometry.headings,0,'The title and node count are absent from the desktop canvas');
+    assert.ok(parseFloat(geometry.radius)>0 && ['clip','hidden'].includes(geometry.overflow),'The desktop frame clips the canvas to its rounded corners');
+    for (const gap of geometry.insets) near(gap,0,'Desktop viewport meets the inner edge of the frame');
+    for (const thumb of geometry.thumbs) {
+      if (thumb.inset !== null) near(thumb.inset,0,thumb.axis+' thumb is flush with the canvas edge');
+    }
+  }
 }
 
 async function compareTools(page, offline, active, sizes, previousFrames) {
