@@ -84,12 +84,14 @@ async function online(page,width) {
   assert.equal((await metrics(note)).overflow,'auto','A retained textarea resizes after hidden programmatic refill');
   await page.evaluate(()=>closeWrongEdit());
   await page.evaluate(()=>{
-    learningState.conceptNotebook={notes:[{id:'auto-note',title:'自动增高',content:'已有内容',updatedAt:1}],deleted:{}};
+    learningState.conceptNotebook={notes:[
+      {id:'auto-note',title:'自动增高',content:'已有内容',updatedAt:1},
+      {id:'auto-note-2',title:'换行',content:'新增一行',updatedAt:2}
+    ],deleted:{}};
     initializeConceptNotebook();dmateConceptNotebook.open();
   });
   await grows(page,page.locator('.dcn-title'),'notebook concept name',longTitle);
   await grows(page,page.locator('.dcn-original'),'notebook original content');
-  await grows(page,page.locator('.dcn-question'),'notebook supplementary request');
   const original=page.locator('.dcn-original');
   const wrapped='多行输入会跟随当前宽度自动重新换行并保持所有原始文字'.repeat(12);
   await original.fill(wrapped);await settle(page);
@@ -99,7 +101,12 @@ async function online(page,width) {
   await page.evaluate(()=>document.documentElement.style.setProperty('--font-scale','1.2'));await settle(page);
   const after=await metrics(original);assert.equal(after.resize,'none');assert.ok(after.height<=after.max+2);
   assert.ok(before.height>0&&after.height>0,'Width/font changes preserve a measured editable field');
-  await page.evaluate(()=>{document.documentElement.style.removeProperty('--font-scale');dmateConceptNotebook.close();});
+  await page.evaluate(()=>document.documentElement.style.removeProperty('--font-scale'));
+  const notebook=page.locator('#conceptNotebookDialog');
+  for(const checkbox of await notebook.getByRole('checkbox').all()) await checkbox.check();
+  await notebook.locator('.dcn-relation-trigger').click();
+  await grows(page,notebook.getByRole('dialog',{name:'分析关联'}).getByRole('textbox',{name:'分析要求（可选）'}),'notebook analysis request');
+  await page.evaluate(()=>dmateConceptNotebook.close());
   await page.setViewportSize({width,height:900});
   await page.evaluate(()=>{
     const svg='<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500"/>';

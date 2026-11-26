@@ -39,7 +39,7 @@ body[data-appearance-theme="dark"] {
         .wrong-search-clear,.ocr-task-remove,.dcn-close,.dcn-search-clear,.dcn-note-delete,.dcn-analysis-cancel,
         .dge-panel-close,.dgs-source-delete,.ddw-history-delete,.ddw-export-close,.session > button.del,
         .appearance-swatch,.mobile-topbar-button,.mobile-install-button,.chat-jump-button,
-        .rich-copy-smart,.rich-copy-button,.dge-history-arrow,.ddw-guide-button,
+        .rich-copy-smart,.rich-copy-button,.dge-history-arrow,.ddw-guide-button,.dcn-analysis-submit,
         .msg-actions button,#knowledgeGraphCopyBtn,.ddw-header-export,
         .kg-mobile-zoom-btn,.kg-mobile-zoom-fit,.kg-mobile-expand,.kg-mobile-node,
         .kg-desktop-zoom-controls button,.kg-mobile-zoom-controls button,
@@ -64,7 +64,7 @@ body[data-appearance-theme="dark"] {
         .wrong-search-clear,.ocr-task-remove,.dcn-close,.dcn-search-clear,.dcn-note-delete,.dcn-analysis-cancel,
         .dge-panel-close,.dgs-source-delete,.ddw-history-delete,.ddw-export-close,.session > button.del,
         .appearance-swatch,.mobile-topbar-button,.mobile-install-button,.chat-jump-button,
-        .rich-copy-smart,.rich-copy-button,.dge-history-arrow,.ddw-guide-button,
+        .rich-copy-smart,.rich-copy-button,.dge-history-arrow,.ddw-guide-button,.dcn-analysis-submit,
         .msg-actions button,#knowledgeGraphCopyBtn,.ddw-header-export,
         .kg-mobile-zoom-btn,.kg-mobile-zoom-fit,.kg-mobile-expand,.kg-mobile-node,
         .kg-desktop-zoom-controls button,.kg-mobile-zoom-controls button,
@@ -96,7 +96,7 @@ body[data-appearance-theme="dark"] {
         --dm-control-text:var(--text-primary);
     }
     body[data-appearance-theme] :is(
-        button.primary,button.dcn-primary,button.dge-primary,button.ddw-primary,button.dmate-update-primary,
+        button.primary,button.dge-primary,button.ddw-primary,button.dmate-update-primary,
         .wrong-actions button:not(.secondary):not(.danger),
         .wrong-edit-actions button:not(.secondary),.wrong-safe-actions button:not(.secondary),
         .wrong-picker-actions button:not(.secondary),.learning-review-actions button,
@@ -630,11 +630,10 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
     }
 }
 
-/* Wrong-book and notebook actions share the message toolbar's quiet feedback. */
+/* Wrong-book actions share the message toolbar's quiet feedback. */
 @layer dmate-button-themes {
     body[data-appearance-theme] :is(#wrongBookModal,#mistakesPanel) .wrong-actions > button,
-    body[data-appearance-theme] #wrongRetestReviewModal button[id^="retest-gen-"],
-    body[data-appearance-theme] #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel) {
+    body[data-appearance-theme] #wrongRetestReviewModal button[id^="retest-gen-"] {
         border:0!important;
         border-radius:8px!important;
         background:transparent!important;
@@ -670,21 +669,18 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
     }
     @media(hover:hover) {
         body[data-appearance-theme] :is(#wrongBookModal,#mistakesPanel) .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):hover,
-        body[data-appearance-theme] #wrongRetestReviewModal button[id^="retest-gen-"]:not(:disabled):not([aria-disabled="true"]):hover,
-        body[data-appearance-theme] #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel):not(:disabled):not([aria-disabled="true"]):hover {
+        body[data-appearance-theme] #wrongRetestReviewModal button[id^="retest-gen-"]:not(:disabled):not([aria-disabled="true"]):hover {
             background:var(--dm-nav-hover,var(--dm-selected-hover))!important;
             color:var(--dm-icon-emphasis,var(--text-primary))!important;
         }
     }
     body[data-appearance-theme] :is(#wrongBookModal,#mistakesPanel) .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):is(:focus-visible,:active),
-    body[data-appearance-theme] #wrongRetestReviewModal button[id^="retest-gen-"]:not(:disabled):not([aria-disabled="true"]):is(:focus-visible,:active),
-    body[data-appearance-theme] #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel):not(:disabled):not([aria-disabled="true"]):is(:focus-visible,:active) {
+    body[data-appearance-theme] #wrongRetestReviewModal button[id^="retest-gen-"]:not(:disabled):not([aria-disabled="true"]):is(:focus-visible,:active) {
         background:var(--dm-nav-hover,var(--dm-selected-hover))!important;
         color:var(--dm-icon-emphasis,var(--text-primary))!important;
     }
     body[data-appearance-theme] :is(#wrongBookModal,#mistakesPanel) .wrong-actions > button:not(:disabled):not([aria-disabled="true"]):focus-visible,
-    body[data-appearance-theme] #wrongRetestReviewModal button[id^="retest-gen-"]:not(:disabled):not([aria-disabled="true"]):focus-visible,
-    body[data-appearance-theme] #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel):not(:disabled):not([aria-disabled="true"]):focus-visible {
+    body[data-appearance-theme] #wrongRetestReviewModal button[id^="retest-gen-"]:not(:disabled):not([aria-disabled="true"]):focus-visible {
         outline:2px solid var(--dm-selected-ring)!important;
         outline-offset:2px!important;
     }
@@ -763,7 +759,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         #knowledgeGraphModal .kg-history-actions > button,
         #knowledgeGraphModal .graph-detail-term,
         #downloadModal .download-actions > a,
-        #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel),
+        #conceptNotebookDialog .dcn-relation-trigger,
         #accountModal .account-body button
     ) {
         box-sizing:border-box!important;
@@ -793,7 +789,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         #knowledgeGraphModal .kg-history-actions > button,
         #knowledgeGraphModal button.graph-detail-term,
         #downloadModal .download-actions > a,
-        #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel),
+        #conceptNotebookDialog .dcn-relation-trigger,
         #accountModal .account-body button
     ):not(:disabled):not([aria-disabled="true"]):is(:hover,:focus-visible,:active) {
         background:var(--dm-filled-hover-bg)!important;
@@ -807,7 +803,7 @@ body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:i
         #knowledgeGraphModal .kg-history-actions > button,
         #knowledgeGraphModal button.graph-detail-term,
         #downloadModal .download-actions > a,
-        #conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel),
+        #conceptNotebookDialog .dcn-relation-trigger,
         #accountModal .account-body button
     ):is(:disabled,[aria-disabled="true"]) {
         --dm-filled-bg:var(--dm-selected-bg);

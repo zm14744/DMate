@@ -16,12 +16,6 @@ const gallery = { version: 2, activeId: 'page-A', pages: names.map((name, index)
     edges: [{ id: 'e1', from: 'v1', to: 'v2', direction: 'forward', weight: 3, edge_label: 'AB', style: 'solid' }] }] }
 })) };
 const settle = page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-async function modalHeading(page, title) {
-  const reference = page.locator(await page.locator('#appConfirmTitle').count() ? '#appConfirmTitle' : '#appearanceModal .modal-head > div:first-child');
-  const read = control => control.evaluate(node => Object.fromEntries(['fontFamily','fontSize','fontWeight','fontStyle','lineHeight']
-    .map(key => [key,getComputedStyle(node)[key]])));
-  assert.deepEqual(await read(title), await read(reference), 'Drawing popup heading uses ordinary modal typography');
-}
 async function readyView(page) {
   await page.locator('.dge-overlay[data-geometry-ready="true"]').waitFor();
   await settle(page);
@@ -101,8 +95,10 @@ async function selectShape(page, kind, mobile) {
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
   });
   if (mobile) await page.touchscreen.tap(point.x, point.y); else await page.mouse.click(point.x, point.y);
-  await page.waitForFunction(text => document.querySelector('.dge-selection-panel h3')?.textContent.includes(text),
-    kind === 'vertex' ? '顶点的属性' : '边的属性');
+  const panel = page.locator('.dge-selection-panel');
+  await panel.getByLabel(kind === 'vertex' ? '当前顶点名称' : '当前边名称', { exact: true }).waitFor();
+  assert.equal(await panel.getAttribute('aria-label'), kind === 'vertex' ? '顶点的属性' : '边的属性');
+  assert.equal(await panel.locator('.dge-property-head,h3').count(), 0);
   await settle(page);
 }
 
@@ -185,22 +181,21 @@ async function compactPanel(page, selector, mobile) {
 
 async function propertyCard(page, mobile) {
   const panel = page.locator('.dge-selection-panel');
-  await modalHeading(page, panel.locator('.dge-property-head > h3'));
   assert.equal(await panel.getByRole('button', { name: /反转方向|Reverse direction/i }).count(), 0,
     'Drawing properties omit the redundant Reverse direction action');
   const body = panel.locator('.dge-property-body');
   await body.evaluate(node => { node.scrollTop = 0; }); await settle(page);
-  const close = panel.locator('.dge-property-head .dge-panel-close');
+  const close = panel.getByRole('button', { name: '关闭属性', exact: true });
   const before = await close.boundingBox();
   const bounds = await panel.evaluate(node => {
-    const panel = node.getBoundingClientRect(), head = node.querySelector('.dge-property-head'), dot = head.querySelector('.dge-panel-close').getBoundingClientRect();
-    const style = getComputedStyle(head);
+    const panel = node.getBoundingClientRect(), dot = node.querySelector('.dge-panel-close').getBoundingClientRect();
+    const firstField = node.querySelector('.dge-property-body .dge-field').getBoundingClientRect();
     return { right: panel.right - dot.right, top: dot.top - panel.top, width: dot.width, height: dot.height,
-      expectedRight: parseFloat(style.paddingRight) + parseFloat(getComputedStyle(node).borderRightWidth),
-      expectedTop: parseFloat(style.paddingTop) + parseFloat(getComputedStyle(node).borderTopWidth) };
+      fieldTop: firstField.top - panel.top };
   });
   assert.ok(bounds.right >= 8 && bounds.right <= 20 && bounds.top >= 8 && bounds.top <= 20,
     'Close dot stays at the property card top-right: ' + JSON.stringify(bounds));
+  assert.ok(Math.abs(bounds.fieldTop - bounds.top) <= 2, 'The first field starts alongside the close button');
   const sharedSize = await page.locator(await page.locator('#graphEditorClose').count() ? '#graphEditorClose' : '#appearanceClose')
     .evaluate(node => parseFloat(getComputedStyle(node).width));
   assert.ok(Math.abs(bounds.width - sharedSize) <= 1 && Math.abs(bounds.height - sharedSize) <= 1,
@@ -361,11 +356,14 @@ async function viewportAndPopoverChecks(page, mobile, label, online = true) {
   for (const [name, trigger, panel] of popovers) {
     await page.locator(trigger).click(); await page.locator(panel).waitFor(); await settle(page);
     if (name !== 'tools') {
-      const title = page.locator(panel + ' :is(.ddw-panel-header,.ddw-editor-panel-header) > h3');
-      await modalHeading(page, title);
-      await page.evaluate(() => DMateI18n.setLanguage('en', false));
-      await modalHeading(page, title);
-      await page.evaluate(() => DMateI18n.setLanguage('zh-CN', false));
+      const popup = page.locator(panel);
+      assert.equal(await popup.locator('.ddw-panel-header,.ddw-editor-panel-header').count(), 0);
+      for (const language of ['en', 'zh-CN']) {
+        await page.evaluate(language => DMateI18n.setLanguage(language, false), language);
+        const triggerName = (await page.locator(trigger).innerText()).trim();
+        assert.equal(await popup.getAttribute('aria-label'), triggerName);
+        assert.equal(await popup.getByRole('heading', { name: triggerName, exact: true }).count(), 0);
+      }
     }
     if (name === 'ai-guidance' || name === 'ai-generation') {
       const generating = name === 'ai-generation';
@@ -373,7 +371,6 @@ async function viewportAndPopoverChecks(page, mobile, label, online = true) {
         'Only the generation panel contains its explicit generation send button');
       assert.equal(await page.locator(panel + ' [data-drawing-guide]').count(), generating ? 0 : 1,
         'Only the guidance panel contains its explicit guidance send button');
-      assert.equal(await page.locator(panel + ' .ddw-panel-header>h3').innerText(), generating ? 'AI生成' : 'AI指导');
       const requirementLabel = await page.locator(panel + ' .ddw-ai-label').innerText();
       assert.equal(requirementLabel, generating ? '绘图要求' : '指导要求');
       assert.equal(await page.locator(panel + ' .ddw-ai-requirement').getAttribute('required'), '');

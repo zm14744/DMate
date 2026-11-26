@@ -125,7 +125,7 @@ body[data-appearance-theme="dark"] {
         .offline-graph-inline > .modal-card,.graph-editor-dialog:not(dialog),.dcn-dialog:not(dialog),
         .input,.ocr-task-panel,.kg-mobile-zoom-controls,
         .dge-tool-palette,.dge-float-panel,.dge-float-content,.dge-selection-panel,
-        .dge-overlay-tools,.dgs-source-picker,.ddw-side-panel,.ddw-export-preview
+        .dge-overlay-tools,.dgs-source-picker,.ddw-side-panel,.dcn-analysis-panel,.ddw-export-preview
     ) {
         background-color:rgba(var(--surface-2-rgb),var(--panel-alpha))!important;
         background-image:none!important;

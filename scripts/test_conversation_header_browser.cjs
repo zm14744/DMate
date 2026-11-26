@@ -237,45 +237,28 @@ const aiActionPaint = locator => locator.evaluate(node => {
     shadow: css.boxShadow, outline: [css.outlineStyle, css.outlineWidth, css.outlineColor], color: css.color };
 });
 
-async function notebookAiActions(page, newButton) {
-  const actions = page.locator('#conceptNotebookDialog .dcn-ai-actions > button:not(.dcn-analysis-cancel)');
-  assert.equal(await actions.count(), 2);
-  assert.equal(await actions.nth(0).isDisabled(), true, 'No selected concepts disables explanation');
-  assert.equal(await actions.nth(1).isDisabled(), true, 'No selected concepts disables relation analysis');
-  const filled = async button => {
-    const paint = await aiActionPaint(button);
-    assert.notEqual(paint.background, 'rgba(0, 0, 0, 0)', 'Notebook AI actions have the shared filled surface');
-    assert.equal(paint.image, 'none'); assert.equal(paint.border, '0px'); assert.equal(paint.shadow, 'none');
-    return paint;
-  };
-  await page.mouse.move(0, 0); await page.locator('#conceptNotebookTitle').focus(); await settle(page);
-  for (const button of await actions.all()) await filled(button);
-  await page.locator('#conceptNotebookDialog .dcn-note input[type="checkbox"]').first().check();
-  assert.equal(await actions.nth(0).isEnabled(), true, 'One selected concept enables explanation');
-  assert.equal(await actions.nth(1).isDisabled(), true, 'Relation analysis still requires two concepts');
-  const explanationPalette = await aiActionPaint(actions.nth(0));
+async function notebookAnalysisTrigger(page, newButton) {
+  const dialog = page.locator('#conceptNotebookDialog');
+  const trigger = dialog.locator('.dcn-tools .dcn-relation-trigger');
+  const checkboxes = dialog.getByRole('checkbox');
+  assert.equal(await trigger.innerText(), '分析关联');
+  assert.equal(await trigger.isDisabled(), true, 'No selected entries disables relation analysis');
+  await checkboxes.first().check();
+  assert.equal(await trigger.isDisabled(), true, 'A single entry cannot be compared');
   await newButton.click();
-  await page.locator('#conceptNotebookDialog .dcn-title').fill('关联概念');
-  for (const checkbox of await page.locator('#conceptNotebookDialog .dcn-note input[type="checkbox"]').all()) await checkbox.check();
-  assert.equal(await actions.nth(0).isDisabled(), true, 'Multiple concepts disable single-concept explanation');
-  assert.equal(await actions.nth(1).isEnabled(), true, 'Two selected concepts enable relation analysis');
-  const relationPalette = await aiActionPaint(actions.nth(1));
-  assert.deepEqual([relationPalette.background, relationPalette.color],
-    [explanationPalette.background, explanationPalette.color], 'Both enabled notebook actions use the same neutral palette');
-  for (const button of await actions.all()) {
-    if (await button.isDisabled()) continue;
-    await page.mouse.move(0, 0); await page.locator('#conceptNotebookTitle').focus(); await settle(page);
-    const idle = await filled(button);
-    if (!mobile(page)) {
-      await button.hover(); await settle(page);
-      assert.notDeepEqual(await aiActionPaint(button), idle, 'Enabled notebook AI action has hover feedback');
-    }
-    await page.mouse.move(0, 0); await page.keyboard.press('Tab'); await button.focus(); await settle(page);
-    assert.notDeepEqual(await aiActionPaint(button), idle, 'Enabled notebook AI action has keyboard focus feedback');
+  await dialog.locator('.dcn-title').fill('关联概念');
+  for (const checkbox of await checkboxes.all()) await checkbox.check();
+  assert.equal(await trigger.isEnabled(), true, 'Two selected entries enable relation analysis');
+  await page.mouse.move(0, 0); await dialog.locator('.dcn-search').focus(); await settle(page);
+  const idle = await aiActionPaint(trigger);
+  if (!mobile(page)) {
+    await trigger.hover(); await settle(page);
+    assert.notDeepEqual(await aiActionPaint(trigger), idle, 'Enabled relation analysis has hover feedback');
   }
-  await page.locator('#conceptNotebookDialog .dcn-note input[type="checkbox"]').last().uncheck();
-  assert.equal(await actions.nth(0).isEnabled(), true, 'Returning to exactly one concept restores explanation');
-  assert.equal(await actions.nth(1).isDisabled(), true);
+  await page.mouse.move(0, 0); await page.keyboard.press('Tab'); await trigger.focus(); await settle(page);
+  assert.ok(await trigger.evaluate(node => node.matches(':focus-visible')), 'The trigger accepts keyboard focus');
+  await checkboxes.last().uncheck();
+  assert.equal(await trigger.isDisabled(), true, 'Returning to one entry disables relation analysis');
 }
 
 async function notebookButton(page) {
@@ -309,7 +292,7 @@ async function notebookButton(page) {
   await button.click();
   assert.equal(await page.locator('#conceptNotebookDialog .dcn-note').count(), before + 1, 'New entry still creates an editable notebook entry');
   await page.locator('#conceptNotebookDialog .dcn-title').fill('局部概念');
-  await notebookAiActions(page, button);
+  await notebookAnalysisTrigger(page, button);
   const savedTitle = await page.locator('#conceptNotebookDialog .dcn-title').inputValue();
   await language(page, 'en');
   assert.equal(await button.innerText(), compact ? 'New entry' : '');
@@ -337,7 +320,7 @@ async function runCase(browser, width, theme) {
     await conversationLifecycle(page, width, theme);
     await notebookButton(page);
     assert.deepEqual(modelRequests, [], 'No AI endpoint calls'); assert.deepEqual(errors, [], 'No browser script errors');
-    console.log('PASS ' + width + '/' + theme + ': blank/header lifecycle, shared conversation tooltips, sidebar state, live language and filled notebook AI actions');
+    console.log('PASS ' + width + '/' + theme + ': blank/header lifecycle, shared conversation tooltips, sidebar state, live language and notebook relation-analysis trigger');
   } finally { await context.close(); }
 }
 

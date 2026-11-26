@@ -63,7 +63,7 @@ async function panelStyle(page, action) {
       .map(key => [key, getComputedStyle(node)[key]]));
     const input = panel.querySelector('.ddw-ai-requirement'), button = panel.querySelector(action);
     const box = node => { const rect = node.getBoundingClientRect(); return [rect.width, rect.height]; };
-    return { panel: css(panel), heading: css(panel.querySelector('h3')), label: css(panel.querySelector('.ddw-ai-label')),
+    return { panel: css(panel), label: css(panel.querySelector('.ddw-ai-label')),
       input: css(input), inputSize: box(input), button: css(button), buttonSize: box(button),
       arrow: button.querySelector('svg').outerHTML };
   }, action);
@@ -84,7 +84,9 @@ async function passiveGenerationPanel(page, mock, guideRequests, initial, langua
   const guidanceLabel = language === 'en' ? 'Guidance request' : '指导要求';
   const request = 'K5 request retained without submitting';
   await ai(page, '');
-  assert.equal(await page.locator('.ddw-side-panel h3').innerText(), language === 'en' ? 'AI generation' : 'AI生成');
+  const panel = page.locator('.ddw-side-panel');
+  assert.equal(await panel.getAttribute('aria-label'), language === 'en' ? 'AI generation' : 'AI生成');
+  assert.equal(await panel.locator('.ddw-panel-header, h3').count(), 0);
   assert.equal(await page.locator('.ddw-ai-requirement').getAttribute('aria-label'), requiredLabel);
   assert.equal(await page.locator('.ddw-ai-requirement').getAttribute('required'), '');
   assert.equal(await page.locator('[data-drawing-guide]').count(), 0, 'Generation and guidance have separate submit actions');
@@ -134,7 +136,8 @@ async function passiveGenerationPanel(page, mock, guideRequests, initial, langua
   assert.equal(await generation.getAttribute('aria-expanded'), 'false');
   assert.equal(await guidance.getAttribute('aria-expanded'), 'true');
   assert.equal(await page.locator('.ddw-side-panel:visible').count(), 1, 'There is one anchored popover');
-  assert.equal(await page.locator('.ddw-side-panel h3').innerText(), language === 'en' ? 'AI guidance' : 'AI指导');
+  assert.equal(await panel.getAttribute('aria-label'), language === 'en' ? 'AI guidance' : 'AI指导');
+  assert.equal(await panel.locator('.ddw-panel-header, h3').count(), 0);
   assert.equal(await page.locator('[data-math-diagram-generate]').count(), 0);
   const popoverIntersectsRail = await page.locator('.ddw-side-panel').evaluate(panel => {
     const p = panel.getBoundingClientRect(), r = panel.closest('.dmate-drawing-workspace').querySelector('.ddw-side-actions').getBoundingClientRect();

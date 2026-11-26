@@ -269,7 +269,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
                 ? graph.vertices.find(v => selectedNodes.has(v.id)) : null;
             const edge = graph.edges.find(e => e.id === selectedEdge);
             if (edge) {
-                aside.append(element('h3', '', '边的属性'));
+                aside.setAttribute('aria-label',uiText('边的属性','Edge properties'));
                 aside.dataset.selectionKind = 'edge';
                 const ids = [edge.id];
                 const endpoints = nodeOptions(graph);
@@ -290,29 +290,26 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
                     model.deleteEdges(graph.id, ids); selectedEdge = null;
                 }, 'dge-danger'));
             } else if (selectedNode) {
-                aside.append(element('h3', '', '顶点的属性'));
+                aside.setAttribute('aria-label',uiText('顶点的属性','Vertex properties'));
                 aside.append(field('名称', input(selectedNode.label ?? selectedNode.display_label, '当前顶点名称',
                     value => model.renameVertex(graph.id, selectedNode.id, value))));
                 aside.append(button('删除这个顶点', () => {
                     model.deleteVertices(graph.id, [selectedNode.id]); selectedNodes.clear();
                 }, 'dge-danger'));
             } else if(selectedGraph && !options.drawingOnly){
-                aside.append(element('h3','','子图属性'));
+                aside.setAttribute('aria-label',uiText('子图属性','Subgraph properties'));
                 aside.append(field('名称',input(graph.name,'当前子图名称',v=>model.renameGraph(graph.id,v))));
                 aside.append(element('p','dge-muted',(graph.directed===false?'无向':'有向或待核对')+' '+(graph.weighted===false?'无权':'带权或待核对')));
                 aside.append(button('删除子图',()=>removeGraph(graph.id),'dge-danger'));
             }
             if(aside.childElementCount){
-                const head=element('div','dge-property-head'),heading=aside.querySelector('h3');
-                if(heading)head.append(heading);
                 const close=button('',()=>{propertiesVisible=false;});close.classList.add('dge-panel-close');close.setAttribute('aria-label','关闭属性');close.title='关闭属性';
-                head.append(close);
                 if(options.drawingOnly){
                     // Keep the close control outside the scrolling fields.
                     const body=element('div','dge-property-body');
                     body.append(...aside.childNodes);aside.classList.add('dge-drawing-properties');
-                    aside.append(head,body);
-                }else aside.prepend(head);
+                    aside.append(close,body);
+                }else aside.prepend(close);
             }
             return aside;
         }
@@ -716,8 +713,9 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
                 const rack=element('div','dge-floating-actions');workspace.append(rack);
                 const floating=(node,title,key,position)=>{
                     if(!node)return;
+                    if(node.classList.contains('dge-review-summary'))node.querySelector(':scope > h3')?.remove();
                     const panel=element('details','dge-float-panel '+position);panel.dataset.panelKey=key;panel.open=Boolean(panelState[key]);
-                    const content=element('div','dge-float-content');content.append(node);
+                    const content=element('div','dge-float-content');content.setAttribute('role','group');content.setAttribute('aria-label',title);content.append(node);
                     const launcher=element('summary','',title);
                     const closeOtherPanels = () => {
                         for (const other of rack.children) if (other !== panel) {

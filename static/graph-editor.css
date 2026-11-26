@@ -131,17 +131,16 @@
  grid-template-columns:minmax(0,1fr);
 }
 .dge-selection-panel{
+ --dge-property-padding:16px;--dge-property-gap:12px;
  min-width:0;padding:16px;border:1px solid var(--dge-border);
  border-radius:12px;background:var(--surface-1,#fff);
  display:flex;flex-direction:column;gap:12px;
 }
-.dge-selection-panel h3{margin:0 0 2px;font-size:14px}
-.dge-property-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0}
-.dge-property-head h3{margin:0}
-.dge-property-head .dge-panel-close{flex:0 0 auto;align-self:center}
+.dge-selection-panel>.dge-panel-close{position:absolute;z-index:2;top:var(--dge-property-padding);right:var(--dge-property-padding)}
+/* Keep the close action beside the first real field label, without a title row. */
+.dge-selection-panel>.dge-field:first-of-type>span,.dge-property-body>.dge-field:first-child>span{padding-inline-end:calc(22px + var(--dge-property-gap))}
 .dge-workspace>.dge-selection-panel.dge-drawing-properties{--dge-property-padding:16px;--dge-property-gap:12px;padding:0;gap:0;overflow:hidden}
-.dge-drawing-properties>.dge-property-head{padding:var(--dge-property-padding) var(--dge-property-padding) var(--dge-property-gap)}
-.dge-property-body{display:flex;flex-direction:column;gap:var(--dge-property-gap);min-height:0;padding:0 var(--dge-property-padding) var(--dge-property-padding);overflow:auto;overscroll-behavior:contain;scrollbar-width:none}
+.dge-property-body{display:flex;flex-direction:column;gap:var(--dge-property-gap);min-height:0;padding:var(--dge-property-padding);overflow:auto;overscroll-behavior:contain;scrollbar-width:none}
 .dge-property-body::-webkit-scrollbar{display:none;width:0;height:0}
 .dge-selection-panel .dge-field{gap:5px}
 .dge-selection-panel .dge-muted{margin:0}
@@ -151,7 +150,7 @@
 .dge-advanced-panel>.dge-edit-panels{padding:0 12px 14px}
 @media(max-width:760px){
  .dge-workspace:has(.dge-overlay-host){grid-template-columns:1fr;gap:8px}
- .dge-selection-panel{padding:12px;gap:8px}
+ .dge-selection-panel{--dge-property-padding:12px;--dge-property-gap:8px;padding:12px;gap:8px}
  .dge-workspace>.dge-selection-panel.dge-drawing-properties{--dge-property-padding:12px;--dge-property-gap:8px}
  .dge-selection-panel .dge-field{flex:1 1 140px}
 }
@@ -329,9 +328,7 @@
 .dgs-source-choice{display:flex;align-items:center;gap:9px;min-height:44px;font-size:13px;line-height:1.4;cursor:pointer}
 .dgs-source-picker .dgs-source-choice input[type=checkbox]{appearance:none;-webkit-appearance:none;box-sizing:border-box;flex:0 0 var(--dgs-source-control-size);width:var(--dgs-source-control-size);height:var(--dgs-source-control-size);min-width:var(--dgs-source-control-size);margin:0;border:2px solid var(--text-subtle,#64748b);border-radius:50%;background:transparent;cursor:pointer}
 .dgs-source-picker .dgs-source-choice input[type=checkbox]:checked{background:var(--accent,#3b82f6);border-color:var(--accent,#3b82f6)}
-.dgs-source-picker-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:0 0 auto}
-.dgs-source-picker-head>h3{margin:0;font-family:var(--dmate-font-ui);font-size:var(--font-base,16px);font-weight:400;line-height:inherit}
-@media(max-width:900px){.dgs-source-picker{padding:10px;gap:8px}.dgs-source-picker-head{gap:8px}}
+@media(max-width:900px){.dgs-source-picker{padding:10px;gap:8px}}
 .dmate-graph-editor :is(.dge-panel-close,.dgs-source-delete){appearance:none;-webkit-appearance:none;flex:0 0 20px;width:20px;min-width:20px;max-width:20px;height:20px;min-height:20px;max-height:20px;padding:0!important;border:0!important;border-radius:50%;background:#ef4444!important;box-shadow:none!important;font-size:0}
 .dmate-graph-editor :is(.dge-panel-close,.dgs-source-delete):hover{background:#dc2626!important}
 .dmate-graph-editor .dgs-source-delete{box-sizing:border-box;flex-basis:var(--dgs-source-control-size);width:var(--dgs-source-control-size);min-width:var(--dgs-source-control-size);max-width:var(--dgs-source-control-size);height:var(--dgs-source-control-size);min-height:var(--dgs-source-control-size);max-height:var(--dgs-source-control-size)}

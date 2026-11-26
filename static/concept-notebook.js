@@ -35,18 +35,62 @@ function mount(options){
  const searchWrap=el('div','dcn-search-wrap'),searchClear=action('',()=>{search.value='';renderList();search.focus({preventScroll:true});},'dcn-search-clear');
  searchClear.setAttribute('aria-label','清空搜索');searchClear.title='清空搜索';searchClear.hidden=true;searchWrap.append(search,searchClear);
  const list=el('div','dcn-list'),selection=el('div','dcn-selection'),count=el('span');
- const tools=el('div','dcn-tools');
- tools.append(newButton,searchWrap);selection.append(count);sidebar.append(tools,selection,list);
+ const tools=el('div','dcn-tools'),toolsRight=el('div','dcn-tools-right');
+ const relationButton=action('分析关联',toggleAnalysisPanel,'dcn-relation-trigger');
+ relationButton.setAttribute('aria-haspopup','dialog');relationButton.setAttribute('aria-controls','conceptNotebookAnalysis');relationButton.setAttribute('aria-expanded','false');
+ toolsRight.append(relationButton,searchWrap);tools.append(newButton,toolsRight);selection.append(count);sidebar.append(tools,selection,list);
  const editor=el('section','dcn-editor');
  const titleLabel=el('label','','条目名称'),title=el('textarea','dcn-title');title.maxLength=LIMITS.title;title.rows=1;title.setAttribute('aria-label','条目名称');titleLabel.append(title);
  const originalLabel=el('label','','条目内容'),original=el('textarea','dcn-original');original.maxLength=LIMITS.content;original.rows=1;original.setAttribute('aria-label','条目内容');originalLabel.append(original);
  const saved=el('span','dcn-saved');saved.setAttribute('role','status');editor.append(titleLabel,originalLabel,saved);
- const ai=el('section','dcn-ai');
- const questionLabel=el('label','','补充要求（可选）'),question=el('textarea','dcn-question');question.maxLength=1000;question.rows=2;question.setAttribute('aria-label','补充要求（可选）');questionLabel.append(question);
- const controls=el('div','dcn-ai-actions'),explainButton=action('AI 解释',()=>void analyze('explain'),'dcn-primary'),relationButton=action('分析关联',()=>void analyze('relations')),cancelButton=action('',()=>invalidate(),'dcn-close dcn-analysis-cancel');
+ const analysisPanel=el('div','dcn-analysis-panel');analysisPanel.id='conceptNotebookAnalysis';analysisPanel.hidden=true;
+ analysisPanel.setAttribute('role','dialog');analysisPanel.setAttribute('aria-label','分析关联');
+ const questionLabel=el('label','','分析要求（可选）'),question=el('textarea','dcn-question');question.maxLength=1000;question.rows=3;questionLabel.append(question);
+ const controls=el('div','dcn-analysis-actions'),submitButton=action('',()=>void analyze(),'dcn-analysis-submit');
+ submitButton.setAttribute('aria-label','提交分析');submitButton.title='提交分析';
+ const sendIcon=d.createElementNS('http://www.w3.org/2000/svg','svg');
+ sendIcon.setAttribute('viewBox','0 0 24 24');sendIcon.setAttribute('aria-hidden','true');
+ sendIcon.innerHTML='<path d="M12 19V5m-6 6 6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+ submitButton.append(sendIcon);
+ const cancelButton=action('',()=>{invalidate();submitButton.focus({preventScroll:true});},'dcn-close dcn-analysis-cancel');
  cancelButton.setAttribute('aria-label','取消分析');cancelButton.title='取消分析';
- const status=el('p','dcn-status'),result=el('div','dcn-results');status.setAttribute('role','status');result.setAttribute('aria-label','AI 解释与概念关联');
- controls.append(explainButton,relationButton,cancelButton);ai.append(questionLabel,controls,status,result);main.append(editor,ai);content.append(sidebar,main);dialog.replaceChildren(heading,content);
+ const status=el('p','dcn-status'),result=el('div','dcn-results');status.setAttribute('role','status');result.setAttribute('aria-label','关联分析结果');
+ controls.append(submitButton,cancelButton);analysisPanel.append(questionLabel,controls,status,result);
+ main.append(editor);content.append(sidebar,main);dialog.replaceChildren(heading,content,analysisPanel);
+ const analysisPanelSize=typeof win.ResizeObserver==='function'?new win.ResizeObserver(positionAnalysisPanel):null;
+ function positionAnalysisPanel(){
+  if(analysisPanel.hidden)return;
+  const viewport=win.visualViewport,frame=dialog.getBoundingClientRect(),anchor=relationButton.getBoundingClientRect();
+  const left=Math.max(frame.left,viewport?.offsetLeft||0)+8,top=Math.max(frame.top,viewport?.offsetTop||0)+8;
+  const right=Math.min(frame.right,(viewport?.offsetLeft||0)+(viewport?.width||win.innerWidth))-8;
+  const bottom=Math.min(frame.bottom,(viewport?.offsetTop||0)+(viewport?.height||win.innerHeight))-8;
+  const below=bottom-anchor.bottom-8,above=anchor.top-top-8,up=below<160&&above>below;
+  analysisPanel.style.maxWidth=Math.max(1,right-left)+'px';
+  analysisPanel.style.maxHeight=Math.max(1,Math.min(bottom-top,Math.max(120,up?above:below)))+'px';
+  const {width,height}=analysisPanel.getBoundingClientRect();
+  analysisPanel.style.left=Math.max(left,Math.min(anchor.left,right-width))+'px';
+  analysisPanel.style.top=Math.max(top,Math.min(up?anchor.top-8-height:anchor.bottom+8,bottom-height))+'px';
+ }
+ function hideAnalysisPanel(restoreFocus=false){
+  if(analysisPanel.hidden)return;
+  analysisPanel.hidden=true;relationButton.setAttribute('aria-expanded','false');
+  analysisPanelSize?.disconnect();
+  win.removeEventListener('resize',positionAnalysisPanel);
+  win.visualViewport?.removeEventListener('resize',positionAnalysisPanel);
+  win.visualViewport?.removeEventListener('scroll',positionAnalysisPanel);
+  if(restoreFocus)relationButton.focus({preventScroll:true});
+ }
+ function toggleAnalysisPanel(){
+  if(relationButton.disabled)return;
+  if(!analysisPanel.hidden){hideAnalysisPanel(true);return;}
+  analysisPanel.hidden=false;relationButton.setAttribute('aria-expanded','true');
+  positionAnalysisPanel();
+  analysisPanelSize?.observe(analysisPanel);
+  win.addEventListener('resize',positionAnalysisPanel);
+  win.visualViewport?.addEventListener('resize',positionAnalysisPanel);
+  win.visualViewport?.addEventListener('scroll',positionAnalysisPanel);
+  question.focus({preventScroll:true});
+ }
  function load(){
   const key=contextKey();if(key!==loadedContext){currentId=null;selected.clear();question.value='';search.value='';saveError=false;saved.textContent='';loadedContext=key;}
   const source=copy(options.getState?.()||{notes:[],deleted:{}});
@@ -63,10 +107,11 @@ function mount(options){
   deletePrompt?.finish(false);deletePending=null;serial++;active?.controller.abort();active=null;result.replaceChildren();status.textContent='';renderActions();
  }
  function renderActions(){
-  const empty=state.notes.length===0;dialog.classList.toggle('is-empty',empty);selection.hidden=empty;ai.hidden=empty;
+  const empty=state.notes.length===0;dialog.classList.toggle('is-empty',empty);selection.hidden=empty;relationButton.hidden=empty;
   const size=selected.size;count.textContent=uiText('已选 '+size+' 条',size+' selected');
-  explainButton.disabled=!!active||size!==1;relationButton.disabled=!!active||size<2;cancelButton.hidden=!active;
-  ai.setAttribute('aria-busy',String(Boolean(active)));
+  relationButton.disabled=size<2;submitButton.disabled=Boolean(active)||size<2;cancelButton.hidden=!active;
+  submitButton.setAttribute('aria-busy',String(Boolean(active)));
+  if(relationButton.disabled)hideAnalysisPanel();
   newButton.disabled=state.notes.length>=LIMITS.notes;
   for(const remove of list.querySelectorAll('.dcn-note-delete'))remove.disabled=!!deletePending;
  }
@@ -152,40 +197,39 @@ function mount(options){
   if(data.summary)result.append(rich('dcn-summary',data.summary));
   for(const row of data.explanations){const section=el('section','dcn-explanation');section.append(contentNode(el('h4','',names.get(row.note_id))),rich('dcn-ai-text',row.explanation));result.append(section);}
   if(data.relations.length){result.append(el('h4','','概念之间的关联'));for(const row of data.relations){const section=el('section','dcn-relation');section.append(contentNode(el('strong','',names.get(row.from)+' → '+names.get(row.to)+' · '+row.type)),rich('dcn-ai-text',row.explanation));result.append(section);}}
-  else if(active?.action==='relations')result.append(el('p','','没有得到可确认的直接关联。'));
+  else result.append(el('p','','没有得到可确认的直接关联。'));
  }
- async function analyze(kind){
-  if(active)return;
+ async function analyze(){
+  if(active||analysisPanel.hidden)return;
   const notes=state.notes.filter(n=>selected.has(n.id)).map(n=>({id:n.id,title:n.title,content:n.content}));
-  if(kind==='explain'&&notes.length!==1){status.textContent=uiText('请选择一条概念进行AI解释。','Select exactly one concept for AI explanation.');return;}
-  if(!notes.length||notes.length>LIMITS.selected){status.textContent='每次请选择1至12条概念。';return;}
-  if(kind==='relations'&&notes.length<2){status.textContent='请选择至少两条概念分析关联。';return;}
-  if(notes.some(n=>!n.title.trim()&&!n.content.trim())){status.textContent='请先写下所选概念的名称或内容。';return;}
+  if(notes.length<2||notes.length>LIMITS.selected){status.textContent='每次请选择 2 至 12 条条目';return;}
+  if(notes.some(n=>!n.title.trim()&&!n.content.trim())){status.textContent='请先完善所选条目';return;}
   if(notes.reduce((sum,n)=>sum+n.title.length+n.content.length,0)>LIMITS.analysis){status.textContent='所选概念内容过长，请减少选择后分析。';return;}
   if(!persist()){status.textContent='笔记尚未保存，请先解决保存错误后再分析。';return;}
-  const op={id:++serial,controller:new AbortController(),fingerprint:fingerprint(),context:contextKey(),action:kind};active=op;
+  const op={id:++serial,controller:new AbortController(),fingerprint:fingerprint(),context:contextKey()};active=op;
   const valid=()=>!destroyed&&active===op&&serial===op.id&&dialog.open&&op.context===contextKey()&&op.fingerprint===fingerprint();
   result.replaceChildren();status.textContent='';renderActions();
   const timeout=setTimeout(()=>op.controller.abort(),85000);
   try{
    const response=await transport(options.endpoint||'/notebook/analyze',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},signal:op.controller.signal,
-    body:JSON.stringify({action:kind,notes,question:question.value.trim(),language:root.DMateI18n?.getLanguage?.()||d.documentElement.lang||'zh-CN'})});
+    body:JSON.stringify({action:'relations',notes,question:question.value.trim(),language:root.DMateI18n?.getLanguage?.()||d.documentElement.lang||'zh-CN'})});
    let data;try{data=await response.json();}catch(_){throw new Error(uiText('概念分析响应异常，请重试。'));}
    if(!valid())return;
    if(!response.ok||data?.ok!==true)throw new Error(typeof data?.error==='string'?data.error:'概念分析失败，请重试。');
-   validateReply(data,notes);if(data.action!==kind)throw new Error(uiText('概念分析任务不匹配，请重试。'));
+   validateReply(data,notes);if(data.action!=='relations')throw new Error(uiText('概念分析任务不匹配，请重试。'));
    showResult(data,notes);options.onResults?.(result);status.textContent='';
-   result.scrollIntoView({block:'nearest'});
+   if(!analysisPanel.hidden){positionAnalysisPanel();result.scrollIntoView({block:'nearest'});}
   }catch(error){if(valid())status.textContent=error?.name==='AbortError'?'概念分析超时，请重试。':error?.message||'概念分析失败，请重试。';}
   finally{clearTimeout(timeout);if(active===op){active=null;if(!destroyed)renderActions();}}
  }
- function open(){if(destroyed)return;invalidate();load();saveError=false;saved.textContent='';search.value='';renderList();renderEditor();renderActions();options.onOpen?.();if(!dialog.open)dialog.showModal();}
- function close(){if(saveError&&!persist())return;invalidate();if(dialog.open)dialog.close();}
- function refresh(){if(destroyed)return;invalidate();load();renderList();renderEditor();renderActions();}
- const onClose=()=>invalidate();
- const onCancel=event=>{if(saveError&&!persist()){event.preventDefault();return;}invalidate();};
+ function open(){if(destroyed)return;hideAnalysisPanel();invalidate();load();saveError=false;saved.textContent='';search.value='';renderList();renderEditor();renderActions();options.onOpen?.();if(!dialog.open)dialog.showModal();}
+ function close(){if(saveError&&!persist())return;hideAnalysisPanel();invalidate();if(dialog.open)dialog.close();}
+ function refresh(){if(destroyed)return;hideAnalysisPanel();invalidate();load();renderList();renderEditor();renderActions();}
+ const onClose=()=>{hideAnalysisPanel();invalidate();};
+ const onCancel=event=>{if(!analysisPanel.hidden){event.preventDefault();hideAnalysisPanel(true);return;}if(saveError&&!persist()){event.preventDefault();return;}invalidate();};
+ const onPointerDown=event=>{if(!analysisPanel.contains(event.target)&&!relationButton.contains(event.target))hideAnalysisPanel();};
  title.addEventListener('input',()=>edit('title',title.value));original.addEventListener('input',()=>edit('content',original.value));
- question.addEventListener('input',()=>invalidate());search.addEventListener('input',renderList);button.addEventListener('click',open);dialog.addEventListener('close',onClose);dialog.addEventListener('cancel',onCancel);
+ question.addEventListener('input',()=>invalidate());search.addEventListener('input',renderList);button.addEventListener('click',open);dialog.addEventListener('close',onClose);dialog.addEventListener('cancel',onCancel);dialog.addEventListener('pointerdown',onPointerDown);
  const viewChange=()=>queueMicrotask(()=>win.dispatchEvent(new Event('dmate:notebook-viewchange')));
  for(const type of ['input','change','click'])dialog.addEventListener(type,viewChange);
  return {open,close,refresh,getState:()=>copy(state),getViewState:()=>({currentId,selected:[...selected],search:search.value,question:question.value}),restoreViewState(value){
@@ -194,7 +238,7 @@ function mount(options){
   selected=new Set((Array.isArray(value.selected)?value.selected:[]).filter(id=>state.notes.some(note=>note.id===id)));
   search.value=typeof value.search==='string'?value.search:'';question.value=typeof value.question==='string'?value.question:'';
   renderList();renderEditor();renderActions();
- },destroy(){if(destroyed)return;invalidate();destroyed=true;button.removeEventListener('click',open);dialog.removeEventListener('close',onClose);dialog.removeEventListener('cancel',onCancel);for(const type of ['input','change','click'])dialog.removeEventListener(type,viewChange);if(dialog.open)dialog.close();dialog.replaceChildren();}};
+ },destroy(){if(destroyed)return;hideAnalysisPanel();invalidate();destroyed=true;button.removeEventListener('click',open);dialog.removeEventListener('close',onClose);dialog.removeEventListener('cancel',onCancel);dialog.removeEventListener('pointerdown',onPointerDown);for(const type of ['input','change','click'])dialog.removeEventListener(type,viewChange);if(dialog.open)dialog.close();dialog.replaceChildren();}};
 }
 root.DMateConceptNotebook={mount};
 })(typeof window!=='undefined'?window:globalThis);

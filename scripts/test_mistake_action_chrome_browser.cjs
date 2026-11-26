@@ -79,7 +79,10 @@ async function seedWrongBook(page) {
       analysis: '', note: '使用奇数的定义。', corrected: false, retestPassed: true,
       retestRecords: [{ id: 'legacy-retest', question, answer: '通过', createdAt: 1 }],
       createdAt: 1, updatedAt: 2
-    }], conceptNotebook: { notes: [{ id: 'chrome-concept', title: '奇数', content: '形如 2k+1 的整数。', updatedAt: 1 }], deleted: {} } });
+    }], conceptNotebook: { notes: [
+      { id: 'chrome-concept', title: '奇数', content: '形如 2k+1 的整数。', updatedAt: 1 },
+      { id: 'chrome-even', title: '偶数', content: '形如 2k 的整数。', updatedAt: 2 }
+    ], deleted: {} } });
     wrongBookFilter = 'pending'; wrongBookSearch = ''; wrongBookSort = 'recent';
   }, question);
 }
@@ -98,11 +101,20 @@ async function checkHeadingLabels(page, reference) {
   await page.evaluate(() => { closeWrongEdit(); closeWrongBook(); });
   await toolsEntry(page, 'conceptNotebookBtn');
   await page.locator('#conceptNotebookDialog').waitFor({ state: 'visible' });
-  for (const selector of ['.dcn-title', '.dcn-original', '.dcn-question']) {
+  const notebook = page.locator('#conceptNotebookDialog');
+  for (const checkbox of await notebook.getByRole('checkbox').all()) await checkbox.check();
+  await notebook.locator('.dcn-relation-trigger').click();
+  await notebook.getByRole('dialog', { name: '分析关联' }).waitFor();
+  for (const selector of ['.dcn-title', '.dcn-original']) {
     assert.deepEqual(await fontStyle(page.locator('#conceptNotebookDialog ' + selector).locator('..')), reference,
       selector + ' label matches the graph heading');
   }
-  await page.locator('#conceptNotebookDialog .dcn-close').first().click();
+  const requirements = notebook.getByRole('textbox', { name: '分析要求（可选）' });
+  const requirementsLabel = await fontStyle(requirements.locator('..'));
+  assert.equal(requirementsLabel.size, reference.size);
+  assert.equal(requirementsLabel.weight, '400', 'The floating panel uses a regular-weight field label');
+  await notebook.locator('.dcn-question').press('Escape');
+  await notebook.locator('.dcn-close').first().click();
   await settle(page);
 }
 

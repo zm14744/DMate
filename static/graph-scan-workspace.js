@@ -100,7 +100,6 @@ function mount(container,options){
  function queuePickerPosition(){if(picker&&!pickerFrame)pickerFrame=d.defaultView.requestAnimationFrame(positionPicker);}
  function sourcePicker(kind){
   const box=el('div','dgs-source-picker');box.style.visibility='hidden';box.setAttribute('role','dialog');box.setAttribute('aria-label',kind==='graph'?'选择图形来源':'选择文字来源');
-  const pickerHead=el('div','dgs-source-picker-head');pickerHead.append(el('h3','',kind==='graph'?'选择图形框':'选择文字框'));box.append(pickerHead);
   const check=(text,checked,change)=>{const wrap=el('label','dgs-source-choice'),input=el('input');input.type='checkbox';input.checked=checked;input.disabled=saving;input.setAttribute('aria-label',text);input.addEventListener('change',()=>change(input.checked));wrap.append(input,el('span','',text));return wrap;};
   const list=el('div','dgs-source-list');
   for(const row of rows(kind)){

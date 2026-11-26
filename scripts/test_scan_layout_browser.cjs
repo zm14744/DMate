@@ -89,6 +89,8 @@ async function runCase(browser, width) {
     }
     await page.locator('[data-source-picker="graph"]').click();
     const popup=page.locator('.dgs-source-picker');await popup.waitFor({state:'visible'});await settle(page);
+    assert.equal(await popup.getAttribute('aria-label'),'选择图形来源');
+    assert.equal(await popup.locator('.dgs-source-picker-head,h3').count(),0);
     assert.equal(await popup.locator('.dgs-source-choice input[type="checkbox"]').count(),8);
     for(const row of await popup.locator('.dgs-source-card').all()){
       const dimensions=await row.evaluate(node=>{const left=node.querySelector('input').getBoundingClientRect(),right=node.querySelector('.dgs-source-delete').getBoundingClientRect();

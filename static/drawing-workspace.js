@@ -167,12 +167,6 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    if(send){send.disabled=disabled||Boolean(aiAbort)||!requirement.trim()||(panelMode==='ai'&&empty);send.setAttribute('aria-busy',String(aiTask===(panelMode==='generate'?'generate':'guide')));}
    shell.classList.toggle('is-empty',empty);
    if(palette){palette.open=toolsExpanded&&!empty;const trigger=palette.querySelector(':scope > summary');trigger?.setAttribute('aria-expanded',String(palette.open));trigger?.setAttribute('aria-disabled',String(disabled));}
-   for(const item of editorHost.querySelectorAll('.dge-float-panel')){
-    const content=item.querySelector(':scope > .dge-float-content');
-    if(content&&!content.querySelector(':scope > .ddw-editor-panel-header')){
-     const head=el('div','ddw-editor-panel-header');head.append(el('h3','',item.dataset.panelKey==='graphs'?'绘图设置':'图形信息'));content.prepend(head);
-    }
-   }
    const editorOpen=Boolean(editorHost.querySelector('.dge-floating-actions > details[open]'));
    const properties=editorHost.querySelector('.dge-selection-panel');
    const propertyOpen=Boolean(properties?.childElementCount);
@@ -327,7 +321,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    if(aiTask==='generate'&&panelMode!=='generate')abortAnswer();
    panel.style.visibility='hidden';panel.hidden=!panelMode;panel.replaceChildren();historyButton.setAttribute('aria-expanded',String(panelMode==='history'));aiButton?.setAttribute('aria-expanded',String(panelMode==='ai'));generateButton?.setAttribute('aria-expanded',String(panelMode==='generate'));
    if(!panelMode){syncChrome();return;}
-   const header=el('div','ddw-panel-header');header.append(el('h3','',panelMode==='history'?'历史绘图':panelMode==='generate'?'AI生成':'AI指导'));panel.append(header);
+   panel.setAttribute('aria-label',panelMode==='history'?uiText('历史绘图','Drawing history'):panelMode==='generate'?uiText('AI生成','AI generation'):uiText('AI指导','AI guidance'));
    if(panelMode==='history'){
     const list=el('div','ddw-history-list');
     // The persisted array is the creation order; visiting or editing a page

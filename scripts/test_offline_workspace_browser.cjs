@@ -232,7 +232,7 @@ async function drawingReference(page) {
   await workspace.getByRole('button', { name: 'AI指导', exact: true }).click();
   await workspace.locator('.ddw-side-actions>[data-drawing-ai-generation]').click();
   await workspace.locator('.ddw-side-panel:not([hidden]) [data-math-diagram-generate]').waitFor();
-  assert.equal(await workspace.locator('.ddw-side-panel:not([hidden]) .ddw-panel-header>h3').innerText(), 'AI生成');
+  assert.equal(await workspace.locator('.ddw-side-panel:not([hidden])').getAttribute('aria-label'), 'AI生成');
   assert.equal(await workspace.locator('[data-drawing-guide]').count(), 0,
     'Generation uses its own explicit send button');
   await workspace.locator('.ddw-side-actions>[data-drawing-ai-generation]').click();

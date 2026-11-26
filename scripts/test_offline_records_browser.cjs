@@ -34,6 +34,7 @@ async function navigate(page, panel) {
 }
 async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
   const page = panel.page(), viewport = page.viewportSize();
+  const hasAnalysis = !expectEmpty && await panel.getAttribute('id') === 'conceptNotebookDialog';
   const search = panel.locator('.dcn-search');
   assert.equal(await search.getAttribute('aria-label'), '搜索');
   assert.equal(await search.evaluate(input => input.placeholder), '');
@@ -72,6 +73,7 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
         reference.remove();
       }
       return {create:shape('.dcn-new'),search:shape('.dcn-search'),tools:shape('.dcn-tools'),main:shape('.dcn-main'),
+        relation:panel.querySelector('.dcn-relation-trigger') && shape('.dcn-relation-trigger'),
         form:shape('.dcn-editor'),firstLabel:shape('.dcn-editor label'),
         colors:innerWidth>1100 ? ['.dcn-list','.dcn-tools','.dcn-main','.dcn-search'].map(paint) : null,
         list:shape('.dcn-list'),content:shape('.dcn-content'),hint:hint && shape('.dcn-list-empty'),
@@ -82,6 +84,9 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
         empty:panel.classList.contains('is-empty')};
     });
     assert.equal(row.empty, expectEmpty);
+    assert.equal(Boolean(row.relation?.width), hasAnalysis);
+    if (hasAnalysis) assert.ok(row.relation.right < row.search.left && Math.abs(row.relation.top-row.search.top)<1,
+      'The online analysis trigger sits to the left of search in the same row');
     assert.equal(row.newLabel,'新条目');
     assert.equal(row.form.width === 0, expectEmpty, 'The empty notebook hides the editing fields');
     assert.equal(row.main.width === 0, expectEmpty && width <= 1100, 'The desktop editor surface remains visible when empty');
@@ -127,7 +132,11 @@ async function checkNoteControlRow(panel, expectEmpty, beforeCreate) {
     assert.equal(row.newText,'新条目');
     assert.equal(row.create.radius,'10px','The new-note action retains its mobile and tablet corners');
     for (const key of ['border','style']) assert.equal(row.create[key],row.search[key]);
-    if (row.empty || width <= 680) {
+    if (hasAnalysis) {
+      assert.ok(row.create.bottom < row.relation.top && Math.abs(row.create.left-row.relation.left)<1
+        && Math.abs(row.create.right-row.search.right)<1,
+      'Create takes the first row above analysis and search in the populated online notebook');
+    } else if (row.empty || width <= 680) {
       for (const key of ['top','height']) assert.ok(Math.abs(row.create[key]-row.search[key]) < 1,
         width+': the notebook control row shares its '+key);
       assert.ok(row.create.left >= 0 && row.create.right < row.search.left && row.search.right <= width,
@@ -290,7 +299,6 @@ async function exercise(page,reference,width) {
   if(width===390&&process.env.OFFLINE_RECORDS_SCREENSHOTS==='1')await page.screenshot({path:'/tmp/dmate-offline-records-390-mistakes.png'});
 
   await navigate(page,'notes');
-  assert.equal(await page.locator('#notesPanel .dcn-ai,#notesPanel .dcn-ai-actions,#notesPanel .dcn-question').count(),0,'The restored notebook has its original local controls and no AI panel');
   const notebook = page.locator('#notesPanel');
   const emptyColumns = await checkNoteControlRow(notebook, true);
   await page.locator('#addNote').click();
@@ -315,6 +323,8 @@ async function exercise(page,reference,width) {
   });
   assert.equal((await records(page,'notes')).find(row=>row.id===firstNote.id)?.content,'保留我的原始推导：幂集含有所有子集',
     'Creating and editing another note retains the original note content');
+  assert.equal(await notebook.locator('.dcn-relation-trigger, .dcn-analysis-panel').count(),0,
+    'Even with two local entries, the offline notebook has no online relation-analysis controls');
   const search=page.locator('.dcn-search');await search.fill('不会匹配的内容');
   assert.equal((await page.locator('.dcn-list-empty').innerText()).trim(),'无');
   await search.fill('原始推导');assert.equal(await page.locator('.dcn-note').count(),1,'Original note search includes its content');
