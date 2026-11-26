@@ -4,16 +4,23 @@ const assert = require('node:assert/strict');
 const { revealInterface } = require('./offline-vault-browser-fixtures.cjs');
 const { chromium } = require('playwright');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
-const attribute = 'data-dmate-scroll-active';
-const settle = (page, selector, active) => page.waitForFunction(({selector, active, attribute}) =>
-  document.querySelector(selector)?.hasAttribute(attribute) === active, {selector, active, attribute});
-const state = (page, selector) => page.locator(selector).evaluate((node, attribute) => {
-  const css = getComputedStyle(node), thumb = getComputedStyle(node, '::-webkit-scrollbar-thumb');
-  return { active:node.hasAttribute(attribute), axis:node.getAttribute(attribute), color:css.scrollbarColor, width:css.scrollbarWidth,
-    thumb:thumb.backgroundColor, gutter:node.offsetWidth - node.clientWidth,
+const state = (page, selector) => page.locator(selector).evaluate(node => {
+  const css = getComputedStyle(node);
+  return { color:css.scrollbarColor, width:css.scrollbarWidth, gutter:node.offsetWidth - node.clientWidth,
     horizontal:node.offsetHeight - node.clientHeight, left:node.scrollLeft, top:node.scrollTop };
-}, attribute);
-const transparent = value => value === 'transparent' || value === 'rgba(0, 0, 0, 0)';
+});
+
+async function hoverThumb(page, selector, axis) {
+  const point = await page.locator(selector).evaluate((node, axis) => {
+    const box = node.getBoundingClientRect();
+    // Our borderless black fixtures have one 8px gutter on each edge.
+    return axis === 'x'
+      ? {x:box.left + node.clientWidth * (node.scrollLeft + node.clientWidth / 2) / node.scrollWidth, y:box.bottom - 4}
+      : {x:box.right - 4, y:box.top + node.clientHeight * (node.scrollTop + node.clientHeight / 2) / node.scrollHeight};
+  }, axis);
+  await page.mouse.move(point.x, point.y);
+  return point;
+}
 
 // CSSOM cannot inspect scrollbar-thumb:vertical/:horizontal. Sample the real
 // rendered gutters instead, decoding the screenshot with the browser's canvas.
@@ -77,52 +84,46 @@ async function assertPaint(page, selector, axis) {
     const before = await state(page, '#scroll-parent');
     assert.equal(before.gutter, 8, 'The existing custom 8px gutter is present at rest');
     assert.equal(before.color, 'auto', 'Chromium must keep using custom WebKit scrollbars');
-    assert.ok(transparent(before.thumb), 'An idle thumb is transparent');
     const rect = await page.locator('#scroll-parent').boundingBox();
-    await page.mouse.move(rect.x + rect.width - 4, rect.y + 100);
-    await settle(page, '#scroll-parent', true);
-    assert.equal((await state(page, '#scroll-parent')).axis, 'y', 'Right gutter hover reveals only the vertical scrollbar');
-    await assertPaint(page, '#scroll-parent', 'y');
-    await page.waitForTimeout(1000);
-    assert.equal((await state(page, '#scroll-parent')).axis, 'y', 'Stationary gutter hover stays visible');
-    await page.mouse.move(rect.x + 150, rect.y + rect.height - 4);
-    await page.waitForFunction(() => document.getElementById('scroll-parent').getAttribute('data-dmate-scroll-active') === 'x');
-    await assertPaint(page, '#scroll-parent', 'x');
-    await page.mouse.move(1400, 20);
-    await settle(page, '#scroll-parent', false);
     await assertPaint(page, '#scroll-parent', null);
-
-    await page.locator('#scroll-parent').evaluate(node => { node.scrollTop = 45; });
-    await settle(page, '#scroll-parent', true);
-    const active = await state(page, '#scroll-parent');
-    assert.equal(active.axis, 'y', 'Vertical scrolling selects only the vertical thumb');
-    await assertPaint(page, '#scroll-parent', 'y');
-    assert.equal(active.color, 'auto', 'Visible thumbs must not enable native arrow controls');
-    assert.equal(active.gutter, before.gutter, 'Revealing paint never changes the gutter');
-    assert.equal((await state(page, '#scroll-child')).active, false);
-    assert.ok(transparent((await state(page, '#scroll-child')).thumb), 'Parent state does not inherit into a child');
-    assert.ok(transparent((await state(page, '#scroll-sibling')).thumb), 'Unscrolled siblings stay hidden');
-    await page.waitForTimeout(400);
-    assert.equal((await state(page, '#scroll-parent')).active, true, 'Thumb persists briefly after scrolling');
-    await page.locator('#scroll-child').evaluate(node => { node.scrollTop = 35; });
-    await settle(page, '#scroll-child', true);
-    await settle(page, '#scroll-parent', false);
-    assert.equal((await state(page, '#scroll-child')).active, true, 'Nested scrollers use independent idle timers');
-    await settle(page, '#scroll-child', false);
-    assert.equal((await state(page, '#scroll-parent')).gutter, before.gutter);
-    console.log('PASS gutter hover, axis-only paint, unchanged gutter and independent nested/sibling timers');
-
-    // Both offsets remain nonzero while changing direction. The old vertical
-    // position must never make the horizontal scroll reveal both axes.
-    await page.locator('#scroll-parent').evaluate(node => { node.scrollLeft = 70; });
-    await settle(page, '#scroll-parent', true);
-    assert.equal((await state(page, '#scroll-parent')).axis, 'x');
+    await page.mouse.move(rect.x + rect.width - 4, rect.y + 110);
+    await assertPaint(page, '#scroll-parent', null);
+    await page.mouse.click(rect.x + rect.width - 4, rect.y + 110);
+    await page.waitForFunction(() => document.getElementById('scroll-parent').scrollTop > 0);
+    // A platform can page toward the pointer or jump straight to it. Move to
+    // the empty end of the track after native paging has landed.
+    const emptyTrackY = await page.locator('#scroll-parent').evaluate(node =>
+      node.scrollTop * 2 < node.scrollHeight - node.clientHeight ? node.clientHeight - 4 : 4);
+    await page.mouse.move(rect.x + rect.width - 4, rect.y + emptyTrackY);
+    await assertPaint(page, '#scroll-parent', null);
+    await page.locator('#scroll-parent').evaluate(node => { node.scrollTop = 0; });
+    await page.mouse.move(rect.x + 180, rect.y + rect.height - 4);
+    await assertPaint(page, '#scroll-parent', null);
+    await hoverThumb(page, '#scroll-parent', 'x');
     await assertPaint(page, '#scroll-parent', 'x');
-    await page.locator('#scroll-parent').evaluate(node => { node.scrollTop = 90; });
-    await page.waitForFunction(() => document.getElementById('scroll-parent').getAttribute('data-dmate-scroll-active') === 'y');
+    await hoverThumb(page, '#scroll-parent', 'y');
     await assertPaint(page, '#scroll-parent', 'y');
-    await settle(page, '#scroll-parent', false);
-    console.log('PASS changing scroll direction immediately hides the other axis');
+    assert.equal((await state(page, '#scroll-parent')).gutter, before.gutter, 'Revealing paint never changes the gutter');
+    await assertPaint(page, '#scroll-child', null);
+    await assertPaint(page, '#scroll-sibling', null);
+    await hoverThumb(page, '#scroll-child', 'y');
+    await assertPaint(page, '#scroll-child', 'y');
+    await assertPaint(page, '#scroll-parent', null);
+    await page.mouse.move(rect.x + rect.width - 20, rect.y + 110);
+    await assertPaint(page, '#scroll-child', null);
+
+    await page.mouse.wheel(0, 60);
+    await page.waitForFunction(() => document.getElementById('scroll-parent').scrollTop > 0);
+    await assertPaint(page, '#scroll-parent', null);
+    await page.locator('#scroll-parent').evaluate(node => { node.scrollLeft = 70; });
+    await assertPaint(page, '#scroll-parent', null);
+    await hoverThumb(page, '#scroll-parent', 'x');
+    await assertPaint(page, '#scroll-parent', 'x');
+    await hoverThumb(page, '#scroll-parent', 'y');
+    await assertPaint(page, '#scroll-parent', 'y');
+    await page.mouse.move(1400, 20);
+    await assertPaint(page, '#scroll-parent', null);
+    console.log('PASS blank tracks, axis-specific thumb hover, nested scrollbars and quiet wheel/programmatic scrolling');
 
     await page.evaluate(() => {
       const dynamic = document.createElement('div');
@@ -131,40 +132,34 @@ async function assertPaint(page, selector, axis) {
       document.getElementById('scrollbar-fixture').append(dynamic);
       dynamic.scrollLeft = 70;
     });
-    await settle(page, '#scroll-dynamic', true);
     const horizontal = await state(page, '#scroll-dynamic');
     assert.equal(horizontal.left, 70);
-    assert.equal(horizontal.axis, 'x', 'Dynamically added horizontal scrollers are observed');
+    await assertPaint(page, '#scroll-dynamic', null);
+    await hoverThumb(page, '#scroll-dynamic', 'x');
     await assertPaint(page, '#scroll-dynamic', 'x');
-    await settle(page, '#scroll-dynamic', false);
+    await page.mouse.move(1400, 20);
+    await assertPaint(page, '#scroll-dynamic', null);
     assert.equal((await state(page, '#scroll-dynamic')).horizontal, horizontal.horizontal);
     await page.locator('#scroll-hidden').evaluate(node => { node.scrollTop = 40; });
-    await settle(page, '#scroll-hidden', true);
     const hidden = await state(page, '#scroll-hidden');
     assert.equal(hidden.width, 'none', 'Explicitly hidden component scrollbars remain hidden');
     assert.equal(hidden.gutter, 0);
     assert.ok(hidden.top > 0, 'Hidden component still scrolls normally');
-    console.log('PASS dynamic horizontal containers and preserved explicit scrollbar-width:none');
+    console.log('PASS dynamically added horizontal scrollbars and explicit scrollbar-width:none');
 
     await page.locator('#scroll-sibling').evaluate(node => { node.scrollTop = 30; });
-    await settle(page, '#scroll-sibling', true);
-    const thumb = await page.locator('#scroll-sibling').evaluate(node => {
-      const r = node.getBoundingClientRect(), h = node.clientHeight;
-      const thumbHeight = Math.max(20, h * h / node.scrollHeight);
-      return {x:r.right - 4, y:r.top + (h - thumbHeight) * node.scrollTop / (node.scrollHeight - h) + thumbHeight / 2};
-    });
-    await page.mouse.move(thumb.x, thumb.y);
+    const thumb = await hoverThumb(page, '#scroll-sibling', 'y');
+    await assertPaint(page, '#scroll-sibling', 'y');
     await page.mouse.down();
-    await page.mouse.move(thumb.x, thumb.y + 55, {steps:5});
-    await page.waitForTimeout(1150);
+    await page.mouse.move(thumb.x - 30, thumb.y + 55, {steps:5});
+    await page.waitForFunction(() => document.getElementById('scroll-sibling').scrollTop > 30);
     const dragging = await state(page, '#scroll-sibling');
     assert.ok(dragging.top > 30, 'Dragging the native thumb changes the real scroll position');
-    assert.equal(dragging.active, true, 'A held native thumb stays visible beyond the idle timeout');
     assert.equal(dragging.gutter, before.gutter);
+    await assertPaint(page, '#scroll-sibling', 'y');
     await page.mouse.up();
-    await page.mouse.move(1400, 20);
-    await settle(page, '#scroll-sibling', false);
-    console.log('PASS native scrollbar dragging and delayed hiding after release');
+    await assertPaint(page, '#scroll-sibling', null);
+    console.log('PASS the native thumb stays painted during a drag outside the gutter and hides on release');
 
     await page.evaluate(() => {
       for (const node of [document.documentElement, document.body]) {
@@ -176,15 +171,13 @@ async function assertPaint(page, selector, axis) {
     });
     const rootWidth = await page.evaluate(() => document.documentElement.clientWidth);
     await page.evaluate(() => window.scrollTo(0, 300));
-    await settle(page, 'html', true);
     assert.ok(await page.evaluate(() => window.scrollY > 0));
     assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).scrollbarColor), 'auto');
     assert.equal(await page.evaluate(() => document.documentElement.clientWidth), rootWidth);
-    assert.equal((await state(page, '#scroll-parent')).active, false, 'Root scrolling does not reveal idle descendants');
-    await settle(page, 'html', false);
+    await assertPaint(page, '#scroll-parent', null);
     console.log('PASS root-document scrolling without geometry or descendant-state changes');
 
-    const offline = await browser.newPage({viewport:{width:1440,height:950}});
+    const offline = await browser.newPage({viewport:{width:1440,height:950}, hasTouch:true});
     await offline.goto(baseURL + '/offline', {waitUntil:'networkidle'});
     await offline.waitForFunction(() => window.__dmateScrollbarsInstalled === true);
     await revealInterface(offline);
@@ -195,17 +188,30 @@ async function assertPaint(page, selector, axis) {
       document.body.append(node);
     });
     const idleOffline = await state(offline, '#offline-scroll-probe');
-    assert.ok(transparent(idleOffline.thumb));
+    await assertPaint(offline, '#offline-scroll-probe', null);
     await offline.locator('#offline-scroll-probe').evaluate(node => { node.scrollTop = 40; });
-    await settle(offline, '#offline-scroll-probe', true);
+    await assertPaint(offline, '#offline-scroll-probe', null);
+    await hoverThumb(offline, '#offline-scroll-probe', 'y');
     const activeOffline = await state(offline, '#offline-scroll-probe');
-    assert.equal(activeOffline.axis, 'y');
     await assertPaint(offline, '#offline-scroll-probe', 'y');
     assert.equal(activeOffline.gutter, idleOffline.gutter);
     assert.equal(activeOffline.color, 'auto');
-    await settle(offline, '#offline-scroll-probe', false);
-    assert.ok(transparent((await state(offline, '#offline-scroll-probe')).thumb));
+    await offline.mouse.move(1400, 20);
     await assertPaint(offline, '#offline-scroll-probe', null);
-    console.log('PASS actual offline entry idle/scroll/idle integration');
+    console.log('PASS offline entry paints only the hovered thumb');
+
+    await offline.setViewportSize({width:390, height:844});
+    const touch = await offline.context().newCDPSession(offline);
+    await touch.send('Input.dispatchTouchEvent', {type:'touchStart', touchPoints:[{x:110,y:230}]});
+    for (const y of [215, 195, 175, 155]) {
+      await touch.send('Input.dispatchTouchEvent', {type:'touchMove', touchPoints:[{x:110,y}]});
+    }
+    await touch.send('Input.dispatchTouchEvent', {type:'touchEnd', touchPoints:[]});
+    await offline.waitForFunction(() => document.getElementById('offline-scroll-probe').scrollTop > 40);
+    await assertPaint(offline, '#offline-scroll-probe', 'y');
+    await offline.waitForFunction(() => !document.getElementById('offline-scroll-probe').hasAttribute('data-dmate-scroll-active'));
+    await assertPaint(offline, '#offline-scroll-probe', null);
+    await touch.detach();
+    console.log('PASS a touch swipe temporarily reveals its scrolling axis on a narrow screen');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

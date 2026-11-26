@@ -165,6 +165,17 @@ async function checkDesktopDrag(page) {
   const viewport = view(page, 'graph');
   const bounds = await viewport.boundingBox();
   const position = () => viewport.evaluate(node => [node.scrollLeft, node.scrollTop]);
+  const checkPaint = async (expectedAxis, message) => {
+    await settle(page);
+    const axes = await page.locator('.kg-desktop-scroll-thumb').evaluateAll(thumbs => thumbs.filter(thumb => {
+      const style = getComputedStyle(thumb);
+      return !thumb.hidden && style.visibility === 'visible' && Number(style.opacity) > 0
+        && !['transparent', 'rgba(0, 0, 0, 0)'].includes(style.backgroundColor);
+    }).map(thumb => thumb.dataset.axis));
+    assert.deepEqual(axes, expectedAxis ? [expectedAxis] : [], message);
+  };
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  await checkPaint(null, 'Scrolling the graph with the pointer away keeps both thumbs hidden');
   for (const axis of ['x', 'y']) {
     const thumb = page.locator('.kg-desktop-scroll-thumb[data-axis="' + axis + '"]');
     await thumb.waitFor();
@@ -180,16 +191,23 @@ async function checkDesktopDrag(page) {
     const before = await position();
     assert.ok(await viewport.evaluate((node, point) => node.contains(document.elementFromPoint(point.x, point.y)), empty),
       'The empty margin along the ' + axis + ' edge belongs to the graph');
+    await page.mouse.move(empty.x, empty.y);
+    await checkPaint(null, 'Hovering the bare ' + axis + ' edge does not reveal either thumb');
     await page.mouse.click(empty.x, empty.y);
-    await settle(page);
+    await checkPaint(null, 'Clicking the bare edge keeps the thumbs hidden');
     assert.deepEqual(await position(), before, 'Clicking the bare ' + axis + ' edge does not page the graph');
 
     const to = { ...center, [axis]:center[axis] + direction * Math.min(48, gap / 2) };
+    to[horizontal ? 'y' : 'x'] -= 28;
     await page.mouse.move(center.x, center.y);
+    await checkPaint(axis, 'Hovering a thumb reveals only its axis');
     await page.mouse.down();
     await page.mouse.move(to.x, to.y, { steps: 5 });
+    assert.ok(await thumb.evaluate((node, point) => !node.contains(document.elementFromPoint(point.x, point.y)), to),
+      'The held pointer has moved beyond the thumb');
+    await checkPaint(axis, 'Pointer capture keeps only the dragged thumb visible outside its edge');
     await page.mouse.up();
-    await settle(page);
+    await checkPaint(null, 'Releasing outside the thumb restores the idle appearance');
     const after = await position();
     const i = horizontal ? 0 : 1;
     assert.ok((after[i] - before[i]) * direction > 1, 'Dragging the ' + axis + ' thumb scrolls its axis');

@@ -6461,7 +6461,7 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         position:absolute;
         z-index:1;
         border-radius:999px;
-        background:rgba(148,163,184,.42);
+        background:transparent;
         cursor:grab;
         touch-action:none;
     }

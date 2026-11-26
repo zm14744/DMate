@@ -1,4 +1,4 @@
-/* Scrollbar gutters stay in place; only their paint changes while scrolling. */
+/* Native thumbs paint on contact; touch scrolling retains its brief reveal. */
 @layer dmate-scrollbars {
     * { scrollbar-color:transparent transparent !important; }
     @supports selector(::-webkit-scrollbar) {
@@ -15,12 +15,12 @@
             box-shadow:none !important;
         }
         *::-webkit-scrollbar-thumb { border-color:transparent !important; }
-        [data-dmate-scroll-active="x"]::-webkit-scrollbar-thumb:horizontal,
-        [data-dmate-scroll-active="y"]::-webkit-scrollbar-thumb:vertical {
+        [data-dmate-scroll-touch][data-dmate-scroll-active="x"]::-webkit-scrollbar-thumb:horizontal,
+        [data-dmate-scroll-touch][data-dmate-scroll-active="y"]::-webkit-scrollbar-thumb:vertical {
             background-color:rgba(148,163,184,.42) !important;
         }
-        [data-dmate-scroll-active="x"]::-webkit-scrollbar-thumb:horizontal:hover,
-        [data-dmate-scroll-active="y"]::-webkit-scrollbar-thumb:vertical:hover {
+        *::-webkit-scrollbar-thumb:hover,
+        *::-webkit-scrollbar-thumb:active {
             background-color:rgba(148,163,184,.58) !important;
         }
         *::-webkit-scrollbar-button {

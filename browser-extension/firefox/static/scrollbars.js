@@ -1,10 +1,11 @@
-/* Native scrolling owns position and dragging; this module only reveals paint. */
+/* Native controls own scrolling; mouse hover is native, touch/fallback paint is local. */
 (() => {
     'use strict';
     if (window.__dmateScrollbarsInstalled) return;
     window.__dmateScrollbarsInstalled = true;
 
     const attribute = 'data-dmate-scroll-active';
+    const touchAttribute = 'data-dmate-scroll-touch';
     const hideDelay = 900;
     const states = new WeakMap();
     const visible = new Set();
@@ -16,6 +17,7 @@
     let disposeThumb = () => {};
     let hovered = null;
     let lastPointer = null;
+    let touchInput = false;
 
     const stateFor = (element, snapshot = false) => {
         let state = states.get(element);
@@ -46,12 +48,14 @@
         state.hoverAxis = null;
         if (hovered?.element === element) hovered = null;
         element.removeAttribute(attribute);
+        element.removeAttribute(touchAttribute);
         visible.delete(element);
         disposeThumb(element);
     };
-    const paint = (element, axis) => {
+    const paint = (element, axis, touch = false) => {
         const state = stateFor(element);
         state.axis = axis;
+        element.toggleAttribute(touchAttribute, touch);
         if (element.getAttribute(attribute) !== axis) element.setAttribute(attribute, axis);
         visible.add(element);
         refreshThumb(element);
@@ -67,6 +71,10 @@
         }, hideDelay);
     };
     const inputAxis = (x, y) => Math.abs(x) > Math.abs(y) ? 'x' : y ? 'y' : x ? 'x' : null;
+    const useMouseInput = () => {
+        touchInput = false;
+        for (const element of visible) if (element.hasAttribute(touchAttribute)) hide(element);
+    };
     const primeInput = (target, axis = null) => {
         for (let element = target; element instanceof Element; element = element.parentElement) {
             const state = stateFor(element, true);
@@ -77,9 +85,11 @@
         }
     };
     document.addEventListener('wheel', event => {
+        useMouseInput();
         primeInput(event.target, inputAxis(event.deltaX, event.deltaY));
     }, { capture:true, passive:true });
     document.addEventListener('keydown', event => {
+        useMouseInput();
         const axis = ['ArrowLeft','ArrowRight'].includes(event.key) ? 'x'
             : ['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].includes(event.key) ? 'y' : null;
         if (axis) primeInput(event.target, axis);
@@ -93,9 +103,15 @@
         state.top = element.scrollTop;
         const axis = state.dragAxis || inputAxis(dx, dy)
             || (Date.now() - state.inputAt < 200 ? state.inputAxis : null);
-        if (axis) {
-            paint(element, axis);
+        if (axis && touchInput) {
+            paint(element, axis, true);
             scheduleHide(element);
+        } else if (fallback && state.dragAxis) {
+            paint(element, state.dragAxis);
+        } else if (fallback && state.hoverAxis) {
+            const hit = lastPointer && scrollbarAxis(element, lastPointer);
+            if (hit) { state.hoverAxis = hit; paint(element, hit); }
+            else hide(element);
         }
         if (fallback) for (const other of visible) if (other !== element) refreshThumb(other);
     }, { capture:true, passive:true });
@@ -123,17 +139,54 @@
             x:element.scrollWidth > element.clientWidth && (root ? !['hidden','clip'].includes(style.overflowX) : ['auto','scroll'].includes(style.overflowX)),
             y:element.scrollHeight > element.clientHeight && (root ? !['hidden','clip'].includes(style.overflowY) : ['auto','scroll'].includes(style.overflowY))};
     };
+    const thumbBounds = (element, axis, g = geometry(element)) => {
+        if (!g || !g[axis]) return null;
+        const sx = g.rect.width / g.width, sy = g.rect.height / g.height;
+        const length = axis === 'x' ? element.clientWidth : element.clientHeight;
+        const total = axis === 'x' ? element.scrollWidth : element.scrollHeight;
+        const size = Math.min(length, Math.max(8, length * length / total));
+        const offset = axis === 'x' ? element.scrollLeft : element.scrollTop;
+        const progress = Math.max(0, Math.min(1,
+            axis === 'x' && g.rtl ? 1 + offset / (total - length) : offset / (total - length)));
+        const gutter = (axis === 'x' ? g.gutterX : g.gutterY) || 8;
+        const thickness = Math.min(6, gutter);
+        let x, y, width, height;
+        if (axis === 'y') {
+            x = g.rect.left + (g.rtl ? g.leftBorder + (gutter - thickness) / 2
+                : g.width - g.rightBorder - gutter + (gutter - thickness) / 2) * sx;
+            y = g.rect.top + (g.top + (length - size) * progress) * sy;
+            width = thickness * sx; height = size * sy;
+        } else {
+            x = g.rect.left + (g.left + (length - size) * progress) * sx;
+            y = g.rect.top + (g.height - g.bottomBorder - gutter + (gutter - thickness) / 2) * sy;
+            width = size * sx; height = thickness * sy;
+        }
+        let left = Math.max(0, x), top = Math.max(0, y);
+        let right = Math.min(window.innerWidth, x + width), bottom = Math.min(window.innerHeight, y + height);
+        for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+            const css = getComputedStyle(parent), r = parent.getBoundingClientRect();
+            const px = parent.offsetWidth ? r.width / parent.offsetWidth : 1;
+            const py = parent.offsetHeight ? r.height / parent.offsetHeight : 1;
+            if (css.overflowX !== 'visible') {
+                left = Math.max(left, r.left + parent.clientLeft * px);
+                right = Math.min(right, r.left + (parent.clientLeft + parent.clientWidth) * px);
+            }
+            if (css.overflowY !== 'visible') {
+                top = Math.max(top, r.top + parent.clientTop * py);
+                bottom = Math.min(bottom, r.top + (parent.clientTop + parent.clientHeight) * py);
+            }
+        }
+        return right > left && bottom > top ? {left, top, right, bottom} : null;
+    };
     const scrollbarAxis = (element, event) => {
         const g = geometry(element);
         if (!g) return null;
-        const x = (event.clientX - g.rect.left) * g.width / g.rect.width;
-        const y = (event.clientY - g.rect.top) * g.height / g.rect.height;
-        const vertical = g.y && y >= g.topBorder && y < g.top + element.clientHeight
-            && (g.rtl ? x >= g.leftBorder && x <= g.leftBorder + Math.max(8, g.gutterY)
-                : x >= g.width - g.rightBorder - Math.max(8, g.gutterY) && x <= g.width - g.rightBorder);
-        const horizontal = g.x && x >= g.left && x < g.left + element.clientWidth
-            && y >= g.height - g.bottomBorder - Math.max(8, g.gutterX) && y <= g.height - g.bottomBorder;
-        return horizontal ? 'x' : vertical ? 'y' : null;
+        for (const axis of ['x', 'y']) {
+            const bounds = thumbBounds(element, axis, g);
+            if (bounds && event.clientX >= bounds.left && event.clientX <= bounds.right
+                    && event.clientY >= bounds.top && event.clientY <= bounds.bottom) return axis;
+        }
+        return null;
     };
     if (fallback) {
         const resize = new ResizeObserver(entries => {
@@ -158,46 +211,14 @@
             }
             const g = geometry(element);
             if (!g || !g[axis]) { state.thumb?.remove(); return; }
-            const sx = g.rect.width / g.width, sy = g.rect.height / g.height;
-            const length = axis === 'x' ? element.clientWidth : element.clientHeight;
-            const total = axis === 'x' ? element.scrollWidth : element.scrollHeight;
-            // A conservative minimum keeps the painted part inside the native
-            // thumb's hit region. Native controls still own pointer capture.
-            const size = Math.min(length, Math.max(8, length * length / total));
-            const offset = axis === 'x' ? element.scrollLeft : element.scrollTop;
-            const progress = Math.max(0, Math.min(1,
-                axis === 'x' && g.rtl ? 1 + offset / (total - length) : offset / (total - length)));
-            const gutter = (axis === 'x' ? g.gutterX : g.gutterY) || 8;
-            const thickness = Math.min(6, gutter);
-            let x, y, width, height;
-            if (axis === 'y') {
-                x = g.rect.left + (g.rtl ? g.leftBorder + (gutter - thickness) / 2
-                    : g.width - g.rightBorder - gutter + (gutter - thickness) / 2) * sx;
-                y = g.rect.top + (g.top + (length - size) * progress) * sy;
-                width = thickness * sx; height = size * sy;
-            } else {
-                x = g.rect.left + (g.left + (length - size) * progress) * sx;
-                y = g.rect.top + (g.height - g.bottomBorder - gutter + (gutter - thickness) / 2) * sy;
-                width = size * sx; height = thickness * sy;
+            const bounds = thumbBounds(element, axis, g);
+            if (!bounds) { state.thumb?.remove(); return; }
+            if (!touchInput && !state.dragAxis && (!lastPointer
+                    || lastPointer.clientX < bounds.left || lastPointer.clientX > bounds.right
+                    || lastPointer.clientY < bounds.top || lastPointer.clientY > bounds.bottom)) {
+                hide(element); return;
             }
-            // A fixed visual thumb must obey the same ancestor clips as its
-            // native control, even when an outer pane scrolls or closes.
-            let left = Math.max(0, x), top = Math.max(0, y);
-            let right = Math.min(window.innerWidth, x + width), bottom = Math.min(window.innerHeight, y + height);
-            for (let parent = element.parentElement; parent; parent = parent.parentElement) {
-                const css = getComputedStyle(parent), r = parent.getBoundingClientRect();
-                const px = parent.offsetWidth ? r.width / parent.offsetWidth : 1;
-                const py = parent.offsetHeight ? r.height / parent.offsetHeight : 1;
-                if (css.overflowX !== 'visible') {
-                    left = Math.max(left, r.left + parent.clientLeft * px);
-                    right = Math.min(right, r.left + (parent.clientLeft + parent.clientWidth) * px);
-                }
-                if (css.overflowY !== 'visible') {
-                    top = Math.max(top, r.top + parent.clientTop * py);
-                    bottom = Math.min(bottom, r.top + (parent.clientTop + parent.clientHeight) * py);
-                }
-            }
-            if (right <= left || bottom <= top) { state.thumb?.remove(); return; }
+            const {left, top, right, bottom} = bounds;
             if (!state.thumb) {
                 state.thumb = document.createElement('div');
                 state.thumb.setAttribute('aria-hidden', 'true');
@@ -235,10 +256,10 @@
         return null;
     };
     const moveHover = hit => {
-        if (hovered && (!hit || hit.element !== hovered.element)) {
+        if (hovered && (!hit || hit.element !== hovered.element || hit.axis !== hovered.axis)) {
             const old = hovered.element;
             stateFor(old).hoverAxis = null;
-            if (visible.has(old)) scheduleHide(old);
+            if (visible.has(old) && !stateFor(old).dragAxis) hide(old);
         }
         hovered = hit;
         if (hit) {
@@ -250,14 +271,25 @@
     };
     document.addEventListener('pointermove', event => {
         if (event.pointerType !== 'mouse') return;
+        useMouseInput();
+        if (!fallback) return;
         // Scroll-induced pointer events at the same coordinates must not let
         // a stationary hover override the direction that is actually scrolling.
-        if (lastPointer && lastPointer.x === event.clientX && lastPointer.y === event.clientY) return;
-        lastPointer = {x:event.clientX, y:event.clientY};
+        if (lastPointer && lastPointer.clientX === event.clientX && lastPointer.clientY === event.clientY) return;
+        lastPointer = {clientX:event.clientX, clientY:event.clientY};
         moveHover(pointerHit(event));
     }, { capture:true, passive:true });
     document.addEventListener('pointerdown', event => {
-        if (event.pointerType !== 'mouse' || event.button !== 0) return;
+        if (event.pointerType !== 'mouse') {
+            moveHover(null);
+            lastPointer = null;
+            touchInput = true;
+            primeInput(event.target);
+            return;
+        }
+        useMouseInput();
+        if (event.button !== 0 || !fallback) return;
+        lastPointer = {clientX:event.clientX, clientY:event.clientY};
         primeInput(event.target);
         const hit = pointerHit(event);
         if (!hit) return;
@@ -271,7 +303,10 @@
         if (!hit) return;
         drags.delete(event.pointerId);
         stateFor(hit.element).dragAxis = null;
-        scheduleHide(hit.element);
+        lastPointer = {clientX:event.clientX, clientY:event.clientY};
+        const axis = scrollbarAxis(hit.element, event);
+        if (axis) moveHover({element:hit.element, axis});
+        else hide(hit.element);
     };
     document.addEventListener('pointerup', finishDrag, { capture:true, passive:true });
     document.addEventListener('pointercancel', finishDrag, { capture:true, passive:true });
@@ -287,6 +322,7 @@
         if (hovered) stateFor(hovered.element).hoverAxis = null;
         hovered = null;
         lastPointer = null;
+        touchInput = false;
         for (const element of visible) hide(element);
     };
     window.addEventListener('pagehide', reset);
