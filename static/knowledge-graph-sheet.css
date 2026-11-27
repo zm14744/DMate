@@ -56,7 +56,8 @@
         min-height:0 !important;
         max-height:min(var(--kg-sheet-max-height), calc(100% - 16px - env(safe-area-inset-bottom))) !important;
         overflow:hidden !important;
-        border:1px solid var(--border-strong);
+        /* Restore the full notebook-style outline over the legacy mobile side panel. */
+        border:1px solid var(--border-strong) !important;
         border-radius:18px;
         background:var(--surface-2);
         color:var(--text-primary);
