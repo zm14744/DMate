@@ -175,14 +175,11 @@ async function checkMobileDetailSheet(page) {
     await readyGraph(page);
     assert.equal(await modal.locator('.kg-mobile-expand,.kg-mobile-zoom-controls,.kg-mobile-zoom-label').count(), 0);
     assert.equal(await stage.locator('.kg-mobile-node.selected').count(), 1);
-    assert.equal(await modal.getAttribute('data-kg-sheet'), 'peek', 'The initially selected node already provides a grabber');
-    assert.equal(await detail.isVisible(), false, 'Automatic selection leaves the detail body collapsed');
-    const graphBasics = stage.getByRole('button', {name:'图的基本概念', exact:true});
-    await graphBasics.tap();
-    await settle(page);
-    assert.equal(await modal.getAttribute('data-kg-sheet'), 'expanded', 'A node tap opens its details directly');
-    assert.equal(await title.innerText(), '图的基本概念');
-    assert.ok(await detail.isVisible());
+    assert.equal(await modal.getAttribute('data-kg-sheet'), 'expanded',
+      'The initially selected node opens its detail sheet immediately on graph entry');
+    assert.equal(await detail.isVisible(), true, 'Automatic selection reveals the detail body without another tap');
+    assert.equal(await title.innerText(), await stage.locator('.kg-mobile-node.selected').getAttribute('aria-label'),
+      'The expanded details belong to the initially selected node');
     await handle.tap();await settle(page);
     assert.equal(await title.isVisible(), false);
     assert.equal(await detail.isVisible(), false, 'The collapsed graph exposes just its grabber');
