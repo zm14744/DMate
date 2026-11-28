@@ -311,9 +311,9 @@
     }
     .dcn-mobile-sheet[open]{display:flex;flex-direction:column;animation:dcn-mobile-sheet-enter 180ms ease-out}
     .dcn-mobile-sheet[data-dcn-sheet-state="expanded"]{
-        /* Float above the fixed notebook actions instead of covering or moving them. */
-        inset-block-end:calc(var(--dcn-sheet-bottom-offset,0px) + 68px + env(safe-area-inset-bottom,0px));
-        max-height:calc(var(--dcn-sheet-visible-height,var(--app-visible-height,100dvh)) - 68px - env(safe-area-inset-bottom,0px) - 8px - env(safe-area-inset-top,0px));
+        /* Cover the fixed notebook actions, matching the graph's floating panel. */
+        inset-block-end:calc(var(--dcn-sheet-bottom-offset,0px) + var(--dcn-sheet-bottom));
+        max-height:calc(var(--dcn-sheet-visible-height,var(--app-visible-height,100dvh)) - var(--dcn-sheet-bottom) - 8px - env(safe-area-inset-top,0px));
     }
     .dcn-mobile-sheet::backdrop{background:transparent}
     .dcn-sheet-head{
