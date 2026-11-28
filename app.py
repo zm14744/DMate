@@ -2295,6 +2295,15 @@ def sync_user_data():
     payload = request.get_json(silent=True)
     payload = payload if isinstance(payload, dict) else {}
     data = payload.get("data")
+    partial_parts = None
+    if "parts" in payload:
+        raw_parts = payload.get("parts")
+        allowed_parts = {"sessions", "learning", "appearance"}
+        if (not isinstance(raw_parts, list) or not raw_parts
+                or any(not isinstance(part, str) or part not in allowed_parts for part in raw_parts)
+                or len(set(raw_parts)) != len(raw_parts)):
+            return jsonify({"ok": False, "error": "同步分段格式不正确"}), 400
+        partial_parts = list(raw_parts)
     if payload.get("force"):
         return jsonify({"ok": False, "error": "不支持强制覆盖云端数据，请合并后重试"}), 400
 
@@ -2308,6 +2317,11 @@ def sync_user_data():
 
     if not isinstance(data, dict):
         return jsonify({"ok": False, "error": "同步数据格式不正确"}), 400
+    if partial_parts is not None:
+        allowed_data_keys = set(partial_parts) | {"schemaVersion"}
+        if (any(part not in data for part in partial_parts)
+                or any(key not in allowed_data_keys for key in data)):
+            return jsonify({"ok": False, "error": "同步分段内容不完整"}), 400
     if base_revision < 0:
         return jsonify({"ok": False, "error": "同步版本号不正确"}), 400
 
@@ -2341,10 +2355,18 @@ def sync_user_data():
                     (user_id,),
                 )
                 current = cur.fetchone()
+                stored_data = data
                 if current and int(current["revision"] or 0) == base_revision:
+                    current_data = current["data"] if isinstance(current["data"], dict) else {}
+                    if partial_parts is not None:
+                        stored_data = dict(current_data)
+                        for part in partial_parts:
+                            stored_data[part] = data[part]
+                        if "schemaVersion" in data:
+                            stored_data["schemaVersion"] = data["schemaVersion"]
                     from concept_notebook import preserve_legacy_notebook
-                    data = preserve_legacy_notebook(data, current["data"] or {})
-                    if len(json.dumps(data, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")) > MAX_SYNC_JSON_BYTES:
+                    stored_data = preserve_legacy_notebook(stored_data, current_data)
+                    if len(json.dumps(stored_data, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")) > MAX_SYNC_JSON_BYTES:
                         conn.rollback()
                         return jsonify({"ok": False, "error": "同步数据过大，请先清理部分历史记录"}), 413
 
@@ -2357,7 +2379,7 @@ def sync_user_data():
                     WHERE user_id = %s AND revision = %s
                     RETURNING revision, updated_at
                     """,
-                    (Jsonb(data), user_id, base_revision),
+                    (Jsonb(stored_data), user_id, base_revision),
                 )
 
                 updated = cur.fetchone()
@@ -2387,7 +2409,7 @@ def sync_user_data():
             "ok": True,
             "revision": int(updated["revision"]),
             "updatedAt": updated["updated_at"].isoformat() if updated.get("updated_at") else None,
-            "parts": _sync_manifest_from_data(data),
+            "parts": _sync_manifest_from_data(stored_data),
         })
     except Exception as exc:
         print(f"写入云端数据失败：{repr(exc)}")
