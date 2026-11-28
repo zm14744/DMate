@@ -86,7 +86,7 @@
             // remains interactive underneath so another entry opens in one tap.
             if (!wasOpen) sheet.show();
             if (initialFocus) focus(initialFocus);
-            else if (!wasOpen) focus(handle);
+            else focus(handle);
             return true;
         }
 
