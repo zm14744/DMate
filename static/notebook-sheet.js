@@ -74,7 +74,7 @@
         function setPeek(peek, initialFocus) {
             if (!current) return false;
             endDrag();
-            if (sheet.open) sheet.close();
+            const wasOpen = sheet.open;
             sheet.dataset.dcnSheetState = peek ? 'peek' : 'expanded';
             body.hidden = peek;
             handle.setAttribute('aria-expanded', String(!peek));
@@ -82,9 +82,11 @@
             const english = peek ? 'Expand panel' : 'Collapse panel';
             handle.setAttribute('aria-label', root.DMateI18n?.t?.(source, english) || source);
             fitViewport();
-            if (peek) sheet.show();
-            else sheet.showModal();
-            focus(initialFocus || handle);
+            // Keep the editor as a non-modal floating layer. The notebook list
+            // remains interactive underneath so another entry opens in one tap.
+            if (!wasOpen) sheet.show();
+            if (initialFocus) focus(initialFocus);
+            else if (!wasOpen) focus(handle);
             return true;
         }
 
