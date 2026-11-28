@@ -2277,7 +2277,8 @@ def sync_user_data():
 
         manifest = _sync_manifest_from_data(row["data"] or {})
         if request.args.get("manifestOnly") == "1":
-            return jsonify({"ok": True, "revision": actual_revision, "parts": manifest})
+            return jsonify({"ok": True, "revision": actual_revision, "parts": manifest,
+                            "partialUpdates": True})
 
         return jsonify({
             "ok": True,
