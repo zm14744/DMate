@@ -136,7 +136,9 @@
             if (destroyed) return;
             parts();
             if (!eligible()) close();
-            else if (!['peek', 'expanded'].includes(state())) setState('peek');
+            // A selected node is already available on entry, so reveal its details immediately.
+            // Keep an explicit peek state when the user has collapsed the sheet.
+            else if (!['peek', 'expanded'].includes(state())) setState('expanded');
             else paint();
         }
         function open({expanded = state() === 'expanded'} = {}) {
