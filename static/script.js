@@ -137,6 +137,7 @@ let accountVerificationOperation = null;
 // Older servers ignore delta query parameters and return a full snapshot.
 // Negotiate once per page, then retain their lightweight revision polling.
 let cloudDeltaSyncSupported = null;
+let cloudPartialSyncSupported = false;
 let cloudSyncCapacityRetryAt = 0;
 let appConfirmResolver = null;
 let appConfirmReturnFocus = null;
@@ -1274,6 +1275,7 @@ function bumpCloudSyncContext() {
     cloudSyncIndicatorPending = false;
     cloudSyncIndicatorVisible = false;
     cloudAppliedPartHashes = null;
+    cloudPartialSyncSupported = false;
     cloudSyncCapacityRetryAt = 0;
     cloudInitialSyncPending = false;
     cloudInitialSyncInFlight = false;
@@ -2488,6 +2490,7 @@ async function pullLatestCloudSnapshot() {
                 ? `/sync?sinceRevision=${localRevision}&parts=sessions,learning&knownHashes=${encodeURIComponent(JSON.stringify(knownHashes))}`
                 : "/sync?revisionOnly=1";
             const { data:head } = await accountFetch(query, options);
+            cloudPartialSyncSupported = head.partialUpdates === true;
             if (!valid()) return false;
             const delta = useDelta && head.delta === true;
             if (useDelta) cloudDeltaSyncSupported = delta;
@@ -3037,7 +3040,8 @@ async function pushCloudSnapshot(_legacyForce = false, initialSyncReady = false)
     // 被另一个标签提前更新，直接采用会绕过服务器的 409 冲突保护。
     let revision = Number(accountState.revision || 0);
     const submittedChangeVersion = cloudLocalChangeVersion;
-    let submittedParts = meta.username === owner && meta.dirty
+    const canSendPartial = cloudPartialSyncSupported === true;
+    let submittedParts = canSendPartial && meta.username === owner && meta.dirty
         ? normalizeCloudSyncDirtyParts(meta.dirtyParts,
             !Array.isArray(meta.dirtyParts) || !meta.dirtyParts.length)
         : [...CLOUD_SYNC_PARTS];
@@ -3071,9 +3075,12 @@ async function pushCloudSnapshot(_legacyForce = false, initialSyncReady = false)
                     partialData[part] = snapshotToSend[part];
                 }
             }
+            const syncPayload = canSendPartial
+                ? {baseRevision:revision, force:false, parts:submittedParts, data:partialData}
+                : {baseRevision:revision, force:false, data:snapshotToSend};
             const {response, data} = await accountFetch("/sync", {
                 method:"PUT", allowConflict:true,
-                body:JSON.stringify({baseRevision:revision, force:false, parts:submittedParts, data:partialData})
+                body:JSON.stringify(syncPayload)
             });
             if (!isCloudSyncContextValid(owner, contextVersion)) {
                 return false;
@@ -3223,6 +3230,7 @@ async function resolveInitialCloudSync(isNewAccount = false) {
         if (!isCloudSyncContextValid(owner, contextVersion)) return;
 
         const { data } = await accountFetch("/sync");
+        cloudPartialSyncSupported = data.partialUpdates === true;
         if (!isCloudSyncContextValid(owner, contextVersion)) return;
         const cloudRevision = Number(data.revision || 0);
         accountState.revision = cloudRevision;
