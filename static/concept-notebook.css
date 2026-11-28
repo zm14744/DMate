@@ -306,7 +306,7 @@
         overflow:hidden;
         box-shadow:0 -4px 24px rgba(0,0,0,.22);
         transform:translateY(var(--dcn-sheet-drag-offset,0px));
-        transition:height 220ms cubic-bezier(.2,.65,.3,1),transform 220ms cubic-bezier(.2,.65,.3,1);
+        transition:height 220ms cubic-bezier(.2,.65,.3,1),inset-block-end 220ms cubic-bezier(.2,.65,.3,1),transform 220ms cubic-bezier(.2,.65,.3,1);
         isolation:isolate;
     }
     .dcn-mobile-sheet[open]{display:flex;flex-direction:column;animation:dcn-mobile-sheet-enter 180ms ease-out}
