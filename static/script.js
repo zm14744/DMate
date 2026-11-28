@@ -1299,8 +1299,9 @@ function bumpCloudSyncContext() {
     cloudSyncIndicatorTimer = 0;
     cloudSyncIndicatorPending = false;
     cloudSyncIndicatorVisible = false;
+    // Keep the tab-scoped dirty marker across auth re-verification/page reload;
+    // resolveInitialCloudSync validates its owner before restoring it.
     cloudPendingDirtyParts.clear();
-    try { sessionStorage.removeItem(CLOUD_SYNC_DIRTY_SESSION_KEY); } catch (_error) {}
     cloudAppliedPartHashes = null;
     cloudPartialSyncSupported = false;
     cloudSyncCapacityRetryAt = 0;
