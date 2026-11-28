@@ -2172,7 +2172,7 @@ def sync_user_data():
 
     if request.method == "GET" and "sinceRevision" in request.args:
         def delta_response(payload, status=200):
-            response = jsonify(payload)
+            response = jsonify({**payload, "partialUpdates": True})
             response.status_code = status
             response.headers["Cache-Control"] = "no-store"
             return response
@@ -2247,6 +2247,7 @@ def sync_user_data():
             return jsonify({
                 "ok": True,
                 "revision": int(revision_row["revision"] or 0) if revision_row else 0,
+                "partialUpdates": True,
             })
         except Exception as exc:
             print(f"检查云端同步版本失败：{repr(exc)}")
@@ -2287,6 +2288,7 @@ def sync_user_data():
             "revision": actual_revision,
             "updatedAt": row["updated_at"].isoformat() if row.get("updated_at") else None,
             "parts": manifest,
+            "partialUpdates": True,
         })
 
     if not request.is_json:
