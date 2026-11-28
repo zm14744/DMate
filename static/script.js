@@ -85,6 +85,7 @@ function refreshManualQuestionModeUi() {
 }
 
 const CLOUD_SYNC_META_KEY = "discrete_math_ai_cloud_sync_v1";
+const CLOUD_SYNC_DIRTY_SESSION_KEY = "dmate_cloud_sync_dirty_parts_v1";
 const CLOUD_BACKUP_KEY = "discrete_math_ai_cloud_backup_v1";
 const ACCOUNT_LOGOUT_SIGNAL_KEY = "dmate_account_logout_signal_v1";
 // 故障排查备份只存于当前页面内存，退出/换账号后不可被下一位用户读取。
@@ -113,6 +114,7 @@ let cloudSyncQueuedAt = null;
 let cloudSyncIndicatorTimer = 0;
 let cloudSyncIndicatorPending = false;
 let cloudSyncIndicatorVisible = false;
+let cloudPendingDirtyParts = new Set();
 let cloudApplyingSnapshot = false;
 // 跨设备同步仍按账号独立登录；防止上传期间的新编辑被错误标为已同步。
 let cloudLocalChangeVersion = 0;
@@ -1237,6 +1239,27 @@ function normalizeCloudSyncDirtyParts(value, fallbackAll = false) {
     return normalized.length || fallbackAll ? (normalized.length ? normalized : [...CLOUD_SYNC_PARTS]) : [];
 }
 
+function restoreCloudSyncDirtyParts(owner) {
+    cloudPendingDirtyParts = new Set();
+    try {
+        const saved = JSON.parse(sessionStorage.getItem(CLOUD_SYNC_DIRTY_SESSION_KEY) || "null");
+        if (saved?.owner === owner) {
+            for (const part of normalizeCloudSyncDirtyParts(saved.parts)) cloudPendingDirtyParts.add(part);
+        } else {
+            sessionStorage.removeItem(CLOUD_SYNC_DIRTY_SESSION_KEY);
+        }
+    } catch (_error) {}
+}
+
+function persistCloudSyncDirtyParts() {
+    try {
+        if (!cloudPendingDirtyParts.size) sessionStorage.removeItem(CLOUD_SYNC_DIRTY_SESSION_KEY);
+        else sessionStorage.setItem(CLOUD_SYNC_DIRTY_SESSION_KEY, JSON.stringify({
+            owner:accountState.username, parts:[...cloudPendingDirtyParts]
+        }));
+    } catch (_error) {}
+}
+
 function readCloudSyncMeta() {
     try {
         const parsed = JSON.parse(localStorage.getItem(CLOUD_SYNC_META_KEY) || "null");
@@ -1274,6 +1297,8 @@ function bumpCloudSyncContext() {
     cloudSyncIndicatorTimer = 0;
     cloudSyncIndicatorPending = false;
     cloudSyncIndicatorVisible = false;
+    cloudPendingDirtyParts.clear();
+    try { sessionStorage.removeItem(CLOUD_SYNC_DIRTY_SESSION_KEY); } catch (_error) {}
     cloudAppliedPartHashes = null;
     cloudPartialSyncSupported = false;
     cloudSyncCapacityRetryAt = 0;
@@ -2337,11 +2362,18 @@ function scheduleCloudSync(parts = CLOUD_SYNC_PARTS) {
     if (!accountState.authenticated || !accountState.username) return;
     const meta = readCloudSyncMeta();
     const requestedParts = normalizeCloudSyncDirtyParts(parts, true);
+    // Dirty parts are tracked per tab as well as in shared metadata. If this
+    // tab inherited an older/other-tab dirty marker, conservatively send both.
+    if (!cloudPendingDirtyParts.size && meta.username === accountState.username && meta.dirty) {
+        for (const part of CLOUD_SYNC_PARTS) cloudPendingDirtyParts.add(part);
+    }
+    for (const part of requestedParts) cloudPendingDirtyParts.add(part);
+    persistCloudSyncDirtyParts();
     const previousParts = meta.username === accountState.username && meta.dirty
         ? normalizeCloudSyncDirtyParts(meta.dirtyParts,
             !Array.isArray(meta.dirtyParts) || !meta.dirtyParts.length)
         : [];
-    const dirtyParts = [...new Set([...previousParts, ...requestedParts])];
+    const dirtyParts = [...new Set([...previousParts, ...cloudPendingDirtyParts])];
     // Only upload sections actually changed. Legacy dirty markers without a
     // part list conservatively retain the old full-snapshot behavior.
     writeCloudSyncMeta({
@@ -2454,6 +2486,10 @@ async function pullLatestCloudSnapshot() {
         // 首次读取失败后仍能恢复；账号未验证前不加载任何旧工作区。
         if (cloudUiEditInProgress()) return false;
         await resolveInitialCloudSync(false);
+        return false;
+    }
+    if (cloudPendingDirtyParts.size) {
+        if (Date.now() >= cloudSyncCapacityRetryAt && !cloudSyncTimer) await pushCloudSnapshot(false);
         return false;
     }
     if (meta.dirty) {
@@ -3041,10 +3077,13 @@ async function pushCloudSnapshot(_legacyForce = false, initialSyncReady = false)
     let revision = Number(accountState.revision || 0);
     const submittedChangeVersion = cloudLocalChangeVersion;
     const canSendPartial = cloudPartialSyncSupported === true;
-    let submittedParts = canSendPartial && meta.username === owner && meta.dirty
-        ? normalizeCloudSyncDirtyParts(meta.dirtyParts,
-            !Array.isArray(meta.dirtyParts) || !meta.dirtyParts.length)
+    let submittedParts = canSendPartial && cloudPendingDirtyParts.size
+        ? [...cloudPendingDirtyParts]
         : [...CLOUD_SYNC_PARTS];
+    if (!cloudPendingDirtyParts.size) {
+        cloudPendingDirtyParts = new Set(submittedParts);
+        persistCloudSyncDirtyParts();
+    }
     let snapshotToSend = collectCloudSnapshot();
     let mergedWithRemote = false;
     let successful = false;
@@ -3089,6 +3128,8 @@ async function pushCloudSnapshot(_legacyForce = false, initialSyncReady = false)
                 backupLocalSnapshot("云同步自动合并前");
                 snapshotToSend = mergeCloudSnapshots(snapshotToSend, data.data || {});
                 submittedParts = [...CLOUD_SYNC_PARTS];
+                cloudPendingDirtyParts = new Set(CLOUD_SYNC_PARTS);
+                persistCloudSyncDirtyParts();
                 revision = Number(data.revision || 0);
                 latestPartHashes = getCloudPartHashMap(data.parts);
                 mergedWithRemote = true;
@@ -3117,9 +3158,13 @@ async function pushCloudSnapshot(_legacyForce = false, initialSyncReady = false)
                 return false;
             }
             const hadNewEdits = cloudLocalChangeVersion !== submittedChangeVersion;
+            if (!hadNewEdits) {
+                for (const part of submittedParts) cloudPendingDirtyParts.delete(part);
+                persistCloudSyncDirtyParts();
+            }
             accountState.revision = latestRevision;
             if (!hadNewEdits) cloudAppliedPartHashes = latestPartHashes;
-            const dirty = hadNewEdits;
+            const dirty = hadNewEdits || cloudPendingDirtyParts.size > 0;
             accountState.status = dirty ? "等待同步" : "已同步";
             const pendingParts = dirty
                 ? normalizeCloudSyncDirtyParts(readCloudSyncMeta().dirtyParts, true)
@@ -3187,6 +3232,7 @@ async function resolveInitialCloudSync(isNewAccount = false) {
         // 必须在服务器验证账号后，才读取属于这个账号的本机缓存。
         // 同浏览器切换另一个账号时不能显示、更不能上传前一账号的资料。
         const savedMeta = readCloudSyncMeta();
+        restoreCloudSyncDirtyParts(owner);
         if (!retryingInitialSync) {
             if (isNewAccount || savedMeta.username !== owner) {
                 void resetAccountOcrPersistence({purge:false});
@@ -3240,6 +3286,8 @@ async function resolveInitialCloudSync(isNewAccount = false) {
         const initialMeta = readCloudSyncMeta();
         const initialSameAccount = initialMeta.username === owner;
         if (isNewAccount || (cloudRevision === 0 && initialSameAccount)) {
+            cloudPendingDirtyParts = new Set(CLOUD_SYNC_PARTS);
+            persistCloudSyncDirtyParts();
             writeCloudSyncMeta({
                 username:owner,
                 revision:cloudRevision,
@@ -3268,7 +3316,7 @@ async function resolveInitialCloudSync(isNewAccount = false) {
 
         const meta = readCloudSyncMeta();
         const sameAccount = meta.username === owner;
-        const localDirty = sameAccount && Boolean(meta.dirty);
+        const localDirty = sameAccount && (Boolean(meta.dirty) || cloudPendingDirtyParts.size > 0);
         const localRevision = sameAccount ? Number(meta.revision || 0) : -1;
 
         if (!sameAccount) {
@@ -3284,6 +3332,8 @@ async function resolveInitialCloudSync(isNewAccount = false) {
             backupLocalSnapshot("登录后自动合并同步前");
             const merged = mergeCloudSnapshots(collectCloudSnapshot(), data.data || {});
             if (!applyCloudSnapshot(merged, { selectionId:merged.sessions.currentId })) throw new Error("云端数据未完整载入，保留本机修改后重试");
+            cloudPendingDirtyParts = new Set(CLOUD_SYNC_PARTS);
+            persistCloudSyncDirtyParts();
             writeCloudSyncMeta({username:owner, revision:cloudRevision, dirty:true,
                 dirtyParts:[...CLOUD_SYNC_PARTS], sectionHashes:partHashes});
             cloudInitialSyncPending = !await pushCloudSnapshot(false, true);
