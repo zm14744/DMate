@@ -3244,6 +3244,7 @@ async function resolveInitialCloudSync(isNewAccount = false) {
                 username:owner,
                 revision:cloudRevision,
                 dirty:true,
+                dirtyParts:[...CLOUD_SYNC_PARTS],
                 sectionHashes:partHashes
             });
             cloudInitialSyncPending = !await pushCloudSnapshot(false, true);
@@ -3259,7 +3260,7 @@ async function resolveInitialCloudSync(isNewAccount = false) {
             if (!applied) throw new Error("云端数据未完整载入，稍后重试");
             cloudInitialSyncPending = false;
             cloudAppliedPartHashes = partHashes;
-            writeCloudSyncMeta({username:owner,revision:0,dirty:false,sectionHashes:partHashes});
+            writeCloudSyncMeta({username:owner,revision:0,dirty:false,dirtyParts:[],sectionHashes:partHashes});
             accountState.status = "已同步";
             renderAccountUi();
             return;
@@ -3283,7 +3284,8 @@ async function resolveInitialCloudSync(isNewAccount = false) {
             backupLocalSnapshot("登录后自动合并同步前");
             const merged = mergeCloudSnapshots(collectCloudSnapshot(), data.data || {});
             if (!applyCloudSnapshot(merged, { selectionId:merged.sessions.currentId })) throw new Error("云端数据未完整载入，保留本机修改后重试");
-            writeCloudSyncMeta({username:owner, revision:cloudRevision, dirty:true, sectionHashes:partHashes});
+            writeCloudSyncMeta({username:owner, revision:cloudRevision, dirty:true,
+                dirtyParts:[...CLOUD_SYNC_PARTS], sectionHashes:partHashes});
             cloudInitialSyncPending = !await pushCloudSnapshot(false, true);
             return;
         } else if (!localDirty) {
@@ -3298,6 +3300,7 @@ async function resolveInitialCloudSync(isNewAccount = false) {
             username:owner,
             revision:cloudRevision,
             dirty:false,
+            dirtyParts:[],
             sectionHashes:partHashes
         });
         accountState.status = "已同步";
