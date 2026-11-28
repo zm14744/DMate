@@ -1287,6 +1287,8 @@ function clearCloudSyncMeta() {
     try {
         localStorage.removeItem(CLOUD_SYNC_META_KEY);
     } catch (_error) {}
+    cloudPendingDirtyParts.clear();
+    try { sessionStorage.removeItem(CLOUD_SYNC_DIRTY_SESSION_KEY); } catch (_error) {}
 }
 
 function bumpCloudSyncContext() {
