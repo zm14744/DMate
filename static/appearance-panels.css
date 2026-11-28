@@ -73,7 +73,7 @@ body[data-appearance-theme="dark"] {
 
     /* The empty global-background preview uses the same near-black base
        as the chat canvas, without a separate outline. */
-    body[data-appearance-theme] .appearance-background-preview:not([data-has-background="true"]) {
+    body[data-appearance-theme] #appearanceBackgroundPreview.appearance-background-preview:not([data-has-background="true"]) {
         border:0!important;
         background-color:rgb(var(--dmate-chat-background-rgb,var(--surface-0-rgb)))!important;
         background-image:none!important;
