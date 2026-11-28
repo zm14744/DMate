@@ -91,12 +91,12 @@ const ACCOUNT_LOGOUT_SIGNAL_KEY = "dmate_account_logout_signal_v1";
 // 故障排查备份只存于当前页面内存，退出/换账号后不可被下一位用户读取。
 let volatileCloudBackup = null;
 // 减少跨设备可见延迟；连续本机写入仍保留短暂防抖，避免每次打字都上传。
-const CLOUD_SYNC_DEBOUNCE_MS = 100;
+const CLOUD_SYNC_DEBOUNCE_MS = 40;
 const CLOUD_SYNC_MAX_WAIT_MS = 1000;
 const CLOUD_SYNC_REQUEST_TIMEOUT_MS = 15000;
 const CLOUD_SYNC_BULK_TIMEOUT_MS = 120000;
 const CLOUD_SYNC_BULK_BYTES = 256 * 1024;
-const CLOUD_SYNC_INDICATOR_DELAY_MS = 320;
+const CLOUD_SYNC_INDICATOR_DELAY_MS = 650;
 const CLOUD_SYNC_PARTS = Object.freeze(["sessions", "learning"]);
 let accountState = {
     configured: null,
