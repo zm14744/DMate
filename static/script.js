@@ -90,11 +90,13 @@ const ACCOUNT_LOGOUT_SIGNAL_KEY = "dmate_account_logout_signal_v1";
 // 故障排查备份只存于当前页面内存，退出/换账号后不可被下一位用户读取。
 let volatileCloudBackup = null;
 // 减少跨设备可见延迟；连续本机写入仍保留短暂防抖，避免每次打字都上传。
-const CLOUD_SYNC_DEBOUNCE_MS = 200;
+const CLOUD_SYNC_DEBOUNCE_MS = 100;
 const CLOUD_SYNC_MAX_WAIT_MS = 1000;
 const CLOUD_SYNC_REQUEST_TIMEOUT_MS = 15000;
 const CLOUD_SYNC_BULK_TIMEOUT_MS = 120000;
 const CLOUD_SYNC_BULK_BYTES = 256 * 1024;
+const CLOUD_SYNC_INDICATOR_DELAY_MS = 320;
+const CLOUD_SYNC_PARTS = Object.freeze(["sessions", "learning"]);
 let accountState = {
     configured: null,
     emailConfigured: null,
@@ -108,6 +110,9 @@ let accountState = {
 };
 let cloudSyncTimer = 0;
 let cloudSyncQueuedAt = null;
+let cloudSyncIndicatorTimer = 0;
+let cloudSyncIndicatorPending = false;
+let cloudSyncIndicatorVisible = false;
 let cloudApplyingSnapshot = false;
 // 跨设备同步仍按账号独立登录；防止上传期间的新编辑被错误标为已同步。
 let cloudLocalChangeVersion = 0;
@@ -1225,6 +1230,12 @@ let learningState = createEmptyLearningState();
 // =========================================================
 // 账号 + 云同步（用户名 / 密码）
 // =========================================================
+function normalizeCloudSyncDirtyParts(value, fallbackAll = false) {
+    if (!Array.isArray(value)) return fallbackAll ? [...CLOUD_SYNC_PARTS] : [];
+    const normalized = [...new Set(value.filter(part => CLOUD_SYNC_PARTS.includes(part)))];
+    return normalized.length || fallbackAll ? (normalized.length ? normalized : [...CLOUD_SYNC_PARTS]) : [];
+}
+
 function readCloudSyncMeta() {
     try {
         const parsed = JSON.parse(localStorage.getItem(CLOUD_SYNC_META_KEY) || "null");
@@ -1256,8 +1267,12 @@ function clearCloudSyncMeta() {
 
 function bumpCloudSyncContext() {
     if (cloudSyncTimer) window.clearTimeout(cloudSyncTimer);
+    if (cloudSyncIndicatorTimer) window.clearTimeout(cloudSyncIndicatorTimer);
     cloudSyncTimer = 0;
     cloudSyncQueuedAt = null;
+    cloudSyncIndicatorTimer = 0;
+    cloudSyncIndicatorPending = false;
+    cloudSyncIndicatorVisible = false;
     cloudAppliedPartHashes = null;
     cloudSyncCapacityRetryAt = 0;
     cloudInitialSyncPending = false;
@@ -1811,7 +1826,12 @@ function preserveActiveCloudSessionIdentities(previousSessions) {
 
 function accountSyncText() {
     if (!accountState.authenticated) return "";
-    if (accountState.syncing) return "同步中…";
+    if (accountState.syncing) {
+        if (cloudSyncIndicatorPending && accountState.status === "同步中…") {
+            return cloudSyncIndicatorVisible ? "同步中…" : "";
+        }
+        return accountState.status || "同步中…";
+    }
     const meta = readCloudSyncMeta();
     if (accountState.status?.includes("容量已满") || accountState.status?.includes("存储空间不足")) {
         return accountState.status;
@@ -1878,7 +1898,8 @@ function renderAccountUi() {
     const emailBindCancel = document.getElementById("accountEmailBindCancel");
 
     entry?.classList.toggle("is-authenticated", accountState.authenticated);
-    entry?.classList.toggle("is-syncing", accountState.syncing);
+    entry?.classList.toggle("is-syncing", accountState.syncing
+        && (!cloudSyncIndicatorPending || cloudSyncIndicatorVisible));
 
     if (label) {
         label.toggleAttribute("data-i18n-content", accountState.authenticated);
@@ -2306,20 +2327,27 @@ async function accountFetch(url, options = {}) {
     }
 }
 
-function scheduleCloudSync() {
+function scheduleCloudSync(parts = CLOUD_SYNC_PARTS) {
     if (cloudApplyingSnapshot) return;
     // 用户做出新的修改后，可以重新尝试之前超限的上传。
     cloudSyncCapacityRetryAt = 0;
 
     if (!accountState.authenticated || !accountState.username) return;
     const meta = readCloudSyncMeta();
-    if (meta.username === accountState.username) {
-        writeCloudSyncMeta({dirty:true});
-    } else {
-        // 首次云端载入失败时，也要把后续新增的对话登记成待同步数据。
-        // 不可因缺少 meta.username 就静默丢掉本端编辑或重试时清空工作区。
-        writeCloudSyncMeta({username:accountState.username,revision:Number(accountState.revision || 0),dirty:true});
-    }
+    const requestedParts = normalizeCloudSyncDirtyParts(parts, true);
+    const previousParts = meta.username === accountState.username && meta.dirty
+        ? normalizeCloudSyncDirtyParts(meta.dirtyParts,
+            !Array.isArray(meta.dirtyParts) || !meta.dirtyParts.length)
+        : [];
+    const dirtyParts = [...new Set([...previousParts, ...requestedParts])];
+    // Only upload sections actually changed. Legacy dirty markers without a
+    // part list conservatively retain the old full-snapshot behavior.
+    writeCloudSyncMeta({
+        username:accountState.username,
+        revision:Number(accountState.revision || 0),
+        dirty:true,
+        dirtyParts
+    });
 
     cloudLocalChangeVersion += 1;
     const now = Date.now();
@@ -3009,10 +3037,24 @@ async function pushCloudSnapshot(_legacyForce = false, initialSyncReady = false)
     // 被另一个标签提前更新，直接采用会绕过服务器的 409 冲突保护。
     let revision = Number(accountState.revision || 0);
     const submittedChangeVersion = cloudLocalChangeVersion;
+    let submittedParts = meta.username === owner && meta.dirty
+        ? normalizeCloudSyncDirtyParts(meta.dirtyParts,
+            !Array.isArray(meta.dirtyParts) || !meta.dirtyParts.length)
+        : [...CLOUD_SYNC_PARTS];
     let snapshotToSend = collectCloudSnapshot();
     let mergedWithRemote = false;
     let successful = false;
     let latestPartHashes = getCloudPartHashMap(meta.sectionHashes);
+    cloudSyncIndicatorPending = true;
+    cloudSyncIndicatorVisible = false;
+    if (cloudSyncIndicatorTimer) window.clearTimeout(cloudSyncIndicatorTimer);
+    cloudSyncIndicatorTimer = window.setTimeout(() => {
+        cloudSyncIndicatorTimer = 0;
+        if (cloudSyncIndicatorPending && accountState.syncing) {
+            cloudSyncIndicatorVisible = true;
+            renderAccountUi();
+        }
+    }, CLOUD_SYNC_INDICATOR_DELAY_MS);
     accountState.syncing = true;
     accountState.status = "同步中…";
     renderAccountUi();
@@ -3023,9 +3065,15 @@ async function pushCloudSnapshot(_legacyForce = false, initialSyncReady = false)
                 return false;
             }
             // 永远不用 force=true；服务端按用户隔离并用版本号防止覆盖其它设备更新。
+            const partialData = {schemaVersion:snapshotToSend.schemaVersion};
+            for (const part of submittedParts) {
+                if (Object.prototype.hasOwnProperty.call(snapshotToSend, part)) {
+                    partialData[part] = snapshotToSend[part];
+                }
+            }
             const {response, data} = await accountFetch("/sync", {
                 method:"PUT", allowConflict:true,
-                body:JSON.stringify({baseRevision:revision, force:false, data:snapshotToSend})
+                body:JSON.stringify({baseRevision:revision, force:false, parts:submittedParts, data:partialData})
             });
             if (!isCloudSyncContextValid(owner, contextVersion)) {
                 return false;
@@ -3033,6 +3081,7 @@ async function pushCloudSnapshot(_legacyForce = false, initialSyncReady = false)
             if (response.status === 409 && data?.conflict) {
                 backupLocalSnapshot("云同步自动合并前");
                 snapshotToSend = mergeCloudSnapshots(snapshotToSend, data.data || {});
+                submittedParts = [...CLOUD_SYNC_PARTS];
                 revision = Number(data.revision || 0);
                 latestPartHashes = getCloudPartHashMap(data.parts);
                 mergedWithRemote = true;
@@ -3065,10 +3114,14 @@ async function pushCloudSnapshot(_legacyForce = false, initialSyncReady = false)
             if (!hadNewEdits) cloudAppliedPartHashes = latestPartHashes;
             const dirty = hadNewEdits;
             accountState.status = dirty ? "等待同步" : "已同步";
+            const pendingParts = dirty
+                ? normalizeCloudSyncDirtyParts(readCloudSyncMeta().dirtyParts, true)
+                : [];
             writeCloudSyncMeta({
                 username:owner,
                 revision:latestRevision,
                 dirty,
+                dirtyParts:pendingParts,
                 sectionHashes:latestPartHashes
             });
             successful = true;
@@ -3084,16 +3137,24 @@ async function pushCloudSnapshot(_legacyForce = false, initialSyncReady = false)
             } else {
                 accountState.status = "离线，稍后自动同步";
             }
-            writeCloudSyncMeta({username:owner, revision, dirty:true, sectionHashes:latestPartHashes});
+            writeCloudSyncMeta({username:owner, revision, dirty:true,
+                dirtyParts:normalizeCloudSyncDirtyParts(readCloudSyncMeta().dirtyParts, true),
+                sectionHashes:latestPartHashes});
         }
         return false;
     } finally {
+        if (cloudSyncIndicatorTimer) window.clearTimeout(cloudSyncIndicatorTimer);
+        cloudSyncIndicatorTimer = 0;
+        cloudSyncIndicatorPending = false;
+        cloudSyncIndicatorVisible = false;
         if (isCloudSyncContextValid(owner, contextVersion)) {
             accountState.syncing = false;
             if (accountState.authenticated && (
                 cloudLocalChangeVersion !== submittedChangeVersion || !successful
             )) {
-                writeCloudSyncMeta({username:owner, dirty:true, sectionHashes:latestPartHashes});
+                writeCloudSyncMeta({username:owner, dirty:true,
+                    dirtyParts:normalizeCloudSyncDirtyParts(readCloudSyncMeta().dirtyParts, true),
+                    sectionHashes:latestPartHashes});
                 if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
                 cloudSyncTimer = window.setTimeout(() => {
                     cloudSyncTimer = 0;
@@ -5087,7 +5148,7 @@ function saveLearningState() {
             renderAccountUi();
         }
     } else if (window.DMateGuestSession) persisted = window.DMateGuestSession.write("learning", learningState);
-    scheduleCloudSync();
+    scheduleCloudSync(["learning"]);
     return persisted;
 }
 
@@ -8676,7 +8737,7 @@ function openWrongQuestionSession(id) {
     }
 
     currentId = session.id;
-    saveState();
+    saveState({sync:false});
     closeWrongBook();
     renderAll();
 }
@@ -8699,7 +8760,7 @@ function openWrongRetestSession(id) {
     }
 
     currentId = session.id;
-    saveState();
+    saveState({sync:false});
     closeWrongBook();
     renderAll();
 }
@@ -10944,7 +11005,7 @@ function semanticContextForRequest(session, targetCandidate, apiMessages, option
     return contexts || context;
 }
 
-function saveState() {
+function saveState({sync = true, parts = CLOUD_SYNC_PARTS} = {}) {
     sessions.forEach(session => ensureSessionMessageIds(session));
     if (shouldPersistClientState()) {
         try {
@@ -10960,7 +11021,7 @@ function saveState() {
             console.warn("本地会话保存失败：", error);
         }
     } else if (window.DMateGuestSession && !window.DMateGuestSession.write("sessions", { sessions, currentId, deletedSessionIds:{...deletedSessionIds} })) reportGuestSaveFailure();
-    scheduleCloudSync();
+    if (sync) scheduleCloudSync(parts);
 }
 
 function loadState({ guest = false } = {}) {
@@ -13877,7 +13938,7 @@ function newChat() {
 
     currentId = id;
 
-    saveState();
+    saveState({parts:["sessions"]});
     renderAll();
     animateMobileConversationSwitch();
 }
@@ -18891,7 +18952,7 @@ function renderSessions() {
             }
             if (typingTimer) forceCompleteTyping();
             currentId = session.id;
-            saveState();
+            saveState({sync:false});
             renderAll();
             animateMobileConversationSwitch();
             if (isMobileAppShell()) closeMobileShellDrawers();
@@ -19031,7 +19092,7 @@ function renderSessions() {
                 currentId = null;
             }
 
-            saveState();
+            saveState({parts:["sessions"]});
             renderAll();
         };
 
@@ -21960,7 +22021,7 @@ function locateKnowledgeGraphQuestion(reference, context) {
     if (!resolved) return;
     if (typingTimer) forceCompleteTyping();
     currentId = resolved.session.id;
-    saveState();
+    saveState({sync:false});
     closeKnowledgeGraph();
     const closedRevision = knowledgeGraphOpenRevision;
     renderAll();
