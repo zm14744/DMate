@@ -2456,7 +2456,7 @@ function dmateHasUnsavedWork() {
         || ocrTasks.size || ocrBatchPreparing || ocrRequestInFlight
         || accountVerificationPending || accountVerificationOperation
         || cloudApplyingSnapshot || cloudInitialSyncPending || cloudInitialSyncInFlight
-        || accountState.syncing || cloudSyncTimer) return true;
+        || accountState.syncing || cloudSyncTimer || cloudPendingDirtyParts.size) return true;
     if (window.dmateVoiceInput && window.dmateVoiceInput.state !== "idle") return true;
     if (accountState.authenticated) {
         const meta = readCloudSyncMeta();
@@ -2472,7 +2472,7 @@ function dmateCanShowClientUpdate() {
         || ocrTasks.size || ocrBatchPreparing || ocrRequestInFlight
         || accountVerificationPending || accountVerificationOperation
         || cloudApplyingSnapshot || cloudInitialSyncPending || cloudInitialSyncInFlight
-        || cloudLivePollInFlight || accountState.syncing || cloudSyncTimer
+        || cloudLivePollInFlight || accountState.syncing || cloudSyncTimer || cloudPendingDirtyParts.size
         || (window.dmateVoiceInput && window.dmateVoiceInput.state !== "idle"));
 }
 
